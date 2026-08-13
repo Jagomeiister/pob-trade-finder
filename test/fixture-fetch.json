@@ -1,0 +1,465 @@
+{
+ "result": [
+  {
+   "id": "6a8fe8cbd51d96bb05f7bf696670b85acf5e20d8e0a6bacaa9cec8083d5ad862",
+   "listing": {
+    "method": "psapi",
+    "indexed": "2026-08-09T16:02:25Z",
+    "stash": {
+     "name": "~price 1 fusing",
+     "x": 4,
+     "y": 1
+    },
+    "price": {
+     "type": "~price",
+     "amount": 1,
+     "currency": "fusing"
+    },
+    "account": {
+     "name": "karyung0813#1966",
+     "online": {
+      "league": "Allflame"
+     },
+     "lastCharacterName": "Kuieeee",
+     "language": "en_US",
+     "realm": "pc"
+    },
+    "whisper": "@Kuieeee Hi, I would like to buy your Beast Brow Dire Pelt listed for 1 fusing in Allflame (stash tab \"~price 1 fusing\"; position: left 5, top 2)"
+   },
+   "item": {
+    "verified": true,
+    "w": 2,
+    "h": 2,
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQXJtb3Vycy9IZWxtZXRzL0hlbG1ldERleDQiLCJ3IjoyLCJoIjoyLCJzY2FsZSI6MX1d/549bc86dd9/HelmetDex4.png",
+    "league": "Allflame",
+    "id": "6a8fe8cbd51d96bb05f7bf696670b85acf5e20d8e0a6bacaa9cec8083d5ad862",
+    "sockets": [
+     {
+      "group": 0,
+      "attr": "G",
+      "sColour": "W"
+     },
+     {
+      "group": 0,
+      "attr": "G",
+      "sColour": "W"
+     },
+     {
+      "group": 0,
+      "attr": "G",
+      "sColour": "W"
+     },
+     {
+      "group": 0,
+      "attr": "G",
+      "sColour": "W"
+     }
+    ],
+    "name": "Beast Brow",
+    "typeLine": "Dire Pelt",
+    "baseType": "Dire Pelt",
+    "rarity": "Rare",
+    "ilvl": 86,
+    "identified": true,
+    "properties": [
+     {
+      "name": "Evasion Rating",
+      "values": [
+       [
+        "492",
+        0
+       ]
+      ],
+      "displayMode": 0,
+      "type": 17
+     }
+    ],
+    "requirements": [
+     {
+      "name": "Level",
+      "values": [
+       [
+        "73",
+        0
+       ]
+      ],
+      "displayMode": 0,
+      "type": 62
+     },
+     {
+      "name": "Dex",
+      "values": [
+       [
+        "170",
+        0
+       ]
+      ],
+      "displayMode": 1,
+      "type": 64
+     }
+    ],
+    "explicitMods": [
+     {
+      "description": "+125 to maximum Life",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_3299347043",
+      "mods": [
+       {
+        "name": "Athlete's",
+        "tier": "P2",
+        "level": 54,
+        "magnitudes": [
+         {
+          "min": "115",
+          "max": "129"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "description": "+45% to Fire Resistance",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_3372524247",
+      "mods": [
+       {
+        "name": "of the Magma",
+        "tier": "S2",
+        "level": 72,
+        "magnitudes": [
+         {
+          "min": "42",
+          "max": "45"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "description": "+35% to Lightning Resistance",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_1671376347",
+      "mods": [
+       {
+        "name": "of the Tempest",
+        "tier": "S4",
+        "level": 49,
+        "magnitudes": [
+         {
+          "min": "30",
+          "max": "35"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "description": "25% increased Stun and Block Recovery",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_2511217560",
+      "mods": [
+       {
+        "name": "of Adamantite Skin",
+        "tier": "S2",
+        "level": 56,
+        "magnitudes": [
+         {
+          "min": "23",
+          "max": "25"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "frameType": 2,
+    "frameTypeId": "Rare",
+    "extended": {
+     "base_defence_percentile": 94,
+     "ev": 590,
+     "ev_aug": true,
+     "hashes": {
+      "explicit": [
+       [
+        "explicit.stat_3299347043",
+        [
+         0
+        ]
+       ],
+       [
+        "explicit.stat_3372524247",
+        [
+         3
+        ]
+       ],
+       [
+        "explicit.stat_1671376347",
+        [
+         2
+        ]
+       ],
+       [
+        "explicit.stat_2511217560",
+        [
+         1
+        ]
+       ]
+      ]
+     },
+     "text": "SXRlbSBDbGFzczogSGVsbWV0cw0KUmFyaXR5OiBSYXJlDQpCZWFzdCBCcm93DQpEaXJlIFBlbHQNCi0tLS0tLS0tDQpFdmFzaW9uIFJhdGluZzogNDkyDQotLS0tLS0tLQ0KUmVxdWlyZW1lbnRzOg0KTGV2ZWw6IDczDQpEZXg6IDE3MA0KLS0tLS0tLS0NClNvY2tldHM6IFctVy1XLVcgDQotLS0tLS0tLQ0KSXRlbSBMZXZlbDogODYNCi0tLS0tLS0tDQorMTI1IHRvIG1heGltdW0gTGlmZQ0KKzQ1JSB0byBGaXJlIFJlc2lzdGFuY2UNCiszNSUgdG8gTGlnaHRuaW5nIFJlc2lzdGFuY2UNCjI1JSBpbmNyZWFzZWQgU3R1biBhbmQgQmxvY2sgUmVjb3ZlcnkNCg=="
+    }
+   }
+  },
+  {
+   "id": "21b6975385644d8ead1115d4c6daca74609faf7195dc2b86904c501d23bfc081",
+   "listing": {
+    "method": "psapi",
+    "indexed": "2026-08-12T07:35:42Z",
+    "stash": {
+     "name": "~price 1 alch 7",
+     "x": 0,
+     "y": 3
+    },
+    "price": {
+     "type": "~price",
+     "amount": 1,
+     "currency": "alch"
+    },
+    "account": {
+     "name": "vanessa#9854",
+     "online": {
+      "league": "Allflame"
+     },
+     "lastCharacterName": "DodoAllflame",
+     "language": "en_US",
+     "realm": "pc"
+    },
+    "whisper": "@DodoAllflame Hi, I would like to buy your Corpse Crown Paladin Crown listed for 1 alch in Allflame (stash tab \"~price 1 alch 7\"; position: left 1, top 4)"
+   },
+   "item": {
+    "verified": true,
+    "w": 2,
+    "h": 2,
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQXJtb3Vycy9IZWxtZXRzL0hlbG1ldFN0ckludDciLCJ3IjoyLCJoIjoyLCJzY2FsZSI6MSwic2VhcmluZyI6dHJ1ZX1d/59571d81d2/HelmetStrInt7.png",
+    "league": "Allflame",
+    "id": "21b6975385644d8ead1115d4c6daca74609faf7195dc2b86904c501d23bfc081",
+    "searing": true,
+    "sockets": [
+     {
+      "group": 0,
+      "attr": "G",
+      "sColour": "W"
+     },
+     {
+      "group": 0,
+      "attr": "G",
+      "sColour": "W"
+     }
+    ],
+    "name": "Corpse Crown",
+    "typeLine": "Paladin Crown",
+    "baseType": "Paladin Crown",
+    "rarity": "Rare",
+    "ilvl": 83,
+    "identified": true,
+    "properties": [
+     {
+      "name": "Armour",
+      "values": [
+       [
+        "319",
+        0
+       ]
+      ],
+      "displayMode": 0,
+      "type": 16
+     },
+     {
+      "name": "Energy Shield",
+      "values": [
+       [
+        "64",
+        0
+       ]
+      ],
+      "displayMode": 0,
+      "type": 18
+     }
+    ],
+    "requirements": [
+     {
+      "name": "Level",
+      "values": [
+       [
+        "78",
+        0
+       ]
+      ],
+      "displayMode": 0,
+      "type": 62
+     },
+     {
+      "name": "Str",
+      "values": [
+       [
+        "116",
+        0
+       ]
+      ],
+      "displayMode": 1,
+      "type": 63
+     },
+     {
+      "name": "Int",
+      "values": [
+       [
+        "116",
+        0
+       ]
+      ],
+      "displayMode": 1,
+      "type": 65
+     }
+    ],
+    "implicitMods": [
+     {
+      "description": "8% increased Cast Speed",
+      "domain": "implicit",
+      "hash": "stat.implicit.stat_2891184298",
+      "mods": [
+       {
+        "level": 75,
+        "magnitudes": [
+         {
+          "min": "8",
+          "max": "8"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "explicitMods": [
+     {
+      "description": "+84 to maximum Life",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_3299347043",
+      "mods": [
+       {
+        "name": "Robust",
+        "tier": "P5",
+        "level": 30,
+        "magnitudes": [
+         {
+          "min": "70",
+          "max": "84"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "description": "+32 to maximum Mana",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_1050105434",
+      "mods": [
+       {
+        "name": "Sapphire",
+        "tier": "P9",
+        "level": 23,
+        "magnitudes": [
+         {
+          "min": "30",
+          "max": "34"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "description": "23% increased Rarity of Items found",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_3917489142",
+      "mods": [
+       {
+        "name": "of Excavation",
+        "tier": "S1",
+        "level": 75,
+        "magnitudes": [
+         {
+          "min": "21",
+          "max": "26"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "description": "+45% to Fire Resistance",
+      "domain": "explicit",
+      "hash": "stat.explicit.stat_3372524247",
+      "mods": [
+       {
+        "name": "of the Magma",
+        "tier": "S2",
+        "level": 72,
+        "magnitudes": [
+         {
+          "min": "42",
+          "max": "45"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "frameType": 2,
+    "frameTypeId": "Rare",
+    "extended": {
+     "base_defence_percentile": 23,
+     "ar": 383,
+     "ar_aug": true,
+     "es": 77,
+     "es_aug": true,
+     "hashes": {
+      "explicit": [
+       [
+        "explicit.stat_3299347043",
+        [
+         0
+        ]
+       ],
+       [
+        "explicit.stat_1050105434",
+        [
+         3
+        ]
+       ],
+       [
+        "explicit.stat_3917489142",
+        [
+         1
+        ]
+       ],
+       [
+        "explicit.stat_3372524247",
+        [
+         2
+        ]
+       ]
+      ],
+      "implicit": [
+       [
+        "implicit.stat_2891184298",
+        [
+         0
+        ]
+       ]
+      ]
+     },
+     "text": "SXRlbSBDbGFzczogSGVsbWV0cw0KUmFyaXR5OiBSYXJlDQpDb3Jwc2UgQ3Jvd24NClBhbGFkaW4gQ3Jvd24NCi0tLS0tLS0tDQpBcm1vdXI6IDMxOQ0KRW5lcmd5IFNoaWVsZDogNjQNCi0tLS0tLS0tDQpSZXF1aXJlbWVudHM6DQpMZXZlbDogNzgNClN0cjogMTE2DQpJbnQ6IDExNg0KLS0tLS0tLS0NClNvY2tldHM6IFctVyANCi0tLS0tLS0tDQpJdGVtIExldmVsOiA4Mw0KLS0tLS0tLS0NCjglIGluY3JlYXNlZCBDYXN0IFNwZWVkDQotLS0tLS0tLQ0KKzg0IHRvIG1heGltdW0gTGlmZQ0KKzMyIHRvIG1heGltdW0gTWFuYQ0KMjMlIGluY3JlYXNlZCBSYXJpdHkgb2YgSXRlbXMgZm91bmQNCis0NSUgdG8gRmlyZSBSZXNpc3RhbmNlDQpTZWFyaW5nIEV4YXJjaCBJdGVtDQo="
+    }
+   }
+  }
+ ]
+}

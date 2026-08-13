@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoB Trade Finder</title>
+<style>
+  :root {
+    --bg: #0c0b09;
+    --panel: #16130f;
+    --panel2: #1d1913;
+    --border: #3a2f1e;
+    --border-hi: #55452a;
+    --gold: #c9a55a;
+    --gold-hi: #e8c87a;
+    --text: #cbc2b3;
+    --dim: #7d7261;
+    --rare: #ffff77;
+    --unique: #af6025;
+    --magic: #8888ff;
+    --normal: #c8c8c8;
+    --accent: #7f4fd0;
+  }
+  * { box-sizing: border-box; }
+  html { scrollbar-color: #3a2f1e var(--bg); }
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #2c2416; border-radius: 6px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+
+  body {
+    margin: 0; padding: 20px 24px 40px;
+    background:
+      radial-gradient(1200px 400px at 50% -100px, #1a150d 0%, var(--bg) 70%);
+    color: var(--text);
+    font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  .container { max-width: 1000px; margin: 0 auto; }
+
+  /* ---- header ---- */
+  .app-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .app-head svg { flex: none; }
+  h1 {
+    color: var(--gold); font-weight: 600; letter-spacing: 1.5px;
+    font-size: 24px; margin: 0;
+  }
+  .subtitle { color: var(--dim); font-size: 13px; margin-top: 2px; }
+
+  /* ---- input panel ---- */
+  #input-panel { transition: opacity .15s; }
+  #input-panel.hidden, .hidden { display: none !important; }
+  textarea {
+    width: 100%; height: 104px; resize: vertical;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; font: 12px/1.4 Consolas, monospace;
+  }
+  textarea::placeholder { color: #55503f; }
+  textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 1px rgba(201,165,90,.25); }
+  .input-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+  #decode-btn {
+    padding: 10px 28px;
+    background: linear-gradient(#8a5fd6, #6a3fb6);
+    color: #fff; border: 1px solid #9a70e0; border-radius: 7px;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  #decode-btn:hover { filter: brightness(1.15); }
+  #decode-btn:active { transform: translateY(1px); }
+  .input-hint { color: var(--dim); font-size: 12px; }
+  #status { margin: 10px 0 0; color: #e08f8f; min-height: 20px; }
+
+  /* ---- loaded-build bar ---- */
+  #build-bar {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    border-radius: 8px; padding: 10px 16px; margin-bottom: 6px;
+  }
+  #build-label { color: var(--gold-hi); font-size: 15px; font-weight: 600; }
+  #build-sub { color: var(--dim); font-size: 12px; }
+  #new-build {
+    margin-left: auto; background: none; color: var(--dim);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer;
+  }
+  #new-build:hover { color: var(--text); border-color: var(--border-hi); }
+
+  /* ---- controls ---- */
+  #controls {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    background: rgba(29,25,19,.97); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; margin: 12px 0 18px;
+    position: sticky; top: 8px; z-index: 5;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  }
+  #controls.hidden { display: none; }
+  #controls label { color: var(--text); white-space: nowrap; font-size: 13px; }
+  select, .min-input {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 5px; padding: 5px 8px;
+  }
+  select:hover, .min-input:hover { border-color: var(--border-hi); }
+  select:focus, .min-input:focus { outline: none; border-color: var(--gold); }
+  input[type=checkbox] { accent-color: var(--gold); }
+  input[type=range] { accent-color: var(--gold); vertical-align: middle; }
+  #pct-label { color: var(--gold); font-weight: 600; display: inline-block; width: 42px; }
+  .ctrl-spacer { flex: 1; }
+
+  .set-picker { margin: 0 0 16px; color: var(--text); }
+  .set-picker select { font-size: 14px; padding: 6px 10px; border-color: var(--gold); }
+
+  .section-head {
+    color: var(--gold); font-size: 15px; margin: 26px 0 10px;
+    border-bottom: 1px solid var(--border); padding-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 2px; font-weight: 600;
+  }
+
+  /* ---- item cards ---- */
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 9px; margin-bottom: 14px; overflow: hidden;
+    transition: border-color .12s;
+  }
+  .card:hover { border-color: var(--border-hi); }
+  .card-head { padding: 10px 14px; background: var(--panel2); border-bottom: 1px solid var(--border); }
+  .slot-tag {
+    color: var(--dim); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1.5px; margin-right: 10px;
+  }
+  .item-name { font-size: 15px; font-weight: 600; }
+  .item-name.rare { color: var(--rare); }
+  .item-name.unique { color: var(--unique); }
+  .item-name.magic { color: var(--magic); }
+  .item-name.normal { color: var(--normal); }
+  .item-base { color: var(--dim); margin-left: 10px; font-size: 13px; }
+  .infl-tag {
+    margin-left: 10px; font-size: 10px; color: #c66;
+    border: 1px solid #5a2c2c; border-radius: 3px; padding: 1px 6px;
+    text-transform: uppercase; letter-spacing: 1px; vertical-align: 1px;
+  }
+
+  .card-body { padding: 8px 14px; }
+  .mod-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 6px; margin: 0 -6px;
+    border-bottom: 1px dotted #241f16; border-radius: 4px;
+  }
+  .mod-row:last-child { border-bottom: none; }
+  .mod-row:hover { background: rgba(201,165,90,.05); }
+  .mod-text { flex: 1; color: var(--magic); }
+  .mod-row.unmatched .mod-text { color: var(--dim); text-decoration: line-through; }
+  .min-input { width: 74px; text-align: right; font-variant-numeric: tabular-nums; }
+  .match-tag {
+    color: var(--dim); font-size: 11px; max-width: 260px; text-align: right;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .match-tag.no-match { color: #a05353; }
+
+  .card-opts {
+    display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+    padding: 10px 14px; background: var(--panel2); border-top: 1px solid var(--border);
+  }
+  .toggle { color: var(--dim); font-size: 12.5px; cursor: pointer; user-select: none; }
+  .toggle:hover { color: var(--text); }
+  .btns { margin-left: auto; display: flex; gap: 8px; }
+  button { font-family: inherit; }
+  .trade-btn {
+    background: linear-gradient(#b3903f, #8a6b25); color: #fff;
+    border: 1px solid #c9a55a; border-radius: 6px; padding: 7px 16px;
+    font-weight: 600; cursor: pointer;
+  }
+  .trade-btn:hover { filter: brightness(1.15); }
+  .trade-btn:active { transform: translateY(1px); }
+  .copy-btn {
+    background: var(--panel); color: #a89a83;
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; cursor: pointer;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--border-hi); }
+  .copy-btn:disabled { opacity: .5; cursor: default; }
+  .unique-note { color: var(--dim); font-style: italic; padding: 6px 0; }
+
+  /* ---- price panel ---- */
+  .price-box {
+    padding: 10px 14px; border-top: 1px solid var(--border);
+    background: #12100c; font-size: 13px;
+  }
+  .price-box.hidden { display: none; }
+  .price-head { color: var(--gold); margin-bottom: 8px; font-weight: 600; }
+  .price-acct { color: var(--dim); font-size: 12px; }
+
+  /* ---- rich listing cards ---- */
+  .listing {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px; margin-bottom: 8px;
+    background: var(--panel); border: 1px solid #241f16; border-radius: 7px;
+  }
+  .listing:hover { border-color: var(--border-hi); }
+  .listing-icon {
+    flex: none; width: 64px; min-height: 64px; display: flex;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, #201a10 0%, #12100c 75%);
+    border: 1px solid #241f16; border-radius: 6px; padding: 4px;
+  }
+  .listing-icon img { max-width: 56px; max-height: 96px; }
+  .listing-main { flex: 1; min-width: 0; }
+  .listing-name { font-weight: 600; font-size: 14.5px; margin-bottom: 2px; font-variant: small-caps; letter-spacing: .3px; }
+  .listing-name.rare { color: var(--rare); }
+  .listing-name.unique { color: var(--unique); }
+  .listing-name.magic { color: var(--magic); }
+  .listing-name.normal { color: var(--normal); }
+  .badge {
+    margin-left: 8px; font-size: 10px; font-weight: 600; color: var(--dim);
+    border: 1px solid var(--border); border-radius: 3px; padding: 0 5px;
+    vertical-align: 1px; letter-spacing: .5px;
+  }
+  .badge.links { color: #7fd07f; border-color: #2c4a2c; }
+  .badge.corrupt { color: #d20000; border-color: #5a1c1c; }
+  .listing-props { color: var(--dim); font-size: 11.5px; margin-bottom: 4px; }
+  .listing-mods { font-size: 12.5px; line-height: 1.55; }
+  .lmod { color: #8888ff; }
+  .lmod.enchant, .lmod.crafted { color: #b4b4ff; }
+  .lmod.implicit { color: #8888ff; }
+  .lmod-src { color: var(--dim); font-size: 10.5px; }
+  .lmod-sep { border-bottom: 1px dotted #2c2416; margin: 3px 0; }
+  .lmod.hl { color: #d8e07a; }
+  .lmod.hl::before { content: '◆ '; color: var(--gold); font-size: 9px; vertical-align: 1px; }
+  .tier {
+    display: inline-block; min-width: 20px; text-align: center;
+    font-size: 9.5px; font-weight: 700; color: #8a795a;
+    border: 1px solid #2c2416; border-radius: 3px; margin-right: 6px; padding: 0 2px;
+    vertical-align: 1px;
+  }
+  .listing-side {
+    flex: none; text-align: right; display: flex; flex-direction: column; gap: 4px;
+    align-items: flex-end; min-width: 120px;
+  }
+  .price-amt { color: #d4af37; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .price-amt.divine { color: #6fd3e0; }
+  .whisper-btn, .hideout-btn { font-size: 11.5px; padding: 4px 10px; }
+  .price-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .price-nav { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+  .price-nav .copy-btn { font-size: 11px; padding: 3px 10px; }
+  .page-label { color: var(--dim); font-size: 12px; }
+  .price-hint { color: #5d543f; font-size: 11px; margin: -2px 0 8px; }
+  .ptype {
+    margin-left: 7px; font-size: 9.5px; font-weight: 600; color: var(--dim);
+    border: 1px solid var(--border); border-radius: 3px; padding: 0 4px;
+    vertical-align: 2px; letter-spacing: .5px;
+  }
+  .fee-tag { color: #e0c060; font-size: 11px; }
+  .price-foot { margin-top: 4px; justify-content: flex-end; }
+  .sort-btn {
+    background: none; border: 1px solid transparent; color: #55503f;
+    border-radius: 4px; padding: 1px 6px; cursor: pointer; font-size: 11px;
+    white-space: nowrap;
+  }
+  .sort-btn:hover { color: var(--text); border-color: var(--border); }
+  .sort-btn.active { color: var(--gold); border-color: var(--gold); }
+  .live-active { color: #ff6b6b !important; border-color: #5a2c2c !important; }
+  .live-box { border-top: 1px solid #3a2020; background: #140f0c; }
+  .live-head { color: #ff8f8f; font-weight: 600; margin-bottom: 6px; }
+  .live-stamp { color: var(--dim); font-size: 10.5px; text-align: center; margin: 6px 0 4px; }
+  .live-new { animation: liveFlash 1.6s ease-out; }
+  @keyframes liveFlash {
+    0% { border-color: #ff6b6b; box-shadow: 0 0 12px rgba(255,107,107,.35); }
+    100% { border-color: #241f16; box-shadow: none; }
+  }
+  /* official trade-site mod colours */
+  .lmod.crafted, .mod-text.crafted { color: #b4b4ff; }   /* crafted: light blue */
+  .lmod.fractured, .mod-text.fractured { color: #a29160; } /* fractured: dirty gold */
+  .lmod.veiled { color: #9a8fb8; font-style: italic; }
+  /* eater / exarch implicit tints (matches in-game colouring) */
+  .lmod.exarch-tint { color: #ff9a76; }
+  .lmod.eater-tint { color: #b09fff; }
+  .badge.exarch { color: #ff9a76; border-color: #6b3a1c; }
+  .badge.eater { color: #b09fff; border-color: #3d2c6b; }
+  .badge.synth { color: #8fd4d4; border-color: #1c4a4a; }
+  .badge.open-affix { color: #7fd07f; border-color: #2c4a2c; }
+  .badge.sold-badge { color: #ff5c5c; border-color: #5a1c1c; }
+  .listing.sold { opacity: .4; filter: grayscale(.75); }
+  .lmod.sortable { cursor: pointer; }
+  .lmod.sortable:hover { text-decoration: underline dotted; filter: brightness(1.25); }
+  .sort-chip {
+    color: var(--gold); font-size: 12px; border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .mod-row { cursor: pointer; }
+  .mod-row.unmatched { cursor: default; }
+  .roll-range { color: #5d5442; font-size: 10.5px; }
+  .base-pct { font-variant: small-caps; letter-spacing: .3px; }
+  .chaos-eq { color: var(--dim); font-size: 10.5px; font-weight: 400; margin-left: 2px; }
+  .card-icon {
+    height: 30px; max-width: 34px; vertical-align: middle; margin-right: 10px;
+    filter: drop-shadow(0 0 3px rgba(0,0,0,.8));
+  }
+  #cost-summary {
+    background: var(--panel); border: 1px solid var(--gold);
+    border-radius: 8px; padding: 12px 16px; margin: 0 0 16px;
+  }
+  #cost-summary.hidden { display: none; }
+  .cost-head { color: var(--gold); font-weight: 600; margin-bottom: 8px; font-variant: small-caps; letter-spacing: .5px; }
+  .cost-row { display: flex; gap: 14px; padding: 2px 0; border-bottom: 1px dotted #241f16; }
+  .cost-row:last-child { border-bottom: none; }
+  .cost-slot { color: var(--dim); min-width: 110px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding-top: 2px; }
+  .cost-item { flex: 1; color: var(--text); }
+  .cost-amt { color: #d4af37; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .cost-total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px; }
+  .cost-total .cost-slot { color: var(--gold); }
+  #saved-builds { max-width: 220px; }
+  #update-banner {
+    display: flex; align-items: center; gap: 14px;
+    background: #1a2416; border: 1px solid #3a5a2c; border-radius: 8px;
+    padding: 10px 16px; margin-bottom: 14px; color: #a8d08f;
+  }
+  #update-banner.hidden { display: none; }
+  .base-pct.roll-hi { color: #7fd07f; }
+  .base-pct.roll-lo { color: #d07f7f; }
+  .roll-range.roll-hi { color: #7fd07f; }
+  .roll-range.roll-lo { color: #d07f7f; }
+
+  .gui-only { display: none; }
+  body.gui .gui-only { display: inline-block; }
+
+  .help { color: var(--dim); font-size: 12px; margin-top: 34px; border-top: 1px solid var(--border); padding-top: 12px; line-height: 1.7; }
+  .help code { background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
+  .footer { color: #4d4638; font-size: 11px; margin-top: 8px; }
+
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    .btns { margin-left: 0; width: 100%; }
+    .match-tag { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="app-head">
+    <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="3" y="3" width="58" height="58" rx="11" fill="#16130f" stroke="#c9a55a" stroke-width="2.5"/>
+      <circle cx="27" cy="27" r="13" fill="none" stroke="#d4af37" stroke-width="4.5"/>
+      <circle cx="27" cy="27" r="4.5" fill="#7f4fd0"/>
+      <line x1="36.5" y1="36.5" x2="49" y2="49" stroke="#d4af37" stroke-width="6" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>PoB Trade Finder</h1>
+      <div class="subtitle">Paste a Path of Building code — get pre-filled trade searches for the exact gear in the build.</div>
+    </div>
+  </header>
+
+  <div id="update-banner" class="hidden">
+    <span id="update-label"></span>
+    <button id="update-btn" class="trade-btn">Install &amp; restart</button>
+  </div>
+
+  <div id="input-panel">
+    <textarea id="pob-input" placeholder="Paste your PoB export code or a pobb.in / pastebin / poe.ninja link…&#10;(PoB → Import/Export Build → Generate → Copy)"></textarea>
+    <div class="input-row">
+      <button id="decode-btn">Decode build</button>
+      <select id="saved-builds"><option value="">Saved builds…</option></select>
+      <button id="delete-build" class="copy-btn" title="Remove the selected saved build">🗑</button>
+      <span class="input-hint">Pasting decodes automatically · Ctrl+Enter also works</span>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div id="build-bar" class="hidden">
+    <div>
+      <div id="build-label"></div>
+      <div id="build-sub"></div>
+    </div>
+    <button id="save-build" class="copy-btn" style="margin-left:auto" title="Keep this build in the library for one-click reload">☆ Save build</button>
+    <button id="new-build" style="margin-left:0">Load another build</button>
+  </div>
+
+  <div id="cost-summary" class="hidden"></div>
+
+  <div id="controls" class="hidden">
+    <label>League:
+      <select id="league"></select>
+    </label>
+    <label>Trade:
+      <select id="trade-status" title="Instant buyout = buy off the site for a gold fee, no whisper needed. In person = whisper the seller and trade manually.">
+        <option value="available">⚡ Instant buyout + in person</option>
+        <option value="securable">⚡ Instant buyout only</option>
+        <option value="online">💬 In person (online)</option>
+        <option value="onlineleague">💬 In person (in league)</option>
+        <option value="any">Any (incl. offline)</option>
+      </select>
+    </label>
+    <label>Sale:
+      <select id="sale-type">
+        <option value="priced">Buyout / fixed price</option>
+        <option value="any">Any</option>
+        <option value="priced_with_info">Price with note</option>
+        <option value="unpriced">No listed price</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="pseudo" checked title="Fold life/res/attribute rolls into pseudo totals — finds more items"> Pseudo totals</label>
+    <label>Min roll: <input type="range" id="pct" min="50" max="100" value="80" step="5"> <span id="pct-label">80%</span></label>
+    <span class="ctrl-spacer"></span>
+    <button id="open-all" class="copy-btn">Open all searches</button>
+    <button id="check-all" class="copy-btn gui-only">Check all prices</button>
+    <button id="refresh-data" class="copy-btn gui-only" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
+  </div>
+
+  <div id="results"></div>
+
+  <div class="help">
+    <b>How it works:</b> each mod on the build's gear is matched to the official trade-site stat database
+    (bundled from GGG's <code>/api/trade/data/stats</code>). Tick the mods that matter, set minimum
+    rolls (defaults to 80% of the build's roll), and hit <i>Search on trade site</i>.
+    <i>"All but one"</i> match mode finds items missing any single mod — usually where upgrades hide.
+    Bench-crafted mods start unticked (you'll re-craft them). Uniques are searched by name.
+    In the desktop app, <i>Check price</i> shows live listings without leaving the tool.
+  </div>
+  <div class="footer">PoB Trade Finder · data © Grinding Gear Games via the public trade API · not affiliated with GGG</div>
+</div>
+<script>
+// Cache-busted loading: WebView2/browsers cache these files between launches,
+// which made updated features invisible until a hard refresh. The version
+// query forces a fresh read on every launch (all local files — no real cost).
+(function () {
+  var v = Date.now();
+  ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
+   'js/pob.js', 'js/matcher.js', 'js/app.js'].forEach(function (src) {
+    document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');
+  });
+})();
+</script>
+</body>
+</html>
