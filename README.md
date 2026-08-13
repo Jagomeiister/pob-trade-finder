@@ -3,6 +3,22 @@
 Paste a Path of Building export code → get pre-filled official trade-site searches for
 every gear slot. No more manually typing mods into pathofexile.com/trade.
 
+## Install (Windows)
+
+Grab the latest zip from [Releases](https://github.com/Jagomeiister/pob-trade-finder/releases),
+extract anywhere, run **`PoB Trade Finder.exe`**. The app checks for updates on launch and
+installs them itself (one click, restarts automatically).
+
+Running from source instead: `pip install pywebview`, then `python gui.py`.
+
+## Releasing a new version (maintainers)
+
+1. Bump `VERSION` in `gui.py`
+2. `python tools/build_release.py` → builds the exe and `dist/PoBTradeFinder-v{V}.zip`
+3. `gh release create v{V} "dist/PoBTradeFinder-v{V}.zip" --title "v{V}" --notes "..."`
+
+Every installed copy picks the release up on next launch.
+
 ## How to use
 
 1. **Run `PoB Trade Finder.bat`** — opens the desktop app (native window, needs

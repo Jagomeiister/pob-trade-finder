@@ -446,7 +446,7 @@ class Api:
                         % (staged, APP_DIR))
                 if exe_path:
                     f.write('start "" "%s"\n' % exe_path)
-                f.write('del "%%~f0"\n')
+                f.write('del "%~f0"\n')
             subprocess.Popen(["cmd", "/c", bat], cwd=APP_DIR,
                              creationflags=0x08000000)  # CREATE_NO_WINDOW
             for w in list(webview.windows):
