@@ -266,6 +266,19 @@
   #results[data-tab="flasks"] .tab-section:not([data-tab="flasks"]),
   #results[data-tab="gems"] .tab-section:not([data-tab="gems"]) { display: none; }
   .listing-props { color: var(--dim); font-size: 11.5px; margin-bottom: 4px; }
+  .sockets-strip { display: flex; align-items: center; margin: 3px 0 5px; }
+  .sock {
+    width: 13px; height: 13px; border-radius: 50%; flex: none;
+    border: 1px solid rgba(0,0,0,.65); box-shadow: inset 0 -2px 3px rgba(0,0,0,.5), 0 0 2px rgba(0,0,0,.6);
+  }
+  .sock-R { background: radial-gradient(circle at 35% 30%, #e05050, #a01515); }
+  .sock-G { background: radial-gradient(circle at 35% 30%, #6cc45f, #2e7d28); }
+  .sock-B { background: radial-gradient(circle at 35% 30%, #6f8fe0, #2c4ba8); }
+  .sock-W { background: radial-gradient(circle at 35% 30%, #ffffff, #b8b4a4); }
+  .sock-A { background: radial-gradient(circle at 35% 30%, #2c4a4a, #101820); border-color: #3fd3c4; }
+  .sock-DV { background: radial-gradient(circle at 35% 30%, #b08a4c, #6b4a1c); }
+  .sock-link { width: 8px; height: 0; flex: none; }
+  .sock-link.linked { height: 3px; background: #b3903f; box-shadow: 0 0 2px rgba(0,0,0,.8); }
   .listing-mods { font-size: 12.5px; line-height: 1.55; }
   .lmod { color: #8888ff; }
   .lmod.enchant, .lmod.crafted { color: #b4b4ff; }

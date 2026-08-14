@@ -51,6 +51,17 @@
           if (!index.exact[ek][secId]) index.exact[ek][secId] = [];
           index.exact[ek][secId].push(entry);
         }
+        // multi-line stats (2000+ in the DB, e.g. flask suffixes): items show the
+        // lines separately, so index every line to the parent stat as well
+        if (entry.text.indexOf('\n') !== -1) {
+          entry.text.split('\n').forEach(function (lineText) {
+            var lk = normalize(lineText);
+            if (!lk || lk === nk) return;
+            if (!index.norm[lk]) index.norm[lk] = {};
+            if (!index.norm[lk][secId]) index.norm[lk][secId] = [];
+            index.norm[lk][secId].push(entry);
+          });
+        }
         index.byId[entry.id] = entry;
       }
     }
@@ -145,6 +156,10 @@
         var aliased = base.replace(/chance to block(?! (attack|spell|projectile))/g, 'chance to block attack damage');
         if (aliased !== base) candidates.push(aliased);
       });
+      // small cluster jewels phrase the socket count in the singular
+      if (norm === '# added passive skill is a jewel socket') {
+        candidates.push('# added passive skills are jewel sockets');
+      }
       for (var c = 0; c < candidates.length && !picked; c++) {
         picked = pickFromSections(index.norm[candidates[c]], order);
       }

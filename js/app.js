@@ -2048,6 +2048,29 @@
     return { p: p, s: s, cap: cap, openP: Math.max(0, cap - p), openS: Math.max(0, cap - s) };
   }
 
+  // trade-style socket display: coloured dots, gold bars for links, gaps between groups
+  function socketStrip(sockets) {
+    if (!sockets || !sockets.length) return null;
+    var wrap = document.createElement('div');
+    wrap.className = 'sockets-strip';
+    var prevGroup = null;
+    var NAMES = { R: 'Red', G: 'Green', B: 'Blue', W: 'White', A: 'Abyssal', DV: 'Resonator' };
+    sockets.forEach(function (s) {
+      if (prevGroup !== null) {
+        var link = document.createElement('span');
+        link.className = 'sock-link' + (s.group === prevGroup ? ' linked' : '');
+        wrap.appendChild(link);
+      }
+      var dot = document.createElement('span');
+      var colour = s.sColour || s.attr || 'W';
+      dot.className = 'sock sock-' + colour;
+      dot.title = NAMES[colour] || colour;
+      wrap.appendChild(dot);
+      prevGroup = s.group;
+    });
+    return wrap;
+  }
+
   function maxLinks(sockets) {
     var counts = {};
     (sockets || []).forEach(function (s) { counts[s.group] = (counts[s.group] || 0) + 1; });
@@ -2101,6 +2124,8 @@
     }
     if (badges) nameEl.innerHTML = esc(nameEl.textContent) + badges;
     main.appendChild(nameEl);
+    var sockStrip = socketStrip(li.sockets);
+    if (sockStrip) main.appendChild(sockStrip);
 
     var props = (li.properties || []).filter(function (p) {
       return PROP_WHITELIST.indexOf(p.name) !== -1 && p.values && p.values.length;

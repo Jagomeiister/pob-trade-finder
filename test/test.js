@@ -280,6 +280,26 @@ async function main() {
   assert(!!gMatch, 'pasted item mods flow through the matcher');
   assert(!PoB.looksLikeGameItem('just some text'), 'plain text not misdetected');
 
+  console.log('== multi-line stats, anoints, cluster singular ==');
+  const mFlask = Matcher.matchMod(index, { line: 'Removes all Burning when used', kind: 'explicit', crafted: false, fractured: false }, 'Flask 2');
+  assert(!!mFlask && mFlask.entry.text.includes('\n'), 'multi-line stat matched via a single line: ' + (mFlask ? JSON.stringify(mFlask.entry.text.slice(0, 40)) : 'NO MATCH'));
+  const mAnoint = Matcher.matchMod(index, { line: 'Allocates Whispers of Doom', kind: 'implicit', crafted: true, fractured: false }, 'Amulet');
+  assert(!!mAnoint && mAnoint.entry.id.indexOf('enchant.') === 0, 'anoint matched to enchant stat: ' + (mAnoint ? mAnoint.entry.id : 'NO MATCH'));
+  const mJsock = Matcher.matchMod(index, { line: '1 Added Passive Skill is a Jewel Socket', kind: 'implicit', crafted: true, fractured: false }, 'Jewel');
+  assert(!!mJsock && /Jewel Sockets/.test(mJsock.entry.text), 'singular jewel-socket line matched: ' + (mJsock ? mJsock.entry.text : 'NO MATCH'));
+
+  console.log('== full real-listing corpus (309 lines) ==');
+  const corpus = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixture-modcorpus.json'), 'utf8'));
+  let corpusMisses = 0;
+  for (const c of corpus) {
+    for (const line of c.line.split('\n')) {
+      const mod = { line, kind: c.kind === 'enchant' ? 'implicit' : (c.kind === 'implicit' ? 'implicit' : 'explicit'),
+                    crafted: c.kind === 'crafted' || c.kind === 'enchant', fractured: c.kind === 'fractured' };
+      if (!Matcher.matchMod(index, mod, c.cat.includes('armour') ? 'Helmet' : 'Ring 1')) corpusMisses++;
+    }
+  }
+  assert(corpusMisses === 0, 'every real listing mod line matches (misses: ' + corpusMisses + ')');
+
   console.log('== pseudo ids exist in DB ==');
   ['pseudo.pseudo_total_life', 'pseudo.pseudo_total_fire_resistance',
    'pseudo.pseudo_total_elemental_resistance', 'pseudo.pseudo_total_all_elemental_resistances',
