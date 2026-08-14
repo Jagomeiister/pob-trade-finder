@@ -270,7 +270,7 @@
 
     set.slots.forEach(function (s) {
       var item = build.items[s.itemId];
-      if (item) root.appendChild(makeCard(s.slot, item));
+      if (item) root.appendChild(makeCard(s.slot, item, setIndex));
     });
 
     if (build.jewels.length) {
@@ -283,7 +283,7 @@
       root.appendChild(sectionHeader('Flasks'));
       set.flasks.forEach(function (f) {
         var item = build.items[f.itemId];
-        if (item) root.appendChild(makeCard(f.slot, item));
+        if (item) root.appendChild(makeCard(f.slot, item, setIndex));
       });
     }
     document.getElementById('controls').classList.remove('hidden');
@@ -317,7 +317,33 @@
     return h;
   }
 
-  function makeCard(slot, item) {
+  // Which gear sets contain this slot, with distinct items? Powers the
+  // per-slot set dropdown (mix sets: endgame helm, budget boots).
+  function setsForSlot(slot) {
+    var out = [];
+    (build.itemSets || []).forEach(function (s, i) {
+      var entry = s.slots.concat(s.flasks).find(function (x) { return x.slot === slot; });
+      if (entry && build.items[entry.itemId]) out.push({ setIndex: i, title: s.title, itemId: entry.itemId });
+    });
+    var distinct = {};
+    out.forEach(function (o) { distinct[o.itemId] = true; });
+    return Object.keys(distinct).length > 1 ? out : [];
+  }
+
+  function swapCardSet(oldState, slot, setIndex) {
+    var entry = setsForSlot(slot).find(function (o) { return o.setIndex === setIndex; });
+    if (!entry) return;
+    stopLive(oldState);
+    var pos = cards.indexOf(oldState);
+    var newCard = makeCard(slot, build.items[entry.itemId], setIndex);
+    var newState = cards.pop(); // makeCard pushed it to the end
+    if (pos !== -1) { cards.splice(pos, 1); cards.splice(pos, 0, newState); }
+    else cards.push(newState);
+    oldState.card.replaceWith(newCard);
+    renderCostSummary();
+  }
+
+  function makeCard(slot, item, setIndex) {
     var card = document.createElement('div');
     card.className = 'card';
     var state = { slot: slot, item: item, rows: [], card: card };
@@ -338,6 +364,24 @@
       (item.base && item.base !== item.name ? '<span class="item-base">' + esc(item.base) + '</span>' : '') +
       (item.influences.length ? '<span class="infl-tag">' + esc(item.influences.join(' + ')) + '</span>' : '') +
       '</div>';
+    // per-slot gear-set dropdown — only when other sets hold a different item here
+    var slotSets = (setIndex !== undefined) ? setsForSlot(slot) : [];
+    if (slotSets.length) {
+      var setSel = document.createElement('select');
+      setSel.className = 'set-mini';
+      slotSets.forEach(function (o) {
+        var opt = document.createElement('option');
+        opt.value = String(o.setIndex);
+        opt.textContent = o.title;
+        setSel.appendChild(opt);
+      });
+      setSel.value = String(setIndex);
+      setSel.title = 'Show this slot from a different gear set';
+      setSel.addEventListener('change', function () {
+        swapCardSet(state, slot, parseInt(this.value, 10));
+      });
+      head.firstChild.appendChild(setSel);
+    }
     card.appendChild(head);
 
     // uniques: swap base art for the real unique art (trade lookup, disk-cached)

@@ -63,8 +63,14 @@ Implicits: 0
 7% increased maximum Life
 +12% to Fire and Cold Resistances
 12% increased Spell Damage</Item>
+    <Item id="8">Rarity: RARE
+Starter Dome
+Iron Hat
+Item Level: 12
+Implicits: 0
++20 to maximum Life</Item>
     <ItemSet useSecondWeaponSet="false" title="Budget" id="1">
-      <Slot name="Helmet" itemId="1"/>
+      <Slot name="Helmet" itemId="8"/>
       <Slot name="Ring 1" itemId="2"/>
     </ItemSet>
     <Item id="6">Rarity: RARE
