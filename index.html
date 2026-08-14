@@ -315,6 +315,49 @@
     padding: 10px 16px; margin-bottom: 14px; color: #a8d08f;
   }
   #update-banner.hidden { display: none; }
+
+  /* character comparison */
+  #char-bar {
+    align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 16px; margin: 0 0 14px;
+  }
+  #char-bar.hidden { display: none !important; }
+  body.gui #char-bar.gui-only-flex:not(.hidden) { display: flex; }
+  body:not(.gui) #char-bar { display: none !important; }
+  .char-label { color: var(--dim); font-size: 13px; }
+  #acct-input {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 5px 10px; width: 190px;
+  }
+  #char-status { color: var(--dim); font-size: 12px; }
+  .char-diff {
+    padding: 6px 14px; font-size: 12.5px; border-bottom: 1px solid var(--border);
+    background: #12100c;
+  }
+  .char-diff b { color: var(--text); }
+  .card.diff-matched { border-left: 3px solid #4a8a3c; }
+  .card.diff-close { border-left: 3px solid #b3903f; }
+  .card.diff-missing { border-left: 3px solid #8a3c3c; }
+  .char-diff .miss { color: #d07f7f; }
+  .char-diff .ok { color: #7fd07f; }
+  body.hide-matched .card.diff-matched { display: none; }
+
+  /* deals + basket + bought */
+  .badge.deal { color: #ffd76b; border-color: #6b5a1c; }
+  .card.bought { opacity: .45; }
+  .card.bought .card-head::after { content: ' ✔ bought'; color: #7fd07f; font-size: 12px; }
+  #basket {
+    background: var(--panel); border: 1px solid var(--border-hi);
+    border-radius: 8px; padding: 12px 16px; margin: 0 0 16px;
+  }
+  #basket.hidden { display: none; }
+  .basket-head { color: var(--gold); font-weight: 600; margin-bottom: 8px; font-variant: small-caps; letter-spacing: .5px; display: flex; gap: 12px; align-items: center; }
+  .basket-row { display: flex; gap: 12px; align-items: center; padding: 3px 0; border-bottom: 1px dotted #241f16; }
+  .basket-row:last-child { border-bottom: none; }
+  .basket-item { flex: 1; color: var(--text); }
+  .basket-price { color: #d4af37; font-weight: 600; min-width: 90px; text-align: right; }
+  .basket-row .copy-btn { font-size: 11px; padding: 3px 8px; }
   .base-pct.roll-hi { color: #7fd07f; }
   .base-pct.roll-lo { color: #d07f7f; }
   .roll-range.roll-hi { color: #7fd07f; }
@@ -374,7 +417,18 @@
     <button id="new-build" style="margin-left:0">Load another build</button>
   </div>
 
+  <div id="char-bar" class="hidden gui-only-flex">
+    <span class="char-label">Compare with your character:</span>
+    <input type="text" id="acct-input" placeholder="Account (Name#1234)">
+    <button id="acct-load" class="copy-btn">Load characters</button>
+    <select id="char-select" class="hidden"></select>
+    <button id="char-compare" class="copy-btn hidden">Compare gear</button>
+    <label class="toggle hidden" id="hide-matched-wrap"><input type="checkbox" id="hide-matched"> Hide matched slots</label>
+    <span id="char-status"></span>
+  </div>
+
   <div id="cost-summary" class="hidden"></div>
+  <div id="basket" class="hidden"></div>
 
   <div id="controls" class="hidden">
     <label>League:

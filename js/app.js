@@ -112,6 +112,66 @@
       ta.focus();
       ta.select();
     });
+    // character import
+    if (saved.account) document.getElementById('acct-input').value = saved.account;
+    document.getElementById('acct-load').addEventListener('click', async function () {
+      var acct = document.getElementById('acct-input').value.trim();
+      var status = document.getElementById('char-status');
+      if (!acct) { status.textContent = 'enter Account#1234'; return; }
+      this.disabled = true;
+      status.textContent = 'loading…';
+      try {
+        var res = await window.pywebview.api.get_characters(acct);
+        if (!res.ok) { status.textContent = '❌ ' + res.error; return; }
+        var sel = document.getElementById('char-select');
+        sel.innerHTML = '';
+        res.characters.forEach(function (c) {
+          var o = document.createElement('option');
+          o.value = c.name;
+          o.textContent = c.name + ' (' + c.league + ' lvl ' + c.level + ' ' + c['class'] + ')';
+          sel.appendChild(o);
+        });
+        sel.classList.remove('hidden');
+        document.getElementById('char-compare').classList.remove('hidden');
+        status.textContent = res.characters.length + ' characters';
+        try {
+          var s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+          s.account = acct;
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+        } catch (e) { /* fine */ }
+      } catch (e) {
+        status.textContent = '❌ ' + e.message;
+      } finally {
+        this.disabled = false;
+      }
+    });
+    document.getElementById('char-compare').addEventListener('click', async function () {
+      var acct = document.getElementById('acct-input').value.trim();
+      var charName = document.getElementById('char-select').value;
+      var status = document.getElementById('char-status');
+      this.disabled = true;
+      status.textContent = 'fetching gear…';
+      try {
+        var res = await window.pywebview.api.get_character_items(acct, charName);
+        if (!res.ok) { status.textContent = '❌ ' + res.error; return; }
+        charGear = {};
+        res.items.forEach(function (it) {
+          var slot = slotForInv(it);
+          if (slot) charGear[slot] = it;
+        });
+        applyCharDiff();
+        document.getElementById('hide-matched-wrap').classList.remove('hidden');
+        status.textContent = '⚖ comparing against ' + charName;
+      } catch (e) {
+        status.textContent = '❌ ' + e.message;
+      } finally {
+        this.disabled = false;
+      }
+    });
+    document.getElementById('hide-matched').addEventListener('change', function () {
+      document.body.classList.toggle('hide-matched', this.checked);
+    });
+
     refreshBuildSelect();
     document.getElementById('save-build').addEventListener('click', function () {
       if (!build) return;
@@ -151,6 +211,7 @@
     document.getElementById('check-all').addEventListener('click', checkAllPrices);
     document.getElementById('refresh-data').addEventListener('click', refreshData);
 
+    renderBasket();
     function markGui() {
       document.body.classList.add('gui');
       checkForUpdates();
@@ -287,7 +348,9 @@
       });
     }
     document.getElementById('controls').classList.remove('hidden');
+    document.getElementById('char-bar').classList.remove('hidden');
     renderCostSummary(); // clears stale summary — fresh cards have no prices yet
+    applyCharDiff();     // re-annotate fresh cards if a character is loaded
   }
 
   // ---- saved builds library --------------------------------------------------
@@ -341,6 +404,7 @@
     else cards.push(newState);
     oldState.card.replaceWith(newCard);
     renderCostSummary();
+    renderCharDiff(newState);
   }
 
   function makeCard(slot, item, setIndex) {
@@ -459,6 +523,20 @@
       state.pctSel = makeMiniSelect(opts, 'Min roll', ['global', '50%', '60%', '70%', '80%', '90%', '100%'], 'global');
       state.pctSel.addEventListener('change', function () { applyPctToCard(state); });
     }
+    // budget cap: chaos-equivalent max price (applies to links, price checks, live)
+    state.maxPriceInput = makeMiniInput(opts, 'Max price', 'c');
+    state.maxPriceInput.title = 'Maximum price in chaos-equivalent — searches, price checks, and live alerts all respect it';
+    // bought tracking: dims the card and drops it from the cost summary
+    var boughtBtn = document.createElement('button');
+    boughtBtn.className = 'copy-btn';
+    boughtBtn.textContent = '✔ Bought';
+    boughtBtn.title = 'Mark this slot as purchased — removed from the build cost total';
+    boughtBtn.addEventListener('click', function () {
+      state.bought = !state.bought;
+      card.classList.toggle('bought', state.bought);
+      renderCostSummary();
+    });
+    opts.appendChild(boughtBtn);
 
     var btnWrap = document.createElement('div');
     btnWrap.className = 'btns';
@@ -689,6 +767,20 @@
     return sel;
   }
 
+  function makeMiniInput(parent, label, placeholder) {
+    var wrap = document.createElement('label');
+    wrap.className = 'toggle';
+    wrap.appendChild(document.createTextNode(label + ' '));
+    var inp = document.createElement('input');
+    inp.type = 'number';
+    inp.className = 'min-input';
+    inp.placeholder = placeholder || '';
+    inp.style.width = '70px';
+    wrap.appendChild(inp);
+    parent.appendChild(wrap);
+    return inp;
+  }
+
   function makeMiniSelect(parent, label, options, value) {
     var wrap = document.createElement('label');
     wrap.className = 'toggle';
@@ -734,8 +826,11 @@
 
     var query = { status: { option: document.getElementById('trade-status').value } };
     var saleType = document.getElementById('sale-type').value;
-    var tradeFilters = (saleType !== 'any')
-      ? { trade_filters: { filters: { sale_type: { option: saleType } } } } : null;
+    var tf = {};
+    if (saleType !== 'any') tf.sale_type = { option: saleType };
+    var maxP = state.maxPriceInput ? parseFloat(state.maxPriceInput.value) : NaN;
+    if (!isNaN(maxP) && maxP > 0) tf.price = { max: maxP }; // chaos-equivalent by default
+    var tradeFilters = Object.keys(tf).length ? { trade_filters: { filters: tf } } : null;
 
     var requireFrac = state.fracToggle && state.fracToggle.checkbox.checked;
     var filters = [];
@@ -886,6 +981,90 @@
     });
   }
 
+  // ---- character import + gear-gap diff ------------------------------------------
+  var charGear = null; // slot name -> equipped item (bridge shape)
+  var INV_SLOT = { Helm: 'Helmet', BodyArmour: 'Body Armour', Gloves: 'Gloves', Boots: 'Boots',
+                   Amulet: 'Amulet', Ring: 'Ring 1', Ring2: 'Ring 2', Belt: 'Belt',
+                   Weapon: 'Weapon 1', Offhand: 'Weapon 2' };
+
+  function slotForInv(it) {
+    if (it.inventoryId === 'Flask') return 'Flask ' + ((it.x || 0) + 1);
+    return INV_SLOT[it.inventoryId] || null;
+  }
+
+  // stat-tail -> value map for an equipped item's mods
+  function equippedStats(equipped, slot) {
+    var tails = {};
+    [['implicitMods', 'implicit'], ['explicitMods', 'explicit'], ['craftedMods', 'crafted'],
+     ['fracturedMods', 'fractured'], ['enchantMods', 'implicit']].forEach(function (pair) {
+      (equipped[pair[0]] || []).forEach(function (line) {
+        if (typeof line !== 'string') return;
+        var m = Matcher.matchMod(statIndex, {
+          line: line, kind: pair[1] === 'implicit' ? 'implicit' : 'explicit',
+          crafted: pair[0] === 'craftedMods', fractured: pair[0] === 'fracturedMods'
+        }, slot);
+        if (m) {
+          var tail = m.entry.id.split('.').pop().split('|')[0];
+          if (!(tail in tails) || (m.avg !== null && m.avg > tails[tail])) tails[tail] = m.avg;
+        }
+      });
+    });
+    return tails;
+  }
+
+  function renderCharDiff(state) {
+    var old = state.card.querySelector('.char-diff');
+    if (old) old.remove();
+    state.card.classList.remove('diff-matched', 'diff-close', 'diff-missing');
+    if (!charGear) return;
+
+    var strip = document.createElement('div');
+    strip.className = 'char-diff';
+    var equipped = charGear[state.slot];
+    var status;
+
+    if (!equipped) {
+      status = 'diff-missing';
+      strip.innerHTML = '<b>You:</b> <span class="miss">nothing equipped in this slot</span>';
+    } else if (state.unique) {
+      var same = equipped.name === state.item.name;
+      status = same ? 'diff-matched' : 'diff-missing';
+      strip.innerHTML = '<b>You:</b> ' + esc((equipped.name || equipped.base)) +
+        (same ? ' <span class="ok">— matches the build</span>'
+              : ' <span class="miss">— build wants ' + esc(state.item.name) + '</span>');
+    } else {
+      var eq = equippedStats(equipped, state.slot);
+      var total = 0, have = 0, lowRolls = 0;
+      var missing = [];
+      state.rows.forEach(function (r) {
+        if (!r.cb.checked || !r.match) return;
+        total++;
+        var tail = r.match.entry.id.split('.').pop().split('|')[0];
+        if (tail in eq) {
+          have++;
+          var min = parseFloat(r.minInput.value);
+          if (!isNaN(min) && min > 0 && eq[tail] !== null && eq[tail] < min) lowRolls++;
+        } else {
+          missing.push(r.mod.line);
+        }
+      });
+      if (!total) { strip.remove(); return; }
+      status = (have === total && !lowRolls) ? 'diff-matched'
+             : (have * 2 >= total) ? 'diff-close' : 'diff-missing';
+      strip.innerHTML = '<b>You:</b> ' + esc(equipped.name || equipped.base) +
+        ' — <span class="' + (have === total ? 'ok' : 'miss') + '">' + have + '/' + total + ' target mods</span>' +
+        (missing.length ? ' · missing: <span class="miss">' + esc(missing.slice(0, 3).join(' · ')) +
+          (missing.length > 3 ? ' +' + (missing.length - 3) : '') + '</span>' : '') +
+        (lowRolls ? ' · <span class="miss">' + lowRolls + ' low roll(s)</span>' : '');
+    }
+    state.card.classList.add(status);
+    state.card.insertBefore(strip, state.card.children[1]);
+  }
+
+  function applyCharDiff() {
+    cards.forEach(renderCharDiff);
+  }
+
   // ---- chaos-equivalent prices + build cost summary ------------------------------
   var RATES = {}; // league -> {currency: chaosRate}
 
@@ -908,6 +1087,7 @@
       } catch (e) { /* rates unavailable — skip annotations */ }
     }
     var cheapest = null;
+    var priced = [];
     state.priceBox.querySelectorAll('.price-amt[data-currency]').forEach(function (el) {
       var cur = el.dataset.currency;
       var amount = parseFloat(el.dataset.amount);
@@ -920,8 +1100,27 @@
         span.textContent = ' ≈ ' + (chaos >= 10 ? Math.round(chaos) : Math.round(chaos * 10) / 10) + 'c';
         el.appendChild(span);
       }
+      priced.push({ el: el, chaos: chaos });
       if (cheapest === null || chaos < cheapest) cheapest = chaos;
     });
+    // sniper badges: flag listings well under the cluster median
+    if (priced.length >= 5) {
+      var sortedVals = priced.map(function (p) { return p.chaos; }).sort(function (a, b) { return a - b; });
+      var median = sortedVals[Math.floor(sortedVals.length / 2)];
+      priced.forEach(function (p) {
+        if (median > 0 && p.chaos < median * 0.6) {
+          var listing = p.el.closest('.listing');
+          var nameEl = listing && listing.querySelector('.listing-name');
+          if (nameEl && !nameEl.querySelector('.badge.deal')) {
+            var b = document.createElement('span');
+            b.className = 'badge deal';
+            b.textContent = '🔥 deal';
+            b.title = 'Priced well under the going rate — verify the mods, could be a snipe (or a scam listing)';
+            nameEl.appendChild(b);
+          }
+        }
+      });
+    }
     if (cheapest !== null) {
       state.cheapestChaos = cheapest;
       renderCostSummary();
@@ -932,7 +1131,7 @@
     var box = document.getElementById('cost-summary');
     if (!box) return;
     var league = document.getElementById('league').value;
-    var rows = cards.filter(function (s) { return s.cheapestChaos !== undefined; });
+    var rows = cards.filter(function (s) { return s.cheapestChaos !== undefined && !s.bought; });
     if (!rows.length) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
     box.innerHTML = '<div class="cost-head">Build cost — cheapest listing per checked slot</div>';
@@ -957,6 +1156,79 @@
 
   function fmtChaos(v) {
     return (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10) + 'c';
+  }
+
+  // ---- shopping basket ------------------------------------------------------------
+  function loadBasket() {
+    try { return JSON.parse(localStorage.getItem('pobtf-basket')) || []; }
+    catch (e) { return []; }
+  }
+  function saveBasket(b) {
+    try { localStorage.setItem('pobtf-basket', JSON.stringify(b.slice(0, 40))); }
+    catch (e) { /* fine */ }
+  }
+  function pinToBasket(li) {
+    var b = loadBasket();
+    b.push({ name: li.name, base: li.base, amount: li.amount, currency: li.currency,
+             account: li.account, whisper: li.whisper, ts: Date.now() });
+    saveBasket(b);
+    renderBasket();
+  }
+  function renderBasket() {
+    var box = document.getElementById('basket');
+    var b = loadBasket();
+    if (!b.length) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.innerHTML = '';
+    var league = document.getElementById('league').value;
+    var head = document.createElement('div');
+    head.className = 'basket-head';
+    var total = 0, totalKnown = true;
+    b.forEach(function (it) {
+      var rate = RATES[league] && RATES[league][it.currency];
+      if (it.amount !== null && it.amount !== undefined && rate !== undefined) total += it.amount * rate;
+      else totalKnown = false;
+    });
+    head.textContent = 'Shopping basket — ' + b.length + ' item(s)' +
+      (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtChaos(total) : '');
+    var clear = document.createElement('button');
+    clear.className = 'copy-btn';
+    clear.textContent = 'Clear';
+    clear.addEventListener('click', function () { saveBasket([]); renderBasket(); });
+    head.appendChild(clear);
+    box.appendChild(head);
+
+    b.forEach(function (it, idx) {
+      var row = document.createElement('div');
+      row.className = 'basket-row';
+      var label = document.createElement('span');
+      label.className = 'basket-item';
+      label.textContent = ((it.name ? it.name + ' ' : '') + it.base) + '  —  ' + it.account;
+      var price = document.createElement('span');
+      price.className = 'basket-price';
+      price.textContent = (it.amount !== null && it.amount !== undefined)
+        ? it.amount + ' ' + it.currency : 'no price';
+      row.appendChild(label);
+      row.appendChild(price);
+      if (it.whisper && isGui()) {
+        var w = document.createElement('button');
+        w.className = 'copy-btn';
+        w.textContent = '⚡ Whisper';
+        w.addEventListener('click', function () { sendPoeChat(w, it.whisper, '⚡ Whisper'); });
+        row.appendChild(w);
+      }
+      var del = document.createElement('button');
+      del.className = 'copy-btn';
+      del.textContent = '✕';
+      del.addEventListener('click', function () {
+        var cur = loadBasket();
+        cur.splice(idx, 1);
+        saveBasket(cur);
+        renderBasket();
+      });
+      row.appendChild(del);
+      box.appendChild(row);
+    });
   }
 
   // ---- sold watcher: periodically re-check open results, grey out listings ------
@@ -1460,6 +1732,16 @@
 
     var side = document.createElement('div');
     side.className = 'listing-side';
+    var pinBtn = document.createElement('button');
+    pinBtn.className = 'copy-btn whisper-btn';
+    pinBtn.textContent = '☆ Pin';
+    pinBtn.title = 'Add to the shopping basket';
+    pinBtn.addEventListener('click', function () {
+      pinToBasket(li);
+      pinBtn.textContent = '★ Pinned';
+      setTimeout(function () { pinBtn.textContent = '☆ Pin'; }, 1200);
+    });
+    side.appendChild(pinBtn);
     var priced = (li.amount !== null && li.amount !== undefined);
     var amt = document.createElement('div');
     amt.className = 'price-amt' + (/divine/i.test(li.currency) ? ' divine' : '');

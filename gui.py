@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -219,6 +219,59 @@ class Api:
                 return {"ok": False, "error": "bad listing ids"}
             fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ",".join(ids), search_id))
             return {"ok": True, "listings": [self._listing_from(r) for r in fetched.get("result", []) if r]}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # -- character import (public profiles; no auth) ------------------------------
+    def _char_get(self, path, params):
+        url = "https://www.pathofexile.com/character-window/%s?%s" % (
+            path, urllib.parse.urlencode(params))
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                body = r.read().decode("utf-8")
+            if body.lstrip().startswith("<"):
+                raise RuntimeError("unexpected response — check the account name (Name#1234)")
+            return json.loads(body)
+        except urllib.error.HTTPError as e:
+            if e.code == 403:
+                raise RuntimeError("profile is private — set 'Hide characters' off on pathofexile.com, or check the name")
+            if e.code == 404:
+                raise RuntimeError("account not found — use the full name, e.g. Name#1234")
+            raise RuntimeError("HTTP %s" % e.code)
+
+    def get_characters(self, account):
+        try:
+            chars = self._char_get("get-characters", {"accountName": account, "realm": "pc"})
+            return {"ok": True, "characters": [
+                {"name": c.get("name"), "league": c.get("league"),
+                 "level": c.get("level"), "class": c.get("class")}
+                for c in chars if isinstance(c, dict)]}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def get_character_items(self, account, character):
+        try:
+            d = self._char_get("get-items", {"accountName": account,
+                                             "character": character, "realm": "pc"})
+            items = []
+            for it in d.get("items", []):
+                items.append({
+                    "inventoryId": it.get("inventoryId"),
+                    "x": it.get("x", 0),
+                    "name": (it.get("name") or "").strip(),
+                    "base": it.get("typeLine", ""),
+                    "frameType": it.get("frameType", 2),
+                    "icon": it.get("icon", ""),
+                    "ilvl": it.get("ilvl", 0),
+                    "corrupted": bool(it.get("corrupted")),
+                    "implicitMods": it.get("implicitMods", []),
+                    "explicitMods": it.get("explicitMods", []),
+                    "craftedMods": it.get("craftedMods", []),
+                    "enchantMods": it.get("enchantMods", []),
+                    "fracturedMods": it.get("fracturedMods", []),
+                })
+            return {"ok": True, "items": items}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

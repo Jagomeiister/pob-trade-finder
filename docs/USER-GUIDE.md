@@ -102,6 +102,27 @@ priced slot in chaos, with a divine conversion — run **Check all prices** to f
 - **⌂ Hideout** — sends `/hideout <seller>` — works **after** the seller parties you
 - **Copy whisper** — for pasting manually
 
+## 6b. Compare with your character
+
+Enter your account name (**Name#1234**) in the bar above the cards, load your characters,
+pick one, and **Compare gear** (public profiles, no login). Every card gains a strip:
+
+> **You:** My Old Dome — 2/4 target mods · missing: +58 to maximum Life · +35% to Cold Resistance
+
+Cards get a coloured edge — green (matched, rolls included), gold (close), red (missing) —
+and **Hide matched slots** collapses what you already own so you only shop the gaps.
+Works with the per-slot gear-set dropdowns, so you can compare against any mix.
+
+## 6c. Budget, deals, basket
+
+- **Max price** (per card, chaos-equivalent) filters searches, price checks, *and* live
+  alerts — no more 50-div listings while shopping on 2 div
+- Listings priced well under the going rate get a **🔥 deal** badge (verify before you
+  buy — sometimes it's a snipe, sometimes it's a scam listing)
+- **☆ Pin** any listing into the **shopping basket** — a persistent panel with every
+  pending purchase, running total, and one-click whispers
+- **✔ Bought** marks a slot as purchased: the card dims and drops out of the build cost total
+
 ## 7. Live search
 
 **🔴 Go live** on any card watches that search (~30s polls). New listings **play a
