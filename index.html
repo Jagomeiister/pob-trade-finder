@@ -217,6 +217,7 @@
   }
   .badge.links { color: #7fd07f; border-color: #2c4a2c; }
   .badge.corrupt { color: #d20000; border-color: #5a1c1c; }
+  .badge.unid { color: #d20000; border-color: #5a1c1c; font-style: italic; }
   .listing-props { color: var(--dim); font-size: 11.5px; margin-bottom: 4px; }
   .listing-mods { font-size: 12.5px; line-height: 1.55; }
   .lmod { color: #8888ff; }
@@ -452,6 +453,12 @@
       </select>
     </label>
     <label><input type="checkbox" id="pseudo" checked title="Fold life/res/attribute rolls into pseudo totals — finds more items"> Pseudo totals</label>
+    <label>≈ in:
+      <select id="eq-currency" title="Show price equivalents and totals in chaos or divine">
+        <option value="chaos">chaos</option>
+        <option value="divine">divine</option>
+      </select>
+    </label>
     <label>Min roll: <input type="range" id="pct" min="50" max="100" value="80" step="5"> <span id="pct-label">80%</span></label>
     <span class="ctrl-spacer"></span>
     <button id="open-all" class="copy-btn">Open all searches</button>

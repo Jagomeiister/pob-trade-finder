@@ -58,6 +58,7 @@
         league: document.getElementById('league').value,
         status: document.getElementById('trade-status').value,
         saleType: document.getElementById('sale-type').value,
+        eqCurrency: document.getElementById('eq-currency').value,
         pseudo: document.getElementById('pseudo').checked,
         pct: document.getElementById('pct').value,
         lastCode: document.getElementById('pob-input').value.slice(0, 200000)
@@ -91,10 +92,15 @@
       document.getElementById('pct-label').textContent = saved.pct + '%';
     }
     if (saved.saleType) document.getElementById('sale-type').value = saved.saleType;
+    if (saved.eqCurrency) document.getElementById('eq-currency').value = saved.eqCurrency;
     if (saved.lastCode) document.getElementById('pob-input').value = saved.lastCode;
 
     ['league', 'trade-status', 'pseudo', 'sale-type'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', saveSettings);
+    });
+    document.getElementById('eq-currency').addEventListener('change', function () {
+      saveSettings();
+      refreshEqDisplays();
     });
 
     document.getElementById('decode-btn').addEventListener('click', onDecode);
@@ -1077,6 +1083,7 @@
       var cur = el.dataset.currency;
       if (!(RATES[league] && RATES[league][cur] !== undefined) && need.indexOf(cur) === -1) need.push(cur);
     });
+    if (eqMode() === 'divine' && !divRate(league) && need.indexOf('divine') === -1) need.push('divine');
     if (need.length) {
       try {
         var res = await window.pywebview.api.exchange_rates(league, JSON.stringify(need));
@@ -1094,10 +1101,10 @@
       var rate = RATES[league] && RATES[league][cur];
       if (rate === undefined || isNaN(amount)) return;
       var chaos = amount * rate;
-      if (cur !== 'chaos' && !el.querySelector('.chaos-eq')) {
+      if (cur !== eqMode() && !el.querySelector('.chaos-eq')) {
         var span = document.createElement('span');
         span.className = 'chaos-eq';
-        span.textContent = ' ≈ ' + (chaos >= 10 ? Math.round(chaos) : Math.round(chaos * 10) / 10) + 'c';
+        span.textContent = ' ≈ ' + fmtEq(chaos, league);
         el.appendChild(span);
       }
       priced.push({ el: el, chaos: chaos });
@@ -1142,20 +1149,47 @@
       row.className = 'cost-row';
       row.innerHTML = '<span class="cost-slot">' + esc(s.slot) + '</span>' +
         '<span class="cost-item">' + esc(s.item.name) + '</span>' +
-        '<span class="cost-amt">' + fmtChaos(s.cheapestChaos) + '</span>';
+        '<span class="cost-amt">' + fmtEq(s.cheapestChaos, league) + '</span>';
       box.appendChild(row);
     });
-    var divRate = RATES[league] && RATES[league]['divine'];
+    var dr = divRate(league);
+    var secondary = eqMode() === 'divine'
+      ? '  (' + fmtChaos(total) + ')'
+      : (dr ? '  (' + (Math.round(total / dr * 10) / 10) + ' div)' : '');
     var totalRow = document.createElement('div');
     totalRow.className = 'cost-row cost-total';
     totalRow.innerHTML = '<span class="cost-slot">TOTAL</span><span class="cost-item">' +
-      rows.length + ' slot(s) priced</span><span class="cost-amt">' + fmtChaos(total) +
-      (divRate ? '  (' + (Math.round(total / divRate * 10) / 10) + ' div)' : '') + '</span>';
+      rows.length + ' slot(s) priced</span><span class="cost-amt">' + fmtEq(total, league) + secondary + '</span>';
     box.appendChild(totalRow);
   }
 
   function fmtChaos(v) {
     return (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10) + 'c';
+  }
+
+  function eqMode() { return document.getElementById('eq-currency').value; }
+  function divRate(league) { return RATES[league] && RATES[league]['divine']; }
+
+  // format a chaos value in the chosen display currency (chaos or divine)
+  function fmtEq(chaosVal, league) {
+    if (eqMode() === 'divine') {
+      var dr = divRate(league);
+      if (dr) {
+        var d = chaosVal / dr;
+        return (d >= 10 ? Math.round(d) : Math.round(d * 100) / 100) + ' div';
+      }
+    }
+    return fmtChaos(chaosVal);
+  }
+
+  function refreshEqDisplays() {
+    cards.forEach(function (state) {
+      if (!state.priceState) return;
+      state.priceBox.querySelectorAll('.chaos-eq').forEach(function (el) { el.remove(); });
+      annotateChaosEq(state);
+    });
+    renderCostSummary();
+    renderBasket();
   }
 
   // ---- shopping basket ------------------------------------------------------------
@@ -1190,7 +1224,7 @@
       else totalKnown = false;
     });
     head.textContent = 'Shopping basket — ' + b.length + ' item(s)' +
-      (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtChaos(total) : '');
+      (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : '');
     var clear = document.createElement('button');
     clear.className = 'copy-btn';
     clear.textContent = 'Clear';
@@ -1652,6 +1686,7 @@
     var badges = '';
     if (links >= 5) badges += '<span class="badge links">' + links + 'L</span>';
     if (li.corrupted) badges += '<span class="badge corrupt">corrupted</span>';
+    if (li.identified === false) badges += '<span class="badge unid">unidentified</span>';
     if (li.searing) badges += '<span class="badge exarch">exarch</span>';
     if (li.tangled) badges += '<span class="badge eater">eater</span>';
     if (li.synthesised) badges += '<span class="badge synth">synthesised</span>';
