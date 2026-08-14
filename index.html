@@ -220,6 +220,28 @@
   .badge.unid { color: #d20000; border-color: #5a1c1c; font-style: italic; }
   .card.pasted { border-color: var(--accent); }
   .gem-row { gap: 8px; }
+  .gem-group-head {
+    margin: 10px -6px 2px; padding: 5px 8px; border-radius: 4px;
+    background: var(--panel2); color: var(--gold); font-size: 12.5px; font-weight: 600;
+  }
+  .gem-group-head:first-child { margin-top: 2px; }
+  .gem-slot {
+    color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; margin-right: 8px;
+    vertical-align: 1px;
+  }
+  .gem-count { color: var(--dim); font-weight: 400; }
+  .gem-panel { margin: 2px 0 8px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .gem-panel.hidden { display: none; }
+  .gem-panel-btns { padding: 8px 12px; background: var(--panel2); justify-content: flex-end; display: flex; gap: 8px; }
+  .gem-expand { padding: 3px 9px; font-size: 12px; }
+  .gem-name.vaal { color: #c03030; }
+  .badge.vaal-badge { color: #c03030; border-color: #5a1c1c; font-variant: small-caps; }
+  .badge.awakened-badge { color: #ff9a3c; border-color: #6b3a1c; font-variant: small-caps; }
+  .badge.exceptional-badge { color: #b4b4ff; border-color: #3d3d6b; font-variant: small-caps; }
+  .badge.transfigured-badge { color: #6fd3e0; border-color: #1c4a5a; font-variant: small-caps; }
+  .gem-icon { width: 22px; height: 22px; object-fit: contain; flex: none; filter: drop-shadow(0 0 2px rgba(0,0,0,.8)); }
+  .listing-name.gem { color: #1ba29b; }
   .gem-name { color: #1ba29b; }
   .gem-in { width: 48px !important; }
   .gem-price { color: #d4af37; font-size: 12px; min-width: 120px; text-align: right; font-variant-numeric: tabular-nums; }

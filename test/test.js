@@ -251,10 +251,13 @@ async function main() {
   assert(mNegBlock && mNegBlock.values[0] === -1, 'negative value preserved: ' + (mNegBlock && mNegBlock.values[0]));
 
   console.log('== gems ==');
-  assert(build.gems.length === 3, 'active-set gems, deduped, enabled only: ' + build.gems.length);
-  const spectre = build.gems.find(g => g.name === 'Raise Spectre');
-  assert(spectre && spectre.count === 2 && spectre.level === 21 && spectre.quality === 23,
-    'Raise Spectre deduped to count 2 at 21/23');
+  assert(build.gemGroups.length === 2, 'two enabled link groups: ' + build.gemGroups.length);
+  assert(build.gemGroups[0].slot === 'Body Armour' && build.gemGroups[1].slot === 'Helmet',
+    'group slots preserved: ' + build.gemGroups.map(g => g.slot).join(', '));
+  assert(build.gemGroups[0].title === 'Raise Spectre setup', 'group titled from main gem: ' + build.gemGroups[0].title);
+  assert(build.gemGroups[0].gems.length === 2 && build.gemGroups[1].gems.length === 2,
+    'gems per group (disabled skipped)');
+  assert(build.gems.length === 4, 'flattened gems keep per-group copies: ' + build.gems.length);
   assert(!build.gems.some(g => g.name === 'Disabled Gem'), 'disabled gems skipped');
   assert(!build.gems.some(g => g.name === 'Summon Raging Spirit'), 'inactive skill set skipped');
 

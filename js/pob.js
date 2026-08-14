@@ -268,24 +268,32 @@
       }
       // old builds have <Skill> directly under <Skills> with no SkillSet wrapper
       var gemScope = found !== null ? found : (firstSet !== null ? firstSet : scope);
-      var seenGems = {};
+      out.gemGroups = [];
       var skillRe = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk;
       while ((sk = skillRe.exec(gemScope))) {
         if (attr(sk[1], 'enabled') === 'false') continue;
-        var skillSlot = attr(sk[1], 'slot') || '';
+        var group = {
+          slot: attr(sk[1], 'slot') || '',
+          label: attr(sk[1], 'label') || '',
+          gems: []
+        };
         var gemRe = /<Gem\b([^>]*)\/?>/g, gm;
         while ((gm = gemRe.exec(sk[2]))) {
           if (attr(gm[1], 'enabled') === 'false') continue;
           var gname = attr(gm[1], 'nameSpec');
           if (!gname) continue;
-          var glevel = parseInt(attr(gm[1], 'level') || '1', 10);
-          var gquality = parseInt(attr(gm[1], 'quality') || '0', 10);
-          var gcount = parseInt(attr(gm[1], 'count') || '1', 10);
-          var key = gname + '|' + glevel + '|' + gquality;
-          if (seenGems[key]) { seenGems[key].count += gcount; continue; }
-          var gem = { name: gname, level: glevel, quality: gquality, count: gcount, slot: skillSlot };
-          seenGems[key] = gem;
-          out.gems.push(gem);
+          group.gems.push({
+            name: gname,
+            level: parseInt(attr(gm[1], 'level') || '1', 10),
+            quality: parseInt(attr(gm[1], 'quality') || '0', 10),
+            count: parseInt(attr(gm[1], 'count') || '1', 10)
+          });
+        }
+        if (group.gems.length) {
+          // group title: user label, else the first (main) gem's name
+          group.title = group.label || (group.gems[0].name + (group.gems.length > 1 ? ' setup' : ''));
+          out.gemGroups.push(group);
+          group.gems.forEach(function (g) { out.gems.push(g); });
         }
       }
     }

@@ -14,7 +14,7 @@ DATA = os.path.join(HERE, "..", "data")
 UA = "Mozilla/5.0 PoB-Trade-Finder/1.0"
 
 SKIP_CLASSES = {
-    "Active Skill Gem", "Support Skill Gem", "Currency", "StackableCurrency",
+    "Currency", "StackableCurrency",
     "Divination Card", "Map Fragment", "Incubator", "Piece", "Sentinel",
     "Memory Line", "Corpse", "Gold", "Relic", "Sanctum Research",
 }

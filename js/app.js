@@ -369,8 +369,8 @@
       var item = build.items[f.itemId];
       if (item) section('flasks').appendChild(makeCard(f.slot, item, setIndex));
     });
-    if (build.gems && build.gems.length) {
-      section('gems').appendChild(makeGemsCard(build.gems));
+    if (build.gemGroups && build.gemGroups.length) {
+      section('gems').appendChild(makeGemsCard(build.gemGroups));
     }
 
     var TAB_LABELS = { gear: 'Gear', jewels: 'Jewels & Clusters', flasks: 'Flasks', gems: 'Gems' };
@@ -443,49 +443,181 @@
            '?q=' + encodeURIComponent(JSON.stringify(payload));
   }
 
-  function makeGemsCard(gems) {
+  function makeGemsCard(gemGroups) {
+    var totalGems = 0;
+    gemGroups.forEach(function (g) { totalGems += g.gems.length; });
     var card = document.createElement('div');
     card.className = 'card';
     var head = document.createElement('div');
     head.className = 'card-head';
     head.innerHTML = '<div><span class="slot-tag">Skill Gems</span>' +
-      '<span class="item-name normal">' + gems.length + ' gems in the build</span></div>';
+      '<span class="item-name normal">' + gemGroups.length + ' link groups · ' + totalGems + ' gems</span></div>';
     card.appendChild(head);
 
     var body = document.createElement('div');
     body.className = 'card-body';
     var rows = [];
-    gems.forEach(function (gem) {
-      var row = document.createElement('div');
-      row.className = 'mod-row gem-row';
-      var label = document.createElement('span');
-      label.className = 'mod-text gem-name';
-      label.textContent = gem.name + (gem.count > 1 ? ' ×' + gem.count : '');
-      row.appendChild(label);
+    gemGroups.forEach(function (group) {
+      // group header, PoB-style: socketed slot + setup name
+      var gh = document.createElement('div');
+      gh.className = 'gem-group-head';
+      gh.innerHTML = (group.slot ? '<span class="gem-slot">' + esc(group.slot) + '</span>' : '') +
+        esc(group.title) + '<span class="gem-count"> · ' + group.gems.length + ' gems</span>';
+      body.appendChild(gh);
 
-      var lvlIn = document.createElement('input');
-      lvlIn.type = 'number'; lvlIn.className = 'min-input gem-in';
-      lvlIn.value = gem.level; lvlIn.title = 'Minimum gem level';
-      var qIn = document.createElement('input');
-      qIn.type = 'number'; qIn.className = 'min-input gem-in';
-      qIn.value = gem.quality; qIn.title = 'Minimum quality';
-      row.appendChild(lvlIn);
-      row.appendChild(document.createTextNode('/'));
-      row.appendChild(qIn);
+      group.gems.forEach(function (gem) {
+        var row = document.createElement('div');
+        row.className = 'mod-row gem-row';
+        var isVaal = /^Vaal /.test(gem.name);
+        var isAwakened = /^Awakened /.test(gem.name);
+        var isExceptional = /^(Empower|Enlighten|Enhance) Support$/.test(gem.name);
+        // transfigured: "Skill of Variant" — excluding naturally "of"-named skills
+        var NATURAL_OF = /^(Herald of|Purity of|Wave of Conviction|Orb of Storms|Sigil of Power|Eye of Winter|Tornado of|Fist of War)/;
+        var isTransfigured = / of /.test(gem.name) && !isVaal && !NATURAL_OF.test(gem.name) &&
+                             !/Support$/.test(gem.name) && gem.name.split(' of ')[1] &&
+                             gem.name.split(' ').length >= 3;
+        var corruptOnly = gem.level >= 21 || gem.quality >= 23 || isVaal;
+        var gemIconPath = window.POE_BASE_ICONS &&
+          (window.POE_BASE_ICONS[gem.name] || window.POE_BASE_ICONS[gem.name.split(' of ')[0]]);
+        if (gemIconPath) {
+          var gIcon = document.createElement('img');
+          gIcon.className = 'gem-icon';
+          gIcon.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
+          gIcon.loading = 'lazy';
+          gIcon.alt = '';
+          row.appendChild(gIcon);
+        }
+        var label = document.createElement('span');
+        label.className = 'mod-text gem-name' + (isVaal ? ' vaal' : '');
+        label.textContent = gem.name + (gem.count > 1 ? ' ×' + gem.count : '');
+        if (isVaal) {
+          var vb = document.createElement('span');
+          vb.className = 'badge vaal-badge';
+          vb.textContent = 'vaal';
+          label.appendChild(vb);
+        }
+        if (isAwakened) {
+          var ab = document.createElement('span');
+          ab.className = 'badge awakened-badge';
+          ab.textContent = 'awakened';
+          ab.title = 'Awakened support — expensive, drops from Maven content';
+          label.appendChild(ab);
+        }
+        if (isExceptional) {
+          var eb = document.createElement('span');
+          eb.className = 'badge exceptional-badge';
+          eb.textContent = 'exceptional';
+          eb.title = 'Empower/Enlighten/Enhance — level matters far more than quality';
+          label.appendChild(eb);
+        }
+        if (isTransfigured) {
+          var tb = document.createElement('span');
+          tb.className = 'badge transfigured-badge';
+          tb.textContent = 'transfigured';
+          tb.title = 'Transfigured version — obtained from the Lab font, tradeable by exact name';
+          label.appendChild(tb);
+        }
+        if (corruptOnly) {
+          var cb2 = document.createElement('span');
+          cb2.className = 'badge corrupt';
+          cb2.textContent = 'corrupted';
+          cb2.title = isVaal ? 'Vaal gems are always corrupted'
+                             : 'Only corrupted gems reach this level/quality (21/23+)';
+          label.appendChild(cb2);
+        }
+        row.appendChild(label);
 
-      var priceSpan = document.createElement('span');
-      priceSpan.className = 'gem-price';
-      var openBtn = document.createElement('button');
-      openBtn.className = 'copy-btn';
-      openBtn.textContent = '↗';
-      openBtn.title = 'Open this gem search on the trade site';
-      openBtn.addEventListener('click', function () {
-        openUrl(gemUrl(gemPayload(gem, parseInt(lvlIn.value, 10) || 1, parseInt(qIn.value, 10) || 0)));
+        var lvlIn = document.createElement('input');
+        lvlIn.type = 'number'; lvlIn.className = 'min-input gem-in';
+        lvlIn.value = gem.level; lvlIn.title = 'Minimum gem level';
+        var qIn = document.createElement('input');
+        qIn.type = 'number'; qIn.className = 'min-input gem-in';
+        qIn.value = gem.quality; qIn.title = 'Minimum quality';
+        row.appendChild(lvlIn);
+        row.appendChild(document.createTextNode('/'));
+        row.appendChild(qIn);
+
+        var priceSpan = document.createElement('span');
+        priceSpan.className = 'gem-price';
+        var openBtn = document.createElement('button');
+        openBtn.className = 'copy-btn';
+        openBtn.textContent = '↗';
+        openBtn.title = 'Open this gem search on the trade site';
+        openBtn.addEventListener('click', function () {
+          openUrl(gemUrl(gemPayload(gem, parseInt(lvlIn.value, 10) || 1, parseInt(qIn.value, 10) || 0)));
+        });
+        row.appendChild(priceSpan);
+        row.appendChild(openBtn);
+
+        // expandable panel: full listings / live search / basket, like gear cards
+        var panel = document.createElement('div');
+        panel.className = 'gem-panel hidden';
+        var gemState = null;
+        function ensureGemPanel() {
+          if (gemState) return gemState;
+          gemState = {
+            gemSpec: { gem: gem, lvlIn: lvlIn, qIn: qIn },
+            slot: group.slot ? group.slot + ' gem' : 'Gem',
+            item: { name: gem.name },
+            rows: [], unique: false, card: null
+          };
+          cards.push(gemState); // joins price summary + sold watcher
+
+          var btns = document.createElement('div');
+          btns.className = 'btns gem-panel-btns';
+          var pBtn = document.createElement('button');
+          pBtn.className = 'copy-btn gui-only';
+          pBtn.textContent = 'Check price';
+          pBtn.addEventListener('click', function () { checkPrice(gemState); });
+          gemState.priceBtn = pBtn;
+          var lBtn = document.createElement('button');
+          lBtn.className = 'copy-btn gui-only';
+          lBtn.textContent = '🔴 Go live';
+          lBtn.addEventListener('click', function () { toggleLive(gemState); });
+          gemState.liveBtn = lBtn;
+          var oBtn = document.createElement('button');
+          oBtn.className = 'trade-btn';
+          oBtn.textContent = 'Search on trade site ↗';
+          oBtn.addEventListener('click', function () {
+            var url = buildTradeUrl(gemState);
+            if (url) openUrl(url);
+          });
+          btns.appendChild(pBtn); btns.appendChild(lBtn); btns.appendChild(oBtn);
+          panel.appendChild(btns);
+
+          var lBox = document.createElement('div');
+          lBox.className = 'price-box live-box hidden';
+          panel.appendChild(lBox);
+          gemState.liveBox = lBox;
+          var prBox = document.createElement('div');
+          prBox.className = 'price-box hidden';
+          panel.appendChild(prBox);
+          gemState.priceBox = prBox;
+          return gemState;
+        }
+        var expandBtn = document.createElement('button');
+        expandBtn.className = 'copy-btn gem-expand';
+        expandBtn.textContent = '▾';
+        expandBtn.title = 'Expand: full listings, live search, pinning — like a gear card';
+        function togglePanel() {
+          if (panel.classList.contains('hidden')) {
+            ensureGemPanel();
+            panel.classList.remove('hidden');
+            expandBtn.textContent = '▴';
+          } else {
+            panel.classList.add('hidden');
+            expandBtn.textContent = '▾';
+          }
+        }
+        expandBtn.addEventListener('click', togglePanel);
+        label.style.cursor = 'pointer';
+        label.addEventListener('click', togglePanel);
+        row.appendChild(expandBtn);
+
+        body.appendChild(row);
+        body.appendChild(panel);
+        rows.push({ gem: gem, lvlIn: lvlIn, qIn: qIn, priceSpan: priceSpan });
       });
-      row.appendChild(priceSpan);
-      row.appendChild(openBtn);
-      body.appendChild(row);
-      rows.push({ gem: gem, lvlIn: lvlIn, qIn: qIn, priceSpan: priceSpan });
     });
     card.appendChild(body);
 
@@ -1033,6 +1165,12 @@
 
   // ---- query building ---------------------------------------------------------
   function buildTradePayload(state, quiet) {
+    // gem states search by gem name + level/quality, not by mods
+    if (state.gemSpec) {
+      return gemPayload(state.gemSpec.gem,
+        parseInt(state.gemSpec.lvlIn.value, 10) || 1,
+        parseInt(state.gemSpec.qIn.value, 10) || 0);
+    }
     var pseudoOn = document.getElementById('pseudo').checked;
 
     var query = { status: { option: document.getElementById('trade-status').value } };
@@ -1224,6 +1362,7 @@
   }
 
   function renderCharDiff(state) {
+    if (!state.card) return; // gem panels have no card element
     var old = state.card.querySelector('.char-diff');
     if (old) old.remove();
     state.card.classList.remove('diff-matched', 'diff-close', 'diff-missing');
@@ -1794,7 +1933,7 @@
     return tails;
   }
 
-  var FRAME_CLASS = { 0: 'normal', 1: 'magic', 2: 'rare', 3: 'unique' };
+  var FRAME_CLASS = { 0: 'normal', 1: 'magic', 2: 'rare', 3: 'unique', 4: 'gem' };
   var PROP_WHITELIST = ['Quality', 'Armour', 'Evasion Rating', 'Energy Shield', 'Ward',
                         'Physical Damage', 'Elemental Damage', 'Critical Strike Chance',
                         'Attacks per Second'];
