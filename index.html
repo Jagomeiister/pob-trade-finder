@@ -241,6 +241,15 @@
   .badge.exceptional-badge { color: #b4b4ff; border-color: #3d3d6b; font-variant: small-caps; }
   .badge.transfigured-badge { color: #6fd3e0; border-color: #1c4a5a; font-variant: small-caps; }
   .gem-icon { width: 22px; height: 22px; object-fit: contain; flex: none; filter: drop-shadow(0 0 2px rgba(0,0,0,.8)); }
+  .gem-panel-head {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 14px; background: radial-gradient(circle at 12% 50%, #1c2420 0%, var(--panel2) 70%);
+    border-bottom: 1px solid var(--border);
+  }
+  .gem-big-icon { width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(27,162,155,.35)); }
+  .gem-panel-name { color: #1ba29b; font-size: 16px; font-weight: 600; font-variant: small-caps; letter-spacing: .4px; }
+  .gem-panel-name.vaal { color: #c03030; }
+  .gem-panel-sub { color: var(--dim); font-size: 12px; }
   .listing-name.gem { color: #1ba29b; }
   .gem-name { color: #1ba29b; }
   .gem-in { width: 48px !important; }

@@ -563,6 +563,38 @@
           };
           cards.push(gemState); // joins price summary + sold watcher
 
+          // trade-style header: big gem art + name + current minimums
+          var ph = document.createElement('div');
+          ph.className = 'gem-panel-head';
+          if (gemIconPath) {
+            var big = document.createElement('img');
+            big.className = 'gem-big-icon';
+            big.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
+            big.alt = '';
+            ph.appendChild(big);
+          }
+          var pht = document.createElement('div');
+          var sub = document.createElement('div');
+          sub.className = 'gem-panel-sub';
+          function updateSub() {
+            sub.textContent = 'min level ' + (parseInt(lvlIn.value, 10) || 1) +
+              ' · min quality ' + (parseInt(qIn.value, 10) || 0) +
+              (corruptOnly ? ' · corrupted' : '');
+          }
+          updateSub();
+          pht.innerHTML = '<div class="gem-panel-name' + (isVaal ? ' vaal' : '') + '">' + esc(gem.name) + '</div>';
+          pht.appendChild(sub);
+          ph.appendChild(pht);
+          panel.appendChild(ph);
+
+          // loosening level/quality re-runs an open price check automatically
+          [lvlIn, qIn].forEach(function (inp) {
+            inp.addEventListener('change', function () {
+              updateSub();
+              if (isGui() && gemState.priceState) checkPrice(gemState, true);
+            });
+          });
+
           var btns = document.createElement('div');
           btns.className = 'btns gem-panel-btns';
           var pBtn = document.createElement('button');
@@ -1893,6 +1925,12 @@
       hint.className = 'price-hint';
       hint.textContent = '⚡ instant: ⌂ Go to hideout opens the search on the site — travel + buy there (gold fee, seller can be offline). 💬 in-person: whisper first, /hideout once they party you. Click any mod on a listing to sort by it.';
       box.appendChild(hint);
+    }
+    if (state.gemSpec && ps.total < 5) {
+      var scarce = document.createElement('div');
+      scarce.className = 'price-hint';
+      scarce.textContent = '⚠ only ' + ps.total + ' listed at these minimums — lower the gem level or quality to see more (it re-searches automatically).';
+      box.appendChild(scarce);
     }
 
     var listings = ps.cache[ps.page] || [];
