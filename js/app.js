@@ -587,6 +587,19 @@
           ph.appendChild(pht);
           panel.appendChild(ph);
 
+          // swap the RePoE atlas art for the trade site's single-frame render
+          if (isGui() && window.pywebview.api.gem_icon) {
+            window.pywebview.api.gem_icon(gem.name).then(function (res) {
+              if (res && res.ok && res.icon) {
+                GEM_ICONS[gem.name] = res.icon;
+                var bigEl = ph.querySelector('.gem-big-icon');
+                if (bigEl) bigEl.src = res.icon;
+                var rowIcon = row.querySelector('.gem-icon');
+                if (rowIcon) rowIcon.src = res.icon;
+              }
+            }).catch(function () { /* keep placeholder */ });
+          }
+
           // loosening level/quality re-runs an open price check automatically
           [lvlIn, qIn].forEach(function (inp) {
             inp.addEventListener('change', function () {
@@ -1972,6 +1985,7 @@
   }
 
   var FRAME_CLASS = { 0: 'normal', 1: 'magic', 2: 'rare', 3: 'unique', 4: 'gem' };
+  var GEM_ICONS = {}; // gem name -> single-frame trade art (bridge-cached)
   var PROP_WHITELIST = ['Quality', 'Armour', 'Evasion Rating', 'Energy Shield', 'Ward',
                         'Physical Damage', 'Elemental Damage', 'Critical Strike Chance',
                         'Attacks per Second'];
@@ -2047,11 +2061,14 @@
     card.className = 'listing';
     if (li.id) card.dataset.lid = li.id;
 
-    if (li.icon) {
+    // gem listings occasionally arrive without art — borrow the cached gem icon
+    var iconUrl = li.icon ||
+      (state && state.gemSpec && GEM_ICONS[state.gemSpec.gem.name]) || '';
+    if (iconUrl) {
       var iconWrap = document.createElement('div');
       iconWrap.className = 'listing-icon';
       var img = document.createElement('img');
-      img.src = li.icon;
+      img.src = iconUrl;
       img.loading = 'lazy';
       img.alt = '';
       iconWrap.appendChild(img);

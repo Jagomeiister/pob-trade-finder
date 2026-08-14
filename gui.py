@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -309,6 +309,34 @@ class Api:
                     f.write("%s unique_icon(%r): %s\n" % (time.strftime("%H:%M:%S"), name, e))
             except Exception:
                 pass
+            return {"ok": False, "error": str(e)}
+
+    def gem_icon(self, name):
+        """Proper single-frame gem art via one trade lookup (RePoE gem art is
+        often a multi-frame atlas). Cached forever alongside unique icons."""
+        try:
+            key = "gem::" + name
+            cached = self._unique_icons.get(key)
+            if cached:
+                return {"ok": True, "icon": cached}
+            search = self._http(TRADE_BASE + "/search/Standard",
+                                {"query": {"status": {"option": "any"}, "type": name}})
+            ids = search.get("result", [])[:1]
+            if not ids:
+                return {"ok": False, "error": "no listings"}
+            fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ids[0], search["id"]))
+            for r in fetched.get("result", []):
+                icon = (r or {}).get("item", {}).get("icon", "")
+                if icon:
+                    self._unique_icons[key] = icon
+                    try:
+                        with open(self._unique_icons_path, "w", encoding="utf-8") as f:
+                            json.dump(self._unique_icons, f)
+                    except Exception:
+                        pass
+                    return {"ok": True, "icon": icon}
+            return {"ok": False, "error": "no icon"}
+        except Exception as e:
             return {"ok": False, "error": str(e)}
 
     # -- currency -> chaos rates via GGG's own bulk exchange ---------------------
