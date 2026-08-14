@@ -101,6 +101,24 @@ Adds 4 to 7 Physical Damage to Attacks</Item>
   <Tree activeSpec="1">
     <Spec><Sockets><Socket nodeId="123" itemId="5"/><Socket nodeId="456" itemId="6"/></Sockets></Spec>
   </Tree>
+  <Skills sortGemsByDPS="true" activeSkillSet="1">
+    <SkillSet id="1" title="Main">
+      <Skill enabled="true" slot="Body Armour" mainActiveSkill="1">
+        <Gem enabled="true" nameSpec="Raise Spectre" level="21" quality="23" count="1"/>
+        <Gem enabled="true" nameSpec="Minion Damage Support" level="20" quality="20" count="1"/>
+        <Gem enabled="false" nameSpec="Disabled Gem" level="1" quality="0" count="1"/>
+      </Skill>
+      <Skill enabled="true" slot="Helmet">
+        <Gem enabled="true" nameSpec="Raise Spectre" level="21" quality="23" count="1"/>
+        <Gem enabled="true" nameSpec="Empower Support" level="4" quality="0" count="1"/>
+      </Skill>
+    </SkillSet>
+    <SkillSet id="2" title="Leveling">
+      <Skill enabled="true" slot="Body Armour">
+        <Gem enabled="true" nameSpec="Summon Raging Spirit" level="1" quality="0" count="1"/>
+      </Skill>
+    </SkillSet>
+  </Skills>
 </PathOfBuilding>`;
 
 function toPobCode(xml) {
@@ -231,6 +249,33 @@ async function main() {
   const mNegBlock = Matcher.matchMod(index, { line: '-1% Chance to Block Attack Damage for every 200 Fire Damage taken from Hits Recently', kind: 'explicit', crafted: false, fractured: false }, 'Body Armour');
   assert(!!mNegBlock, 'negative roll of +# template matches: ' + (mNegBlock ? mNegBlock.entry.text : 'NO MATCH'));
   assert(mNegBlock && mNegBlock.values[0] === -1, 'negative value preserved: ' + (mNegBlock && mNegBlock.values[0]));
+
+  console.log('== gems ==');
+  assert(build.gems.length === 3, 'active-set gems, deduped, enabled only: ' + build.gems.length);
+  const spectre = build.gems.find(g => g.name === 'Raise Spectre');
+  assert(spectre && spectre.count === 2 && spectre.level === 21 && spectre.quality === 23,
+    'Raise Spectre deduped to count 2 at 21/23');
+  assert(!build.gems.some(g => g.name === 'Disabled Gem'), 'disabled gems skipped');
+  assert(!build.gems.some(g => g.name === 'Summon Raging Spirit'), 'inactive skill set skipped');
+
+  console.log('== game clipboard item ==');
+  const gameText = ['Item Class: Rings', 'Rarity: Rare', 'Corpse Bite', 'Steel Ring', '--------',
+    'Requirements:', 'Level: 64', '--------', 'Item Level: 84', '--------',
+    'Adds 8 to 13 Physical Damage to Attacks (implicit)', '--------',
+    '+68 to maximum Life', '+45 to Intelligence (crafted)', '+38% to Lightning Resistance (fractured)',
+    '--------', 'Corrupted'].join('\n');
+  assert(PoB.looksLikeGameItem(gameText), 'game format detected');
+  const gi = PoB.parseGameItem(gameText);
+  assert(gi.name === 'Corpse Bite' && gi.base === 'Steel Ring', 'game item name/base');
+  assert(gi.slotGuess === 'Ring 1', 'slot guessed from Item Class');
+  assert(gi.itemLevel === 84 && gi.corrupted === true, 'ilvl + corrupted parsed');
+  assert(gi.mods.length === 4, 'game item mods: ' + gi.mods.length);
+  assert(gi.mods[0].kind === 'implicit', 'implicit suffix parsed');
+  assert(gi.mods[1].line === '+68 to maximum Life', 'clean explicit line');
+  assert(gi.mods[2].crafted === true && gi.mods[3].fractured === true, 'crafted/fractured suffixes');
+  const gMatch = Matcher.matchMod(index, gi.mods[1], 'Ring 1');
+  assert(!!gMatch, 'pasted item mods flow through the matcher');
+  assert(!PoB.looksLikeGameItem('just some text'), 'plain text not misdetected');
 
   console.log('== pseudo ids exist in DB ==');
   ['pseudo.pseudo_total_life', 'pseudo.pseudo_total_fire_resistance',

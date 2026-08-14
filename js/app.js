@@ -254,6 +254,15 @@
     if (!input) { status.textContent = 'Paste a PoB export code first.'; return; }
     status.textContent = 'Decoding…';
 
+    // in-game Ctrl+C item text -> standalone price-check card
+    if (window.PoB.looksLikeGameItem && PoB.looksLikeGameItem(input)) {
+      var pasted = PoB.parseGameItem(input);
+      if (pasted) {
+        status.textContent = '';
+        renderPastedItem(pasted);
+        return;
+      }
+    }
     try {
       var code = input;
       var linkMatch = input.match(/(?:pobb\.in|pastebin\.com\/raw|pastebin\.com)\/([A-Za-z0-9_-]+)/);
@@ -312,6 +321,7 @@
     root.innerHTML = '';
     cards.forEach(stopLive); // kill any live-search timers before replacing cards
     cards = [];
+    pastedState = null;
 
     var sets = build.itemSets || [];
     if (setIndex === undefined) setIndex = build.activeSetIndex || 0;
@@ -335,24 +345,55 @@
       root.appendChild(pickWrap);
     }
 
+    // tabbed sections: gear / jewels & clusters / flasks / gems
+    var sections = {};
+    function section(key) {
+      if (!sections[key]) {
+        sections[key] = document.createElement('div');
+        sections[key].className = 'tab-section';
+        sections[key].dataset.tab = key;
+      }
+      return sections[key];
+    }
+
     set.slots.forEach(function (s) {
       var item = build.items[s.itemId];
-      if (item) root.appendChild(makeCard(s.slot, item, setIndex));
+      if (!item) return;
+      var target = /Abyssal/i.test(s.slot) ? section('jewels') : section('gear');
+      target.appendChild(makeCard(s.slot, item, setIndex));
     });
+    build.jewels.forEach(function (id) {
+      section('jewels').appendChild(makeCard('Jewel', build.items[id]));
+    });
+    set.flasks.forEach(function (f) {
+      var item = build.items[f.itemId];
+      if (item) section('flasks').appendChild(makeCard(f.slot, item, setIndex));
+    });
+    if (build.gems && build.gems.length) {
+      section('gems').appendChild(makeGemsCard(build.gems));
+    }
 
-    if (build.jewels.length) {
-      root.appendChild(sectionHeader('Jewels'));
-      build.jewels.forEach(function (id) {
-        root.appendChild(makeCard('Jewel', build.items[id]));
+    var TAB_LABELS = { gear: 'Gear', jewels: 'Jewels & Clusters', flasks: 'Flasks', gems: 'Gems' };
+    var present = ['gear', 'jewels', 'flasks', 'gems'].filter(function (k) { return sections[k]; });
+    if (present.length > 1) {
+      var bar = document.createElement('div');
+      bar.className = 'tab-bar';
+      ['all'].concat(present).forEach(function (k) {
+        var btn = document.createElement('button');
+        btn.className = 'tab-btn' + (k === 'all' ? ' active' : '');
+        var count = k === 'all' ? null : sections[k].children.length;
+        btn.textContent = (k === 'all' ? 'All' : TAB_LABELS[k]) + (count ? ' (' + count + ')' : '');
+        btn.addEventListener('click', function () {
+          root.dataset.tab = k;
+          bar.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+        });
+        bar.appendChild(btn);
       });
+      root.appendChild(bar);
     }
-    if (set.flasks.length) {
-      root.appendChild(sectionHeader('Flasks'));
-      set.flasks.forEach(function (f) {
-        var item = build.items[f.itemId];
-        if (item) root.appendChild(makeCard(f.slot, item, setIndex));
-      });
-    }
+    root.dataset.tab = 'all';
+    present.forEach(function (k) { root.appendChild(sections[k]); });
     document.getElementById('controls').classList.remove('hidden');
     document.getElementById('char-bar').classList.remove('hidden');
     renderCostSummary(); // clears stale summary — fresh cards have no prices yet
@@ -377,6 +418,170 @@
       o.textContent = b.name;
       sel.appendChild(o);
     });
+  }
+
+  // ---- gem shopping list ----------------------------------------------------------
+  function gemPayload(gem, level, quality) {
+    var misc = {};
+    if (level > 1) misc.gem_level = { min: level };
+    if (quality > 0) misc.quality = { min: quality };
+    var filters = {};
+    if (Object.keys(misc).length) filters.misc_filters = { filters: misc };
+    var saleType = document.getElementById('sale-type').value;
+    if (saleType !== 'any') filters.trade_filters = { filters: { sale_type: { option: saleType } } };
+    var query = {
+      status: { option: document.getElementById('trade-status').value },
+      type: gem.name
+    };
+    if (Object.keys(filters).length) query.filters = filters;
+    return { query: query, sort: { price: 'asc' } };
+  }
+
+  function gemUrl(payload) {
+    var league = document.getElementById('league').value;
+    return 'https://www.pathofexile.com/trade/search/' + encodeURIComponent(league) +
+           '?q=' + encodeURIComponent(JSON.stringify(payload));
+  }
+
+  function makeGemsCard(gems) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    var head = document.createElement('div');
+    head.className = 'card-head';
+    head.innerHTML = '<div><span class="slot-tag">Skill Gems</span>' +
+      '<span class="item-name normal">' + gems.length + ' gems in the build</span></div>';
+    card.appendChild(head);
+
+    var body = document.createElement('div');
+    body.className = 'card-body';
+    var rows = [];
+    gems.forEach(function (gem) {
+      var row = document.createElement('div');
+      row.className = 'mod-row gem-row';
+      var label = document.createElement('span');
+      label.className = 'mod-text gem-name';
+      label.textContent = gem.name + (gem.count > 1 ? ' ×' + gem.count : '');
+      row.appendChild(label);
+
+      var lvlIn = document.createElement('input');
+      lvlIn.type = 'number'; lvlIn.className = 'min-input gem-in';
+      lvlIn.value = gem.level; lvlIn.title = 'Minimum gem level';
+      var qIn = document.createElement('input');
+      qIn.type = 'number'; qIn.className = 'min-input gem-in';
+      qIn.value = gem.quality; qIn.title = 'Minimum quality';
+      row.appendChild(lvlIn);
+      row.appendChild(document.createTextNode('/'));
+      row.appendChild(qIn);
+
+      var priceSpan = document.createElement('span');
+      priceSpan.className = 'gem-price';
+      var openBtn = document.createElement('button');
+      openBtn.className = 'copy-btn';
+      openBtn.textContent = '↗';
+      openBtn.title = 'Open this gem search on the trade site';
+      openBtn.addEventListener('click', function () {
+        openUrl(gemUrl(gemPayload(gem, parseInt(lvlIn.value, 10) || 1, parseInt(qIn.value, 10) || 0)));
+      });
+      row.appendChild(priceSpan);
+      row.appendChild(openBtn);
+      body.appendChild(row);
+      rows.push({ gem: gem, lvlIn: lvlIn, qIn: qIn, priceSpan: priceSpan });
+    });
+    card.appendChild(body);
+
+    var opts = document.createElement('div');
+    opts.className = 'card-opts';
+    var btns = document.createElement('div');
+    btns.className = 'btns';
+    var priceAll = document.createElement('button');
+    priceAll.className = 'copy-btn gui-only';
+    priceAll.textContent = 'Price all gems';
+    priceAll.addEventListener('click', async function () {
+      if (!isGui()) return;
+      priceAll.disabled = true;
+      var league = document.getElementById('league').value;
+      var cheapest = []; // {amount, currency, count}
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        priceAll.textContent = 'Pricing ' + (i + 1) + '/' + rows.length + '…';
+        r.priceSpan.textContent = '…';
+        try {
+          var res = await window.pywebview.api.trade_search(league,
+            JSON.stringify(gemPayload(r.gem, parseInt(r.lvlIn.value, 10) || 1, parseInt(r.qIn.value, 10) || 0)));
+          if (res.ok && res.listings.length) {
+            var li = res.listings[0];
+            r.priceSpan.textContent = li.amount + ' ' + li.currency + ' · ' + res.total + ' listed';
+            if (li.amount !== null && li.amount !== undefined) {
+              cheapest.push({ amount: li.amount, currency: li.currency, count: r.gem.count || 1 });
+            }
+          } else {
+            r.priceSpan.textContent = res.ok ? 'none listed' : '❌ ' + (res.error || '').slice(0, 40);
+          }
+        } catch (e) {
+          r.priceSpan.textContent = '❌ ' + e.message.slice(0, 40);
+        }
+      }
+      // fetch any missing rates once, then total in the display currency
+      var needCur = [];
+      cheapest.forEach(function (c) {
+        if (!(RATES[league] && RATES[league][c.currency] !== undefined) && needCur.indexOf(c.currency) === -1) needCur.push(c.currency);
+      });
+      if (eqMode() === 'divine' && !divRate(league) && needCur.indexOf('divine') === -1) needCur.push('divine');
+      if (needCur.length) {
+        try {
+          var rr = await window.pywebview.api.exchange_rates(league, JSON.stringify(needCur));
+          if (rr.ok) {
+            RATES[league] = RATES[league] || {};
+            Object.keys(rr.rates).forEach(function (k) { RATES[league][k] = rr.rates[k]; });
+          }
+        } catch (e) { /* totals stay partial */ }
+      }
+      var totalChaos = 0, known = 0;
+      cheapest.forEach(function (c) {
+        var rate = RATES[league] && RATES[league][c.currency];
+        if (rate !== undefined) { totalChaos += c.amount * rate * c.count; known++; }
+      });
+      priceAll.textContent = known
+        ? 'Gems ≈ ' + fmtEq(totalChaos, league) + (known < cheapest.length ? ' (partial)' : '')
+        : 'Price all gems';
+      priceAll.disabled = false;
+    });
+    var openAllG = document.createElement('button');
+    openAllG.className = 'copy-btn';
+    openAllG.textContent = 'Open all gem searches';
+    openAllG.addEventListener('click', function () {
+      rows.forEach(function (r, i) {
+        setTimeout(function () {
+          openUrl(gemUrl(gemPayload(r.gem, parseInt(r.lvlIn.value, 10) || 1, parseInt(r.qIn.value, 10) || 0)));
+        }, i * 400);
+      });
+    });
+    btns.appendChild(priceAll);
+    btns.appendChild(openAllG);
+    opts.appendChild(btns);
+    card.appendChild(opts);
+    return card;
+  }
+
+  // ---- pasted in-game item -------------------------------------------------------
+  var pastedState = null;
+
+  function renderPastedItem(item) {
+    document.getElementById('controls').classList.remove('hidden');
+    if (pastedState) {
+      stopLive(pastedState);
+      var i = cards.indexOf(pastedState);
+      if (i !== -1) cards.splice(i, 1);
+      pastedState.card.remove();
+      pastedState = null;
+    }
+    var root = document.getElementById('results');
+    var card = makeCard(item.slotGuess || 'Pasted item', item);
+    pastedState = cards[cards.length - 1];
+    card.classList.add('pasted');
+    root.insertBefore(card, root.firstChild);
+    renderCharDiff(pastedState);
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function sectionHeader(text) {

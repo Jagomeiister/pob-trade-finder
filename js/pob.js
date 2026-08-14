@@ -254,6 +254,42 @@
     var act = out.itemSets[out.activeSetIndex];
     if (act) { out.slots = act.slots; out.flasks = act.flasks; }
 
+    // Skill gems — active skill set, enabled gems only, deduped by name/level/quality
+    out.gems = [];
+    var skillsBlock = xml.match(/<Skills\b([^>]*)>([\s\S]*?)<\/Skills>/);
+    if (skillsBlock) {
+      var activeGemSet = attr(skillsBlock[1], 'activeSkillSet') || '1';
+      var scope = skillsBlock[2];
+      var setRe2 = /<SkillSet\b([^>]*)>([\s\S]*?)<\/SkillSet>/g, ss;
+      var found = null, firstSet = null;
+      while ((ss = setRe2.exec(scope))) {
+        if (firstSet === null) firstSet = ss[2];
+        if (attr(ss[1], 'id') === activeGemSet) { found = ss[2]; break; }
+      }
+      // old builds have <Skill> directly under <Skills> with no SkillSet wrapper
+      var gemScope = found !== null ? found : (firstSet !== null ? firstSet : scope);
+      var seenGems = {};
+      var skillRe = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk;
+      while ((sk = skillRe.exec(gemScope))) {
+        if (attr(sk[1], 'enabled') === 'false') continue;
+        var skillSlot = attr(sk[1], 'slot') || '';
+        var gemRe = /<Gem\b([^>]*)\/?>/g, gm;
+        while ((gm = gemRe.exec(sk[2]))) {
+          if (attr(gm[1], 'enabled') === 'false') continue;
+          var gname = attr(gm[1], 'nameSpec');
+          if (!gname) continue;
+          var glevel = parseInt(attr(gm[1], 'level') || '1', 10);
+          var gquality = parseInt(attr(gm[1], 'quality') || '0', 10);
+          var gcount = parseInt(attr(gm[1], 'count') || '1', 10);
+          var key = gname + '|' + glevel + '|' + gquality;
+          if (seenGems[key]) { seenGems[key].count += gcount; continue; }
+          var gem = { name: gname, level: glevel, quality: gquality, count: gcount, slot: skillSlot };
+          seenGems[key] = gem;
+          out.gems.push(gem);
+        }
+      }
+    }
+
     // Jewels socketed in the tree (Sockets under active Spec)
     var sockRe = /<Socket\b([^>]*)\/?>/g, skm;
     var seen = {};
@@ -267,10 +303,97 @@
     return out;
   }
 
+  // ---- game clipboard format (Ctrl+C on an item in the client) --------------
+
+  var GAME_ITEM_CLASS_SLOT = {
+    'Helmets': 'Helmet', 'Body Armours': 'Body Armour', 'Gloves': 'Gloves', 'Boots': 'Boots',
+    'Amulets': 'Amulet', 'Rings': 'Ring 1', 'Belts': 'Belt', 'Quivers': 'Weapon 2',
+    'Shields': 'Weapon 2', 'Wands': 'Weapon 1', 'Daggers': 'Weapon 1', 'Rune Daggers': 'Weapon 1',
+    'Claws': 'Weapon 1', 'Sceptres': 'Weapon 1', 'One Hand Swords': 'Weapon 1',
+    'Thrusting One Hand Swords': 'Weapon 1', 'One Hand Axes': 'Weapon 1', 'One Hand Maces': 'Weapon 1',
+    'Two Hand Swords': 'Weapon 1', 'Two Hand Axes': 'Weapon 1', 'Two Hand Maces': 'Weapon 1',
+    'Bows': 'Weapon 1', 'Staves': 'Weapon 1', 'Warstaves': 'Weapon 1', 'Fishing Rods': 'Weapon 1',
+    'Jewels': 'Jewel', 'Abyss Jewels': 'Jewel', 'Life Flasks': 'Flask 1', 'Mana Flasks': 'Flask 1',
+    'Hybrid Flasks': 'Flask 1', 'Utility Flasks': 'Flask 1', 'Tinctures': 'Flask 1'
+  };
+
+  var GAME_META_PREFIXES = [
+    'Item Class:', 'Rarity:', 'Requirements', 'Level:', 'Str:', 'Dex:', 'Int:',
+    'Strength:', 'Dexterity:', 'Intelligence:', 'Sockets:', 'Item Level:', 'Quality:',
+    'Armour:', 'Evasion Rating:', 'Energy Shield:', 'Ward:', 'Chance to Block:',
+    'Physical Damage:', 'Elemental Damage:', 'Chaos Damage:', 'Critical Strike Chance:',
+    'Attacks per Second:', 'Weapon Range:', 'Map Tier:', 'Stack Size:', 'Radius:',
+    'Limited to:', 'Talisman Tier:', 'Quality (', 'Note:', 'Price:'
+  ];
+
+  function looksLikeGameItem(text) {
+    return /^Item Class:/m.test(text) && /^--------$/m.test(text);
+  }
+
+  /* Parse the in-game Ctrl+C item text into the same item model parseItemText
+   * produces, so the whole matcher/search pipeline applies. */
+  function parseGameItem(text) {
+    if (!looksLikeGameItem(text)) return null;
+    var sections = text.replace(/\r/g, '').split(/\n--------\n/);
+    var headLines = sections[0].split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    var item = { rarity: 'RARE', name: '', base: '', sockets: '', maxLinks: 0,
+                 corrupted: false, itemLevel: 0, influences: [], mods: [], slotGuess: null };
+    var itemClass = '';
+    var nameLines = [];
+    headLines.forEach(function (l) {
+      var m;
+      if ((m = l.match(/^Item Class:\s*(.+)$/))) itemClass = m[1].trim();
+      else if ((m = l.match(/^Rarity:\s*(\w+)/))) item.rarity = m[1].toUpperCase();
+      else nameLines.push(l);
+    });
+    if (nameLines.length >= 2) { item.name = nameLines[0]; item.base = nameLines[1]; }
+    else if (nameLines.length === 1) { item.name = nameLines[0]; item.base = nameLines[0]; }
+    item.slotGuess = GAME_ITEM_CLASS_SLOT[itemClass] || null;
+
+    for (var s = 1; s < sections.length; s++) {
+      var lines = sections[s].split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      lines.forEach(function (line) {
+        var m;
+        if ((m = line.match(/^Item Level:\s*(\d+)/))) { item.itemLevel = parseInt(m[1], 10); return; }
+        if ((m = line.match(/^Sockets:\s*(.+)$/))) {
+          item.sockets = m[1].trim();
+          m[1].trim().split(/\s+/).forEach(function (g) {
+            var linked = g.split('-').length;
+            if (linked > item.maxLinks) item.maxLinks = linked;
+          });
+          return;
+        }
+        if (line === 'Corrupted') { item.corrupted = true; return; }
+        if ((m = line.match(/^(Shaper|Elder|Crusader|Redeemer|Hunter|Warlord|Searing Exarch|Eater of Worlds) Item$/))) {
+          item.influences.push(m[1]);
+          return;
+        }
+        for (var p = 0; p < GAME_META_PREFIXES.length; p++) {
+          if (line.indexOf(GAME_META_PREFIXES[p]) === 0) return;
+        }
+        // mod line — kind comes from the parenthesised suffix
+        var kind = 'explicit', crafted = false, fractured = false;
+        var suffix = line.match(/\s\((implicit|crafted|fractured|enchant|scourge|crucible)\)$/);
+        if (suffix) {
+          line = line.slice(0, -suffix[0].length);
+          if (suffix[1] === 'implicit' || suffix[1] === 'enchant') kind = 'implicit';
+          if (suffix[1] === 'enchant') crafted = true;   // matcher tries enchant section first
+          if (suffix[1] === 'crafted') crafted = true;
+          if (suffix[1] === 'fractured') fractured = true;
+        }
+        item.mods.push({ line: line, raw: line, kind: kind, crafted: crafted,
+                         fractured: fractured, ranged: false });
+      });
+    }
+    return item;
+  }
+
   return {
     decodePobCode: decodePobCode,
     parseBuild: parseBuild,
     parseItemText: parseItemText,
+    parseGameItem: parseGameItem,
+    looksLikeGameItem: looksLikeGameItem,
     resolveRanges: resolveRanges
   };
 });

@@ -102,6 +102,17 @@ priced slot in chaos, with a divine conversion — run **Check all prices** to f
 - **⌂ Hideout** — sends `/hideout <seller>` — works **after** the seller parties you
 - **Copy whisper** — for pasting manually
 
+## 5b. Tabs, gems, and pasted items
+
+- **Tabs** above the cards — All / Gear / Jewels & Clusters / Flasks / Gems — with counts;
+  abyssal-socket jewels live under Jewels
+- **Gems tab** — every skill gem in the build (active skill set, deduped with ×N counts).
+  Each row has editable min level/quality, a search link, and a price; **Price all gems**
+  totals the whole setup ("Gems ≈ 3.2 div")
+- **Paste an in-game item** — Ctrl+C any item in the client, paste into the build box:
+  it becomes a purple-edged card at the top with all its mods matched, ready to
+  price-check, sell-price, or compare against your character. The loaded build stays put
+
 ## 6b. Compare with your character
 
 Enter your account name (**Name#1234**) in the bar above the cards, load your characters,
