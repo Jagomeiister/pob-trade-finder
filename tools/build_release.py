@@ -29,6 +29,9 @@ SHIP = [
     "data/leagues.js",
     "data/ranges.js",
     "data/baseicons.js",
+    "data/eldritch.js",
+    "data/uniquenames.js",
+    "data/uniqueranges.js",
     "data/stats.json",
     "data/leagues.json",
 ]
