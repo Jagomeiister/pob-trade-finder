@@ -1,5 +1,10 @@
 # Launch kit
 
+> **Status: DEFERRED.** Launch waits until (1) the remaining backlog features land,
+> (2) all known bugs are fixed, and (3) the tool survives real dogfooding through a
+> league launch. Then refresh all data tables, retake screenshots on a fresh build,
+> and post during that league's opening week — the highest-traffic window anyway.
+
 Ready-to-post announcements. Take 3–4 screenshots first (they carry the post):
 
 1. A loaded build — gear cards with item art, mods ticked, per-slot set dropdowns
