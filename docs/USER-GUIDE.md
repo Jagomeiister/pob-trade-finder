@@ -151,6 +151,16 @@ It's stored only on this machine (`data/session.json`), sent only to pathofexile
 and you can clear it by saving an empty field. If the session expires, live searches
 say so and fall back to polling.
 
+## 7c. Settings & accessibility (⚙, top right)
+
+- **Text size** (90–125%) and **density** (comfortable/compact)
+- **Sound alerts** on/off and **volume** for the live-search ding
+- **Reduce motion** — disables flashes and animations
+- **High contrast** — brighter text and borders
+- **Colourblind-friendly sockets** — socket colours get letter labels (R/G/B/W/A)
+
+All preferences persist across launches and updates.
+
 ## 8. Rate limits
 
 The app reads GGG's quota headers and paces itself — sustained use should never trip a

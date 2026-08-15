@@ -458,6 +458,50 @@
   .help code { background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
   .footer { color: #4d4638; font-size: 11px; margin-top: 8px; }
 
+  /* ---- settings, accessibility, rate chip ---- */
+  #settings-panel {
+    background: var(--panel); border: 1px solid var(--gold);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 16px;
+  }
+  #settings-panel.hidden { display: none; }
+  .settings-head {
+    color: var(--gold); font-weight: 600; font-variant: small-caps; letter-spacing: .5px;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  .settings-grid { display: flex; flex-wrap: wrap; gap: 12px 26px; }
+  .settings-grid label { color: var(--text); font-size: 13px; white-space: nowrap; }
+  #rate-chip {
+    color: #ffb04c; border: 1px solid #6b4a1c; border-radius: 14px;
+    padding: 4px 12px; font-size: 12.5px; margin-right: 10px;
+  }
+  #rate-chip.hidden { display: none; }
+
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; border-radius: 3px; }
+
+  body.compact .card-body { padding: 3px 12px; }
+  body.compact .mod-row { padding: 1px 6px; }
+  body.compact .card { margin-bottom: 8px; }
+  body.compact .card-head, body.compact .card-opts { padding: 6px 12px; }
+  body.compact .listing { padding: 6px; margin-bottom: 5px; }
+
+  body.high-contrast { --text: #efe9dc; --dim: #b0a690; --border: #6b5c3e; --magic: #a8a8ff; }
+  body.high-contrast .mod-text { color: #b8b8ff; }
+
+  body.reduce-motion .live-new { animation: none; }
+  body.reduce-motion .trade-btn:active, body.reduce-motion #decode-btn:active { transform: none; }
+  body.reduce-motion * { scroll-behavior: auto !important; }
+
+  body.cb-sockets .sock { position: relative; }
+  body.cb-sockets .sock::after {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: 800; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000;
+  }
+  body.cb-sockets .sock-R::after { content: 'R'; }
+  body.cb-sockets .sock-G::after { content: 'G'; }
+  body.cb-sockets .sock-B::after { content: 'B'; }
+  body.cb-sockets .sock-W::after { content: 'W'; color: #333; text-shadow: none; }
+  body.cb-sockets .sock-A::after { content: 'A'; }
+
   @media (max-width: 640px) {
     body { padding: 12px; }
     .btns { margin-left: 0; width: 100%; }
@@ -478,7 +522,39 @@
       <h1>PoB Trade Finder</h1>
       <div class="subtitle">Paste a Path of Building code — get pre-filled trade searches for the exact gear in the build.</div>
     </div>
+    <span class="ctrl-spacer"></span>
+    <span id="rate-chip" class="hidden" title="GGG API rate-limit cooldown — everything resumes automatically"></span>
+    <button id="settings-btn" class="copy-btn" aria-label="Settings" title="Settings — text size, sounds, accessibility">⚙</button>
   </header>
+
+  <div id="settings-panel" class="hidden" role="dialog" aria-label="Settings">
+    <div class="settings-head">Settings <button id="settings-close" class="copy-btn" aria-label="Close settings">✕</button></div>
+    <div class="settings-grid">
+      <label>Text size
+        <select id="pref-fontsize">
+          <option value="90">Small</option>
+          <option value="100">Normal</option>
+          <option value="112">Large</option>
+          <option value="125">Extra large</option>
+        </select>
+      </label>
+      <label>Density
+        <select id="pref-density">
+          <option value="comfortable">Comfortable</option>
+          <option value="compact">Compact</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="pref-sound" checked> Sound alerts (live-search ding)</label>
+      <label>Alert volume <input type="range" id="pref-volume" min="5" max="100" value="25"></label>
+      <label><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
+      <label><input type="checkbox" id="pref-contrast"> High contrast text</label>
+      <label><input type="checkbox" id="pref-cb"> Colourblind-friendly sockets (letter labels)</label>
+      <span class="gui-only">
+        <button id="check-updates-btn" class="copy-btn">Check for updates</button>
+        <span id="update-check-status"></span>
+      </span>
+    </div>
+  </div>
 
   <div id="update-banner" class="hidden">
     <span id="update-label"></span>

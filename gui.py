@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.4.1"
+VERSION = "1.5.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -483,6 +483,11 @@ class Api:
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    # -- rate-limit visibility -------------------------------------------------------
+    def rate_status(self):
+        hold = max(0.0, self._blocked_until - time.time())
+        return {"ok": True, "cooldownSeconds": int(hold)}
 
     # -- durable storage for the web app -------------------------------------------
     def storage_get(self):

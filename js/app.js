@@ -50,6 +50,39 @@
     return !!(window.pywebview && window.pywebview.api);
   }
 
+  // ---- user preferences (text size, density, sound, accessibility) ---------
+  var PREFS = { fontsize: '100', density: 'comfortable', sound: true,
+                volume: 25, motion: false, contrast: false, cb: false };
+
+  function loadPrefs() {
+    try {
+      var p = JSON.parse(localStorage.getItem('pobtf-prefs'));
+      if (p) Object.keys(PREFS).forEach(function (k) { if (k in p) PREFS[k] = p[k]; });
+    } catch (e) { /* defaults */ }
+  }
+
+  function applyPrefs() {
+    document.body.style.zoom = (parseInt(PREFS.fontsize, 10) || 100) / 100;
+    document.body.classList.toggle('compact', PREFS.density === 'compact');
+    document.body.classList.toggle('reduce-motion', !!PREFS.motion);
+    document.body.classList.toggle('high-contrast', !!PREFS.contrast);
+    document.body.classList.toggle('cb-sockets', !!PREFS.cb);
+    var ids = { 'pref-fontsize': PREFS.fontsize, 'pref-density': PREFS.density };
+    Object.keys(ids).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = ids[id];
+    });
+    var s = document.getElementById('pref-sound'); if (s) s.checked = !!PREFS.sound;
+    var v = document.getElementById('pref-volume'); if (v) v.value = PREFS.volume;
+    var m = document.getElementById('pref-motion'); if (m) m.checked = !!PREFS.motion;
+    var c = document.getElementById('pref-contrast'); if (c) c.checked = !!PREFS.contrast;
+    var cb = document.getElementById('pref-cb'); if (cb) cb.checked = !!PREFS.cb;
+  }
+
+  function savePrefs() {
+    persist('pobtf-prefs', JSON.stringify(PREFS));
+  }
+
   // ---- settings persistence ----------------------------------------------
   // localStorage is the live cache; the Python bridge is the durable copy
   // (the exe's WebView2 storage does not survive restarts reliably)
@@ -105,6 +138,22 @@
 
     ['league', 'trade-status', 'pseudo', 'sale-type'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', saveSettings);
+    });
+    // pseudo totals change the SCALE of dual-res inputs (×2) — rescale live so
+    // the number in the box always matches the stat the search will use
+    document.getElementById('pseudo').addEventListener('change', function () {
+      var on = this.checked;
+      cards.forEach(function (state) {
+        (state.rows || []).forEach(function (r) {
+          if (!r.match || !r.match.pseudo || !r.minInput) return;
+          var newScale = on ? (r.pseudoMult || 1) : 1;
+          if (newScale === r.inputScale) return;
+          var v = parseFloat(r.minInput.value);
+          if (!isNaN(v)) r.minInput.value = roundMin(v * newScale / r.inputScale);
+          if (r.baseAvg !== null) r.baseAvg = r.baseAvg * newScale / r.inputScale;
+          r.inputScale = newScale;
+        });
+      });
     });
     document.getElementById('eq-currency').addEventListener('change', function () {
       saveSettings();
@@ -237,12 +286,47 @@
     document.getElementById('refresh-data').addEventListener('click', refreshData);
 
     renderBasket();
+    loadPrefs();
+    applyPrefs();
+    document.getElementById('settings-btn').addEventListener('click', function () {
+      document.getElementById('settings-panel').classList.toggle('hidden');
+    });
+    document.getElementById('settings-close').addEventListener('click', function () {
+      document.getElementById('settings-panel').classList.add('hidden');
+    });
+    document.getElementById('check-updates-btn').addEventListener('click', function () {
+      checkForUpdates(true);
+    });
+    [['pref-fontsize', 'fontsize', 'value'], ['pref-density', 'density', 'value'],
+     ['pref-sound', 'sound', 'checked'], ['pref-volume', 'volume', 'value'],
+     ['pref-motion', 'motion', 'checked'], ['pref-contrast', 'contrast', 'checked'],
+     ['pref-cb', 'cb', 'checked']].forEach(function (spec) {
+      document.getElementById(spec[0]).addEventListener('change', function () {
+        PREFS[spec[1]] = spec[2] === 'checked' ? this.checked : this.value;
+        applyPrefs();
+        savePrefs();
+      });
+    });
     function markGui() {
       document.body.classList.add('gui');
       checkForUpdates();
       setInterval(checkForUpdates, 4 * 3600 * 1000); // not just at launch
       refreshSessionStatus();
       hydrateFromBridge();
+      // surface rate-limit cooldowns so the app never feels silently stuck
+      setInterval(async function () {
+        try {
+          var r = await window.pywebview.api.rate_status();
+          var chip = document.getElementById('rate-chip');
+          if (r && r.ok && r.cooldownSeconds > 5) {
+            chip.textContent = '⏳ API cooldown ' + Math.floor(r.cooldownSeconds / 60) + 'm ' +
+              (r.cooldownSeconds % 60) + 's';
+            chip.classList.remove('hidden');
+          } else {
+            chip.classList.add('hidden');
+          }
+        } catch (e) { /* bridge missing */ }
+      }, 10000);
     }
 
     // pull durable state from the bridge and re-apply it to the UI
@@ -272,19 +356,31 @@
         if (saved.lastCode && !ta.value.trim()) ta.value = saved.lastCode;
         refreshBuildSelect();
         renderBasket();
+        loadPrefs();
+        applyPrefs();
       } catch (e) { /* browser mode / bridge unavailable */ }
     }
     if (isGui()) markGui();
     else window.addEventListener('pywebviewready', markGui);
   });
 
-  function checkForUpdates() {
+  function checkForUpdates(manual) {
     if (!isGui() || !window.pywebview.api.check_update) return;
+    var statusEl = document.getElementById('update-check-status');
+    if (manual && statusEl) statusEl.textContent = 'checking…';
     window.pywebview.api.check_update().then(function (res) {
-      if (!res || !res.ok) return;
+      if (!res || !res.ok) {
+        if (manual && statusEl) statusEl.textContent = '❌ ' + ((res && res.error) || 'could not reach GitHub');
+        return;
+      }
       if (res.current) {
         var foot = document.querySelector('.footer');
         if (foot && foot.textContent.indexOf('· v') === -1) foot.textContent += ' · v' + res.current;
+      }
+      if (manual && statusEl) {
+        statusEl.textContent = res.newer
+          ? '⬆ ' + res.latest + ' available — see the banner above'
+          : '✓ up to date (v' + res.current + ')';
       }
       if (!res.newer || !res.url) return;
       var bar = document.getElementById('update-banner');
@@ -667,6 +763,7 @@
         openBtn.className = 'copy-btn';
         openBtn.textContent = '↗';
         openBtn.title = 'Open this gem search on the trade site';
+        openBtn.setAttribute('aria-label', 'Open ' + gem.name + ' search on the trade site');
         openBtn.addEventListener('click', function () {
           openUrl(gemUrl(gemPayload(gem, parseInt(lvlIn.value, 10) || 1, parseInt(qIn.value, 10) || 0)));
         });
@@ -775,6 +872,7 @@
         expandBtn.className = 'copy-btn gem-expand';
         expandBtn.textContent = '▾';
         expandBtn.title = 'Expand: full listings, live search, pinning — like a gear card';
+        expandBtn.setAttribute('aria-label', 'Expand ' + gem.name + ' listings');
         function togglePanel() {
           if (panel.classList.contains('hidden')) {
             ensureGemPanel();
@@ -1169,7 +1267,12 @@
     var tag = document.createElement('span');
     tag.className = 'match-tag';
 
-    var rowState = { mod: mod, match: match, cb: cb, minInput: minInput, baseAvg: null, exactCount: false };
+    var rowState = { mod: mod, match: match, cb: cb, minInput: minInput, baseAvg: null,
+                     exactCount: false, pseudoMult: 1, inputScale: 1 };
+    if (match && match.pseudo) {
+      rowState.pseudoMult = match.pseudo.multiplier;
+      if (document.getElementById('pseudo').checked) rowState.inputScale = match.pseudo.multiplier;
+    }
     var showInput = false;
     // A unique's mod is only adjustable if it actually rolls — i.e. the PoB
     // text had an (a-b) range. Fixed unique lines are presence-only.
@@ -1222,6 +1325,7 @@
       sortBtn.className = 'sort-btn';
       sortBtn.textContent = '⇅';
       sortBtn.title = 'Sort search results by this mod (highest / lowest roll)';
+      sortBtn.setAttribute('aria-label', 'Sort results by this mod');
       rowState.sortBtn = sortBtn;
       sortBtn.addEventListener('click', function () {
         var eff = effectiveMatch(rowState, document.getElementById('pseudo').checked);
@@ -1374,14 +1478,28 @@
       if (!r.cb.checked || !r.match) return;
       var eff = effectiveMatch(r, pseudoOn);
       var f = { id: eff.entry.id };
-      // "Require fractured": swap the stat into the fractured.stat_X namespace
+      // "Require fractured": swap to the fractured twin of the EXACT matched
+      // stat (same stat number keeps locality — text lookup would resolve
+      // local armour/evasion mods to their global twins)
       if (requireFrac && r.mod.fractured) {
-        var fe = Matcher.findInSection(statIndex, r.mod.line, 'fractured');
-        if (fe) f.id = fe.id;
+        var fracTwin = Matcher.lookupById(statIndex,
+          'fractured.' + r.match.entry.id.split('.').slice(1).join('.'));
+        if (fracTwin) f.id = fracTwin.id;
+        else {
+          var fe = Matcher.findInSection(statIndex, r.mod.line, 'fractured');
+          if (fe) f.id = fe.id;
+        }
       }
       if (!r.match.fixedText && !r.uniqueFixed) {
         var min = parseFloat(r.minInput.value);
         if (!isNaN(min)) {
+          // the input was rendered in one scale (pseudo totals fold dual-res
+          // rolls ×2) — convert if the id we're sending uses a different one
+          var targetScale = (pseudoOn && r.match.pseudo && !(requireFrac && r.mod.fractured))
+            ? (r.pseudoMult || 1) : 1;
+          if (r.inputScale && targetScale !== r.inputScale) {
+            min = Math.round(min * targetScale / r.inputScale * 10) / 10;
+          }
           if (r.exactCount) f.value = { min: min, max: min };
           // negative-value mods (e.g. -# mana cost): lower is better -> use max
           else f.value = (min < 0) ? { max: min } : { min: min };
@@ -1659,7 +1777,14 @@
       });
     }
     if (cheapest !== null) {
-      state.cheapestChaos = cheapest;
+      // merge across pages — later pages must never raise the "cheapest"
+      var ps2 = state.priceState;
+      if (ps2) {
+        if (ps2.cheapestChaos === undefined || cheapest < ps2.cheapestChaos) ps2.cheapestChaos = cheapest;
+        state.cheapestChaos = ps2.cheapestChaos;
+      } else {
+        state.cheapestChaos = cheapest;
+      }
       renderCostSummary();
     }
   }
@@ -1784,6 +1909,7 @@
       var del = document.createElement('button');
       del.className = 'copy-btn';
       del.textContent = '✕';
+      del.setAttribute('aria-label', 'Remove from basket');
       del.addEventListener('click', function () {
         var cur = loadBasket();
         cur.splice(idx, 1);
@@ -1857,15 +1983,16 @@
   }
 
   function playDing() {
-    if (!audioCtx) return;
+    if (!audioCtx || !PREFS.sound) return;
     try {
+      var peak = Math.max(0.02, Math.min(1, (parseInt(PREFS.volume, 10) || 25) / 100));
       var t = audioCtx.currentTime;
       [880, 1320].forEach(function (freq, i) {
         var o = audioCtx.createOscillator(), g = audioCtx.createGain();
         o.type = 'sine';
         o.frequency.value = freq;
         g.gain.setValueAtTime(0.0001, t + i * 0.12);
-        g.gain.exponentialRampToValueAtTime(0.25, t + i * 0.12 + 0.02);
+        g.gain.exponentialRampToValueAtTime(peak, t + i * 0.12 + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.35);
         o.connect(g); g.connect(audioCtx.destination);
         o.start(t + i * 0.12); o.stop(t + i * 0.12 + 0.4);
@@ -2206,12 +2333,37 @@
   // {description, hash: "stat.explicit.stat_XXX", mods: [{tier: "P2"|"S2", ...}]}
   function normListingMod(entry) {
     if (typeof entry === 'string') return { text: entry, tier: null, tail: null, hash: null, magnitudes: null };
+    var mods = entry.mods || [];
+    var tier = null, magnitudes = null;
+    if (mods.length === 1) {
+      tier = mods[0].tier || null;
+      magnitudes = mods[0].magnitudes || null;
+    } else if (mods.length > 1) {
+      // combined line (several affixes feeding one stat): tiers joined, roll
+      // range = sum of the contributing ranges when the shapes agree
+      var tiers = mods.map(function (m) { return m.tier; }).filter(Boolean);
+      tier = tiers.length ? tiers.join('+') : null;
+      var lists = mods.map(function (m) { return m.magnitudes || []; });
+      var n = lists[0].length;
+      if (n && lists.every(function (l) { return l.length === n; })) {
+        magnitudes = [];
+        for (var i = 0; i < n; i++) {
+          var lo = 0, hi = 0, ok = true;
+          lists.forEach(function (l) {
+            var a = parseFloat(l[i].min), b = parseFloat(l[i].max);
+            if (isNaN(a) || isNaN(b)) ok = false; else { lo += a; hi += b; }
+          });
+          if (!ok) { magnitudes = null; break; }
+          magnitudes.push({ min: lo, max: hi });
+        }
+      }
+    }
     return {
       text: entry.description || '',
-      tier: (entry.mods && entry.mods[0] && entry.mods[0].tier) || null,
+      tier: tier,
       tail: entry.hash ? entry.hash.split('.').pop() : null,
       hash: entry.hash || null,
-      magnitudes: (entry.mods && entry.mods[0] && entry.mods[0].magnitudes) || null
+      magnitudes: magnitudes
     };
   }
 
@@ -2220,6 +2372,11 @@
   function rollInfo(text, magnitudes) {
     if (!magnitudes || !magnitudes.length) return null;
     var values = Matcher.extractNumbers(text);
+    // stat templates can contain literal digits before the rolled ones
+    // ("With at least 40 Dexterity in Radius, …") — align from the tail
+    if (values.length > magnitudes.length) {
+      values = values.slice(values.length - magnitudes.length);
+    }
     var parts = [], fracs = [];
     for (var i = 0; i < magnitudes.length && i < values.length; i++) {
       var lo = parseFloat(magnitudes[i].min), hi = parseFloat(magnitudes[i].max);
