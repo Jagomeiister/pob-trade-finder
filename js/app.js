@@ -190,16 +190,7 @@
       try {
         var res = await window.pywebview.api.get_characters(acct);
         if (!res.ok) { status.textContent = '❌ ' + res.error; return; }
-        var sel = document.getElementById('char-select');
-        sel.innerHTML = '';
-        res.characters.forEach(function (c) {
-          var o = document.createElement('option');
-          o.value = c.name;
-          o.textContent = c.name + ' (' + c.league + ' lvl ' + c.level + ' ' + c['class'] + ')';
-          sel.appendChild(o);
-        });
-        sel.classList.remove('hidden');
-        document.getElementById('char-compare').classList.remove('hidden');
+        populateCharSelect(res.characters);
         status.textContent = res.characters.length + ' characters';
         try {
           var s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
@@ -240,12 +231,28 @@
     });
     document.getElementById('sessid-save').addEventListener('click', async function () {
       var inp = document.getElementById('sessid-input');
+      var status = document.getElementById('sessid-status');
       this.disabled = true;
       try {
         var r = await window.pywebview.api.set_poesessid(inp.value);
         inp.value = '';
         inp.placeholder = r && r.set ? 'POESESSID saved' : 'POESESSID (optional)';
         await refreshSessionStatus();
+        if (r && r.set) {
+          status.textContent = 'validating…';
+          var v = await window.pywebview.api.session_validate();
+          if (v && v.ok && v.valid) {
+            status.textContent = '🟢 valid — instant alerts on';
+            // the session tells us who you are — fill the compare flow for free
+            if (v.account) document.getElementById('acct-input').value = v.account;
+            populateCharSelect(v.characters || []);
+            document.getElementById('char-status').textContent =
+              (v.characters || []).length + ' characters loaded from your session';
+          } else {
+            status.textContent = '🟠 saved, but ' + ((v && v.error) || 'validation failed') +
+              ' — instant alerts won\'t connect';
+          }
+        }
       } catch (e) { /* bridge missing in browser */ }
       this.disabled = false;
     });
@@ -2276,6 +2283,26 @@
   var liveCount = 0;
   var audioCtx = null;
   var HAS_SESSION = false; // POESESSID saved -> instant WebSocket live search
+
+  // fill the character dropdown, current league first, then by level
+  function populateCharSelect(characters) {
+    var league = document.getElementById('league').value;
+    var sorted = characters.slice().sort(function (a, b) {
+      var al = a.league === league ? 0 : 1, bl = b.league === league ? 0 : 1;
+      return al !== bl ? al - bl : (b.level || 0) - (a.level || 0);
+    });
+    var sel = document.getElementById('char-select');
+    sel.innerHTML = '';
+    sorted.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.name;
+      o.textContent = (c.league === league ? '★ ' : '') + c.name +
+        ' (' + c.league + ' lvl ' + c.level + ' ' + c['class'] + ')';
+      sel.appendChild(o);
+    });
+    sel.classList.remove('hidden');
+    document.getElementById('char-compare').classList.remove('hidden');
+  }
 
   async function refreshSessionStatus() {
     if (!isGui() || !window.pywebview.api.session_status) return;

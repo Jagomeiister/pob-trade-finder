@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.7.4"
+VERSION = "1.7.5"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -528,6 +528,57 @@ class Api:
 
     def session_status(self):
         return {"ok": True, "set": bool(self._poesessid)}
+
+    def session_validate(self):
+        """Check the saved POESESSID against GGG and, when valid, return the
+        account's own characters (no account name needed) plus the account
+        name recovered from the /my-account redirect."""
+        if not self._poesessid:
+            return {"ok": True, "valid": False, "error": "no POESESSID set"}
+        headers = {"User-Agent": UA, "Cookie": "POESESSID=" + self._poesessid}
+        try:
+            req = urllib.request.Request(
+                "https://www.pathofexile.com/character-window/get-characters",
+                headers=headers)
+            with urllib.request.urlopen(req, timeout=20) as r:
+                body = r.read().decode("utf-8", "replace")
+            if body.lstrip().startswith("<"):
+                return {"ok": True, "valid": False, "error": "session rejected (login page returned)"}
+            chars = json.loads(body)
+            if not isinstance(chars, list):
+                return {"ok": True, "valid": False, "error": "unexpected response"}
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                return {"ok": True, "valid": False, "error": "session invalid or expired"}
+            return {"ok": False, "error": "HTTP %s" % e.code}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+        account = ""
+        try:
+            class NoRedirect(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, *args, **kwargs):
+                    return None
+            opener = urllib.request.build_opener(NoRedirect)
+            req2 = urllib.request.Request("https://www.pathofexile.com/my-account",
+                                          headers=headers)
+            try:
+                opener.open(req2, timeout=20)
+            except urllib.error.HTTPError as e2:
+                loc = e2.headers.get("Location", "")
+                m = re.search(r"/account/view-profile/([^/?#]+)", loc)
+                if m:
+                    account = urllib.parse.unquote(m.group(1))
+                    # profile URLs write the discriminator as -1234
+                    account = re.sub(r"-(\d{4})$", r"#\1", account)
+        except Exception:
+            pass
+
+        return {"ok": True, "valid": True, "account": account,
+                "characters": [
+                    {"name": c.get("name"), "league": c.get("league"),
+                     "level": c.get("level"), "class": c.get("class")}
+                    for c in chars if isinstance(c, dict)]}
 
     def live_start(self, league, payload_json):
         """Open a GGG live-search WebSocket for this query. Returns a subId to
