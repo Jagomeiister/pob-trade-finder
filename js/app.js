@@ -612,6 +612,19 @@
 
   function gemsWord(n) { return n + (n === 1 ? ' gem' : ' gems'); }
 
+  // prefixed/renamed uniques ("Foulborn The Red Nightmare") -> exact trade name
+  function resolveUniqueName(name) {
+    var T = window.POE_UNIQUE_NAMES;
+    if (!name || !T) return name;
+    if (T[name]) return name;
+    var best = null;
+    for (var k in T) {
+      if (name.length > k.length && name.slice(-k.length) === k &&
+          (!best || k.length > best.length)) best = k;
+    }
+    return best || name;
+  }
+
   var FLASK_BASE_KEYS = null;
   function findFlaskBase(name) {
     if (!name || !window.POE_BASE_ICONS) return null;
@@ -716,14 +729,18 @@
                              gem.name.split(' ').length >= 3;
         var corruptOnly = gem.level >= 21 || gem.quality >= 23 || isVaal;
         var gemIconPath = gemArtPath(gem.name);
-        if (gemIconPath || GEM_ICONS[gem.name]) {
+        if (gemIconPath || GEM_ICONS[gem.name] || isGui()) {
           var gIcon = document.createElement('img');
           gIcon.className = 'gem-icon';
           gIcon.dataset.gem = gem.name;
           if (GEM_ICONS[gem.name]) {
             gIcon.src = GEM_ICONS[gem.name];
             gIcon.dataset.swapped = '1';
-          } else {
+          } else if (isGui()) {
+            // atlas frames can't be told apart from wide single-frame art —
+            // hold an empty slot until the cached trade render arrives
+            gIcon.classList.add('pending');
+          } else if (gemIconPath) {
             gIcon.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
             gIcon.onload = markAtlas;
           }
@@ -811,14 +828,16 @@
           // trade-style header: big gem art + name + current minimums
           var ph = document.createElement('div');
           ph.className = 'gem-panel-head';
-          if (gemIconPath || GEM_ICONS[gem.name]) {
+          if (gemIconPath || GEM_ICONS[gem.name] || isGui()) {
             var big = document.createElement('img');
             big.className = 'gem-big-icon';
             big.dataset.gem = gem.name;
             if (GEM_ICONS[gem.name]) {
               big.src = GEM_ICONS[gem.name];
               big.dataset.swapped = '1';
-            } else {
+            } else if (isGui()) {
+              big.classList.add('pending');
+            } else if (gemIconPath) {
               big.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
               big.onload = markAtlas;
             }
@@ -1110,7 +1129,7 @@
     // uniques: swap base art for the real unique art (trade lookup, disk-cached)
     if (isUnique && isGui()) {
       if (iconEl) {
-        window.pywebview.api.unique_icon(item.name, item.base).then(function (res) {
+        window.pywebview.api.unique_icon(state.resolvedName || item.name, item.base).then(function (res) {
           if (res && res.ok && res.icon && iconEl.isConnected) {
             iconEl.src = res.icon;
             iconEl.dataset.swapped = '1';
@@ -1136,6 +1155,7 @@
 
     if (item.rarity === 'UNIQUE' || item.rarity === 'RELIC') {
       state.unique = true;
+      state.resolvedName = resolveUniqueName(item.name);
       var note = document.createElement('div');
       note.className = 'unique-note';
       note.textContent = 'Unique — searched by name. Tick mods below to also require minimum rolls (rolls matter on this one? tick them).';
@@ -1357,13 +1377,19 @@
         minInput.value = roundMin(eff.avg * pct);
         showInput = true;
         if (state.unique) {
-          // unique rolls live in their own range — use the PoB (a-b) bounds
-          // when known; never clamp with rare-affix ranges
-          if (mod.bounds) {
-            minInput.min = mod.bounds[0];
-            minInput.max = mod.bounds[1];
-            minInput.title = 'Rolls ' + mod.bounds[0] + ' – ' + mod.bounds[1] + ' on this unique';
-            rangeHint = mod.bounds[0] + '–' + mod.bounds[1];
+          // unique rolls live in their own range — PoB (a-b) bounds when the
+          // build carried them, else the bundled PoB unique database; never
+          // clamp uniques with rare-affix ranges
+          var uB = mod.bounds;
+          if (!uB && window.POE_UNIQUE_RANGES) {
+            var ur = window.POE_UNIQUE_RANGES[state.resolvedName || state.item.name];
+            if (ur) uB = ur[Matcher.normalize(mod.line)];
+          }
+          if (uB) {
+            minInput.min = uB[0];
+            minInput.max = uB[1];
+            minInput.title = 'Rolls ' + uB[0] + ' – ' + uB[1] + ' on this unique';
+            rangeHint = uB[0] + '–' + uB[1];
           }
         } else {
           // Clamp to what this mod can actually roll (lowest tier min .. highest
@@ -1396,6 +1422,13 @@
     // fixed-width control column so every input lines up down the card
     var ctrl = document.createElement('span');
     ctrl.className = 'mod-ctrl';
+    if (rangeHint) {
+      var rh = document.createElement('span');
+      rh.className = 'range-hint';
+      rh.textContent = rangeHint;
+      rh.title = 'This mod rolls ' + rangeHint + ' on this unique';
+      ctrl.appendChild(rh);
+    }
     if (showInput) ctrl.appendChild(minInput);
     // Sort listings by this mod's roll: off -> highest first -> lowest first
     if (showInput || rowState.exactCount) {
@@ -1616,7 +1649,7 @@
     });
 
     if (state.unique) {
-      query.name = state.item.name;
+      query.name = state.resolvedName || state.item.name;
       if (state.item.base && state.item.base !== state.item.name) query.type = state.item.base;
       // unique roll filters: any ticked mods become hard requirements
       if (filters.length) query.stats = [{ type: 'and', filters: filters }];

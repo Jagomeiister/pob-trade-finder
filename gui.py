@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.7.2"
+VERSION = "1.7.3"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
