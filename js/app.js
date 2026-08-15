@@ -323,7 +323,8 @@
       document.body.classList.add('gui');
       checkForUpdates();
       setInterval(checkForUpdates, 4 * 3600 * 1000); // not just at launch
-      refreshSessionStatus();
+      refreshSessionStatus(true);
+      setInterval(function () { refreshSessionStatus(true); }, 30 * 60 * 1000);
       hydrateFromBridge();
       // surface rate-limit cooldowns so the app never feels silently stuck
       setInterval(async function () {
@@ -594,6 +595,13 @@
     var base = name.split(' of ')[0]; // transfigured gems share base art
     return I[name] || I[name + ' Support'] || I[base] || I[base + ' Support'] || null;
   }
+  // transfigured gems are a discriminated base type on the trade API — sending
+  // the full name as a plain type string gets HTTP 400 "Unknown item base type"
+  function gemDisc(name) { return (window.POE_GEM_TYPES || {})[name] || null; }
+  function gemIconLookup(name) {
+    var tf = gemDisc(name);
+    return window.pywebview.api.gem_icon(gemTradeName(name), tf ? tf.t : null, tf ? tf.d : null);
+  }
 
   function gemPayload(gem, level, quality) {
     var misc = {};
@@ -603,9 +611,10 @@
     if (Object.keys(misc).length) filters.misc_filters = { filters: misc };
     var saleType = document.getElementById('sale-type').value;
     if (saleType !== 'any') filters.trade_filters = { filters: { sale_type: { option: saleType } } };
+    var tf = gemDisc(gem.name);
     var query = {
       status: { option: document.getElementById('trade-status').value },
-      type: gemTradeName(gem.name)
+      type: tf ? { option: tf.t, discriminator: tf.d } : gemTradeName(gem.name)
     };
     if (Object.keys(filters).length) query.filters = filters;
     return { query: query, sort: { price: 'asc' } };
@@ -675,7 +684,7 @@
       var name = names[i];
       if (GEM_ICONS[name]) { applyGemIcon(name, GEM_ICONS[name]); continue; }
       try {
-        var res = await window.pywebview.api.gem_icon(gemTradeName(name));
+        var res = await gemIconLookup(name);
         if (res && res.ok && res.icon) {
           GEM_ICONS[name] = res.icon;
           applyGemIcon(name, res.icon);
@@ -870,7 +879,7 @@
 
           // swap the RePoE atlas art for the trade site's single-frame render
           if (isGui() && window.pywebview.api.gem_icon) {
-            window.pywebview.api.gem_icon(gemTradeName(gem.name)).then(function (res) {
+            gemIconLookup(gem.name).then(function (res) {
               if (res && res.ok && res.icon) {
                 GEM_ICONS[gem.name] = res.icon;
                 var bigEl = ph.querySelector('.gem-big-icon');
@@ -1105,9 +1114,14 @@
       if (flaskBase) iconPath = window.POE_BASE_ICONS[flaskBase];
     }
     var isUnique = item.rarity === 'UNIQUE' || item.rarity === 'RELIC';
+    if (isUnique) {
+      state.unique = true;
+      // resolve BEFORE the icon lookup below uses it — prefixed names need this
+      state.resolvedName = resolveUniqueName(item.name);
+    }
     var iconHtml = (iconPath || (isUnique && isGui()))
       ? '<img class="card-icon" ' +
-        (iconPath ? 'src="https://web.poecdn.com/image/' + iconPath + '?scale=1" ' : '') +
+        'src="' + (iconPath ? 'https://web.poecdn.com/image/' + iconPath + '?scale=1' : BLANK_PX) + '" ' +
         'alt="" loading="lazy">'
       : '';
     head.innerHTML =
@@ -1165,9 +1179,7 @@
     body.className = 'card-body';
     card.appendChild(body);
 
-    if (item.rarity === 'UNIQUE' || item.rarity === 'RELIC') {
-      state.unique = true;
-      state.resolvedName = resolveUniqueName(item.name);
+    if (state.unique) {
       var note = document.createElement('div');
       note.className = 'unique-note';
       note.textContent = 'Unique — searched by name. Tick mods below to also require minimum rolls (rolls matter on this one? tick them).';
@@ -1196,9 +1208,9 @@
       if (item.influences.length) {
         state.inflToggle = makeToggle(opts, 'Require influence: ' + item.influences.join(' + '), true);
       }
-      if (item.itemLevel) {
-        state.ilvlToggle = makeToggle(opts, 'Min item level ' + item.itemLevel, false);
-      }
+      state.ilvlInput = makeMiniInput(opts, 'Min ilvl', item.itemLevel ? String(item.itemLevel) : '');
+      state.ilvlInput.parentElement.title = 'Require minimum item level — blank means no filter' +
+        (item.itemLevel ? '. The build item is ilvl ' + item.itemLevel + ' (shown greyed)' : '');
       if (item.mods.some(function (m) { return m.fractured; })) {
         state.fracToggle = makeToggle(opts, 'Require fractured mod(s)', false);
       }
@@ -1722,8 +1734,9 @@
           if (INFLUENCE_KEY[inf]) misc[INFLUENCE_KEY[inf]] = { option: true };
         });
       }
-      if (state.ilvlToggle && state.ilvlToggle.checkbox.checked) {
-        misc.ilvl = { min: state.item.itemLevel };
+      var ilvlMin = state.ilvlInput ? parseInt(state.ilvlInput.value, 10) : NaN;
+      if (!isNaN(ilvlMin) && ilvlMin > 0) {
+        misc.ilvl = { min: ilvlMin };
       }
       if (Object.keys(misc).length) qFilters.misc_filters = { filters: misc };
       if (tradeFilters) qFilters.trade_filters = tradeFilters.trade_filters;
@@ -1814,7 +1827,9 @@
     [['implicitMods', 'implicit'], ['explicitMods', 'explicit'], ['craftedMods', 'crafted'],
      ['fracturedMods', 'fractured'], ['enchantMods', 'implicit']].forEach(function (pair) {
       (equipped[pair[0]] || []).forEach(function (line) {
-        if (typeof line !== 'string') return;
+        // newer character-window responses wrap mods as {description, flags}
+        if (line && typeof line === 'object') line = line.description || '';
+        if (typeof line !== 'string' || !line) return;
         var m = Matcher.matchMod(statIndex, {
           line: line, kind: pair[1] === 'implicit' ? 'implicit' : 'explicit',
           crafted: pair[0] === 'craftedMods', fractured: pair[0] === 'fracturedMods'
@@ -2130,7 +2145,7 @@
     pinAll.className = 'copy-btn';
     pinAll.textContent = '☆ Pin combo to basket';
     pinAll.addEventListener('click', function () {
-      solverResult.picks.forEach(function (p) { pinToBasket(p.cand.li); });
+      solverResult.picks.forEach(function (p) { pinToBasket(p.cand.li, p.state); });
       pinAll.textContent = '★ Pinned ' + solverResult.picks.length;
     });
     box.appendChild(pinAll);
@@ -2174,10 +2189,18 @@
     try { persist('pobtf-basket', JSON.stringify(b.slice(0, 40))); }
     catch (e) { /* fine */ }
   }
-  function pinToBasket(li) {
+  function pinToBasket(li, state) {
     var b = loadBasket();
+    // link back to the trade-site search that produced this listing (frozen at
+    // search time, so later UI tweaks don't change what the pin points at)
+    var tradeUrl = null;
+    var ps = state && state.priceState;
+    if (ps && ps.payloadStr && ps.league) {
+      tradeUrl = 'https://www.pathofexile.com/trade/search/' + encodeURIComponent(ps.league) +
+                 '?q=' + encodeURIComponent(ps.payloadStr);
+    }
     b.push({ name: li.name, base: li.base, amount: li.amount, currency: li.currency,
-             account: li.account, whisper: li.whisper, ts: Date.now() });
+             account: li.account, whisper: li.whisper, tradeUrl: tradeUrl, ts: Date.now() });
     saveBasket(b);
     renderBasket();
   }
@@ -2217,6 +2240,14 @@
         ? it.amount + ' ' + it.currency : 'no price';
       row.appendChild(label);
       row.appendChild(price);
+      if (it.tradeUrl) {
+        var tl = document.createElement('button');
+        tl.className = 'copy-btn';
+        tl.textContent = '↗ Trade';
+        tl.title = 'Open the search that found this item on the trade site';
+        tl.addEventListener('click', function () { openUrl(it.tradeUrl); });
+        row.appendChild(tl);
+      }
       if (it.whisper && isGui()) {
         var w = document.createElement('button');
         w.className = 'copy-btn';
@@ -2304,13 +2335,27 @@
     document.getElementById('char-compare').classList.remove('hidden');
   }
 
-  async function refreshSessionStatus() {
+  async function refreshSessionStatus(deep) {
     if (!isGui() || !window.pywebview.api.session_status) return;
     try {
       var r = await window.pywebview.api.session_status();
       HAS_SESSION = !!(r && r.set);
       var el = document.getElementById('sessid-status');
-      if (el) el.textContent = HAS_SESSION ? '🟢 instant alerts on' : '';
+      if (!el) return;
+      if (!HAS_SESSION) { el.textContent = ''; return; }
+      if (deep && window.pywebview.api.session_validate) {
+        // live check against GGG — expired sessions show up here instead of
+        // failing silently when a live search tries to connect
+        var v = await window.pywebview.api.session_validate();
+        if (v && v.ok && v.valid) {
+          el.textContent = '🟢 session active — instant alerts on';
+        } else if (v && v.ok) {
+          HAS_SESSION = false;
+          el.textContent = '🔴 session expired — save a fresh POESESSID';
+        } // network errors: leave the last known state alone
+      } else {
+        el.textContent = '🟢 instant alerts on';
+      }
     } catch (e) { /* browser mode */ }
   }
 
@@ -2950,7 +2995,7 @@
     pinBtn.textContent = '☆ Pin';
     pinBtn.title = 'Add to the shopping basket';
     pinBtn.addEventListener('click', function () {
-      pinToBasket(li);
+      pinToBasket(li, state);
       pinBtn.textContent = '★ Pinned';
       setTimeout(function () { pinBtn.textContent = '☆ Pin'; }, 1200);
     });

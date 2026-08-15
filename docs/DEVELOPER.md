@@ -93,6 +93,16 @@ RePoE lives at `https://repoe-fork.github.io/<file>` (root path — not `/RePoE/
 - pathofexile.com **HTML** is Cloudflare-gated; the **API** endpoints are not. Never
   drive a browser at the site (bot challenge) — and never call the API while the
   user's IP is mid-ban
+- Transfigured gems are **not** standalone item types — `type: "Frostblink of
+  Wintry Blast"` gets HTTP 400 "Unknown item base type". They are a base type +
+  discriminator: `type: {option: "Frostblink", discriminator: "alt_x"}`. The map
+  comes from `/api/trade/data/items` (gems section entries with `disc`) —
+  bundled as `data/gemtypes.js` by `tools/make_gemtypes.py`
+- `character-window/get-items` mod arrays arrive either as plain strings (old)
+  or as `{description, flags:{crafted,fractured}}` objects with crafted/fractured
+  merged into `explicitMods` (new). The bridge re-normalizes to the old string
+  contract in `Api._char_mods` — without it the gear diff sees zero equipped mods
+  on rares and reports everything "missing"
 
 ## Auto-update
 

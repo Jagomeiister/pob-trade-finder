@@ -32,6 +32,7 @@ SHIP = [
     "data/eldritch.js",
     "data/uniquenames.js",
     "data/uniqueranges.js",
+    "data/gemtypes.js",
     "data/stats.json",
     "data/leagues.json",
 ]
@@ -47,9 +48,13 @@ def main():
     print("Building PoB Trade Finder v%s" % v)
 
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyinstaller", "pywebview", "websocket-client"], check=True)
+    # onedir, NOT onefile: onefile self-extracts to %TEMP%\_MEI... on every
+    # launch, and antivirus scanning a freshly-updated exe races that
+    # extraction ("Failed to load Python DLL"). Onedir ships _internal next
+    # to the exe — no extraction, no race, faster startup.
     subprocess.run([
         sys.executable, "-m", "PyInstaller",
-        "--noconfirm", "--onefile", "--windowed",
+        "--noconfirm", "--windowed",
         "--icon", os.path.join(ROOT, "icon.ico"),
         "--name", "PoB Trade Finder",
         "--collect-all", "webview",
@@ -60,7 +65,9 @@ def main():
     stage = os.path.join(ROOT, "dist", "release")
     shutil.rmtree(stage, ignore_errors=True)
     os.makedirs(stage)
-    shutil.copy2(os.path.join(ROOT, "dist", "PoB Trade Finder.exe"), stage)
+    appdir = os.path.join(ROOT, "dist", "PoB Trade Finder")
+    shutil.copy2(os.path.join(appdir, "PoB Trade Finder.exe"), stage)
+    shutil.copytree(os.path.join(appdir, "_internal"), os.path.join(stage, "_internal"))
     for rel in SHIP:
         src = os.path.join(ROOT, rel)
         dst = os.path.join(stage, rel)

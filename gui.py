@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.7.5"
+VERSION = "1.7.6"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -290,15 +290,38 @@ class Api:
                     "icon": it.get("icon", ""),
                     "ilvl": it.get("ilvl", 0),
                     "corrupted": bool(it.get("corrupted")),
-                    "implicitMods": it.get("implicitMods", []),
-                    "explicitMods": it.get("explicitMods", []),
-                    "craftedMods": it.get("craftedMods", []),
-                    "enchantMods": it.get("enchantMods", []),
-                    "fracturedMods": it.get("fracturedMods", []),
+                    **self._char_mods(it),
                 })
             return {"ok": True, "items": items}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    @staticmethod
+    def _char_mods(it):
+        # character-window mods arrive either as plain strings (old format) or
+        # as {"description": ..., "flags": {"crafted"/"fractured": true}} objects
+        # with crafted/fractured merged into explicitMods (new format). Emit the
+        # old string-array contract either way, re-splitting flagged mods.
+        out = {"implicitMods": [], "explicitMods": [], "craftedMods": [],
+               "enchantMods": [], "fracturedMods": []}
+        for src in out:
+            for m in it.get(src, []) or []:
+                if isinstance(m, str):
+                    out[src].append(m)
+                    continue
+                if not isinstance(m, dict):
+                    continue
+                line = m.get("description") or m.get("line") or ""
+                if not line:
+                    continue
+                flags = m.get("flags") or {}
+                if src in ("implicitMods", "explicitMods") and flags.get("crafted"):
+                    out["craftedMods"].append(line)
+                elif src == "explicitMods" and flags.get("fractured"):
+                    out["fracturedMods"].append(line)
+                else:
+                    out[src].append(line)
+        return out
 
     # -- unique item art: one trade lookup per unique, cached on disk forever ----
     def unique_icon(self, name, base):
@@ -337,16 +360,19 @@ class Api:
                 pass
             return {"ok": False, "error": str(e)}
 
-    def gem_icon(self, name):
+    def gem_icon(self, name, disc_type=None, disc=None):
         """Proper single-frame gem art via one trade lookup (RePoE gem art is
-        often a multi-frame atlas). Cached forever alongside unique icons."""
+        often a multi-frame atlas). Cached forever alongside unique icons.
+        Transfigured gems are a discriminated base type on the trade API —
+        pass disc_type/disc (e.g. "Frostblink", "alt_x") for those."""
         try:
             key = "gem::" + name
             cached = self._unique_icons.get(key)
             if cached:
                 return {"ok": True, "icon": cached}
+            qtype = {"option": disc_type, "discriminator": disc} if (disc_type and disc) else name
             search = self._http(TRADE_BASE + "/search/Standard",
-                                {"query": {"status": {"option": "any"}, "type": name}},
+                                {"query": {"status": {"option": "any"}, "type": qtype}},
                                 background=True)
             ids = search.get("result", [])[:1]
             if not ids:
@@ -718,6 +744,9 @@ class Api:
                 f.write('robocopy "%s" "%s" /E /MOVE /R:60 /W:1 /NFL /NDL /NJH /NJS >> "_update.log" 2>&1\n'
                         % (staged, APP_DIR))
                 if exe_path:
+                    # brief pause before relaunch: antivirus rescans the freshly
+                    # written exe, and launching into that scan can fail
+                    f.write("ping -n 4 127.0.0.1 >nul\n")
                     f.write('start "" "%s"\n' % exe_path)
                 f.write('echo update finished %date% %time% >> "_update.log"\n')
                 f.write('del "%~f0"\n')
