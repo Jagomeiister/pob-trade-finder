@@ -51,10 +51,18 @@
   }
 
   // ---- settings persistence ----------------------------------------------
+  // localStorage is the live cache; the Python bridge is the durable copy
+  // (the exe's WebView2 storage does not survive restarts reliably)
   var SETTINGS_KEY = 'pobtf-settings';
+  function persist(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { /* fine */ }
+    if (isGui() && window.pywebview.api.storage_set) {
+      window.pywebview.api.storage_set(key, value).then(function () {}, function () {});
+    }
+  }
   function saveSettings() {
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      persist(SETTINGS_KEY, JSON.stringify({
         league: document.getElementById('league').value,
         status: document.getElementById('trade-status').value,
         saleType: document.getElementById('sale-type').value,
@@ -143,7 +151,7 @@
         try {
           var s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
           s.account = acct;
-          localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+          persist(SETTINGS_KEY, JSON.stringify(s));
         } catch (e) { /* fine */ }
       } catch (e) {
         status.textContent = '❌ ' + e.message;
@@ -234,6 +242,37 @@
       checkForUpdates();
       setInterval(checkForUpdates, 4 * 3600 * 1000); // not just at launch
       refreshSessionStatus();
+      hydrateFromBridge();
+    }
+
+    // pull durable state from the bridge and re-apply it to the UI
+    async function hydrateFromBridge() {
+      if (!window.pywebview.api.storage_get) return;
+      try {
+        var r = await window.pywebview.api.storage_get();
+        if (!r || !r.ok || !r.data) return;
+        Object.keys(r.data).forEach(function (k) {
+          try { localStorage.setItem(k, r.data[k]); } catch (e) { /* fine */ }
+        });
+        var saved = loadSettings();
+        if (saved.league && Array.prototype.some.call(document.getElementById('league').options,
+            function (o) { return o.value === saved.league; })) {
+          document.getElementById('league').value = saved.league;
+        }
+        if (saved.status) document.getElementById('trade-status').value = saved.status;
+        if (saved.saleType) document.getElementById('sale-type').value = saved.saleType;
+        if (saved.eqCurrency) document.getElementById('eq-currency').value = saved.eqCurrency;
+        if (saved.pseudo !== undefined) document.getElementById('pseudo').checked = saved.pseudo;
+        if (saved.pct) {
+          document.getElementById('pct').value = saved.pct;
+          document.getElementById('pct-label').textContent = saved.pct + '%';
+        }
+        if (saved.account) document.getElementById('acct-input').value = saved.account;
+        var ta = document.getElementById('pob-input');
+        if (saved.lastCode && !ta.value.trim()) ta.value = saved.lastCode;
+        refreshBuildSelect();
+        renderBasket();
+      } catch (e) { /* browser mode / bridge unavailable */ }
     }
     if (isGui()) markGui();
     else window.addEventListener('pywebviewready', markGui);
@@ -419,7 +458,7 @@
     catch (e) { return []; }
   }
   function saveBuildLib(lib) {
-    try { localStorage.setItem('pobtf-builds', JSON.stringify(lib.slice(0, 20))); }
+    try { persist('pobtf-builds', JSON.stringify(lib.slice(0, 20))); }
     catch (e) { /* storage full/unavailable */ }
   }
   function refreshBuildSelect() {
@@ -471,6 +510,39 @@
   }
 
   function gemsWord(n) { return n + (n === 1 ? ' gem' : ' gems'); }
+
+  // RePoE gem art is often a horizontal multi-frame atlas — crop to frame one
+  function markAtlas() {
+    if (!this.dataset.swapped && this.naturalWidth >= this.naturalHeight * 1.6) {
+      this.classList.add('atlas2');
+    }
+  }
+
+  function applyGemIcon(name, icon) {
+    document.querySelectorAll('img[data-gem="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]')
+      .forEach(function (img) {
+        img.src = icon;
+        img.dataset.swapped = '1';
+        img.classList.remove('atlas2');
+      });
+  }
+
+  // background: swap every gem row to the trade site's single-frame art.
+  // First run costs throttled lookups; afterwards it's all disk cache.
+  async function resolveGemIcons(names) {
+    if (!isGui() || !window.pywebview.api.gem_icon) return;
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      if (GEM_ICONS[name]) { applyGemIcon(name, GEM_ICONS[name]); continue; }
+      try {
+        var res = await window.pywebview.api.gem_icon(gemTradeName(name));
+        if (res && res.ok && res.icon) {
+          GEM_ICONS[name] = res.icon;
+          applyGemIcon(name, res.icon);
+        }
+      } catch (e) { return; /* bridge gone — stop quietly */ }
+    }
+  }
 
   function makeGemsCard(gemGroups) {
     var totalGems = 0;
@@ -524,10 +596,17 @@
                              gem.name.split(' ').length >= 3;
         var corruptOnly = gem.level >= 21 || gem.quality >= 23 || isVaal;
         var gemIconPath = gemArtPath(gem.name);
-        if (gemIconPath) {
+        if (gemIconPath || GEM_ICONS[gem.name]) {
           var gIcon = document.createElement('img');
           gIcon.className = 'gem-icon';
-          gIcon.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
+          gIcon.dataset.gem = gem.name;
+          if (GEM_ICONS[gem.name]) {
+            gIcon.src = GEM_ICONS[gem.name];
+            gIcon.dataset.swapped = '1';
+          } else {
+            gIcon.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
+            gIcon.onload = markAtlas;
+          }
           gIcon.loading = 'lazy';
           gIcon.alt = '';
           row.appendChild(gIcon);
@@ -611,10 +690,17 @@
           // trade-style header: big gem art + name + current minimums
           var ph = document.createElement('div');
           ph.className = 'gem-panel-head';
-          if (gemIconPath) {
+          if (gemIconPath || GEM_ICONS[gem.name]) {
             var big = document.createElement('img');
             big.className = 'gem-big-icon';
-            big.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
+            big.dataset.gem = gem.name;
+            if (GEM_ICONS[gem.name]) {
+              big.src = GEM_ICONS[gem.name];
+              big.dataset.swapped = '1';
+            } else {
+              big.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
+              big.onload = markAtlas;
+            }
             big.alt = '';
             ph.appendChild(big);
           }
@@ -711,6 +797,15 @@
       });
     });
     card.appendChild(body);
+
+    // background: replace atlas art with proper single-frame trade renders
+    var uniqueNames = [];
+    gemGroups.forEach(function (g) {
+      g.gems.forEach(function (gem) {
+        if (uniqueNames.indexOf(gem.name) === -1) uniqueNames.push(gem.name);
+      });
+    });
+    resolveGemIcons(uniqueNames);
 
     var opts = document.createElement('div');
     opts.className = 'card-opts';
@@ -1633,7 +1728,7 @@
     catch (e) { return []; }
   }
   function saveBasket(b) {
-    try { localStorage.setItem('pobtf-basket', JSON.stringify(b.slice(0, 40))); }
+    try { persist('pobtf-basket', JSON.stringify(b.slice(0, 40))); }
     catch (e) { /* fine */ }
   }
   function pinToBasket(li) {

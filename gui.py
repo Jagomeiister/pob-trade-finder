@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -58,6 +58,14 @@ class Api:
         except Exception:
             pass
         self._live_subs = {}  # searchId -> {'queue': [], 'status': str, 'ws': app}
+        # durable key-value store: the exe's WebView2 localStorage is ephemeral
+        # (onefile temp dirs), so persistence lives here instead
+        self._storage_path = os.path.join(DATA_DIR, "storage.json")
+        try:
+            with open(self._storage_path, "r", encoding="utf-8") as f:
+                self._storage = json.load(f)
+        except Exception:
+            self._storage = {}
 
     # -- shared HTTP helper: quota-aware throttle, global 429 lockout ------------
     def _read_quota(self, headers):
@@ -472,6 +480,19 @@ class Api:
             key(VK_CONTROL); key(VK_V); key(VK_V, True); key(VK_CONTROL, True)  # paste
             time.sleep(0.08)
             key(VK_RETURN); key(VK_RETURN, True)          # send
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # -- durable storage for the web app -------------------------------------------
+    def storage_get(self):
+        return {"ok": True, "data": self._storage}
+
+    def storage_set(self, key, value):
+        try:
+            self._storage[str(key)] = str(value)
+            with open(self._storage_path, "w", encoding="utf-8") as f:
+                json.dump(self._storage, f)
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
