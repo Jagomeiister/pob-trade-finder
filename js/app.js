@@ -1130,6 +1130,12 @@
       if (item.mods.some(function (m) { return m.fractured; })) {
         state.fracToggle = makeToggle(opts, 'Require fractured mod(s)', false);
       }
+      // 2+ resistance mods -> offer any-split total matching (weight group)
+      if (state.rows.filter(isFlexResRow).length >= 2) {
+        state.flexToggle = makeToggle(opts, 'Flexible resistances (any split)', false);
+        state.flexToggle.checkbox.parentElement.title =
+          'Match the combined resistance total instead of each roll separately — an item with the same total split differently still matches. Needs Pseudo totals on. In-app price checks need a saved POESESSID (higher query budget); trade-site links work while you are logged in there.';
+      }
     }
     // Base defence percentile filter — armour pieces only
     var isArmourSlot = /^(Helmet|Body Armour|Gloves|Boots)/i.test(slot) ||
@@ -1477,12 +1483,25 @@
     var tradeFilters = Object.keys(tf).length ? { trade_filters: { filters: tf } } : null;
 
     var requireFrac = state.fracToggle && state.fracToggle.checkbox.checked;
+    var flexOn = state.flexToggle && state.flexToggle.checkbox.checked && pseudoOn;
+    var flexDiverted = []; // {id, weight, min}
     var filters = [];
     var seenIds = {};
     state.rows.forEach(function (r) {
       if (!r.cb.checked || !r.match) return;
       var eff = effectiveMatch(r, pseudoOn);
       var f = { id: eff.entry.id };
+      // flexible resistances: divert res rows into a weight group
+      if (flexOn && isFlexResRow(r) && !(requireFrac && r.mod.fractured)) {
+        var min = parseFloat(r.minInput.value);
+        if (!isNaN(min) && min > 0) {
+          var w = /all_elemental_resistances$/.test(eff.entry.id) ? 3 : 1;
+          var existing = flexDiverted.find(function (d) { return d.id === eff.entry.id; });
+          if (existing) existing.min += min;
+          else flexDiverted.push({ id: eff.entry.id, weight: w, min: min });
+          return;
+        }
+      }
       // "Require fractured": swap to the fractured twin of the EXACT matched
       // stat (same stat number keeps locality — text lookup would resolve
       // local armour/evasion mods to their global twins)
@@ -1541,16 +1560,36 @@
       if (tradeFilters) uFilters.trade_filters = tradeFilters.trade_filters;
       if (Object.keys(uFilters).length) query.filters = uFilters;
     } else {
-      if (!filters.length) { if (!quiet) alert('No mods selected for this search.'); return null; }
+      // a weight group needs 2+ members to mean anything — otherwise restore
+      if (flexDiverted.length === 1) {
+        var lone = flexDiverted.pop();
+        filters.push({ id: lone.id, value: { min: lone.min } });
+      }
+      if (!filters.length && !flexDiverted.length) {
+        if (!quiet) alert('No mods selected for this search.');
+        return null;
+      }
 
       var mode = state.modeSel ? parseInt(state.modeSel.value, 10) : 0;
-      var group;
-      if (mode > 0 && filters.length > mode) {
-        group = { type: 'count', value: { min: filters.length - mode }, filters: filters };
-      } else {
-        group = { type: 'and', filters: filters };
+      query.stats = [];
+      if (filters.length) {
+        var group;
+        if (mode > 0 && filters.length > mode) {
+          group = { type: 'count', value: { min: filters.length - mode }, filters: filters };
+        } else {
+          group = { type: 'and', filters: filters };
+        }
+        query.stats.push(group);
       }
-      query.stats = [group];
+      if (flexDiverted.length >= 2) {
+        var flexMin = 0;
+        flexDiverted.forEach(function (d) { flexMin += d.min * d.weight; });
+        query.stats.push({
+          type: 'weight',
+          value: { min: Math.round(flexMin) },
+          filters: flexDiverted.map(function (d) { return { id: d.id, value: { weight: d.weight } }; })
+        });
+      }
 
       var qFilters = {};
       var cat = categoryFor(state.slot, state.item);
@@ -1600,6 +1639,12 @@
       return sc > 0 ? 3 : 6; // unknown sockets: don't restrict below 6
     }
     return 0; // jewellery, jewels, flasks
+  }
+
+  var FLEX_RES_RE = /pseudo_total_(fire|cold|lightning|chaos)_resistance$|pseudo_total_elemental_resistance$|pseudo_total_all_elemental_resistances$/;
+
+  function isFlexResRow(r) {
+    return !!(r.match && r.match.pseudo && FLEX_RES_RE.test(r.match.pseudo.entry.id));
   }
 
   function basePercentileFilter(state) {
@@ -2171,7 +2216,10 @@
       var res = await window.pywebview.api.trade_search(league, payloadStr);
       if (seq !== state.priceSeq) return; // superseded by a newer search
       if (!res.ok) {
-        box.textContent = '❌ ' + res.error;
+        box.textContent = '❌ ' + res.error +
+          (/complex/i.test(res.error || '') && !HAS_SESSION
+            ? ' — flexible-resistance checks need a saved POESESSID (higher query budget); the trade-site link works while logged in there.'
+            : '');
         state.priceState = null; // stop the sold watcher polling a dead panel
         return;
       }

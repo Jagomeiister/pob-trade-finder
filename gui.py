@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.5.1"
+VERSION = "1.6.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -104,10 +104,12 @@ class Api:
                 time.sleep(wait)
             self._last_call = time.time()
         data = json.dumps(payload).encode() if payload is not None else None
-        req = urllib.request.Request(url, data=data, headers={
-            "User-Agent": UA,
-            "Content-Type": "application/json",
-        })
+        headers = {"User-Agent": UA, "Content-Type": "application/json"}
+        # logged-in trade requests get higher rate and query-complexity budgets
+        # (needed for weight-group searches); cookie goes only to pathofexile.com
+        if self._poesessid and "pathofexile.com" in url:
+            headers["Cookie"] = "POESESSID=" + self._poesessid
+        req = urllib.request.Request(url, data=data, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 hold = self._read_quota(resp.headers)

@@ -60,6 +60,10 @@ Per-card options:
 - **Same base type** — exact base filter (on by default for weapons)
 - **Match** — *all mods* / *all but one* (default — upgrades usually miss one mod) / *all but two*
 - **Require influence** — on by default when the build item is influenced (the mod pool needs it)
+- **Flexible resistances (any split)** — on cards with 2+ resistance mods: match the
+  *combined* total instead of each roll separately (a 75% total split 20/55 matches a
+  build asking 35/40). Site links work while logged in there; in-app checks need a
+  saved POESESSID (weight searches use the logged-in query budget)
 - **Min item level / Base %ile ≥ / Sockets ≥ / Links ≥** — caps are slot-aware
   (helm/gloves/boots max 4, shields 3, body 6); links default to the build item's 5/6-link
 - **Require fractured mod(s)** — the fractured mod must actually be fractured (crafting-base shopping)
