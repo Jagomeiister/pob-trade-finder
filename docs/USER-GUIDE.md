@@ -94,6 +94,14 @@ While a results panel is open, the app **re-checks it every 60s** and greys out 
 The **Build cost panel** (appears above the results) totals the cheapest listing per
 priced slot in chaos, with a divine conversion — run **Check all prices** to fill it.
 
+**The solver** (bottom of the cost panel): set build-wide targets — *Total ele res ≥*
+and *Total life ≥* — and **Solve cheapest combo**. It scores every priced listing's
+resistances and life, then finds the cheapest one-listing-per-slot combination that
+meets the targets, letting slots trade off against each other (overshooting res on a
+cheap ring so the expensive helm doesn't need any). ✔ COMBO = targets met; ⚠ BEST TRY
+means they're unreachable with what's priced — check more pages or slots. One click
+pins the whole combination to the basket.
+
 ## 6. Buying
 
 **⚡ Instant buyout listings** (fee shown, e.g. `⚡ instant · fee 4,368 gold`):

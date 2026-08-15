@@ -1839,6 +1839,99 @@
     }
   }
 
+  // ---- budget solver: cheapest listing combo meeting build-wide targets ----------
+  // Scores every cached listing's total elemental resistance and life via the
+  // matcher, then optimizes one pick per slot: start cheapest, then repeatedly
+  // make the best "stat gained per chaos added" swap until targets are met.
+  var RES_TAILS = { stat_3372524247: 1, stat_4220027924: 1, stat_1671376347: 1,   // fire/cold/lightning
+                    stat_2901986750: 3,                                            // all ele res
+                    stat_2915988346: 2, stat_4277795662: 2, stat_1876857497: 2 };  // dual res
+  var LIFE_TAIL = 'stat_3299347043';
+
+  function scoreListing(li, slot) {
+    var res = 0, life = 0;
+    [['implicitMods', 'implicit'], ['explicitMods', 'explicit'], ['craftedMods', 'crafted'],
+     ['fracturedMods', 'fractured'], ['enchantMods', 'implicit']].forEach(function (pair) {
+      (li[pair[0]] || []).forEach(function (raw) {
+        var line = typeof raw === 'string' ? raw : (raw.description || '');
+        if (!line) return;
+        var m = Matcher.matchMod(statIndex, {
+          line: line, kind: pair[1] === 'implicit' ? 'implicit' : 'explicit',
+          crafted: pair[0] === 'craftedMods', fractured: pair[0] === 'fracturedMods'
+        }, slot);
+        if (!m || m.avg === null) return;
+        var tail = m.entry.id.split('.').pop().split('|')[0];
+        if (tail in RES_TAILS) res += m.avg * RES_TAILS[tail];
+        if (tail === LIFE_TAIL) life += m.avg;
+      });
+    });
+    return { res: res, life: life };
+  }
+
+  function solveBudget(resTarget, lifeTarget) {
+    var league = document.getElementById('league').value;
+    var slots = [];
+    cards.forEach(function (state) {
+      if (!state.priceState || state.bought || state.gemSpec) return;
+      var cands = [];
+      Object.keys(state.priceState.cache).forEach(function (pg) {
+        state.priceState.cache[pg].forEach(function (li) {
+          if (li.amount === null || li.amount === undefined) return;
+          var rate = RATES[league] && RATES[league][li.currency];
+          if (rate === undefined) return;
+          var score = scoreListing(li, state.slot);
+          cands.push({ li: li, chaos: li.amount * rate, res: score.res, life: score.life });
+        });
+      });
+      if (cands.length) {
+        cands.sort(function (a, b) { return a.chaos - b.chaos; });
+        slots.push({ state: state, cands: cands, pick: 0 });
+      }
+    });
+    if (slots.length < 2) return { ok: false, error: 'Price-check at least two slots first (Check all prices).' };
+
+    function totals() {
+      var t = { chaos: 0, res: 0, life: 0 };
+      slots.forEach(function (s) {
+        var c = s.cands[s.pick];
+        t.chaos += c.chaos; t.res += c.res; t.life += c.life;
+      });
+      return t;
+    }
+
+    // greedy upgrades: best deficit-closed-per-chaos swap until targets met
+    var guard = 0;
+    while (guard++ < 500) {
+      var t = totals();
+      var resDef = Math.max(0, resTarget - t.res);
+      var lifeDef = Math.max(0, lifeTarget - t.life);
+      if (resDef <= 0 && lifeDef <= 0) break;
+      var best = null;
+      slots.forEach(function (s) {
+        var cur = s.cands[s.pick];
+        s.cands.forEach(function (cand, idx) {
+          if (idx === s.pick) return;
+          var dChaos = cand.chaos - cur.chaos;
+          var gain = Math.min(resDef, Math.max(0, cand.res - cur.res)) +
+                     Math.min(lifeDef, Math.max(0, cand.life - cur.life)) / 10;
+          if (gain <= 0) return;
+          var eff = gain / Math.max(0.5, dChaos);
+          if (dChaos <= 0) eff = Infinity; // strictly better and cheaper/equal
+          if (!best || eff > best.eff) best = { slot: s, idx: idx, eff: eff };
+        });
+      });
+      if (!best) break; // no swap helps — targets unreachable with these listings
+      best.slot.pick = best.idx;
+    }
+    var finalT = totals();
+    return {
+      ok: true,
+      met: finalT.res >= resTarget && finalT.life >= lifeTarget,
+      totals: finalT,
+      picks: slots.map(function (s) { return { state: s.state, cand: s.cands[s.pick] }; })
+    };
+  }
+
   function renderCostSummary() {
     var box = document.getElementById('cost-summary');
     if (!box) return;
@@ -1866,6 +1959,68 @@
     totalRow.innerHTML = '<span class="cost-slot">TOTAL</span><span class="cost-item">' +
       rows.length + ' slot(s) priced</span><span class="cost-amt">' + fmtEq(total, league) + secondary + '</span>';
     box.appendChild(totalRow);
+    renderSolver(box, league);
+  }
+
+  var solverResTarget = 300, solverLifeTarget = 0, solverResult = null;
+
+  function renderSolver(box, league) {
+    var bar = document.createElement('div');
+    bar.className = 'solve-bar';
+    var lbl = document.createElement('span');
+    lbl.className = 'cost-slot';
+    lbl.textContent = 'SOLVER';
+    lbl.title = 'Cheapest combination of priced listings that still meets build-wide targets — slots trade off against each other';
+    bar.appendChild(lbl);
+    var resIn = makeMiniInput(bar, 'Total ele res ≥', '300');
+    resIn.value = solverResTarget || '';
+    resIn.addEventListener('change', function () { solverResTarget = parseFloat(this.value) || 0; });
+    var lifeIn = makeMiniInput(bar, 'Total life ≥', '0');
+    lifeIn.value = solverLifeTarget || '';
+    lifeIn.addEventListener('change', function () { solverLifeTarget = parseFloat(this.value) || 0; });
+    var solveBtn = document.createElement('button');
+    solveBtn.className = 'copy-btn';
+    solveBtn.textContent = 'Solve cheapest combo';
+    solveBtn.addEventListener('click', function () {
+      solverResult = solveBudget(solverResTarget || 0, solverLifeTarget || 0);
+      renderCostSummary();
+    });
+    bar.appendChild(solveBtn);
+    box.appendChild(bar);
+
+    if (!solverResult) return;
+    if (!solverResult.ok) {
+      var err = document.createElement('div');
+      err.className = 'cost-row';
+      err.innerHTML = '<span class="cost-slot"></span><span class="cost-item">' + esc(solverResult.error) + '</span>';
+      box.appendChild(err);
+      return;
+    }
+    solverResult.picks.forEach(function (p) {
+      var row = document.createElement('div');
+      row.className = 'cost-row';
+      row.innerHTML = '<span class="cost-slot">' + esc(p.state.slot) + '</span>' +
+        '<span class="cost-item">' + esc(((p.cand.li.name ? p.cand.li.name + ' ' : '') + p.cand.li.base)) +
+        ' <span class="chaos-eq">res ' + Math.round(p.cand.res) + ' · life ' + Math.round(p.cand.life) + '</span></span>' +
+        '<span class="cost-amt">' + fmtEq(p.cand.chaos, league) + '</span>';
+      box.appendChild(row);
+    });
+    var t = solverResult.totals;
+    var sumRow = document.createElement('div');
+    sumRow.className = 'cost-row cost-total';
+    sumRow.innerHTML = '<span class="cost-slot">' + (solverResult.met ? '✔ COMBO' : '⚠ BEST TRY') + '</span>' +
+      '<span class="cost-item">res ' + Math.round(t.res) + ' · life ' + Math.round(t.life) +
+      (solverResult.met ? '' : ' — targets not reachable with the priced listings (price more pages/slots)') + '</span>' +
+      '<span class="cost-amt">' + fmtEq(t.chaos, league) + '</span>';
+    box.appendChild(sumRow);
+    var pinAll = document.createElement('button');
+    pinAll.className = 'copy-btn';
+    pinAll.textContent = '☆ Pin combo to basket';
+    pinAll.addEventListener('click', function () {
+      solverResult.picks.forEach(function (p) { pinToBasket(p.cand.li); });
+      pinAll.textContent = '★ Pinned ' + solverResult.picks.length;
+    });
+    box.appendChild(pinAll);
   }
 
   function fmtChaos(v) {
