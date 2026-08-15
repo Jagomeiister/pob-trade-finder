@@ -1,5 +1,9 @@
 # PoB Trade Finder
 
+[![Latest release](https://img.shields.io/github/v/release/Jagomeiister/pob-trade-finder?color=c9a55a&label=download)](https://github.com/Jagomeiister/pob-trade-finder/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Jagomeiister/pob-trade-finder/total?color=7f4fd0)](https://github.com/Jagomeiister/pob-trade-finder/releases)
+[![License](https://img.shields.io/badge/license-MIT-3c4)](LICENSE)
+
 **Paste a Path of Building code → get one-click, pre-filled official trade searches for
 every piece of gear in the build.** Shop for exactly the items the build creator used —
 no more hand-typing mods into pathofexile.com/trade.

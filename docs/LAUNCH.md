@@ -1,90 +1,74 @@
-# Launch Playbook
+# Launch kit
 
-Everything needed to take PoB Trade Finder public. The posts below are ready to paste —
-fill in the screenshot links and go.
+Ready-to-post announcements. Take 3–4 screenshots first (they carry the post):
 
-## 1. Screenshots to take first (3, from your real build)
+1. A loaded build — gear cards with item art, mods ticked, per-slot set dropdowns
+2. A price-check panel — listings with art, tiers, roll percentiles, 🔥 deal badge, socket colours
+3. The character-compare strips (green/gold/red slots + "missing: …")
+4. The build cost summary + gems tab
 
-1. **The money shot** — a gear card with price-check results open: item art, socket
-   colours, tier badges, roll percentiles, ≈chaos prices, deal badge if you have one
-2. **Character comparison** — the char bar loaded with "You: … 2/4 target mods ·
-   missing: …" strips visible on two or three cards
-3. **Build cost summary + gems tab** — the total panel, and the gems tab with icons
+Post timing: league launch week is the highest-traffic window; otherwise weekends.
 
-Drop them in an imgur album or the repo (`assets/`), link them in the posts.
+---
 
-## 2. Reddit — r/pathofexile (the launch that matters)
+## Reddit — r/pathofexile (flair: Tool)
 
-Check the subreddit's current tool-post rules before posting (some periods require the
-weekly tool thread). Flair: **Tool**.
+**Title:**
+I built a free tool that turns any PoB code into pre-filled trade searches — live prices, instant listing alerts, and a "what am I missing vs the build" diff
 
-**Title options (pick one):**
-- I built a tool that turns any PoB build into one-click trade searches — with live prices, character comparison, and instant listing alerts
-- PoB Trade Finder — paste a build code, shop every slot without touching the trade site's filter UI
+**Body:**
 
-**Body (paste, add links):**
+Like most of you I follow build guides, and I got sick of hand-typing every mod
+into the trade site for every slot. So I built **PoB Trade Finder** — a free,
+open-source Windows app:
 
-> Like everyone, I copy builds in PoB and then spend an evening hand-typing mods into
-> the trade site. So I built **PoB Trade Finder** — a free, open-source Windows app:
->
-> Paste a PoB code (or pobb.in link) and every gear slot, jewel, cluster, flask, and
-> **gem** becomes a pre-filled trade search — the exact mods the build creator used,
-> with min-rolls set relative to their rolls and clamped to what mods can actually roll.
->
-> The parts I actually use every day:
->
-> * **Live price checks in-app** — listings with item art, socket colours, mod tiers
->   (P2/S2), roll percentiles, base percentile, quality/catalysts — click any mod to
->   sort all results by it
-> * **Import your character** (public profile, no login) — every slot shows *matched /
->   close / missing* vs the build, so you only shop your gaps
-> * **Whole-build cost summary** in chaos/divine, per-slot max-price caps, a shopping
->   basket, and bought-tracking that counts your remaining cost down
-> * **Live search with sound** — and with your POESESSID it uses the trade site's real
->   WebSocket for instant alerts
-> * **In-game buying**: one-click whisper into your PoE chat, /hideout travel, instant
->   buyout supported (fee shown)
-> * Ctrl+C any item in game and paste it in to price it
->
-> Boring-but-important: it's **MIT open source**, reads GGG's public trade API with
-> quota-aware rate limiting (it parses the rate-limit headers and paces itself — no
-> louder than using the website), one action per click for anything in-game, no account
-> required (POESESSID is optional, stored only on your machine), and it self-updates
-> from GitHub releases.
->
-> Download: [github.com/Jagomeiister/pob-trade-finder/releases](https://github.com/Jagomeiister/pob-trade-finder/releases)
-> Source: [github.com/Jagomeiister/pob-trade-finder](https://github.com/Jagomeiister/pob-trade-finder)
->
-> PoE1 only right now — PoE2 support is on the list. Feedback and bug reports very welcome.
+**Paste a PoB code (or pobb.in link) and every slot becomes a card:**
+- One click opens the official trade site with the mods, min rolls, category,
+  influence, sockets/links all pre-filled — or price-check in-app (item art,
+  mod tiers, roll percentiles, base %ile, DPS)
+- **Compare with your character** (public profile, no login): each slot shows
+  matched / close / missing with the exact mods you lack — shop only the gaps
+- **Gems too** — the whole skill setup, grouped like PoB, with per-gem searches
+  (21/23, awakened, transfigured) and a "price all gems" total
+- **Budget tools**: max price per slot, whole-build cost total in chaos/div,
+  a solver that finds the cheapest *combination* of listings hitting your
+  build-wide res/attribute targets, 🔥 deal flags on underpriced listings
+- **Live search** with sound — instant WebSocket alerts if you add your
+  POESESSID (same mechanism as the site), polling otherwise
+- **Buying**: one-click whisper in game, /hideout travel, instant-buyout aware
+  (fee shown), shopping basket with totals, bought-tracking
+- Paste any in-game item (Ctrl+C) to price it
 
-## 3. Official forums
+Quality-of-life: auto-updates, dark PoE theme, accessibility options
+(colourblind socket letters, reduce motion, text scaling), and it respects
+GGG's rate limits properly (reads the quota headers, shows cooldowns instead
+of hammering).
 
-Post the same body (BBCode the links) in **Beyond → Community Tools**
-(pathofexile.com/forum/view-forum/tools). A forum thread is what most tool lists link to
-and what GGG staff occasionally bless with a sticky.
+**Download:** https://github.com/Jagomeiister/pob-trade-finder/releases/latest
+**Source (MIT):** https://github.com/Jagomeiister/pob-trade-finder
 
-## 4. Tool directories (submit once the thread exists)
+PoE1 only for now (PoE2 is on the roadmap). Not affiliated with GGG — it uses
+the public trade API and never automates anything against the site; every
+whisper/purchase is one click by you.
 
-- poe-vault.com/guides/path-of-exile-tools — contact form
-- poetools.net — submission link in footer
-- Awakened PoE Trade's "related tools" wiki + r/pathofexile wiki tools page (modmail)
+Feedback and bug reports very welcome — the mod matcher is fuzzed against real
+listings, but PoE has a long tail of weird mods; if one shows "no trade-stat
+match", paste it in an issue.
 
-## 5. First-week checklist
+---
 
-- [ ] Watch GitHub issues — first-day bug reports decide the tool's reputation; the
-      auto-updater means fixes reach everyone in hours
-- [ ] Answer every comment in the first 24h (sort by new)
-- [ ] Pin a "known issues / roadmap" issue on the repo
-- [ ] Best timing: 1–2 weeks before a league launch (peak build-planning traffic),
-      or the weekend after launch (peak gearing traffic)
+## Official forums — Beyond league tools thread / Tool Development
 
-## FAQ ammunition (questions you'll get)
+Same body as Reddit; title:
+**PoB Trade Finder — turn any Path of Building code into pre-filled trade searches (free, open source)**
 
-- **"Is this against ToS?"** It uses the public trade API and website links; in-game it
-  performs exactly one action per user click (same policy Awakened PoE Trade follows).
-  It parses GGG's rate-limit headers and throttles itself below the limits.
-- **"Why does it want my POESESSID?"** It doesn't — that's optional, only for instant
-  WebSocket alerts (the same live search the website has). Stored locally, sent only to
-  pathofexile.com. The code is open — check `gui.py`.
-- **"Virus warning on the exe?"** Unsigned PyInstaller exes sometimes trip SmartScreen.
-  The build script is in the repo — anyone can build from source or run `python gui.py`.
+---
+
+## Checklist before posting
+
+- [ ] Screenshots taken on a real, good-looking build (hide POESESSID field state)
+- [ ] Latest release installs clean on a machine without Python
+- [ ] README screenshots section updated with the same images
+- [ ] Watch the thread for the first few hours — fast replies to bug reports
+      convert sceptics; ship fixes with `python tools/build_release.py` +
+      `gh release create` and installs pick them up automatically
