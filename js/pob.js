@@ -295,6 +295,9 @@
           if (attr(gm[1], 'enabled') === 'false') continue;
           var gname = attr(gm[1], 'nameSpec');
           if (!gname) continue;
+          // real gems always carry a gemId; item-granted skills don't (and not
+          // every PoB version marks the parent Skill with a source attribute)
+          if (!attr(gm[1], 'gemId') && !attr(gm[1], 'variantId')) continue;
           group.gems.push({
             name: gname,
             level: parseInt(attr(gm[1], 'level') || '1', 10),

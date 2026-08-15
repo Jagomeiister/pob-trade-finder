@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.7.3"
+VERSION = "1.7.4"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -90,16 +90,22 @@ class Api:
                     hold = max(hold, lperiod / max(1, lmax))
         return hold
 
-    def _http(self, url, payload=None):
+    BG_INTERVAL = 6.0  # background (icon prefetch) calls pace far gentler
+
+    def _http(self, url, payload=None, background=False):
         with self._lock:
             now = time.time()
             hold = self._blocked_until - now
+            if background and hold > 0:
+                # background work never competes during any cooldown
+                raise RuntimeError("cooldown — background fetch skipped")
             if hold > 30:
                 # long cooldown (rate-limit penalty) — fail fast with a countdown
                 # instead of stacking sleeping threads that hammer on wake
                 raise RuntimeError("GGG rate-limit cooldown — %dm %ds remaining"
                                    % (int(hold) // 60, int(hold) % 60))
-            wait = max(MIN_INTERVAL - (now - self._last_call), hold)
+            interval = self.BG_INTERVAL if background else MIN_INTERVAL
+            wait = max(interval - (now - self._last_call), hold)
             if wait > 0:
                 time.sleep(wait)
             self._last_call = time.time()
@@ -306,11 +312,12 @@ class Api:
             if base and base != name:
                 query["query"]["type"] = base
             # Standard has every unique ever — league items may not exist yet
-            search = self._http(TRADE_BASE + "/search/Standard", query)
+            search = self._http(TRADE_BASE + "/search/Standard", query, background=True)
             ids = search.get("result", [])[:1]
             if not ids:
                 return {"ok": False, "error": "no listings found"}
-            fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ids[0], search["id"]))
+            fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ids[0], search["id"]),
+                                 background=True)
             for r in fetched.get("result", []):
                 icon = (r or {}).get("item", {}).get("icon", "")
                 if icon:
@@ -339,11 +346,13 @@ class Api:
             if cached:
                 return {"ok": True, "icon": cached}
             search = self._http(TRADE_BASE + "/search/Standard",
-                                {"query": {"status": {"option": "any"}, "type": name}})
+                                {"query": {"status": {"option": "any"}, "type": name}},
+                                background=True)
             ids = search.get("result", [])[:1]
             if not ids:
                 return {"ok": False, "error": "no listings"}
-            fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ids[0], search["id"]))
+            fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ids[0], search["id"]),
+                                 background=True)
             for r in fetched.get("result", []):
                 icon = (r or {}).get("item", {}).get("icon", "")
                 if icon:
@@ -645,16 +654,34 @@ class Api:
 
             exe_path = sys.executable if getattr(sys, "frozen", False) else None
             bat = os.path.join(APP_DIR, "_apply_update.bat")
+            log = os.path.join(APP_DIR, "_update.log")
             with open(bat, "w", encoding="ascii") as f:
                 f.write("@echo off\n")
-                f.write("timeout /t 2 /nobreak >nul\n")
-                f.write('robocopy "%s" "%s" /E /MOVE /NFL /NDL /NJH /NJS >nul\n'
+                f.write('cd /d "%~dp0"\n')
+                f.write('echo update started %date% %time% > "_update.log"\n')
+                # 'timeout' needs a console stdin and dies when run windowless —
+                # ping is the reliable console-free delay
+                f.write("ping -n 3 127.0.0.1 >nul\n")
+                # /R:60 /W:1 — retry the (briefly locked) exe every second
+                # instead of robocopy's default 30s waits
+                f.write('robocopy "%s" "%s" /E /MOVE /R:60 /W:1 /NFL /NDL /NJH /NJS >> "_update.log" 2>&1\n'
                         % (staged, APP_DIR))
                 if exe_path:
                     f.write('start "" "%s"\n' % exe_path)
+                f.write('echo update finished %date% %time% >> "_update.log"\n')
                 f.write('del "%~f0"\n')
-            subprocess.Popen(["cmd", "/c", bat], cwd=APP_DIR,
-                             creationflags=0x08000000)  # CREATE_NO_WINDOW
+            try:
+                os.remove(log)
+            except Exception:
+                pass
+            # fully detach: parent teardown (PyInstaller cleanup) must not
+            # touch the swap process. 0x08000000 CREATE_NO_WINDOW |
+            # 0x00000200 CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen(["cmd", "/c", bat], cwd=APP_DIR, close_fds=True,
+                             creationflags=0x08000000 | 0x00000200,
+                             stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
             for w in list(webview.windows):
                 try:
                     w.destroy()

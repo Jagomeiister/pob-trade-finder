@@ -738,8 +738,10 @@
             gIcon.dataset.swapped = '1';
           } else if (isGui()) {
             // atlas frames can't be told apart from wide single-frame art —
-            // hold an empty slot until the cached trade render arrives
+            // hold a blank slot until the cached trade render arrives
+            gIcon.src = BLANK_PX;
             gIcon.classList.add('pending');
+            gIcon.title = 'Gem art loads once from the trade site, then it\'s cached forever';
           } else if (gemIconPath) {
             gIcon.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
             gIcon.onload = markAtlas;
@@ -836,6 +838,7 @@
               big.src = GEM_ICONS[gem.name];
               big.dataset.swapped = '1';
             } else if (isGui()) {
+              big.src = BLANK_PX;
               big.classList.add('pending');
             } else if (gemIconPath) {
               big.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
@@ -946,7 +949,9 @@
         if (uniqueNames.indexOf(gem.name) === -1) uniqueNames.push(gem.name);
       });
     });
-    resolveGemIcons(uniqueNames);
+    // start after a beat so the user's own actions (price checks) go first;
+    // uncached art trickles in on the gentle background pace, cached is instant
+    setTimeout(function () { resolveGemIcons(uniqueNames); }, 4000);
 
     var opts = document.createElement('div');
     opts.className = 'card-opts';
@@ -2634,6 +2639,8 @@
 
   var FRAME_CLASS = { 0: 'normal', 1: 'magic', 2: 'rare', 3: 'unique', 4: 'gem' };
   var GEM_ICONS = {}; // gem name -> single-frame trade art (bridge-cached)
+  // srcless <img> renders a broken frame — pending slots use a blank pixel
+  var BLANK_PX = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
   var PROP_WHITELIST = ['Quality', 'Armour', 'Evasion Rating', 'Energy Shield', 'Ward',
                         'Physical Damage', 'Elemental Damage', 'Critical Strike Chance',
                         'Attacks per Second', 'Level'];
