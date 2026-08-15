@@ -110,7 +110,10 @@ Adds 4 to 7 Physical Damage to Attacks</Item>
       </Skill>
       <Skill enabled="true" slot="Helmet">
         <Gem enabled="true" nameSpec="Raise Spectre" level="21" quality="23" count="1"/>
-        <Gem enabled="true" nameSpec="Empower Support" level="4" quality="0" count="1"/>
+        <Gem enabled="true" nameSpec="Empower" level="4" quality="0" count="1"/>
+      </Skill>
+      <Skill enabled="true" slot="Weapon 1" source="Item:5:Whisper Bloom">
+        <Gem enabled="true" nameSpec="Granted By Item" level="20" quality="0" count="1"/>
       </Skill>
     </SkillSet>
     <SkillSet id="2" title="Leveling">
@@ -260,6 +263,7 @@ async function main() {
   assert(build.gems.length === 4, 'flattened gems keep per-group copies: ' + build.gems.length);
   assert(!build.gems.some(g => g.name === 'Disabled Gem'), 'disabled gems skipped');
   assert(!build.gems.some(g => g.name === 'Summon Raging Spirit'), 'inactive skill set skipped');
+  assert(!build.gems.some(g => g.name === 'Granted By Item'), 'item-granted skills skipped');
 
   console.log('== game clipboard item ==');
   const gameText = ['Item Class: Rings', 'Rarity: Rare', 'Corpse Bite', 'Steel Ring', '--------',

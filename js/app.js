@@ -177,6 +177,17 @@
     document.getElementById('hide-matched').addEventListener('change', function () {
       document.body.classList.toggle('hide-matched', this.checked);
     });
+    document.getElementById('sessid-save').addEventListener('click', async function () {
+      var inp = document.getElementById('sessid-input');
+      this.disabled = true;
+      try {
+        var r = await window.pywebview.api.set_poesessid(inp.value);
+        inp.value = '';
+        inp.placeholder = r && r.set ? 'POESESSID saved' : 'POESESSID (optional)';
+        await refreshSessionStatus();
+      } catch (e) { /* bridge missing in browser */ }
+      this.disabled = false;
+    });
 
     refreshBuildSelect();
     document.getElementById('save-build').addEventListener('click', function () {
@@ -221,6 +232,8 @@
     function markGui() {
       document.body.classList.add('gui');
       checkForUpdates();
+      setInterval(checkForUpdates, 4 * 3600 * 1000); // not just at launch
+      refreshSessionStatus();
     }
     if (isGui()) markGui();
     else window.addEventListener('pywebviewready', markGui);
@@ -239,11 +252,11 @@
       bar.classList.remove('hidden');
       document.getElementById('update-label').textContent =
         'Update ' + res.latest + ' available — you have v' + res.current;
-      document.getElementById('update-btn').addEventListener('click', function () {
+      document.getElementById('update-btn').onclick = function () {
         this.disabled = true;
         this.textContent = 'Updating… the app will restart itself';
         window.pywebview.api.apply_update(res.url);
-      });
+      };
     }).catch(function () { /* offline — skip */ });
   }
 
@@ -421,6 +434,20 @@
   }
 
   // ---- gem shopping list ----------------------------------------------------------
+  // PoB writes support gems without the " Support" suffix ("Enhance") but the
+  // trade site and art database use the full name ("Enhance Support").
+  function gemTradeName(name) {
+    var I = window.POE_BASE_ICONS || {};
+    if (I[name]) return name;
+    if (I[name + ' Support']) return name + ' Support';
+    return name;
+  }
+  function gemArtPath(name) {
+    var I = window.POE_BASE_ICONS || {};
+    var base = name.split(' of ')[0]; // transfigured gems share base art
+    return I[name] || I[name + ' Support'] || I[base] || I[base + ' Support'] || null;
+  }
+
   function gemPayload(gem, level, quality) {
     var misc = {};
     if (level > 1) misc.gem_level = { min: level };
@@ -431,7 +458,7 @@
     if (saleType !== 'any') filters.trade_filters = { filters: { sale_type: { option: saleType } } };
     var query = {
       status: { option: document.getElementById('trade-status').value },
-      type: gem.name
+      type: gemTradeName(gem.name)
     };
     if (Object.keys(filters).length) query.filters = filters;
     return { query: query, sort: { price: 'asc' } };
@@ -443,6 +470,8 @@
            '?q=' + encodeURIComponent(JSON.stringify(payload));
   }
 
+  function gemsWord(n) { return n + (n === 1 ? ' gem' : ' gems'); }
+
   function makeGemsCard(gemGroups) {
     var totalGems = 0;
     gemGroups.forEach(function (g) { totalGems += g.gems.length; });
@@ -451,18 +480,35 @@
     var head = document.createElement('div');
     head.className = 'card-head';
     head.innerHTML = '<div><span class="slot-tag">Skill Gems</span>' +
-      '<span class="item-name normal">' + gemGroups.length + ' link groups · ' + totalGems + ' gems</span></div>';
+      '<span class="item-name normal">' + gemGroups.length +
+      (gemGroups.length === 1 ? ' link group' : ' link groups') + ' · ' + gemsWord(totalGems) + '</span></div>';
     card.appendChild(head);
 
     var body = document.createElement('div');
     body.className = 'card-body';
     var rows = [];
-    gemGroups.forEach(function (group) {
-      // group header, PoB-style: socketed slot + setup name
+
+    // two levels: gear piece -> link groups socketed in it
+    var bySlot = {}, slotOrder = [];
+    gemGroups.forEach(function (g) {
+      var key = g.slot || 'Unassigned';
+      if (!bySlot[key]) { bySlot[key] = []; slotOrder.push(key); }
+      bySlot[key].push(g);
+    });
+
+    slotOrder.forEach(function (slotKey) {
+      var slotTotal = bySlot[slotKey].reduce(function (n, g) { return n + g.gems.length; }, 0);
+      var sh = document.createElement('div');
+      sh.className = 'gem-gear-head';
+      sh.innerHTML = '<span class="gem-gear-name">' + esc(slotKey) + '</span>' +
+        '<span class="gem-count">' + gemsWord(slotTotal) + '</span>';
+      body.appendChild(sh);
+
+      bySlot[slotKey].forEach(function (group) {
       var gh = document.createElement('div');
       gh.className = 'gem-group-head';
-      gh.innerHTML = (group.slot ? '<span class="gem-slot">' + esc(group.slot) + '</span>' : '') +
-        esc(group.title) + '<span class="gem-count"> · ' + group.gems.length + ' gems</span>';
+      gh.innerHTML = esc(group.title) +
+        '<span class="gem-count"> · ' + gemsWord(group.gems.length) + '</span>';
       body.appendChild(gh);
 
       group.gems.forEach(function (gem) {
@@ -470,15 +516,14 @@
         row.className = 'mod-row gem-row';
         var isVaal = /^Vaal /.test(gem.name);
         var isAwakened = /^Awakened /.test(gem.name);
-        var isExceptional = /^(Empower|Enlighten|Enhance) Support$/.test(gem.name);
+        var isExceptional = /^(Empower|Enlighten|Enhance)( Support)?$/.test(gem.name);
         // transfigured: "Skill of Variant" — excluding naturally "of"-named skills
         var NATURAL_OF = /^(Herald of|Purity of|Wave of Conviction|Orb of Storms|Sigil of Power|Eye of Winter|Tornado of|Fist of War)/;
         var isTransfigured = / of /.test(gem.name) && !isVaal && !NATURAL_OF.test(gem.name) &&
                              !/Support$/.test(gem.name) && gem.name.split(' of ')[1] &&
                              gem.name.split(' ').length >= 3;
         var corruptOnly = gem.level >= 21 || gem.quality >= 23 || isVaal;
-        var gemIconPath = window.POE_BASE_ICONS &&
-          (window.POE_BASE_ICONS[gem.name] || window.POE_BASE_ICONS[gem.name.split(' of ')[0]]);
+        var gemIconPath = gemArtPath(gem.name);
         if (gemIconPath) {
           var gIcon = document.createElement('img');
           gIcon.className = 'gem-icon';
@@ -589,7 +634,7 @@
 
           // swap the RePoE atlas art for the trade site's single-frame render
           if (isGui() && window.pywebview.api.gem_icon) {
-            window.pywebview.api.gem_icon(gem.name).then(function (res) {
+            window.pywebview.api.gem_icon(gemTradeName(gem.name)).then(function (res) {
               if (res && res.ok && res.icon) {
                 GEM_ICONS[gem.name] = res.icon;
                 var bigEl = ph.querySelector('.gem-big-icon');
@@ -662,6 +707,7 @@
         body.appendChild(row);
         body.appendChild(panel);
         rows.push({ gem: gem, lvlIn: lvlIn, qIn: qIn, priceSpan: priceSpan });
+      });
       });
     });
     card.appendChild(body);
@@ -1697,6 +1743,17 @@
   // ---- live search: poll for new listings, ding on arrival (desktop app only) ----
   var liveCount = 0;
   var audioCtx = null;
+  var HAS_SESSION = false; // POESESSID saved -> instant WebSocket live search
+
+  async function refreshSessionStatus() {
+    if (!isGui() || !window.pywebview.api.session_status) return;
+    try {
+      var r = await window.pywebview.api.session_status();
+      HAS_SESSION = !!(r && r.set);
+      var el = document.getElementById('sessid-status');
+      if (el) el.textContent = HAS_SESSION ? '🟢 instant alerts on' : '';
+    } catch (e) { /* browser mode */ }
+  }
 
   function initAudio() {
     if (!audioCtx) {
@@ -1731,7 +1788,8 @@
     liveCount++;
     // freeze the query at go-live: mid-session control changes must not shift
     // the result window (that would make old listings look "new")
-    state.live = { seen: null, timer: null, found: 0,
+    state.live = { seen: null, timer: null, found: 0, subId: null,
+                   mode: HAS_SESSION ? 'ws' : 'poll',
                    payloadStr: JSON.stringify(payload),
                    league: document.getElementById('league').value };
     state.liveBtn.textContent = '⏹ Stop live';
@@ -1740,18 +1798,25 @@
     state.liveBox.innerHTML = '';
     var head = document.createElement('div');
     head.className = 'live-head';
-    head.textContent = '🔴 LIVE — watching for new listings…';
+    head.textContent = state.live.mode === 'ws'
+      ? '🟢 INSTANT — connecting to the live-search WebSocket…'
+      : '🔴 LIVE — watching for new listings…';
     var feed = document.createElement('div');
     state.liveBox.appendChild(head);
     state.liveBox.appendChild(feed);
     state.live.head = head;
     state.live.feed = feed;
-    liveTick(state);
+    if (state.live.mode === 'ws') startWsLive(state);
+    else liveTick(state);
   }
 
   function stopLive(state) {
     if (!state.live) return;
     clearTimeout(state.live.timer);
+    clearInterval(state.live.timer);
+    if (state.live.subId && isGui() && window.pywebview.api.live_stop) {
+      window.pywebview.api.live_stop(state.live.subId).then(function () {}, function () {});
+    }
     state.live = null;
     liveCount--;
     if (state.liveBtn) {
@@ -1762,6 +1827,70 @@
       var h = state.liveBox.querySelector('.live-head');
       if (h) h.textContent = '⏹ live stopped';
     }
+  }
+
+  // shared renderer for freshly-arrived live listings (polling or WebSocket)
+  function renderLiveFresh(state, session, listings, freshCount) {
+    playDing();
+    session.found += freshCount;
+    var tails = tailsFor(state);
+    var stamp = document.createElement('div');
+    stamp.className = 'live-stamp';
+    stamp.textContent = '— ' + freshCount + ' new @ ' + new Date().toLocaleTimeString() + ' —';
+    session.feed.insertBefore(stamp, session.feed.firstChild);
+    listings.slice().reverse().forEach(function (li) {
+      var card = listingCard(li, tails, state);
+      card.classList.add('live-new');
+      session.feed.insertBefore(card, session.feed.firstChild);
+    });
+    session.head.textContent = (session.mode === 'ws' ? '🟢 INSTANT — ' : '🔴 LIVE — ') +
+      session.found + ' new listing(s) found so far';
+  }
+
+  async function startWsLive(state) {
+    var session = state.live;
+    try {
+      var res = await window.pywebview.api.live_start(session.league, session.payloadStr);
+      if (state.live !== session) {
+        if (res && res.ok) window.pywebview.api.live_stop(res.subId).then(function () {}, function () {});
+        return;
+      }
+      if (!res.ok) {
+        session.mode = 'poll';
+        session.head.textContent = '🔴 LIVE (polling — instant unavailable: ' + res.error + ')';
+        liveTick(state);
+        return;
+      }
+      session.subId = res.subId;
+      session.head.textContent = '🟢 INSTANT — ' + res.total +
+        ' existing listings, new ones alert the moment they appear';
+      session.timer = setInterval(function () { wsPoll(state, session); }, 1500);
+    } catch (e) {
+      if (state.live === session) {
+        session.mode = 'poll';
+        session.head.textContent = '🔴 LIVE (polling — ' + e.message + ')';
+        liveTick(state);
+      }
+    }
+  }
+
+  async function wsPoll(state, session) {
+    if (state.live !== session) return;
+    try {
+      var r = await window.pywebview.api.live_poll(session.subId);
+      if (state.live !== session || !r.ok) return;
+      if (r.status && r.status.indexOf('error') === 0) {
+        session.head.textContent = '🟠 INSTANT (reconnect needed) — ' + r.status +
+          ' — is your POESESSID still valid?';
+        return;
+      }
+      if (r.ids && r.ids.length) {
+        var r2 = await window.pywebview.api.trade_fetch(session.subId, JSON.stringify(r.ids.slice(0, 10)));
+        if (r2.ok && state.live === session && r2.listings.length) {
+          renderLiveFresh(state, session, r2.listings, r.ids.length);
+        }
+      }
+    } catch (e) { /* transient — next poll */ }
   }
 
   async function liveTick(state) {
@@ -1781,19 +1910,7 @@
           if (fresh.length) {
             var r2 = await window.pywebview.api.trade_fetch(res.searchId, JSON.stringify(fresh.slice(0, 10)));
             if (r2.ok && state.live === session) {
-              playDing();
-              session.found += fresh.length;
-              var tails = tailsFor(state);
-              var stamp = document.createElement('div');
-              stamp.className = 'live-stamp';
-              stamp.textContent = '— ' + fresh.length + ' new @ ' + new Date().toLocaleTimeString() + ' —';
-              session.feed.insertBefore(stamp, session.feed.firstChild);
-              r2.listings.reverse().forEach(function (li) {
-                var card = listingCard(li, tails, state);
-                card.classList.add('live-new');
-                session.feed.insertBefore(card, session.feed.firstChild);
-              });
-              session.head.textContent = '🔴 LIVE — ' + session.found + ' new listing(s) found so far';
+              renderLiveFresh(state, session, r2.listings, fresh.length);
             }
           }
         }

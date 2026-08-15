@@ -141,6 +141,16 @@ ding** and appear at the top with a red flash and timestamp. Maximum 2 live sear
 once. The query is frozen at go-live, so changing filters mid-watch can't corrupt it.
 Press ⏹ to stop.
 
+### 7b. Instant alerts (POESESSID)
+
+Paste your **POESESSID** cookie into the field in the character bar and Save — live
+searches then use the trade site's real **WebSocket**: new listings alert **the moment
+they're listed** (🟢 INSTANT), not on a 30-second poll. To find the cookie: on
+pathofexile.com while logged in, press F12 → Application → Cookies → `POESESSID`.
+It's stored only on this machine (`data/session.json`), sent only to pathofexile.com,
+and you can clear it by saving an empty field. If the session expires, live searches
+say so and fall back to polling.
+
 ## 8. Rate limits
 
 The app reads GGG's quota headers and paces itself — sustained use should never trip a

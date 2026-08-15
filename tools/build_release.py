@@ -43,13 +43,14 @@ def main():
     v = version()
     print("Building PoB Trade Finder v%s" % v)
 
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyinstaller", "pywebview"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyinstaller", "pywebview", "websocket-client"], check=True)
     subprocess.run([
         sys.executable, "-m", "PyInstaller",
         "--noconfirm", "--onefile", "--windowed",
         "--icon", os.path.join(ROOT, "icon.ico"),
         "--name", "PoB Trade Finder",
         "--collect-all", "webview",
+        "--collect-all", "websocket",
         os.path.join(ROOT, "gui.py"),
     ], check=True, cwd=ROOT)
 

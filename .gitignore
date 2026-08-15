@@ -6,6 +6,7 @@ _update/
 _apply_update.bat
 
 # user-local caches and logs
+data/session.json
 data/unique_icons.json
 data/debug.log
 data/base_items.min.json

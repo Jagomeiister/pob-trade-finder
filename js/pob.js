@@ -272,6 +272,7 @@
       var skillRe = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk;
       while ((sk = skillRe.exec(gemScope))) {
         if (attr(sk[1], 'enabled') === 'false') continue;
+        if (attr(sk[1], 'source')) continue; // item-granted skill, not a real gem
         var group = {
           slot: attr(sk[1], 'slot') || '',
           label: attr(sk[1], 'label') || '',

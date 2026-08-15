@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.3.6"
+VERSION = "1.4.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -50,6 +50,14 @@ class Api:
                 self._unique_icons = json.load(f)
         except Exception:
             self._unique_icons = {}
+        self._session_path = os.path.join(DATA_DIR, "session.json")
+        self._poesessid = ""
+        try:
+            with open(self._session_path, "r", encoding="utf-8") as f:
+                self._poesessid = (json.load(f).get("poesessid") or "").strip()
+        except Exception:
+            pass
+        self._live_subs = {}  # searchId -> {'queue': [], 'status': str, 'ws': app}
 
     # -- shared HTTP helper: quota-aware throttle, global 429 lockout ------------
     def _read_quota(self, headers):
@@ -467,6 +475,94 @@ class Api:
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    # -- POESESSID session + true live search over the trade WebSocket -------------
+    # The session cookie is stored ONLY in data/session.json on this machine and
+    # sent ONLY to pathofexile.com. It enables the same instant live search the
+    # trade website has.
+    def set_poesessid(self, value):
+        try:
+            self._poesessid = (value or "").strip()
+            with open(self._session_path, "w", encoding="utf-8") as f:
+                json.dump({"poesessid": self._poesessid}, f)
+            return {"ok": True, "set": bool(self._poesessid)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def session_status(self):
+        return {"ok": True, "set": bool(self._poesessid)}
+
+    def live_start(self, league, payload_json):
+        """Open a GGG live-search WebSocket for this query. Returns a subId to
+        poll with live_poll. Needs a POESESSID."""
+        if not self._poesessid:
+            return {"ok": False, "error": "no POESESSID set"}
+        try:
+            import websocket
+        except ImportError:
+            return {"ok": False, "error": "websocket-client not installed (pip install websocket-client)"}
+        try:
+            payload = json.loads(payload_json)
+            search = self._http("%s/search/%s" % (TRADE_BASE, urllib.request.quote(league)), payload)
+            search_id = search.get("id")
+            if not search_id:
+                return {"ok": False, "error": "search failed"}
+            sub = {"queue": [], "status": "connecting", "ws": None}
+
+            def on_message(ws, msg):
+                try:
+                    data = json.loads(msg)
+                    ids = data.get("new") or []
+                    if ids:
+                        sub["queue"].extend(ids)
+                    sub["status"] = "connected"
+                except Exception:
+                    pass
+
+            def on_open(ws):
+                sub["status"] = "connected"
+
+            def on_error(ws, err):
+                sub["status"] = "error: %s" % str(err)[:120]
+
+            def on_close(ws, code, reason):
+                if not sub["status"].startswith("error"):
+                    sub["status"] = "closed"
+
+            url = "wss://www.pathofexile.com/api/trade/live/%s/%s" % (
+                urllib.request.quote(league), search_id)
+            ws = websocket.WebSocketApp(
+                url,
+                header=["User-Agent: " + UA,
+                        "Origin: https://www.pathofexile.com",
+                        "Cookie: POESESSID=" + self._poesessid],
+                on_message=on_message, on_open=on_open,
+                on_error=on_error, on_close=on_close)
+            sub["ws"] = ws
+            t = threading.Thread(target=lambda: ws.run_forever(ping_interval=30), daemon=True)
+            t.start()
+            self._live_subs[search_id] = sub
+            return {"ok": True, "subId": search_id,
+                    "total": search.get("total", len(search.get("result", [])))}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def live_poll(self, sub_id):
+        sub = self._live_subs.get(sub_id)
+        if not sub:
+            return {"ok": False, "error": "unknown live search"}
+        ids = sub["queue"][:10]
+        del sub["queue"][:len(ids)]
+        return {"ok": True, "status": sub["status"], "ids": ids}
+
+    def live_stop(self, sub_id):
+        sub = self._live_subs.pop(sub_id, None)
+        if sub and sub.get("ws"):
+            try:
+                sub["ws"].close()
+            except Exception:
+                pass
+        return {"ok": True}
 
     # -- auto-update via GitHub Releases ------------------------------------------
     @staticmethod
