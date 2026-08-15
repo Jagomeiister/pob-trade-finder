@@ -2104,8 +2104,17 @@
     var nameEl = document.createElement('div');
     nameEl.className = 'listing-name ' + (FRAME_CLASS[li.frameType] || 'rare');
     nameEl.textContent = (li.name ? li.name + ' ' : '') + li.base;
+    var qualProp = (li.properties || []).find(function (p) { return /^Quality/.test(p.name || '') && p.values && p.values.length; });
+    var qualNum = qualProp ? parseInt(String(qualProp.values[0][0]).replace(/[^0-9]/g, ''), 10) : 0;
     var links = maxLinks(li.sockets);
     var badges = '';
+    if (qualNum > 0) {
+      // catalyst quality carries its type: "Quality (Resistance Modifiers)" -> "resistance"
+      var qtMatch = qualProp.name.match(/^Quality \(([^)]+)\)/);
+      var qtype = qtMatch ? ' · ' + qtMatch[1].replace(/ Modifiers$/i, '').toLowerCase() : '';
+      badges += '<span class="badge qual' + (qualNum >= 28 ? ' qual-hi' : '') + '" title="' +
+        esc(qualProp.name + ': ' + qualProp.values[0][0]) + '">Q' + qualNum + esc(qtype) + '</span>';
+    }
     if (links >= 5) badges += '<span class="badge links">' + links + 'L</span>';
     if (li.corrupted) badges += '<span class="badge corrupt">corrupted</span>';
     if (li.identified === false) badges += '<span class="badge unid">unidentified</span>';
@@ -2127,8 +2136,10 @@
     var sockStrip = socketStrip(li.sockets);
     if (sockStrip) main.appendChild(sockStrip);
 
+    // "Quality" plus catalyst variants like "Quality (Resistance Modifiers)"
     var props = (li.properties || []).filter(function (p) {
-      return PROP_WHITELIST.indexOf(p.name) !== -1 && p.values && p.values.length;
+      return (PROP_WHITELIST.indexOf(p.name) !== -1 || /^Quality/.test(p.name || '')) &&
+             p.values && p.values.length;
     }).map(function (p) { return p.name + ': ' + p.values[0][0]; });
     // trade-site extended stats: weapons always show all three DPS numbers
     if (li.dps !== null && li.dps !== undefined) {
