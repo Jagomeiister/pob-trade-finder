@@ -8,6 +8,8 @@
 every piece of gear in the build.** Shop for exactly the items the build creator used —
 no more hand-typing mods into pathofexile.com/trade.
 
+![PoB Trade Finder](docs/screenshots/hero.png)
+
 📖 **[User Guide](docs/USER-GUIDE.md)** · 🔧 **[Developer Guide](docs/DEVELOPER.md)** · 📦 **[Releases](https://github.com/Jagomeiister/pob-trade-finder/releases)**
 
 ## Install (Windows)
