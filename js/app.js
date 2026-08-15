@@ -52,7 +52,7 @@
 
   // ---- user preferences (text size, density, sound, accessibility) ---------
   var PREFS = { fontsize: '100', density: 'comfortable', sound: true,
-                volume: 25, motion: false, contrast: false, cb: false };
+                volume: 25, motion: false, contrast: false, cb: false, theme: 'classic' };
 
   function loadPrefs() {
     try {
@@ -62,6 +62,10 @@
   }
 
   function applyPrefs() {
+    if (PREFS.theme && PREFS.theme !== 'classic') document.body.dataset.theme = PREFS.theme;
+    else delete document.body.dataset.theme;
+    var themeSel = document.getElementById('pref-theme');
+    if (themeSel) themeSel.value = PREFS.theme || 'classic';
     document.body.style.zoom = (parseInt(PREFS.fontsize, 10) || 100) / 100;
     document.body.classList.toggle('compact', PREFS.density === 'compact');
     document.body.classList.toggle('reduce-motion', !!PREFS.motion);
@@ -297,7 +301,8 @@
     document.getElementById('check-updates-btn').addEventListener('click', function () {
       checkForUpdates(true);
     });
-    [['pref-fontsize', 'fontsize', 'value'], ['pref-density', 'density', 'value'],
+    [['pref-theme', 'theme', 'value'],
+     ['pref-fontsize', 'fontsize', 'value'], ['pref-density', 'density', 'value'],
      ['pref-sound', 'sound', 'checked'], ['pref-volume', 'volume', 'value'],
      ['pref-motion', 'motion', 'checked'], ['pref-contrast', 'contrast', 'checked'],
      ['pref-cb', 'cb', 'checked']].forEach(function (spec) {

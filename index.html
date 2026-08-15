@@ -20,18 +20,54 @@
     --magic: #8888ff;
     --normal: #c8c8c8;
     --accent: #7f4fd0;
+    --bg-glow: #1a150d;
+    --panel-deep: #12100c;
+    --border-soft: #241f16;
   }
+  /* ---- colour schemes ---- */
+  body[data-theme="obsidian"] {
+    --bg: #0b0d10; --bg-glow: #131720; --panel: #12151a; --panel2: #181c23;
+    --border: #2a3038; --border-hi: #3d4550; --panel-deep: #0e1114; --border-soft: #1e232a;
+    --gold: #8fa8c0; --gold-hi: #bcd2e8; --text: #c8cdd4; --dim: #79828d; --accent: #4a90d0;
+  }
+  body[data-theme="midnight"] {
+    --bg: #0a0a16; --bg-glow: #14122a; --panel: #121222; --panel2: #181832;
+    --border: #2c2c52; --border-hi: #40406e; --panel-deep: #0e0e1c; --border-soft: #1e1e38;
+    --gold: #9a8fe0; --gold-hi: #beb4f0; --text: #c8c6dc; --dim: #7d7a9a; --accent: #6f5fd0;
+  }
+  body[data-theme="blood"] {
+    --bg: #100a0a; --bg-glow: #201012; --panel: #181010; --panel2: #221515;
+    --border: #482424; --border-hi: #643232; --panel-deep: #140c0c; --border-soft: #2c1818;
+    --gold: #c96a5a; --gold-hi: #e8988a; --text: #d0c2bc; --dim: #8d7570; --accent: #d04a4a;
+  }
+  body[data-theme="forest"] {
+    --bg: #0a100c; --bg-glow: #101c14; --panel: #101812; --panel2: #16211a;
+    --border: #2a4232; --border-hi: #3c5c46; --panel-deep: #0c140e; --border-soft: #1a2a20;
+    --gold: #6cae7c; --gold-hi: #96d0a4; --text: #c2ccc4; --dim: #75887a; --accent: #3ca35c;
+  }
+  body[data-theme="light"] {
+    --bg: #ece5d6; --bg-glow: #f4ecda; --panel: #f7f2e8; --panel2: #ebe3d2;
+    --border: #c6b9a0; --border-hi: #a49274; --panel-deep: #efe8d8; --border-soft: #d8cdb6;
+    --gold: #8a6b25; --gold-hi: #6b5220; --text: #3a3428; --dim: #7d7261;
+    --accent: #6a3fb6; --magic: #4646b0; --rare: #9a7d00; --normal: #55503f;
+  }
+  body[data-theme="light"] .mod-text { color: #4646b0; }
+  body[data-theme="light"] .lmod { color: #4646b0; }
+  body[data-theme="light"] .lmod.enchant, body[data-theme="light"] .lmod.crafted,
+  body[data-theme="light"] .mod-text.crafted { color: #6a6ad0; }
+  body[data-theme="light"] .price-amt { color: #8a6b25; }
+  body[data-theme="light"] textarea::placeholder { color: #a0967e; }
   * { box-sizing: border-box; }
   html { scrollbar-color: #3a2f1e var(--bg); }
   ::-webkit-scrollbar { width: 12px; height: 12px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: #2c2416; border-radius: 6px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 6px; border: 2px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
 
   body {
     margin: 0; padding: 20px 24px 40px;
     background:
-      radial-gradient(1200px 400px at 50% -100px, #1a150d 0%, var(--bg) 70%);
+      radial-gradient(1200px 400px at 50% -100px, var(--bg-glow) 0%, var(--bg) 70%);
     color: var(--text);
     font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
     min-height: 100vh;
@@ -88,7 +124,7 @@
   /* ---- controls ---- */
   #controls {
     display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
-    background: rgba(29,25,19,.97); border: 1px solid var(--border);
+    background: var(--panel2); border: 1px solid var(--border);
     border-radius: 8px; padding: 12px 16px; margin: 12px 0 18px;
     position: sticky; top: 8px; z-index: 5;
     box-shadow: 0 4px 14px rgba(0,0,0,.5);
@@ -145,7 +181,7 @@
   .mod-row {
     display: flex; align-items: center; gap: 10px;
     padding: 4px 6px; margin: 0 -6px;
-    border-bottom: 1px dotted #241f16; border-radius: 4px;
+    border-bottom: 1px dotted var(--border-soft); border-radius: 4px;
   }
   .mod-row:last-child { border-bottom: none; }
   .mod-row:hover { background: rgba(201,165,90,.05); }
@@ -184,7 +220,7 @@
   /* ---- price panel ---- */
   .price-box {
     padding: 10px 14px; border-top: 1px solid var(--border);
-    background: #12100c; font-size: 13px;
+    background: var(--panel-deep); font-size: 13px;
   }
   .price-box.hidden { display: none; }
   .price-head { color: var(--gold); margin-bottom: 8px; font-weight: 600; }
@@ -194,14 +230,14 @@
   .listing {
     display: flex; gap: 12px; align-items: flex-start;
     padding: 10px; margin-bottom: 8px;
-    background: var(--panel); border: 1px solid #241f16; border-radius: 7px;
+    background: var(--panel); border: 1px solid var(--border-soft); border-radius: 7px;
   }
   .listing:hover { border-color: var(--border-hi); }
   .listing-icon {
     flex: none; width: 64px; min-height: 64px; display: flex;
     align-items: center; justify-content: center;
     background: radial-gradient(circle at 50% 40%, #201a10 0%, #12100c 75%);
-    border: 1px solid #241f16; border-radius: 6px; padding: 4px;
+    border: 1px solid var(--border-soft); border-radius: 6px; padding: 4px;
   }
   .listing-icon img { max-width: 56px; max-height: 96px; }
   .listing-main { flex: 1; min-width: 0; }
@@ -220,7 +256,7 @@
   .badge.qual.qual-hi { color: #b4b4ff; border-color: #4a4a8a; }
   .gem-exp { display: flex; align-items: center; gap: 8px; margin: 3px 0 5px; }
   .gem-exp-bar {
-    width: 140px; height: 6px; border-radius: 3px; background: #241f16;
+    width: 140px; height: 6px; border-radius: 3px; background: var(--border-soft);
     border: 1px solid var(--border); overflow: hidden;
   }
   .gem-exp-fill { height: 100%; background: linear-gradient(90deg, #1ba29b, #3fd3c4); }
@@ -306,7 +342,7 @@
   .lmod.enchant, .lmod.crafted { color: #b4b4ff; }
   .lmod.implicit { color: #8888ff; }
   .lmod-src { color: var(--dim); font-size: 10.5px; }
-  .lmod-sep { border-bottom: 1px dotted #2c2416; margin: 3px 0; }
+  .lmod-sep { border-bottom: 1px dotted var(--border-soft); margin: 3px 0; }
   .lmod.hl { color: #d8e07a; }
   .lmod.hl::before { content: '◆ '; color: var(--gold); font-size: 9px; vertical-align: 1px; }
   .tier {
@@ -384,7 +420,7 @@
   }
   #cost-summary.hidden { display: none; }
   .cost-head { color: var(--gold); font-weight: 600; margin-bottom: 8px; font-variant: small-caps; letter-spacing: .5px; }
-  .cost-row { display: flex; gap: 14px; padding: 2px 0; border-bottom: 1px dotted #241f16; }
+  .cost-row { display: flex; gap: 14px; padding: 2px 0; border-bottom: 1px dotted var(--border-soft); }
   .cost-row:last-child { border-bottom: none; }
   .cost-slot { color: var(--dim); min-width: 110px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding-top: 2px; }
   .cost-item { flex: 1; color: var(--text); }
@@ -421,7 +457,7 @@
   #sessid-status { color: #7fd07f; font-size: 12px; }
   .char-diff {
     padding: 6px 14px; font-size: 12.5px; border-bottom: 1px solid var(--border);
-    background: #12100c;
+    background: var(--panel-deep);
   }
   .char-diff b { color: var(--text); }
   .card.diff-matched { border-left: 3px solid #4a8a3c; }
@@ -441,7 +477,7 @@
   }
   #basket.hidden { display: none; }
   .basket-head { color: var(--gold); font-weight: 600; margin-bottom: 8px; font-variant: small-caps; letter-spacing: .5px; display: flex; gap: 12px; align-items: center; }
-  .basket-row { display: flex; gap: 12px; align-items: center; padding: 3px 0; border-bottom: 1px dotted #241f16; }
+  .basket-row { display: flex; gap: 12px; align-items: center; padding: 3px 0; border-bottom: 1px dotted var(--border-soft); }
   .basket-row:last-child { border-bottom: none; }
   .basket-item { flex: 1; color: var(--text); }
   .basket-price { color: #d4af37; font-weight: 600; min-width: 90px; text-align: right; }
@@ -484,8 +520,9 @@
   body.compact .card-head, body.compact .card-opts { padding: 6px 12px; }
   body.compact .listing { padding: 6px; margin-bottom: 5px; }
 
-  body.high-contrast { --text: #efe9dc; --dim: #b0a690; --border: #6b5c3e; --magic: #a8a8ff; }
-  body.high-contrast .mod-text { color: #b8b8ff; }
+  body.high-contrast:not([data-theme="light"]) { --text: #efe9dc; --dim: #b0a690; --border: #6b5c3e; --magic: #a8a8ff; }
+  body.high-contrast:not([data-theme="light"]) .mod-text { color: #b8b8ff; }
+  body.high-contrast[data-theme="light"] { --text: #17140e; --dim: #4a4438; --border: #8a7a58; }
 
   body.reduce-motion .live-new { animation: none; }
   body.reduce-motion .trade-btn:active, body.reduce-motion #decode-btn:active { transform: none; }
@@ -530,6 +567,16 @@
   <div id="settings-panel" class="hidden" role="dialog" aria-label="Settings">
     <div class="settings-head">Settings <button id="settings-close" class="copy-btn" aria-label="Close settings">✕</button></div>
     <div class="settings-grid">
+      <label>Theme
+        <select id="pref-theme">
+          <option value="classic">Classic (PoE gold)</option>
+          <option value="obsidian">Obsidian</option>
+          <option value="midnight">Midnight</option>
+          <option value="blood">Blood</option>
+          <option value="forest">Forest</option>
+          <option value="light">Light</option>
+        </select>
+      </label>
       <label>Text size
         <select id="pref-fontsize">
           <option value="90">Small</option>

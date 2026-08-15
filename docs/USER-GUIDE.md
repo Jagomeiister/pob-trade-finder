@@ -153,6 +153,7 @@ say so and fall back to polling.
 
 ## 7c. Settings & accessibility (⚙, top right)
 
+- **Theme** — six colour schemes: Classic (PoE gold), Obsidian, Midnight, Blood, Forest, Light
 - **Text size** (90–125%) and **density** (comfortable/compact)
 - **Sound alerts** on/off and **volume** for the live-search ding
 - **Reduce motion** — disables flashes and animations
