@@ -407,11 +407,9 @@
   /* eater / exarch implicit tints (matches in-game colouring) */
   .lmod.exarch-tint { color: #ff9a76; }
   .lmod.eater-tint { color: #b09fff; }
-  /* precise per-mod eldritch attribution (search cards + listings) */
-  .mod-text.eldritch-exarch, .lmod.eldritch-exarch { color: #ff9a76; }
-  .mod-text.eldritch-eater, .lmod.eldritch-eater { color: #b09fff; }
-  .mod-text.eldritch-exarch::before, .lmod.eldritch-exarch::before { content: '◉ '; color: #d0501c; font-size: 10px; }
-  .mod-text.eldritch-eater::before, .lmod.eldritch-eater::before { content: '◉ '; color: #6a4fd0; font-size: 10px; }
+  /* precise per-mod eldritch attribution: small tags, trade-site style */
+  .badge.exarch-mod { color: #ff9a76; border-color: #6b3a1c; font-variant: small-caps; }
+  .badge.eater-mod { color: #b09fff; border-color: #3d2c6b; font-variant: small-caps; }
   .badge.exarch { color: #ff9a76; border-color: #6b3a1c; }
   .badge.eater { color: #b09fff; border-color: #3d2c6b; }
   .badge.synth { color: #8fd4d4; border-color: #1c4a4a; }

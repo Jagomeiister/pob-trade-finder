@@ -1298,15 +1298,23 @@
     // trade-site convention: colour identifies the mod source, no text labels
     var label = document.createElement('span');
     label.className = 'mod-text' + (mod.crafted ? ' crafted' : '') + (mod.fractured ? ' fractured' : '');
-    if (match) {
+    label.textContent = mod.line;
+    // eldritch tags: implicit-kind mods on influenced items only — the stat
+    // ids overlap with regular affixes, so kind + influence must gate them
+    if (match && mod.kind === 'implicit' && !mod.crafted) {
       var eldTail = match.entry.id.split('.').pop().split('|')[0];
       var eld = window.POE_ELDRITCH && window.POE_ELDRITCH[eldTail];
+      var infl = state.item.influences || [];
+      if (eld === 'exarch' && infl.indexOf('Searing Exarch') === -1) eld = null;
+      if (eld === 'eater' && infl.indexOf('Eater of Worlds') === -1) eld = null;
       if (eld) {
-        label.classList.add('eldritch-' + eld);
-        label.title = (eld === 'exarch' ? 'Searing Exarch' : 'Eater of Worlds') + ' implicit';
+        var eldBadge = document.createElement('span');
+        eldBadge.className = 'badge ' + (eld === 'exarch' ? 'exarch-mod' : 'eater-mod');
+        eldBadge.textContent = eld === 'exarch' ? 'exarch' : 'eater';
+        eldBadge.title = (eld === 'exarch' ? 'Searing Exarch' : 'Eater of Worlds') + ' implicit';
+        label.appendChild(eldBadge);
       }
     }
-    label.textContent = mod.line;
     if (mod.crafted) label.title = 'Crafted mod';
     if (mod.fractured) label.title = 'Fractured mod';
     if (mod.kind === 'implicit' && !mod.crafted) label.title = 'Implicit';
@@ -2825,9 +2833,13 @@
         var m = normListingMod(raw);
         if (!m.text) return;
         var line = document.createElement('div');
-        var eldL = m.tail && window.POE_ELDRITCH && window.POE_ELDRITCH[m.tail];
-        line.className = 'lmod ' + cls + (eldL ? ' eldritch-' + eldL : '') +
-          (m.tail && tails[m.tail] ? ' hl' : '');
+        var eldL = null;
+        if (cls.indexOf('implicit') === 0 && m.tail && window.POE_ELDRITCH) {
+          eldL = window.POE_ELDRITCH[m.tail];
+          if (eldL === 'exarch' && !li.searing) eldL = null;
+          if (eldL === 'eater' && !li.tangled) eldL = null;
+        }
+        line.className = 'lmod ' + cls + (m.tail && tails[m.tail] ? ' hl' : '');
         var tierBadge = m.tier ? '<span class="tier">' + esc(m.tier) + '</span>' : '';
         var roll = rollInfo(m.text, m.magnitudes);
         var rollHtml = '';
@@ -2836,7 +2848,11 @@
           rollHtml = ' <span class="roll-range' + rollCls + '" title="Tier range ' + esc(roll.range) +
                      ' — this rolled at ' + roll.pct + '%">[' + esc(roll.range) + '] ' + roll.pct + '%</span>';
         }
-        line.innerHTML = tierBadge + esc(m.text) + rollHtml + (prefix ? ' <span class="lmod-src">(' + prefix + ')</span>' : '');
+        var eldHtml = eldL
+          ? ' <span class="badge ' + (eldL === 'exarch' ? 'exarch-mod' : 'eater-mod') + '">' +
+            (eldL === 'exarch' ? 'exarch' : 'eater') + '</span>'
+          : '';
+        line.innerHTML = tierBadge + esc(m.text) + eldHtml + rollHtml + (prefix ? ' <span class="lmod-src">(' + prefix + ')</span>' : '');
         if (m.hash && state) {
           // click any listing mod to sort all results by it
           line.classList.add('sortable');
