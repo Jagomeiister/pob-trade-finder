@@ -612,9 +612,28 @@
 
   function gemsWord(n) { return n + (n === 1 ? ' gem' : ' gems'); }
 
-  // RePoE gem art is often a horizontal multi-frame atlas — crop to frame one
+  var FLASK_BASE_KEYS = null;
+  function findFlaskBase(name) {
+    if (!name || !window.POE_BASE_ICONS) return null;
+    if (!FLASK_BASE_KEYS) {
+      FLASK_BASE_KEYS = Object.keys(window.POE_BASE_ICONS)
+        .filter(function (k) { return / (Flask|Tincture)$/.test(k) || /Flask$|Tincture$/.test(k); })
+        .sort(function (a, b) { return b.length - a.length; });
+    }
+    for (var i = 0; i < FLASK_BASE_KEYS.length; i++) {
+      if (name.indexOf(FLASK_BASE_KEYS[i]) !== -1) return FLASK_BASE_KEYS[i];
+    }
+    return null;
+  }
+
+  // RePoE gem art is often a horizontal multi-frame atlas — crop to frame one,
+  // but only when the ratio is a near-exact frame multiple (wide single-frame
+  // art must not get chopped)
   function markAtlas() {
-    if (!this.dataset.swapped && this.naturalWidth >= this.naturalHeight * 1.6) {
+    if (this.dataset.swapped) return;
+    var ratio = this.naturalWidth / Math.max(1, this.naturalHeight);
+    var frames = Math.round(ratio);
+    if (frames >= 2 && Math.abs(ratio - frames) < 0.12) {
       this.classList.add('atlas2');
     }
   }
@@ -1048,6 +1067,12 @@
     var head = document.createElement('div');
     head.className = 'card-head';
     var iconPath = window.POE_BASE_ICONS && window.POE_BASE_ICONS[item.base];
+    // magic flasks/tinctures embed the base inside the affixed name
+    var flaskBase = null;
+    if (!iconPath && /flask|tincture/i.test((item.name || '') + ' ' + (item.base || ''))) {
+      flaskBase = findFlaskBase(item.name) || findFlaskBase(item.base);
+      if (flaskBase) iconPath = window.POE_BASE_ICONS[flaskBase];
+    }
     var isUnique = item.rarity === 'UNIQUE' || item.rarity === 'RELIC';
     var iconHtml = (iconPath || (isUnique && isGui()))
       ? '<img class="card-icon" ' +
@@ -1080,14 +1105,29 @@
     }
     card.appendChild(head);
 
+    var iconEl = head.querySelector('.card-icon');
+    if (iconEl) iconEl.onload = markAtlas; // flask/gem base art can be a sprite atlas
     // uniques: swap base art for the real unique art (trade lookup, disk-cached)
     if (isUnique && isGui()) {
-      var iconEl = head.querySelector('.card-icon');
       if (iconEl) {
         window.pywebview.api.unique_icon(item.name, item.base).then(function (res) {
-          if (res && res.ok && res.icon && iconEl.isConnected) iconEl.src = res.icon;
+          if (res && res.ok && res.icon && iconEl.isConnected) {
+            iconEl.src = res.icon;
+            iconEl.dataset.swapped = '1';
+            iconEl.classList.remove('atlas2');
+          }
         }).catch(function () { /* keep base art */ });
       }
+    } else if (iconEl && (flaskBase || /flask|tincture/i.test(item.base || '')) && isGui() && window.pywebview.api.gem_icon) {
+      // flasks: fetch the trade site's single-frame render (cached forever)
+      var fb = flaskBase || item.base;
+      window.pywebview.api.gem_icon(fb).then(function (res) {
+        if (res && res.ok && res.icon && iconEl.isConnected) {
+          iconEl.src = res.icon;
+          iconEl.dataset.swapped = '1';
+          iconEl.classList.remove('atlas2');
+        }
+      }).catch(function () { /* keep cropped art */ });
     }
 
     var body = document.createElement('div');
@@ -1258,6 +1298,14 @@
     // trade-site convention: colour identifies the mod source, no text labels
     var label = document.createElement('span');
     label.className = 'mod-text' + (mod.crafted ? ' crafted' : '') + (mod.fractured ? ' fractured' : '');
+    if (match) {
+      var eldTail = match.entry.id.split('.').pop().split('|')[0];
+      var eld = window.POE_ELDRITCH && window.POE_ELDRITCH[eldTail];
+      if (eld) {
+        label.classList.add('eldritch-' + eld);
+        label.title = (eld === 'exarch' ? 'Searing Exarch' : 'Eater of Worlds') + ' implicit';
+      }
+    }
     label.textContent = mod.line;
     if (mod.crafted) label.title = 'Crafted mod';
     if (mod.fractured) label.title = 'Fractured mod';
@@ -1285,16 +1333,13 @@
       if (document.getElementById('pseudo').checked) rowState.inputScale = match.pseudo.multiplier;
     }
     var showInput = false;
-    // A unique's mod is only adjustable if it actually rolls — i.e. the PoB
-    // text had an (a-b) range. Fixed unique lines are presence-only.
-    var uniqueFixed = state.unique && !mod.ranged;
-    rowState.uniqueFixed = uniqueFixed;
+    var rangeHint = null;
     if (match) {
       rowState.exactCount = !!EXACT_COUNT_TEXTS[match.entry.text];
       var pseudoOn = document.getElementById('pseudo').checked;
       var eff = effectiveMatch(rowState, pseudoOn);
       var pct = parseInt(document.getElementById('pct').value, 10) / 100;
-      if (match.fixedText || eff.avg === null || uniqueFixed) {
+      if (match.fixedText || eff.avg === null) {
         // stat carries no adjustable value — no min input
       } else if (rowState.exactCount) {
         minInput.value = eff.avg; // exact match, never % scaled
@@ -1303,20 +1348,31 @@
         rowState.baseAvg = eff.avg;
         minInput.value = roundMin(eff.avg * pct);
         showInput = true;
-        // Clamp to what this mod can actually roll (lowest tier min .. highest
-        // tier max, from RePoE). Pseudo totals sum several mods — never clamped.
-        var usingPseudo = eff.entry !== match.entry;
-        var rng = !usingPseudo && window.POE_RANGES && window.POE_RANGES[match.entry.id];
-        if (rng) {
-          minInput.min = rng[0];
-          minInput.max = rng[1];
-          minInput.title = 'This mod rolls ' + rng[0] + ' – ' + rng[1];
-          minInput.addEventListener('change', function () {
-            var v = parseFloat(minInput.value);
-            if (isNaN(v)) return;
-            if (v < rng[0]) minInput.value = rng[0];
-            if (v > rng[1]) minInput.value = rng[1];
-          });
+        if (state.unique) {
+          // unique rolls live in their own range — use the PoB (a-b) bounds
+          // when known; never clamp with rare-affix ranges
+          if (mod.bounds) {
+            minInput.min = mod.bounds[0];
+            minInput.max = mod.bounds[1];
+            minInput.title = 'Rolls ' + mod.bounds[0] + ' – ' + mod.bounds[1] + ' on this unique';
+            rangeHint = mod.bounds[0] + '–' + mod.bounds[1];
+          }
+        } else {
+          // Clamp to what this mod can actually roll (lowest tier min .. highest
+          // tier max, from RePoE). Pseudo totals sum several mods — never clamped.
+          var usingPseudo = eff.entry !== match.entry;
+          var rng = !usingPseudo && window.POE_RANGES && window.POE_RANGES[match.entry.id];
+          if (rng) {
+            minInput.min = rng[0];
+            minInput.max = rng[1];
+            minInput.title = 'This mod rolls ' + rng[0] + ' – ' + rng[1];
+            minInput.addEventListener('change', function () {
+              var v = parseFloat(minInput.value);
+              if (isNaN(v)) return;
+              if (v < rng[0]) minInput.value = rng[0];
+              if (v > rng[1]) minInput.value = rng[1];
+            });
+          }
         }
       }
       tag.textContent = eff.entry.text;
@@ -1329,7 +1385,10 @@
 
     row.appendChild(cb);
     row.appendChild(label);
-    if (showInput) row.appendChild(minInput);
+    // fixed-width control column so every input lines up down the card
+    var ctrl = document.createElement('span');
+    ctrl.className = 'mod-ctrl';
+    if (showInput) ctrl.appendChild(minInput);
     // Sort listings by this mod's roll: off -> highest first -> lowest first
     if (showInput || rowState.exactCount) {
       var sortBtn = document.createElement('button');
@@ -1342,8 +1401,9 @@
         var eff = effectiveMatch(rowState, document.getElementById('pseudo').checked);
         cycleSort(state, 'stat.' + eff.entry.id, eff.entry.text);
       });
-      row.appendChild(sortBtn);
+      ctrl.appendChild(sortBtn);
     }
+    row.appendChild(ctrl);
     row.appendChild(tag);
     state.rows.push(rowState);
     return row;
@@ -1514,7 +1574,7 @@
           if (fe) f.id = fe.id;
         }
       }
-      if (!r.match.fixedText && !r.uniqueFixed) {
+      if (!r.match.fixedText) {
         var min = parseFloat(r.minInput.value);
         if (!isNaN(min)) {
           // the input was rendered in one scale (pseudo totals fold dual-res
@@ -2765,7 +2825,9 @@
         var m = normListingMod(raw);
         if (!m.text) return;
         var line = document.createElement('div');
-        line.className = 'lmod ' + cls + (m.tail && tails[m.tail] ? ' hl' : '');
+        var eldL = m.tail && window.POE_ELDRITCH && window.POE_ELDRITCH[m.tail];
+        line.className = 'lmod ' + cls + (eldL ? ' eldritch-' + eldL : '') +
+          (m.tail && tails[m.tail] ? ' hl' : '');
         var tierBadge = m.tier ? '<span class="tier">' + esc(m.tier) + '</span>' : '';
         var roll = rollInfo(m.text, m.magnitudes);
         var rollHtml = '';
@@ -2785,8 +2847,7 @@
       });
     }
     addMods(li.enchantMods, 'enchant', null);
-    var implTint = li.searing ? ' exarch-tint' : (li.tangled ? ' eater-tint' : '');
-    addMods(li.implicitMods, 'implicit' + implTint, null);
+    addMods(li.implicitMods, 'implicit', null); // eldritch tints applied per-line
     if ((li.enchantMods || []).length + (li.implicitMods || []).length) {
       var sep = document.createElement('div');
       sep.className = 'lmod-sep';

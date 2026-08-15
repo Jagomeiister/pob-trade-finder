@@ -69,6 +69,12 @@ Iron Hat
 Item Level: 12
 Implicits: 0
 +20 to maximum Life</Item>
+    <Item id="9">Rarity: MAGIC
+Flagellant's Silver Flask of the Kakapo
+Item Level: 70
+Implicits: 0
+Gain 3 Charges when you are Hit by an Enemy
+59% reduced Effect of Curses on you during Effect</Item>
     <ItemSet useSecondWeaponSet="false" title="Budget" id="1">
       <Slot name="Helmet" itemId="8"/>
       <Slot name="Ring 1" itemId="2"/>
@@ -96,6 +102,7 @@ Adds 4 to 7 Physical Damage to Attacks</Item>
       <Slot name="Body Armour" itemId="3"/>
       <Slot name="Weapon 1" itemId="4"/>
       <Slot name="Belt Abyssal Socket 1" itemId="7"/>
+      <Slot name="Flask 1" itemId="9"/>
     </ItemSet>
   </Items>
   <Tree activeSpec="1">

@@ -154,7 +154,19 @@
       line = line.trim();
       if (!line) continue;
       var isRanged = RANGE_PATTERN.test(line);
+      var bounds = null;
       if (isRanged) {
+        // capture the roll bounds (avg-space for multi-range "Adds (a-b) to (c-d)")
+        var lows = [], highs = [], pm;
+        var pairRe = /\((-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\)/g;
+        while ((pm = pairRe.exec(line))) {
+          lows.push(parseFloat(pm[1]));
+          highs.push(parseFloat(pm[2]));
+        }
+        if (lows.length) {
+          var avg = function (a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; };
+          bounds = [avg(lows), avg(highs)];
+        }
         // Nth ranged mod on the item — <ModRange id="N"> gives its real roll
         rangedSeen++;
         var rf = 0.5;
@@ -166,7 +178,7 @@
       var kind = (implicitsSeen < implicitCount) ? 'implicit' : 'explicit';
       if (implicitsSeen < implicitCount) implicitsSeen++;
       item.mods.push({ line: line, raw: raw, kind: kind, crafted: crafted,
-                       fractured: fractured, ranged: isRanged });
+                       fractured: fractured, ranged: isRanged, bounds: bounds });
     }
 
     // Defensive fallback: no "Implicits: N" marker at all (hand-edited or
