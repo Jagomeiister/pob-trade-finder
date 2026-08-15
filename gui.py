@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.3.5"
+VERSION = "1.3.6"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -174,6 +174,7 @@ class Api:
             "identified": it.get("identified", True),
             "sockets": it.get("sockets", []),
             "properties": it.get("properties", []),
+            "additionalProperties": it.get("additionalProperties", []),
             "searing": bool(it.get("searing")),
             "tangled": bool(it.get("tangled")),
             "synthesised": bool(it.get("synthesised")),

@@ -1988,7 +1988,7 @@
   var GEM_ICONS = {}; // gem name -> single-frame trade art (bridge-cached)
   var PROP_WHITELIST = ['Quality', 'Armour', 'Evasion Rating', 'Energy Shield', 'Ward',
                         'Physical Damage', 'Elemental Damage', 'Critical Strike Chance',
-                        'Attacks per Second'];
+                        'Attacks per Second', 'Level'];
 
   // fetch API mod entries are either plain strings or rich objects
   // {description, hash: "stat.explicit.stat_XXX", mods: [{tier: "P2"|"S2", ...}]}
@@ -2157,6 +2157,28 @@
         propEl.appendChild(bp);
       }
       main.appendChild(propEl);
+    }
+
+    // gem experience: progress toward the next level
+    var expProp = (li.additionalProperties || []).find(function (p) { return p.name === 'Experience'; });
+    if (expProp) {
+      var frac = typeof expProp.progress === 'number' ? expProp.progress : 0;
+      var expText = (expProp.values && expProp.values[0] && expProp.values[0][0]) || '';
+      var expWrap = document.createElement('div');
+      expWrap.className = 'gem-exp';
+      expWrap.title = 'Experience: ' + expText;
+      var bar = document.createElement('div');
+      bar.className = 'gem-exp-bar';
+      var fill = document.createElement('div');
+      fill.className = 'gem-exp-fill';
+      fill.style.width = Math.round(frac * 100) + '%';
+      bar.appendChild(fill);
+      var lbl = document.createElement('span');
+      lbl.className = 'gem-exp-label';
+      lbl.textContent = Math.round(frac * 1000) / 10 + '% to next level';
+      expWrap.appendChild(bar);
+      expWrap.appendChild(lbl);
+      main.appendChild(expWrap);
     }
 
     var modsEl = document.createElement('div');

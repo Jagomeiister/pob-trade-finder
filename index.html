@@ -218,6 +218,13 @@
   .badge.links { color: #7fd07f; border-color: #2c4a2c; }
   .badge.qual { color: #8888ff; border-color: #34346b; }
   .badge.qual.qual-hi { color: #b4b4ff; border-color: #4a4a8a; }
+  .gem-exp { display: flex; align-items: center; gap: 8px; margin: 3px 0 5px; }
+  .gem-exp-bar {
+    width: 140px; height: 6px; border-radius: 3px; background: #241f16;
+    border: 1px solid var(--border); overflow: hidden;
+  }
+  .gem-exp-fill { height: 100%; background: linear-gradient(90deg, #1ba29b, #3fd3c4); }
+  .gem-exp-label { color: var(--dim); font-size: 10.5px; }
   .badge.corrupt { color: #d20000; border-color: #5a1c1c; }
   .badge.unid { color: #d20000; border-color: #5a1c1c; font-style: italic; }
   .card.pasted { border-color: var(--accent); }
