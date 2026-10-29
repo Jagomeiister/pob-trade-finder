@@ -20,6 +20,17 @@ SKIP_CLASSES = {
 }
 
 
+WEAPON_CATEGORY = {
+    "Bow": "weapon.bow", "Claw": "weapon.claw", "Dagger": "weapon.dagger",
+    "Rune Dagger": "weapon.runedagger", "One Hand Axe": "weapon.oneaxe",
+    "One Hand Mace": "weapon.onemace", "One Hand Sword": "weapon.onesword",
+    "Thrusting One Hand Sword": "weapon.onesword", "Sceptre": "weapon.sceptre",
+    "Staff": "weapon.staff", "Warstaff": "weapon.warstaff", "Two Hand Axe": "weapon.twoaxe",
+    "Two Hand Mace": "weapon.twomace", "Two Hand Sword": "weapon.twosword", "Wand": "weapon.wand",
+}
+ARMOUR_CLASSES = {"Helmet", "Body Armour", "Gloves", "Boots", "Shield"}
+
+
 def main():
     fetch = "--fetch" in sys.argv
     path = os.path.join(DATA, "base_items.min.json")
@@ -53,6 +64,29 @@ def main():
         json.dump(dict(sorted(out.items())), f, separators=(",", ":"))
         f.write(";\n")
     print("wrote", dest, "-", len(out), "bases")
+
+    # base -> [trade weapon category or "", defence types] for "Search by"
+    types = {}
+    for b in bases.values():
+        name, cls = b.get("name"), b.get("item_class", "")
+        if not name or b.get("release_state") not in ("released", "legacy"):
+            continue
+        props = b.get("properties") or {}
+        if cls in WEAPON_CATEGORY:
+            types[name] = [WEAPON_CATEGORY[cls], ""]
+        elif cls in ARMOUR_CLASSES:
+            d = "/".join(k for k, p in (("ar", "armour"), ("ev", "evasion"), ("es", "energy_shield"))
+                         if (props.get(p) or {}).get("max"))
+            if d:
+                types[name] = ["", d]
+    dest = os.path.join(DATA, "basetypes.js")
+    with open(dest, "w", encoding="utf-8") as f:
+        f.write("window.POE_BASE_TYPES = ")
+        json.dump(dict(sorted(types.items())), f, separators=(",", ":"))
+        f.write(";\n")
+    print("wrote", dest, "-", len(types), "bases")
+    for probe in ("Hubris Circlet", "Imbued Wand", "Carnal Armour", "Titan Greaves"):
+        print(" ", probe, "->", types.get(probe))
     for probe in ("Hubris Circlet", "Imbued Wand", "Large Cluster Jewel", "Stygian Vise"):
         print(" ", probe, "->", out.get(probe))
 

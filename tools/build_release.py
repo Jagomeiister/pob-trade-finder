@@ -33,6 +33,7 @@ SHIP = [
     "data/uniquenames.js",
     "data/uniqueranges.js",
     "data/gemtypes.js",
+    "data/basetypes.js",
     "data/stats.json",
     "data/leagues.json",
 ]

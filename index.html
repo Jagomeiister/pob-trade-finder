@@ -215,6 +215,7 @@
   .btns { margin-left: auto; display: flex; gap: 8px; align-items: center; }
   .btns .trade-btn, .btns .copy-btn { height: 32px; padding-top: 0; padding-bottom: 0; }
   button { font-family: inherit; }
+  .hist-sel { max-width: 200px; }
   .trade-btn {
     background: linear-gradient(#b3903f, #8a6b25); color: #fff;
     border: 1px solid #c9a55a; border-radius: 6px; padding: 7px 16px;
@@ -731,7 +732,7 @@
 (function () {
   var v = Date.now();
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
-   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js',
+   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js',
    'js/pob.js', 'js/matcher.js', 'js/app.js'].forEach(function (src) {
     document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');
   });

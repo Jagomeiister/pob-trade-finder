@@ -57,14 +57,20 @@ showing its art and mods. Per mod:
 
 Per-card options:
 
-- **Same base type** — exact base filter (on by default for weapons)
+- **Search by** — how strictly to match the base: *this base* (default for weapons),
+  *any base with the same defences* (e.g. any pure-ES helmet), *any weapon of that class*
+  (e.g. any wand), or *any base* for the slot. Broader searches usually find cheaper items
 - **Match** — *all mods* / *all but one* (default — upgrades usually miss one mod) / *all but two*
 - **Require influence** — on by default when the build item is influenced (the mod pool needs it)
 - **Flexible resistances (any split)** — on cards with 2+ resistance mods: match the
   *combined* total instead of each roll separately (a 75% total split 20/55 matches a
   build asking 35/40). Site links work while logged in there; in-app checks need a
   saved POESESSID (weight searches use the logged-in query budget)
-- **Min item level / Base %ile ≥ / Sockets ≥ / Links ≥** — caps are slot-aware
+- **🕘 History** — appears after your first price check: the last 8 searches for that slot
+  in this build (time, league, listing count, cheapest price); pick one to reopen it on the
+  trade site
+- **Min ilvl** — type a minimum item level (the greyed number is the build item's ilvl)
+- **Base %ile ≥ / Sockets ≥ / Links ≥** — caps are slot-aware
   (helm/gloves/boots max 4, shields 3, body 6); links default to the build item's 5/6-link
 - **Require fractured mod(s)** — the fractured mod must actually be fractured (crafting-base shopping)
 - **Min roll** — per-card override of the global percentage

@@ -581,6 +581,64 @@
     });
   }
 
+  // ---- per-build search history ------------------------------------------------
+  // { buildKey: { slotKey: [ {ts, league, payloadStr, total, first} ] } }
+  var HISTORY_PER_SLOT = 8, HISTORY_BUILDS = 30;
+  function buildKey() {
+    var s = document.getElementById('pob-input').value.trim(), h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return 'b' + h.toString(16);
+  }
+  function slotKey(state) {
+    return state.slot + '|' + ((state.item && (state.item.name || state.item.base)) ||
+                               (state.gemSpec && state.gemSpec.gem.name) || '');
+  }
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem('pobtf-history')) || {}; }
+    catch (e) { return {}; }
+  }
+  function slotHistory(state) {
+    return ((loadHistory()[buildKey()] || {})[slotKey(state)]) || [];
+  }
+  function tradeUrlFor(league, payloadStr) {
+    return 'https://www.pathofexile.com/trade/search/' + encodeURIComponent(league) +
+           '?q=' + encodeURIComponent(payloadStr);
+  }
+  function recordHistory(state, res) {
+    var ps = state.priceState;
+    if (!ps) return;
+    var all = loadHistory(), bk = buildKey(), sk = slotKey(state);
+    var first = (!state.sortSpec && res.listings && res.listings[0]) || null;
+    var entry = { ts: Date.now(), league: ps.league, payloadStr: ps.payloadStr, total: res.total,
+                  first: first && first.amount != null ? first.amount + ' ' + first.currency : null };
+    var list = ((all[bk] = all[bk] || {})[sk] = (all[bk][sk] || []).filter(function (h) {
+      return h.payloadStr !== entry.payloadStr || h.league !== entry.league;
+    }));
+    list.unshift(entry);
+    all[bk][sk] = list.slice(0, HISTORY_PER_SLOT);
+    all[bk]._ts = Date.now();
+    var keys = Object.keys(all).sort(function (a, b) { return (all[b]._ts || 0) - (all[a]._ts || 0); });
+    keys.slice(HISTORY_BUILDS).forEach(function (k) { delete all[k]; });
+    try { persist('pobtf-history', JSON.stringify(all)); } catch (e) { /* storage full */ }
+    renderHistorySelect(state);
+  }
+  function renderHistorySelect(state) {
+    var sel = state.historySel;
+    if (!sel) return;
+    var hist = slotHistory(state);
+    sel.classList.toggle('hidden', !hist.length);
+    sel.innerHTML = '<option value="">🕘 History (' + hist.length + ')</option>';
+    hist.forEach(function (h, i) {
+      var o = document.createElement('option');
+      o.value = String(i);
+      var d = new Date(h.ts);
+      o.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+        d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + ' · ' + h.league +
+        ' · ' + (h.total != null ? h.total + ' listed' : '?') + (h.first ? ' · from ' + h.first : '');
+      sel.appendChild(o);
+    });
+  }
+
   // ---- gem shopping list ----------------------------------------------------------
   // PoB writes support gems without the " Support" suffix ("Enhance") but the
   // trade site and art database use the full name ("Enhance Support").
@@ -1203,7 +1261,7 @@
       // Magic items embed affix text in the name — their "base" is unreliable as a type filter
       var baseDefault = !categoryFor(slot, item) && !!item.base &&
                         !/flask|tincture|jewel/i.test(item.base) && item.rarity !== 'MAGIC';
-      state.baseToggle = makeToggle(opts, 'Same base type (' + (item.base || '?') + ')', baseDefault);
+      state.searchBySel = makeSearchBySelect(opts, slot, item, baseDefault);
       state.modeSel = makeModeSelect(opts, state);
       if (item.influences.length) {
         state.inflToggle = makeToggle(opts, 'Require influence: ' + item.influences.join(' + '), true);
@@ -1297,6 +1355,18 @@
     });
     btnWrap.appendChild(openBtn);
     btnWrap.appendChild(copyBtn);
+    var histSel = document.createElement('select');
+    histSel.className = 'hist-sel hidden';
+    histSel.title = 'Earlier price checks for this slot in this build — pick one to reopen it on the trade site';
+    histSel.setAttribute('aria-label', 'Search history');
+    histSel.addEventListener('change', function () {
+      var h = slotHistory(state)[parseInt(histSel.value, 10)];
+      histSel.value = '';
+      if (h) openUrl(tradeUrlFor(h.league, h.payloadStr));
+    });
+    state.historySel = histSel;
+    btnWrap.appendChild(histSel);
+    renderHistorySelect(state);
     opts.appendChild(btnWrap);
     card.appendChild(opts);
 
@@ -1550,6 +1620,47 @@
     return inp;
   }
 
+  // "Search by": exact base → same defence type / weapon class → anything in the slot
+  var DEF_LABEL = { ar: 'Armour', ev: 'Evasion', es: 'ES' };
+  var WEAPON_LABEL = {
+    'weapon.bow': 'bow', 'weapon.claw': 'claw', 'weapon.dagger': 'dagger', 'weapon.runedagger': 'rune dagger',
+    'weapon.oneaxe': 'one-hand axe', 'weapon.onemace': 'one-hand mace', 'weapon.onesword': 'one-hand sword',
+    'weapon.sceptre': 'sceptre', 'weapon.staff': 'staff', 'weapon.warstaff': 'warstaff',
+    'weapon.twoaxe': 'two-hand axe', 'weapon.twomace': 'two-hand mace', 'weapon.twosword': 'two-hand sword',
+    'weapon.wand': 'wand'
+  };
+  function searchByOptions(slot, item) {
+    var bt = (window.POE_BASE_TYPES || {})[item.base] || null;
+    var cat = categoryFor(slot, item);
+    var out = [];
+    if (item.base) out.push(['exact', 'This base (' + item.base + ')']);
+    if (bt && bt[1] && cat) {
+      out.push(['def', 'Any ' + bt[1].split('/').map(function (d) { return DEF_LABEL[d]; }).join('/') + ' base']);
+    }
+    if (bt && bt[0]) out.push(['class', 'Any ' + (WEAPON_LABEL[bt[0]] || bt[0].replace('weapon.', ''))]);
+    if (cat) out.push(['slot', 'Any base']);
+    return out;
+  }
+  function makeSearchBySelect(parent, slot, item, preferExact) {
+    var options = searchByOptions(slot, item);
+    if (!options.length) return null;
+    var wrap = document.createElement('label');
+    wrap.className = 'toggle';
+    wrap.title = 'How strictly to match the item base — broader searches find more (and cheaper) listings';
+    wrap.appendChild(document.createTextNode('Search by '));
+    var sel = document.createElement('select');
+    options.forEach(function (o) {
+      var opt = document.createElement('option');
+      opt.value = o[0]; opt.textContent = o[1];
+      sel.appendChild(opt);
+    });
+    var values = options.map(function (o) { return o[0]; });
+    sel.value = (preferExact && values.indexOf('exact') !== -1) ? 'exact' : values[values.length - 1];
+    wrap.appendChild(sel);
+    parent.appendChild(wrap);
+    return sel;
+  }
+
   function makeMiniSelect(parent, label, options, value) {
     var wrap = document.createElement('label');
     wrap.className = 'toggle';
@@ -1718,16 +1829,29 @@
 
       var qFilters = {};
       var cat = categoryFor(state.slot, state.item);
-      var useBase = state.baseToggle && state.baseToggle.checkbox.checked && state.item.base;
-      if (useBase) {
+      var searchBy = state.searchBySel ? state.searchBySel.value : (cat ? 'slot' : null);
+      var bt = (window.POE_BASE_TYPES || {})[state.item.base] || null;
+      var armourF = {};
+      if (searchBy === 'exact' && state.item.base) {
         query.type = state.item.base;
+      } else if (searchBy === 'class' && bt && bt[0]) {
+        qFilters.type_filters = { filters: { category: { option: bt[0] } } };
       } else if (cat) {
         qFilters.type_filters = { filters: { category: { option: cat } } };
+        if (searchBy === 'def' && bt && bt[1]) {
+          // absent defences capped at 0 — "min 1" alone admits other bases that
+          // pick up incidental ES/armour from implicits or mods
+          var has = bt[1].split('/');
+          ['ar', 'ev', 'es'].forEach(function (d) {
+            armourF[d] = has.indexOf(d) !== -1 ? { min: 1 } : { max: 0 };
+          });
+        }
       }
       var sf = socketFilters(state);
       if (sf) qFilters.socket_filters = sf;
       var bp = basePercentileFilter(state);
-      if (bp) qFilters.armour_filters = bp;
+      if (bp) Object.keys(bp.filters).forEach(function (k) { armourF[k] = bp.filters[k]; });
+      if (Object.keys(armourF).length) qFilters.armour_filters = { filters: armourF };
       var misc = {};
       if (state.inflToggle && state.inflToggle.checkbox.checked) {
         state.item.influences.forEach(function (inf) {
@@ -2571,6 +2695,7 @@
       renderListings(state);
       ensureSoldWatcher();
       annotateChaosEq(state);
+      recordHistory(state, res);
     } catch (e) {
       if (seq === state.priceSeq) {
         box.textContent = '❌ ' + e.message;

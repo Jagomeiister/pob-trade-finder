@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STEPS = [
     ["node", "tools/make-data-js.js", "--fetch"],
     [sys.executable, "tools/make_ranges.py", "--fetch"],
-    [sys.executable, "tools/make_baseicons.py", "--fetch"],
+    [sys.executable, "tools/make_baseicons.py", "--fetch"],  # also writes basetypes.js
     [sys.executable, "tools/make_eldritch.py", "--fetch"],
     [sys.executable, "tools/make_uniquenames.py"],
     [sys.executable, "tools/make_uniqueranges.py"],
