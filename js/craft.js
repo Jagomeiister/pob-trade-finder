@@ -6,8 +6,11 @@
  *   - each affix is drawn from the mods that can still roll, weighted by spawn
  *     weight (first spawn tag the base carries wins), limited by item level
  *   - an essence forces its mod first, the rest roll as above
+ *   - a fossil resonator rolls the same way with spawn weights scaled by the
+ *     fossils' tag multipliers (withFossils / fossilCombos below)
  *   - afterwards ONE bench craft may fill a free affix to supply a missing mod
- * Not modelled: fossils, harvest, recombinators, metamods, fractured bases,
+ * Not modelled: non-weight fossils (Glyphic, Tangled, Sanctified, Hollow, Fractured,
+ * Bloodstained, Gilded), harvest, recombinators, metamods, fractured bases,
  * alt-regal, eldritch implicits. The UI says so.
  *
  * Draws are made over mod "families" (all tiers sharing one group set) so a
@@ -69,26 +72,8 @@
       return out;
     }
 
-    // random pool grouped into families (one family = one exact group set)
-    var famByKey = {}, fams = [];
-    C.mods.forEach(function (m) {
-      if (!(m[5] & 1) || m[2] > ilvl) return;
-      var w = spawnWeight(C.spawn[m[3]], tags);
-      if (w <= 0) return;
-      var key = m[0] + ':' + m[1].join(',');
-      var f = famByKey[key];
-      if (!f) {
-        f = famByKey[key] = { affix: m[0], groups: m[1], w: 0, tiers: [] };
-        fams.push(f);
-      }
-      f.w += w;
-      f.tiers.push({ w: w, contribs: contribs(m[4]) });
-    });
-    // taking a group blocks every family that contains it
-    var famsByGroup = {};
-    fams.forEach(function (f, i) {
-      f.groups.forEach(function (g) { (famsByGroup[g] = famsByGroup[g] || []).push(i); });
-    });
+    var pool = buildPool(C, tags, ilvl, contribs, null, null);
+    var fams = pool.fams;
 
     function modInfo(i) {
       var m = C.mods[i];
@@ -96,8 +81,16 @@
     }
 
     // which targets can appear at all, and from where
-    var reach = T.map(function () { return { random: false, essence: false, bench: false }; });
+    var reach = T.map(function () { return { random: false, essence: false, bench: false, fossil: false }; });
     fams.forEach(function (f) { f.tiers.forEach(function (t) { t.contribs.forEach(function (c) { reach[c[0]].random = true; }); }); });
+    // fossil-only mods (Faceted's gem levels) that fit this base
+    (C.fossils || []).forEach(function (fo) {
+      fo[4].forEach(function (mi) {
+        var m = C.mods[mi];
+        if (m[2] > ilvl || spawnWeight(C.spawn[m[3]], tags) <= 0) return;
+        contribs(m[4]).forEach(function (c) { reach[c[0]].fossil = true; });
+      });
+    });
 
     var essences = [];
     C.essences.forEach(function (e) {
@@ -120,8 +113,150 @@
       });
     });
 
-    return { cls: cls, ilvl: ilvl, targets: T, fams: fams, famsByGroup: famsByGroup,
-             groupCount: C.groups.length, essences: essences, bench: bench, reach: reach };
+    return { cls: cls, ilvl: ilvl, targets: T, fams: fams, famsByGroup: pool.famsByGroup,
+             groupCount: C.groups.length, essences: essences, bench: bench, reach: reach,
+             C: C, tags: tags, contribs: contribs };
+  }
+
+  /* The random pool grouped into families (one family = one exact group set).
+     mult(mod) scales each mod's spawn weight (fossils); extra lists mod indices that
+     join the pool on top of the normal random mods (fossil-added mods). */
+  function buildPool(C, tags, ilvl, contribs, mult, extra) {
+    var famByKey = {}, fams = [];
+    function add(m) {
+      if (m[2] > ilvl) return;
+      var w = spawnWeight(C.spawn[m[3]], tags);
+      if (w > 0 && mult) w *= mult(m);
+      if (!(w > 0)) return;
+      var key = m[0] + ':' + m[1].join(',');
+      var f = famByKey[key];
+      if (!f) {
+        f = famByKey[key] = { affix: m[0], groups: m[1], w: 0, tiers: [] };
+        fams.push(f);
+      }
+      f.w += w;
+      f.tiers.push({ w: w, contribs: contribs(m[4]) });
+    }
+    C.mods.forEach(function (m) { if (m[5] & 1) add(m); });
+    (extra || []).forEach(function (mi) { if (!(C.mods[mi][5] & 1)) add(C.mods[mi]); });
+    // taking a group blocks every family that contains it
+    var famsByGroup = {};
+    fams.forEach(function (f, i) {
+      f.groups.forEach(function (g) { (famsByGroup[g] = famsByGroup[g] || []).push(i); });
+    });
+    return { fams: fams, famsByGroup: famsByGroup };
+  }
+
+  /* ---- fossils -------------------------------------------------------------------
+     A resonator reforge rolls like a chaos orb (4/5/6 affixes at 8:3:1) but each
+     mod's spawn weight is scaled by the socketed fossils, matched on the mod's tags
+     (RePoE implicit_tags, bundled as a bit mask in mods[i][6]). Fossil weights are
+     percentages: 1000 = x10 ("more"), 15 = x0.15 ("fewer"), 0 = blocked ("no").
+     Per poewiki ("Fossil"): each fossil affects a mod at most once even when several
+     of its tags match — here a matching fewer/no entry wins, else the largest more.
+     Across fossils, fewer/no multipliers multiply; "more" multipliers are combined
+     per `stack`: 'additive' (sum — CraftOfExile/poeDB default and the more widely
+     accepted reading) or 'multiplicative' (product). The community hasn't settled it. */
+  var FOSSIL_STACK_DEFAULT = 'additive';
+
+  function fossilMultiplier(mask, fossils, stack) {
+    var neg = 1, more = [], i, j;
+    for (i = 0; i < fossils.length; i++) {
+      var fo = fossils[i], hitNeg = -1, hitPos = -1;
+      for (j = 0; j < fo[3].length; j++) {
+        if (mask & (1 << fo[3][j][0]) && (hitNeg < 0 || fo[3][j][1] < hitNeg)) hitNeg = fo[3][j][1];
+      }
+      if (hitNeg >= 0) { neg *= hitNeg / 100; continue; }
+      for (j = 0; j < fo[2].length; j++) {
+        if (mask & (1 << fo[2][j][0]) && fo[2][j][1] > hitPos) hitPos = fo[2][j][1];
+      }
+      if (hitPos >= 0) more.push(hitPos / 100);
+    }
+    if (!neg) return 0;
+    var m = 1;
+    if (more.length) {
+      if (stack === 'multiplicative') more.forEach(function (x) { m *= x; });
+      else m = more.reduce(function (s, x) { return s + x; }, 0);
+    }
+    return m * neg;
+  }
+
+  /* A copy of P whose random pool is reweighted by the given fossils (indices into
+     C.fossils). Usable with runBatch exactly like P. */
+  function withFossils(P, fossilIdx, stack) {
+    var C = P.C, fossils = fossilIdx.map(function (i) { return C.fossils[i]; });
+    var extra = [];
+    fossils.forEach(function (fo) { fo[4].forEach(function (mi) { if (extra.indexOf(mi) === -1) extra.push(mi); }); });
+    var pool = buildPool(C, P.tags, P.ilvl, P.contribs, function (m) {
+      return fossilMultiplier(m[6] || 0, fossils, stack || FOSSIL_STACK_DEFAULT);
+    }, extra);
+    var Q = {};
+    Object.keys(P).forEach(function (k) { Q[k] = P[k]; });
+    Q.fams = pool.fams;
+    Q.famsByGroup = pool.famsByGroup;
+    Q.fossils = fossilIdx.slice();
+    Q.fossilNames = fossils.map(function (fo) { return fo[0]; });
+    Q.reach = P.targets.map(function () { return { random: false, essence: false, bench: false, fossil: false }; });
+    pool.fams.forEach(function (f) { f.tiers.forEach(function (t) { t.contribs.forEach(function (c) { Q.reach[c[0]].random = true; }); }); });
+    return Q;
+  }
+
+  /* Rough odds of one reroll hitting every target, from pool shares only: for each
+     target, the weight share of tiers that can meet its minimum within its affix
+     type, over ~2.2 draws of that type (a 4/5/6-affix item averages 4.4 affixes).
+     Only used to rank fossil combos — the simulation gives the real numbers. */
+  function roughOdds(Q) {
+    var tot = [0, 0], hit = Q.targets.map(function () { return [0, 0]; });
+    Q.fams.forEach(function (f) {
+      tot[f.affix] += f.w;
+      f.tiers.forEach(function (t) {
+        t.contribs.forEach(function (c) {
+          var tg = Q.targets[c[0]], lo = 0, hi = 0;
+          c[1].forEach(function (s) { lo += s[0]; hi += s[1]; });
+          lo /= c[1].length; hi /= c[1].length;
+          var frac = tg.min === null || lo >= tg.min ? 1 : hi < tg.min ? 0 : (hi - tg.min + 1e-9) / (hi - lo);
+          hit[c[0]][f.affix] += t.w * frac;
+        });
+      });
+    });
+    var p = 1;
+    hit.forEach(function (h) {
+      var miss = 1;
+      for (var a = 0; a < 2; a++) if (tot[a] > 0) miss *= Math.pow(1 - Math.min(1, h[a] / tot[a]), 2.2);
+      p *= 1 - miss;
+    });
+    return p;
+  }
+
+  /* Candidate fossil combos for P: every modelled fossil alone, then 2- and 3-fossil
+     combos of the best singles (by rough odds). Returns [{fossils, names, Q, rough}],
+     each Q ready for runBatch; combos that can't hit every target are dropped. */
+  function fossilCombos(P, opts) {
+    opts = opts || {};
+    var C = P.C, maxSize = opts.maxSize || 3, keep = opts.keepSingles || 7;
+    if (!C.fossils || !C.fossils.length) return [];
+    var stack = opts.stack || FOSSIL_STACK_DEFAULT;
+    function sig(fams) { // pool fingerprint — a fossil that changes nothing here is skipped
+      return fams.length + ':' + fams.reduce(function (s, f) { return s + f.w; }, 0);
+    }
+    var plain = sig(P.fams), singles = [];
+    C.fossils.forEach(function (fo, i) {
+      var Q = withFossils(P, [i], stack), r = roughOdds(Q);
+      if (r > 0 && sig(Q.fams) !== plain) singles.push({ fossils: [i], names: Q.fossilNames, Q: Q, rough: r });
+    });
+    singles.sort(function (a, b) { return b.rough - a.rough; });
+    var out = singles.slice();
+    var top = singles.slice(0, keep).map(function (s) { return s.fossils[0]; });
+    function rec(start, cur) {
+      if (cur.length >= 2) {
+        var Q = withFossils(P, cur, stack), r = roughOdds(Q);
+        if (r > 0) out.push({ fossils: cur.slice(), names: Q.fossilNames, Q: Q, rough: r });
+      }
+      if (cur.length >= maxSize) return;
+      for (var i = start; i < top.length; i++) { cur.push(top[i]); rec(i + 1, cur); cur.pop(); }
+    }
+    rec(0, []);
+    return out;
   }
 
   function mulberry32(seed) {
@@ -247,5 +382,7 @@
   }
 
   return { prepare: prepare, runBatch: runBatch, summarize: summarize, mulberry32: mulberry32,
-           spawnWeight: spawnWeight, AFFIX_COUNTS: AFFIX_COUNTS };
+           spawnWeight: spawnWeight, AFFIX_COUNTS: AFFIX_COUNTS,
+           withFossils: withFossils, fossilCombos: fossilCombos, fossilMultiplier: fossilMultiplier,
+           roughOdds: roughOdds, FOSSIL_STACK_DEFAULT: FOSSIL_STACK_DEFAULT };
 });

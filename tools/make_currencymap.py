@@ -39,8 +39,12 @@ def main():
             metas = by_name.get(name or "")
             if not code or not metas:
                 continue
-            # duplicate names (legacy/alt rows): prefer the Currency path, then shortest
-            metas.sort(key=lambda m: ("/Currency/" not in m, len(m)))
+            # duplicate names (legacy/alt rows): prefer stackable rows (what the currency
+            # exchange trades — e.g. DelveStackableSocketableCurrencyReroll1 for chaotic
+            # resonators, not the old DelveSocketableCurrency rows), then the Currency
+            # path, then shortest
+            metas.sort(key=lambda m: ("Stackable" not in (bases[m].get("item_class") or ""),
+                                      "/Currency/" not in m, len(m)))
             out[code] = {"id": metas[0], "name": name, "img": e.get("image", "")}
 
     with open(os.path.join(DATA, "currencymap.json"), "w", encoding="utf-8") as f:

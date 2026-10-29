@@ -26,8 +26,11 @@ function makeData(extra) {
 }
 
 // exact probability that the chosen families satisfy pred(chosenSet)
-function exact(C, pred, forcedIdx) {
-  const fams = C.mods.map((m, i) => ({ i, affix: m[0], w: C.spawn[m[3]][0][1] })).filter(f => C.mods[f.i][5] & 1);
+// weightOf(modIdx) overrides the spawn weight (fossils); 0 drops the mod. Mods
+// flagged 8 (fossil-added) join only when weightOf gives them a weight.
+function exact(C, pred, forcedIdx, weightOf) {
+  const wOf = weightOf || (i => (C.mods[i][5] & 1) ? C.spawn[C.mods[i][3]][0][1] : 0);
+  const fams = C.mods.map((m, i) => ({ i, affix: m[0], w: wOf(i) })).filter(f => f.w > 0);
   function rec(chosen, counts, left) {
     if (left === 0) return pred(chosen) ? 1 : 0;
     const elig = fams.filter(f => !chosen.includes(f.i) && counts[f.affix] < 3);
@@ -150,7 +153,78 @@ function within(pHat, p, n) { // 4 standard errors
   check('Shaper tag unlocks the mod', shaper.reach[0].random);
 }
 
-// 8) real data smoke: ES helmet with life + res
+// 8) fossils: tag multipliers, blocking, additive vs multiplicative "more", added mods
+{
+  const LIFE = 0, DEF = 1, FIRE = 2, GEM = 3, MINION = 4;
+  const C = makeData(C => {
+    C.fossilTags = ['life', 'defences', 'fire', 'gem', 'minion'];
+    C.mods[4][6] = 1 << LIFE;                  // P4: life
+    C.mods[3][6] = (1 << LIFE) | (1 << DEF);   // P3: hybrid life + defences
+    C.mods[5][6] = 1 << DEF;                   // S0: defences
+    C.mods[8][6] = 1 << FIRE;                  // S3: fire
+    C.mods[9][6] = 1 << FIRE;                  // S4: fire
+    C.spawn.push([['default', 1000]]);
+    C.groups.push('GemLevel');
+    C.mods.push([1, [C.groups.length - 1], 1, C.spawn.length - 1, [['stat_G', [[1, 1]]]], 8, 1 << GEM]);
+    const G = C.mods.length - 1;
+    C.fossils = [
+      ['Pristine-like', 'pristine-fossil', [[LIFE, 1000]], [[DEF, 0]], []],
+      ['Scorched-like', 'scorched-fossil', [[FIRE, 1000]], [], []],
+      ['Half-life', 'half-fossil', [[LIFE, 500]], [], []],
+      ['Faceted-like', 'faceted-fossil', [[GEM, 1000]], [], [G]],
+      ['Minion-only', 'bound-fossil', [[MINION, 1000]], [], []],
+      ['Fewer-fire', 'aetheric-fossil', [], [[FIRE, 15]], []]
+    ];
+  });
+  const G = C.mods.length - 1;
+  const base = i => (C.mods[i][5] & 1) ? C.spawn[C.mods[i][3]][0][1] : 0;
+  const fm = Craft.fossilMultiplier;
+  check('fossil: more x10 on a matching tag', fm(1 << LIFE, [C.fossils[0]]) === 10);
+  check('fossil: "no" tag blocks', fm(1 << DEF, [C.fossils[0]]) === 0);
+  check('fossil: hybrid with a blocked tag is blocked', fm((1 << LIFE) | (1 << DEF), [C.fossils[0]]) === 0);
+  check('fossil: untouched mod keeps x1', fm(1 << FIRE, [C.fossils[0]]) === 1);
+  check('fossil: "more" stacks additively by default', fm(1 << LIFE, [C.fossils[0], C.fossils[2]]) === 15);
+  check('fossil: multiplicative option', fm(1 << LIFE, [C.fossils[0], C.fossils[2]], 'multiplicative') === 50);
+  check('fossil: fewer multiplies the more', Math.abs(fm(1 << FIRE, [C.fossils[1], C.fossils[5]]) - 1.5) < 1e-12);
+
+  const P = Craft.prepare(C, 'Test Ring', [], 86, [{ tail: 'stat_P4', min: null }, { tail: 'stat_S1', min: null }]);
+  const Q = Craft.withFossils(P, [0]);
+  const wQ = i => base(i) * fm(C.mods[i][6] || 0, [C.fossils[0]]);
+  const want = exact(C, ch => ch.includes(4) && ch.includes(6), undefined, wQ);
+  const st = simulate(Q, {}, 200000, 21);
+  check('fossil reroll matches exact (x10 + block)', within(st.s / st.n, want, st.n),
+        'sim ' + (st.s / st.n).toFixed(4) + ' vs exact ' + want.toFixed(4) + ', chaos ' + exact(C, ch => ch.includes(4) && ch.includes(6)).toFixed(4));
+  check('fossil raises odds over chaos', want > exact(C, ch => ch.includes(4) && ch.includes(6)));
+  const Pdef = Craft.prepare(C, 'Test Ring', [], 86, [{ tail: 'stat_S0', min: null }]);
+  check('blocked target unreachable under the fossil', Pdef.reach[0].random && !Craft.withFossils(Pdef, [0]).reach[0].random);
+
+  for (const stack of ['additive', 'multiplicative']) {
+    const Q2 = Craft.withFossils(P, [0, 2], stack);
+    const w2 = i => base(i) * fm(C.mods[i][6] || 0, [C.fossils[0], C.fossils[2]], stack);
+    const want2 = exact(C, ch => ch.includes(4) && ch.includes(6), undefined, w2);
+    const st2 = simulate(Q2, {}, 200000, stack === 'additive' ? 23 : 29);
+    check('two-fossil ' + stack + ' matches exact', within(st2.s / st2.n, want2, st2.n),
+          'sim ' + (st2.s / st2.n).toFixed(4) + ' vs exact ' + want2.toFixed(4));
+  }
+
+  const Pg = Craft.prepare(C, 'Test Ring', [], 86, [{ tail: 'stat_G', min: null }]);
+  check('fossil-only mod: not in the chaos pool', !Pg.reach[0].random && Pg.reach[0].fossil);
+  const Qg = Craft.withFossils(Pg, [3]);
+  const wg = i => i === G ? 1000 * 10 : base(i);
+  const wantG = exact(C, ch => ch.includes(G), undefined, wg);
+  const stG = simulate(Qg, {}, 200000, 31);
+  check('fossil-added mod matches exact', Qg.reach[0].random && within(stG.s / stG.n, wantG, stG.n),
+        'sim ' + (stG.s / stG.n).toFixed(4) + ' vs exact ' + wantG.toFixed(4));
+
+  const combos = Craft.fossilCombos(P);
+  const names = combos.map(c => c.names.join('+'));
+  check('combos skip fossils with no effect on this base', !names.some(n => /Minion-only/.test(n)));
+  combos.sort((a, b) => b.rough - a.rough);
+  check('best combo for a life target uses the life fossil', /Pristine-like/.test(combos[0].names.join('+')), names.slice(0, 3).join(', '));
+  check('combos include pairs and triples', combos.some(c => c.fossils.length === 2) && combos.some(c => c.fossils.length === 3));
+}
+
+// 9) real data smoke: ES helmet with life + res
 try {
   global.window = {};
   require('../data/craftdata.js');
@@ -166,6 +240,26 @@ try {
   check('real helmet: plausible chaos odds', st.s > 0 && st.s / st.n < 0.2,
         '1 in ' + Math.round(st.n / Math.max(1, st.s)) + ', ' + Math.round(200000 / ms) + 'k trials/s... ' + ms + 'ms for 200k');
   check('real helmet: essence of Greed offered', P.essences.some(e => /Greed/.test(e.name)));
+
+  // Pristine Fossil (poewiki: "Life" x10, no "Defence") on a body armour
+  const fi = C.fossils.findIndex(f => f[0] === 'Pristine Fossil');
+  check('real data: Pristine Fossil bundled as life x10 / defences blocked', fi >= 0 &&
+        C.fossilTags[C.fossils[fi][2][0][0]] === 'life' && C.fossils[fi][2][0][1] === 1000 &&
+        C.fossilTags[C.fossils[fi][3][0][0]] === 'defences' && C.fossils[fi][3][0][1] === 0);
+  check('real data: resonator codes bundled', C.resonators.length === 4 && C.resonators.every(Boolean));
+  const BA = Craft.prepare(C, 'Vaal Regalia', [], 86, [{ tail: 'stat_3299347043', min: 80 }]); // +# to maximum Life
+  const chaosSt = simulate(BA, {}, 200000, 41);
+  const pr = Craft.withFossils(BA, [fi]);
+  const prSt = simulate(pr, {}, 200000, 43);
+  const pc = chaosSt.s / chaosSt.n, pp = prSt.s / prSt.n;
+  check('real body armour: Pristine raises P(80+ life) over chaos', pp > 2 * pc,
+        'chaos ' + (pc * 100).toFixed(1) + '% vs Pristine ' + (pp * 100).toFixed(1) + '%');
+  const es = Craft.prepare(C, 'Vaal Regalia', [], 86, [{ tail: 'stat_4015621042', min: null }]); // #% increased Energy Shield (local)
+  check('real body armour: Pristine blocks ES% (defences)', es.reach[0].random && !Craft.withFossils(es, [fi]).reach[0].random);
+  const t1 = Date.now(), combos = Craft.fossilCombos(BA);
+  check('real body armour: combo search is quick and finds Pristine', Date.now() - t1 < 500 &&
+        combos.sort((a, b) => b.rough - a.rough)[0].names.indexOf('Pristine Fossil') !== -1,
+        combos.length + ' combos in ' + (Date.now() - t1) + 'ms, best ' + combos[0].names.join(' + '));
 } catch (e) {
   check('real data smoke', false, e.message);
 }

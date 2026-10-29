@@ -160,9 +160,18 @@ Estimates what it would cost to roll the ticked explicit mods yourself, then com
 with the cheapest listing from **Check price**.
 
 - It simulates hundreds of thousands of rerolls using the game's mod weights, tiers, mod
-  groups and the 3 prefix / 3 suffix limit. The methods it compares are **chaos spam**
-  and **essence spam** (Screaming and up; each essence that forces one of your mods).
-  When an affix is still free, a **bench craft** can supply one missing mod.
+  groups and the 3 prefix / 3 suffix limit. The methods it compares are **chaos spam**,
+  **essence spam** (Screaming and up; each essence that forces one of your mods) and
+  **fossil spam**. When an affix is still free, a **bench craft** can supply one missing mod.
+- **Fossils**: it tries every fossil that changes the odds on your base, then pairs and
+  triples of the most promising ones, and shows the best **1-, 2- and 3-fossil** combo for
+  the money. Cost per try is the chaotic resonator (Primitive / Potent / Powerful) plus the
+  fossils. A fossil's "more" tag is ×10 (Prismatic ×6), "fewer" ×0.15 and "no" blocks the
+  mod — that's why Pristine helps a life roll on armour, and also why it can never give you
+  an armour or energy shield % mod. When two fossils boost the same mod the boosts are
+  **added** (two ×10 fossils = ×20), the convention CraftOfExile and poeDB use; some
+  crafters believe they multiply, so treat stacked-fossil odds as approximate. A combo
+  whose fossil has no price yet is still simulated but ranked after priced ones.
 - **Base ilvl** controls which tiers can roll (86 by default). **Base price** adds the cost
   of the blank base; **Price base** looks it up with one trade search.
 - The table shows the odds per try, the cost per try, the **average** total, and an
@@ -172,8 +181,10 @@ with the cheapest listing from **Check price**.
 - It honours the card's minimum rolls and **Match** mode, so "all but one" means any
   N−1 of your mods count as a success.
 - Prices come from GGG's hourly currency exchange.
-- **It's an estimate.** Fossils, harvest, alt-regal, recombinators, metamods and fractured
-  bases aren't modelled, so a skilled crafter can often beat the number shown. Mods that
+- **It's an estimate.** Not modelled: fossils that don't just reweight mods (Glyphic,
+  Tangled, Sanctified, Hollow, Fractured, Bloodstained, Gilded), Opulent's "no tagless
+  modifiers", 4-fossil Prime resonators, harvest, alt-regal, recombinators, metamods and
+  fractured bases — so a skilled crafter can often beat the number shown. Mods that
   can't roll on the base (for example influence mods on a non-influenced base) are listed
   and left out.
 
