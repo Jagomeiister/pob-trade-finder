@@ -584,6 +584,29 @@
     padding: 4px 12px; font-size: 12.5px; margin-right: 10px;
   }
   #rate-chip.hidden { display: none; }
+  .hotkey-status { color: var(--dim); font-size: 12px; margin-left: 8px; white-space: normal; }
+
+  /* ---- in-game price-check overlay (index.html?overlay=1) ---- */
+  #overlay-bar { display: none; }
+  body.overlay { padding: 8px 10px 12px; min-height: 0; }
+  body.overlay .app-head, body.overlay #settings-panel, body.overlay #update-banner,
+  body.overlay #input-panel, body.overlay #build-bar, body.overlay #char-bar,
+  body.overlay #cost-summary, body.overlay #basket, body.overlay #controls,
+  body.overlay #market-panel, body.overlay .help, body.overlay .footer,
+  body.overlay #results > :not(.card.pasted) { display: none !important; }
+  body.overlay #overlay-bar {
+    display: flex; align-items: center; gap: 10px;
+    position: sticky; top: 0; z-index: 6; margin-bottom: 8px; padding: 6px 10px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  }
+  .ov-title { color: var(--gold); font-weight: 600; font-variant: small-caps; letter-spacing: .5px; }
+  .ov-meta { flex: 1; min-width: 0; color: var(--dim); font-size: 12px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #overlay-close { padding: 2px 10px; }
+  body.overlay .card.pasted { margin-bottom: 0; }
+  body.overlay .btns { margin-left: 0; width: 100%; flex-wrap: wrap; }
+  body.overlay .btns > * { white-space: nowrap; }
 
   :focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; border-radius: 3px; }
 
@@ -669,6 +692,17 @@
       <label><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
       <label><input type="checkbox" id="pref-contrast"> High contrast text</label>
       <label><input type="checkbox" id="pref-cb"> Colourblind-friendly sockets (letter labels)</label>
+      <span class="gui-only">
+        <label>Price-check hotkey
+          <select id="pref-hotkey" title="Hover an item in Path of Exile and press this to price it in a small overlay. Only active while the game window is focused.">
+            <option value="ctrl+d">Ctrl+D</option>
+            <option value="ctrl+shift+d">Ctrl+Shift+D</option>
+            <option value="alt+d">Alt+D</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <span id="hotkey-status" class="hotkey-status"></span>
+      </span>
       <span class="gui-only">
         <button id="check-updates-btn" class="copy-btn">Check for updates</button>
         <span id="update-check-status"></span>

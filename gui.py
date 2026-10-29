@@ -21,6 +21,7 @@ import zipfile
 
 import webview
 
+import price_hotkey
 from currency_feed import CurrencyFeed
 
 VERSION = "1.10.0"
@@ -38,6 +39,18 @@ TRADE_BASE = "https://www.pathofexile.com/api/trade"
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
 MIN_INTERVAL = 2.5
+
+# in-game price-check overlay: a second window on index.html?overlay=1
+OVERLAY_TITLE = "PoB Trade Finder - Price check"
+OVERLAY_SIZE = (560, 700)
+
+
+def _debug_log(msg):
+    try:
+        with open(os.path.join(DATA_DIR, "debug.log"), "a", encoding="utf-8") as f:
+            f.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
+    except Exception:
+        pass
 
 
 class Api:
@@ -78,6 +91,16 @@ class Api:
                 self._storage = json.load(f)
         except Exception:
             self._storage = {}
+        # in-game price check: hotkey thread + overlay window (wired up by main())
+        self._hotkey = None
+        self._overlay = None
+        self._quitting = False
+        try:
+            spec = json.loads(self._storage.get("pobtf-prefs") or "{}").get("hotkey", "ctrl+d")
+            price_hotkey.parse_hotkey(spec)
+        except Exception:
+            spec = "ctrl+d"
+        self._hotkey_spec = spec
 
     # -- shared HTTP helper: quota-aware throttle, global 429 lockout ------------
     def _read_quota(self, headers):
@@ -546,22 +569,8 @@ class Api:
         return found[0] if found else None
 
     def _set_clipboard(self, text):
-        import ctypes
-        CF_UNICODETEXT = 13
-        GMEM_MOVEABLE = 0x0002
-        user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
-        if not user32.OpenClipboard(None):
-            raise RuntimeError("could not open clipboard")
-        try:
-            user32.EmptyClipboard()
-            data = text.encode("utf-16-le") + b"\x00\x00"
-            h = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data))
-            p = kernel32.GlobalLock(h)
-            ctypes.memmove(p, data, len(data))
-            kernel32.GlobalUnlock(h)
-            user32.SetClipboardData(CF_UNICODETEXT, h)
-        finally:
-            user32.CloseClipboard()
+        # typed ctypes prototypes live in price_hotkey (64-bit safe handles)
+        price_hotkey.set_clipboard_text(text)
 
     def poe_chat(self, text):
         """Paste one chat line into the running PoE client and press Enter."""
@@ -589,6 +598,115 @@ class Api:
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    # -- in-game price-check hotkey + overlay ----------------------------------------
+    # Hotkey (default Ctrl+D) is held only while Path of Exile is the foreground
+    # window. On press: Ctrl+C the hovered item, restore the clipboard, push the
+    # item into the always-on-top overlay window, which prices it through this
+    # same Api instance — so the overlay shares the global GGG rate limiter.
+    def _attach_windows(self, main_window, overlay):
+        self._overlay = overlay
+
+        def main_closed():
+            # the hidden overlay would otherwise keep the app alive
+            self._quitting = True
+            try:
+                overlay.destroy()
+            except Exception:
+                pass
+
+        def overlay_closing():
+            if self._quitting:
+                return True
+            # the overlay's own close box only hides it (it is reused on every press)
+            threading.Thread(target=self._hide_overlay, daemon=True).start()
+            return False
+
+        main_window.events.closed += main_closed
+        overlay.events.closing += overlay_closing
+
+    def _start_hotkey(self):
+        if sys.platform != "win32" or self._hotkey:
+            return
+        try:
+            self._hotkey = price_hotkey.HotkeyWatcher(self._on_price_hotkey, self._hotkey_spec,
+                                                      log=_debug_log)
+            self._hotkey.start()
+        except Exception as e:
+            _debug_log("price hotkey unavailable: %s" % e)
+            self._hotkey = None
+
+    def _stop_hotkey(self):
+        if self._hotkey:
+            self._hotkey.stop()
+
+    def _on_price_hotkey(self, game_hwnd):
+        text = price_hotkey.copy_item_text()
+        if text:
+            self._show_overlay(text, game_hwnd)
+
+    def _show_overlay(self, text, game_hwnd=None):
+        ov = self._overlay
+        if not ov:
+            return False
+        # JSON-encoded: the item text reaches JS as a string literal, never as code
+        ov.evaluate_js("window.__overlayItem ? (window.__overlayItem(%s), true) : false"
+                       % json.dumps(text))
+        hwnd = price_hotkey.find_window(OVERLAY_TITLE)
+        game = price_hotkey.window_rect(game_hwnd)
+        own = price_hotkey.window_rect(hwnd)
+        if hwnd and game and own:
+            x, y = price_hotkey.overlay_position(price_hotkey.cursor_x(), game,
+                                                 (own[2] - own[0], own[3] - own[1]))
+            price_hotkey.place_window(hwnd, x, y)
+        ov.show()
+        # the hotkey press gives this process foreground rights; claim them so
+        # Esc works straight away (on_top keeps it visible even if this fails)
+        price_hotkey.focus_window(hwnd)
+        return True
+
+    def _hide_overlay(self):
+        ov = self._overlay
+        if not ov:
+            return
+        try:
+            ov.evaluate_js("window.__overlayHidden && window.__overlayHidden()")
+        except Exception:
+            pass
+        ov.hide()
+        game = self._find_poe_window()
+        if game:
+            price_hotkey.focus_window(game)  # hand the keyboard back to the game
+
+    def overlay_hide(self):
+        """Hide the price-check overlay (Esc / ✕ in the overlay) and refocus the game."""
+        try:
+            self._hide_overlay()
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def set_price_hotkey(self, spec):
+        """Change the price-check hotkey at runtime: ctrl+d | ctrl+shift+d | alt+d | off."""
+        try:
+            spec = (spec or "off").strip().lower().replace(" ", "")
+            price_hotkey.parse_hotkey(spec)
+            self._hotkey_spec = spec
+            if self._hotkey:
+                self._hotkey.set_spec(spec)
+            return self.hotkey_status()
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+
+    def hotkey_status(self):
+        if self._hotkey:
+            st = self._hotkey.status()
+        else:
+            st = {"hotkey": self._hotkey_spec, "label": price_hotkey.hotkey_label(self._hotkey_spec),
+                  "running": False, "active": False,
+                  "error": None if sys.platform == "win32" else "Windows only"}
+        st["ok"] = True
+        return st
 
     # -- rate-limit visibility -------------------------------------------------------
     def rate_status(self):
@@ -831,6 +949,7 @@ class Api:
                              stdin=subprocess.DEVNULL,
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL)
+            self._quitting = True  # let the overlay window close too
             for w in list(webview.windows):
                 try:
                     w.destroy()
@@ -853,15 +972,34 @@ def main():
     index = os.path.join(APP_DIR, "index.html")
     if not os.path.exists(index):
         sys.exit("index.html not found next to gui.py")
-    webview.create_window(
+    api = Api()
+    main_window = webview.create_window(
         "PoB Trade Finder",
         index,
-        js_api=Api(),
+        js_api=api,
         width=1060,
         height=880,
         background_color="#0c0b09",
     )
-    webview.start()
+    # in-game price-check overlay: same page in overlay mode, same Api instance
+    # (one rate limiter for both windows), created hidden and reused per press
+    overlay = webview.create_window(
+        OVERLAY_TITLE,
+        index + "?overlay=1",
+        js_api=api,
+        width=OVERLAY_SIZE[0],
+        height=OVERLAY_SIZE[1],
+        min_size=(380, 300),
+        hidden=True,
+        on_top=True,
+        background_color="#0c0b09",
+    )
+    api._attach_windows(main_window, overlay)
+    api._start_hotkey()
+    try:
+        webview.start()
+    finally:
+        api._stop_hotkey()
 
 
 if __name__ == "__main__":
