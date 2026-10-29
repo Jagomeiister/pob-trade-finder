@@ -113,9 +113,21 @@ RePoE lives at `https://repoe-fork.github.io/<file>` (root path — not `/RePoE/
 - League day: `python tools/refresh_all.py` regenerates every data table and runs
   the tests. Stats with `option` dropdowns are now only Temple rooms and eldritch
   tier pseudos — gear stats (cluster jewels included) are numeric or value-in-id
-- Price history should use the public hourly feed
-  `https://web.poecdn.com/api/currency-exchange[/<realm>][/<id>]` (no auth, paged by
-  `next_change_id`) — never poll the trade API for it
+- Currency rates and price history come from GGG's public hourly feed
+  (`currency_feed.py`): `GET https://web.poecdn.com/api/currency-exchange/<unix hour>`,
+  no auth, not the trade API. Each hour is an immutable ~0.9 MB snapshot of every
+  exchange market in every league; the current hour 404s until published (latest
+  is usually now − 1h). A market `{A: a, B: b}` reads "a of A traded for b of B".
+  `distill()` reduces a snapshot to `{league: {metadata id: [chaos value, chaos
+  volume]}}` using a volume-weighted price across BOTH the chaos and divine markets
+  (cheap orbs trade in bulk vs divines — either market alone jitters); no-trade
+  hours fall back to the ratio-range midpoint. Distilled hours are cached forever
+  in `data/cx_cache/<hour>.v<FORMAT>.json` — bump `FORMAT` when `distill()` changes.
+  `data/currencymap.json` (tools/make_currencymap.py) maps trade codes ("divine")
+  to metadata ids by item name. `exchange_rates()` is feed-first and only falls
+  back to the trade exchange API for codes the feed lacks
+- Thin markets: low-value orbs often see under 5k chaos traded per hour, so hourly
+  samples swing ±30%. The market panel flags those rows "thin" rather than hiding it
 
 ## Auto-update
 

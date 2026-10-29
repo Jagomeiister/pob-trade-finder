@@ -20,7 +20,9 @@ STEPS = [
     [sys.executable, "tools/make_uniquenames.py"],
     [sys.executable, "tools/make_uniqueranges.py"],
     [sys.executable, "tools/make_gemtypes.py"],
+    [sys.executable, "tools/make_currencymap.py"],  # after make_baseicons (needs base_items)
     ["node", "test/test.js"],
+    [sys.executable, "test/test_currency_feed.py"],
 ]
 
 

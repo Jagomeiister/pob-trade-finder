@@ -325,7 +325,20 @@
       setInterval(checkForUpdates, 4 * 3600 * 1000); // not just at launch
       refreshSessionStatus(true);
       setInterval(function () { refreshSessionStatus(true); }, 30 * 60 * 1000);
-      hydrateFromBridge();
+      // market history loads after the saved league is restored; the feed is hourly
+      hydrateFromBridge().then(function () { setTimeout(loadMarket, 1500); });
+      setInterval(loadMarket, 60 * 60 * 1000);
+      document.getElementById('league').addEventListener('change', loadMarket);
+      var tile = document.getElementById('market-tile');
+      tile.addEventListener('click', function (e) {
+        if (e.target.closest('.spark')) return; // hovering/focusing the chart isn't a toggle
+        var panel = document.getElementById('market-panel');
+        var open = panel.classList.toggle('hidden') === false;
+        tile.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      tile.addEventListener('keydown', function (e) {
+        if (e.target === tile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tile.click(); }
+      });
       // surface rate-limit cooldowns so the app never feels silently stuck
       setInterval(async function () {
         try {
@@ -604,18 +617,29 @@
     return 'https://www.pathofexile.com/trade/search/' + encodeURIComponent(league) +
            '?q=' + encodeURIComponent(payloadStr);
   }
-  function recordHistory(state, res) {
-    var ps = state.priceState;
+  // ps is the priceState the listings came from (frozen — a newer search may
+  // have replaced state.priceState by the time chaos equivalents resolve).
+  // Re-running the same search appends an observation, so each saved search
+  // carries its own "cheapest over time" series.
+  var HISTORY_OBS = 30;
+  function recordHistory(state, res, ps) {
     if (!ps) return;
     var all = loadHistory(), bk = buildKey(), sk = slotKey(state);
-    var first = (!state.sortSpec && res.listings && res.listings[0]) || null;
-    var entry = { ts: Date.now(), league: ps.league, payloadStr: ps.payloadStr, total: res.total,
-                  first: first && first.amount != null ? first.amount + ' ' + first.currency : null };
-    var list = ((all[bk] = all[bk] || {})[sk] = (all[bk][sk] || []).filter(function (h) {
-      return h.payloadStr !== entry.payloadStr || h.league !== entry.league;
-    }));
-    list.unshift(entry);
-    all[bk][sk] = list.slice(0, HISTORY_PER_SLOT);
+    var byPrice = !ps.payloadStr || JSON.parse(ps.payloadStr).sort.price !== undefined;
+    var first = (byPrice && res.listings && res.listings[0]) || null;
+    var chaos = byPrice && ps.cheapestChaos !== undefined ? Math.round(ps.cheapestChaos * 10) / 10 : null;
+    var slotList = (all[bk] = all[bk] || {})[sk] || [];
+    var prev = null;
+    slotList = slotList.filter(function (h) {
+      if (h.payloadStr === ps.payloadStr && h.league === ps.league) { prev = h; return false; }
+      return true;
+    });
+    var now = Date.now();
+    var obs = ((prev && prev.obs) || []).concat(chaos !== null ? [[now, chaos]] : []).slice(-HISTORY_OBS);
+    slotList.unshift({ ts: now, league: ps.league, payloadStr: ps.payloadStr, total: res.total,
+                       first: first && first.amount != null ? first.amount + ' ' + first.currency : null,
+                       obs: obs });
+    all[bk][sk] = slotList.slice(0, HISTORY_PER_SLOT);
     all[bk]._ts = Date.now();
     var keys = Object.keys(all).sort(function (a, b) { return (all[b]._ts || 0) - (all[a]._ts || 0); });
     keys.slice(HISTORY_BUILDS).forEach(function (k) { delete all[k]; });
@@ -632,11 +656,29 @@
       var o = document.createElement('option');
       o.value = String(i);
       var d = new Date(h.ts);
+      var obs = h.obs || [];
+      var trend = obs.length > 1 ? ' · ' + fmtDelta(obs[0][1], obs[obs.length - 1][1]) + ' over ' + obs.length + ' checks' : '';
       o.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
         d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + ' · ' + h.league +
-        ' · ' + (h.total != null ? h.total + ' listed' : '?') + (h.first ? ' · from ' + h.first : '');
+        ' · ' + (h.total != null ? h.total + ' listed' : '?') + (h.first ? ' · from ' + h.first : '') + trend;
       sel.appendChild(o);
     });
+    // cheapest-over-time for the newest search, once it has been re-checked
+    var box = state.trendBox;
+    if (!box) return;
+    box.textContent = '';
+    var latest = hist[0], obs0 = (latest && latest.obs) || [];
+    box.classList.toggle('hidden', obs0.length < 2);
+    if (obs0.length < 2) return;
+    var pts = obs0.map(function (o) { return { t: o[0] / 1000, v: o[1] }; });
+    var lbl = document.createElement('span');
+    lbl.textContent = 'Cheapest';
+    box.appendChild(lbl);
+    box.appendChild(sparkline(pts, { w: 72, label: 'Cheapest listing for this search over ' + pts.length + ' checks',
+      fmt: function (v) { return fmtEq(v, latest.league); } }));
+    var val = document.createElement('span');
+    val.textContent = fmtEq(pts[0].v, latest.league) + ' → ' + fmtEq(pts[pts.length - 1].v, latest.league);
+    box.appendChild(val);
   }
 
   // ---- gem shopping list ----------------------------------------------------------
@@ -1366,6 +1408,10 @@
     });
     state.historySel = histSel;
     btnWrap.appendChild(histSel);
+    var trendBox = document.createElement('span');
+    trendBox.className = 'slot-trend hidden';
+    state.trendBox = trendBox;
+    btnWrap.appendChild(trendBox);
     renderHistorySelect(state);
     opts.appendChild(btnWrap);
     card.appendChild(opts);
@@ -2024,6 +2070,195 @@
   // ---- chaos-equivalent prices + build cost summary ------------------------------
   var RATES = {}; // league -> {currency: chaosRate}
 
+  // ---- sparkline: one series, de-emphasis line, accent latest point, crosshair --
+  // points: [{t: unix seconds, v: number, sub: optional secondary text}]
+  function sparkline(points, opts) {
+    opts = opts || {};
+    var w = opts.w || 96, h = opts.h || 22, pad = 3;
+    var wrap = document.createElement('span');
+    wrap.className = 'spark';
+    if (!points || points.length < 2) return wrap;
+    var NS = 'http://www.w3.org/2000/svg';
+    var vals = points.map(function (p) { return p.v; });
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    if (hi === lo) { hi += 1; lo -= 1; }
+    var t0 = points[0].t, t1 = points[points.length - 1].t;
+    function x(p) { return pad + (t1 === t0 ? 0 : (p.t - t0) / (t1 - t0)) * (w - 2 * pad); }
+    function y(p) { return h - pad - (p.v - lo) / (hi - lo) * (h - 2 * pad); }
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', w); svg.setAttribute('height', h);
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svg.setAttribute('aria-hidden', 'true');
+    var line = document.createElementNS(NS, 'polyline');
+    line.setAttribute('points', points.map(function (p) { return x(p).toFixed(1) + ',' + y(p).toFixed(1); }).join(' '));
+    line.setAttribute('class', 'spark-line');
+    svg.appendChild(line);
+    var hair = document.createElementNS(NS, 'line');
+    hair.setAttribute('class', 'spark-hair'); hair.setAttribute('y1', 0); hair.setAttribute('y2', h);
+    svg.appendChild(hair);
+    var last = points[points.length - 1];
+    var dot = document.createElementNS(NS, 'circle');
+    dot.setAttribute('class', 'spark-dot'); dot.setAttribute('r', 3);
+    dot.setAttribute('cx', x(last)); dot.setAttribute('cy', y(last));
+    svg.appendChild(dot);
+    wrap.appendChild(svg);
+
+    var fmt = opts.fmt || function (v) { return String(v); };
+    var tip = document.createElement('span');
+    tip.className = 'spark-tip hidden';
+    wrap.appendChild(tip);
+    function show(i) {
+      var p = points[i];
+      hair.setAttribute('x1', x(p)); hair.setAttribute('x2', x(p));
+      hair.classList.add('on');
+      dot.setAttribute('cx', x(p)); dot.setAttribute('cy', y(p));
+      tip.textContent = '';
+      var b = document.createElement('b');
+      b.textContent = fmt(p.v);
+      tip.appendChild(b);
+      var when = new Date(p.t * 1000);
+      tip.appendChild(document.createTextNode(' · ' + when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+        ' ' + when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + (p.sub ? ' · ' + p.sub : '')));
+      tip.classList.remove('hidden');
+      tip.style.left = Math.min(Math.max(0, x(p) - 60), w) + 'px';
+    }
+    function hide() {
+      hair.classList.remove('on');
+      dot.setAttribute('cx', x(last)); dot.setAttribute('cy', y(last));
+      tip.classList.add('hidden');
+    }
+    function nearest(clientX) {
+      var r = svg.getBoundingClientRect();
+      var px = (clientX - r.left) * (w / r.width), best = 0;
+      points.forEach(function (p, i) { if (Math.abs(x(p) - px) < Math.abs(x(points[best]) - px)) best = i; });
+      return best;
+    }
+    var idx = points.length - 1;
+    svg.addEventListener('pointermove', function (e) { idx = nearest(e.clientX); show(idx); });
+    svg.addEventListener('pointerleave', hide);
+    // keyboard: focus the chart, arrows walk the points
+    wrap.tabIndex = 0;
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', (opts.label || 'Trend') + ': from ' + fmt(points[0].v) + ' to ' + fmt(last.v) +
+      ', low ' + fmt(Math.min.apply(null, vals)) + ', high ' + fmt(Math.max.apply(null, vals)));
+    wrap.addEventListener('focus', function () { show(idx); });
+    wrap.addEventListener('blur', hide);
+    wrap.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft') idx = Math.max(0, idx - 1);
+      else if (e.key === 'ArrowRight') idx = Math.min(points.length - 1, idx + 1);
+      else return;
+      e.preventDefault(); show(idx);
+    });
+    return wrap;
+  }
+
+  function fmtCompact(v) {
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (v >= 1e4) return (v / 1e3).toFixed(1) + 'K';
+    if (v >= 100) return String(Math.round(v));
+    if (v >= 1) return String(Math.round(v * 10) / 10);
+    return String(+v.toPrecision(2)); // cheap orbs: 0.042, not 0
+  }
+  function fmtDelta(first, last) {
+    if (!first) return '';
+    var d = (last - first) / first * 100;
+    return (Math.abs(d) < 0.05 ? '±0.0' : (d > 0 ? '▲ ' : '▼ ') + Math.abs(d).toFixed(1)) + '%';
+  }
+
+  // ---- market: GGG's hourly currency-exchange feed (no trade-API quota) -------
+  var MARKET_CODES = ['divine', 'exalted', 'mirror', 'annul', 'vaal', 'gcp', 'regal',
+                      'fusing', 'alch', 'chrome', 'scour', 'alt', 'jewellers', 'chance'];
+  var market = null; // {league, hour, series, names}
+  var THIN_MARKET_CHAOS = 5000; // median chaos-equivalent traded per hour
+  var marketSeq = 0;
+
+  async function loadMarket() {
+    if (!isGui() || !window.pywebview.api.cx_history) return;
+    var league = document.getElementById('league').value;
+    var seq = ++marketSeq;
+    var tile = document.getElementById('market-tile');
+    tile.classList.remove('hidden');
+    if (!market || market.league !== league) {
+      tile.querySelector('.mt-value').textContent = '…';
+      tile.querySelector('.mt-delta').textContent = 'loading 7-day history';
+    }
+    try {
+      var r = await window.pywebview.api.cx_history(league, JSON.stringify(MARKET_CODES), 7);
+      if (seq !== marketSeq) return; // league switched mid-load
+      if (!r || !r.ok) throw new Error((r && r.error) || 'feed unavailable');
+      market = { league: league, hour: r.hour, series: r.series, names: r.names };
+      // seed the rate cache: chaos equivalents render instantly, no trade-API calls
+      RATES[league] = RATES[league] || {};
+      RATES[league].chaos = 1;
+      Object.keys(r.series).forEach(function (c) {
+        var s = r.series[c];
+        if (s.length) RATES[league][c] = s[s.length - 1][1];
+      });
+      refreshEqDisplays(); // re-annotates listings and renders the market tile/panel
+    } catch (e) {
+      if (seq !== marketSeq) return;
+      tile.querySelector('.mt-value').textContent = '—';
+      tile.querySelector('.mt-delta').textContent = 'market feed unavailable';
+      tile.title = String(e.message || e);
+    }
+  }
+
+  function marketPoints(code) {
+    return ((market && market.series[code]) || []).map(function (p) {
+      return { t: p[0], v: p[1], sub: p[2] ? fmtCompact(p[2]) + 'c traded/h' : 'no trades that hour' };
+    });
+  }
+
+  function renderMarket() {
+    if (!market) return;
+    var league = market.league;
+    var tile = document.getElementById('market-tile');
+    var div = marketPoints('divine');
+    var lastDiv = div.length ? div[div.length - 1].v : null;
+    tile.querySelector('.mt-value').textContent = lastDiv ? fmtCompact(lastDiv) + 'c' : '—';
+    tile.querySelector('.mt-delta').textContent = div.length > 1 ? fmtDelta(div[0].v, lastDiv) + ' 7d' : '';
+    var sp = tile.querySelector('.mt-spark');
+    sp.textContent = '';
+    sp.appendChild(sparkline(div, { label: 'Divine Orb in chaos, 7 days', fmt: function (v) { return fmtCompact(v) + 'c'; } }));
+    var updated = new Date(market.hour * 1000);
+    tile.title = 'Divine Orb price, 7 days — GGG currency exchange (' + league + '), hour of ' +
+      updated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + '. Click for more currencies.';
+
+    var panel = document.getElementById('market-panel');
+    var body = panel.querySelector('tbody');
+    body.textContent = '';
+    MARKET_CODES.forEach(function (c) {
+      var pts = marketPoints(c);
+      if (!pts.length) return;
+      var tr = document.createElement('tr');
+      var name = document.createElement('td');
+      name.textContent = market.names[c] || c;
+      var now = document.createElement('td');
+      now.className = 'num';
+      var cur = pts[pts.length - 1].v, dr = RATES[league] && RATES[league].divine;
+      now.textContent = fmtCompact(cur) + 'c' + (dr && cur >= dr && c !== 'divine' ? ' · ' + fmtCompact(cur / dr) + ' div' : '');
+      var delta = document.createElement('td');
+      delta.className = 'num';
+      delta.textContent = pts.length > 1 ? fmtDelta(pts[0].v, cur) : '';
+      // thin markets: hourly samples of a few thousand chaos swing on single trades
+      var vols = market.series[c].map(function (p) { return p[2]; }).sort(function (a, b) { return a - b; });
+      if (vols[Math.floor(vols.length / 2)] < THIN_MARKET_CHAOS) {
+        var thin = document.createElement('span');
+        thin.className = 'thin';
+        thin.textContent = ' · thin';
+        delta.title = 'Thin market — under ' + fmtCompact(THIN_MARKET_CHAOS) + 'c traded in a typical hour, so hourly samples are noisy';
+        delta.appendChild(thin);
+      }
+      var trend = document.createElement('td');
+      trend.appendChild(sparkline(pts, { label: (market.names[c] || c) + ' in chaos, 7 days',
+        fmt: function (v) { return fmtCompact(v) + 'c'; } }));
+      [name, now, delta, trend].forEach(function (td) { tr.appendChild(td); });
+      body.appendChild(tr);
+    });
+    panel.querySelector('.mp-caption').textContent = 'GGG currency exchange · ' + league + ' · hourly, sampled every 12h · updated ' +
+      updated.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
   async function annotateChaosEq(state) {
     if (!isGui() || !state.priceState) return;
     var league = state.priceState.league;
@@ -2302,6 +2537,7 @@
     });
     renderCostSummary();
     renderBasket();
+    renderMarket();
   }
 
   // ---- shopping basket ------------------------------------------------------------
@@ -2694,8 +2930,9 @@
       };
       renderListings(state);
       ensureSoldWatcher();
-      annotateChaosEq(state);
-      recordHistory(state, res);
+      var frozen = state.priceState;
+      annotateChaosEq(state).then(function () { recordHistory(state, res, frozen); },
+                                  function () { recordHistory(state, res, frozen); });
     } catch (e) {
       if (seq === state.priceSeq) {
         box.textContent = '❌ ' + e.message;

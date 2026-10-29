@@ -34,6 +34,7 @@ SHIP = [
     "data/uniqueranges.js",
     "data/gemtypes.js",
     "data/basetypes.js",
+    "data/currencymap.json",
     "data/stats.json",
     "data/leagues.json",
 ]

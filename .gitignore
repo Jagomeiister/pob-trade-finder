@@ -16,3 +16,4 @@ data/stat_translations.min.json
 test/gui-stderr.log
 
 .claude/
+data/cx_cache/

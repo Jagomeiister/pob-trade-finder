@@ -40,6 +40,7 @@ in-game whisper/hideout actions, all without touching the trade website's filter
 | **Min roll** | Sets every mod's minimum to this % of the build's roll (default 80%) |
 | **Open all searches** | Opens every slot's search in browser tabs |
 | **Check all prices** | Live-prices every slot in sequence (rate-limit safe) |
+| **Divine Orb tile** | Current divine price in chaos, its 7-day change and trend line (hover or arrow-key through the points). Click it for a table of 14 common currencies with the same 7-day history. Data is GGG's official hourly currency-exchange feed, so it doesn't use any trade-site rate limit. Rows marked *thin* trade so little per hour that their trend is mostly noise |
 
 ## 4. Item cards
 
@@ -68,7 +69,8 @@ Per-card options:
   saved POESESSID (weight searches use the logged-in query budget)
 - **🕘 History** — appears after your first price check: the last 8 searches for that slot
   in this build (time, league, listing count, cheapest price); pick one to reopen it on the
-  trade site
+  trade site. Re-run the same search later and the card shows a **Cheapest** trend line
+  (e.g. 20c → 12c over 3 checks) so you can see whether waiting is paying off
 - **Min ilvl** — type a minimum item level (the greyed number is the build item's ilvl)
 - **Base %ile ≥ / Sockets ≥ / Links ≥** — caps are slot-aware
   (helm/gloves/boots max 4, shields 3, body 6); links default to the build item's 5/6-link

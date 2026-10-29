@@ -21,7 +21,9 @@ import zipfile
 
 import webview
 
-VERSION = "1.8.0"
+from currency_feed import CurrencyFeed
+
+VERSION = "1.9.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -45,6 +47,15 @@ class Api:
         self._blocked_until = 0.0  # global hold-off from 429s / quota headers
         self._err_times = []  # recent 4xx timestamps — GGG restricts clients that burst errors
         self._rate_cache = {}  # league -> {currency: (chaos_rate, fetched_at)}
+        self._feed = CurrencyFeed(os.path.join(DATA_DIR, "cx_cache"),
+                                  "PoBTradeFinder/%s (+https://github.com/%s/%s)"
+                                  % (VERSION, GITHUB_OWNER, GITHUB_REPO))
+        try:
+            with open(os.path.join(DATA_DIR, "currencymap.json"), "r", encoding="utf-8") as f:
+                self._currency_map = json.load(f)  # trade code -> {id, name, img}
+        except Exception:
+            self._currency_map = {}
+        threading.Thread(target=self._feed.prune, daemon=True).start()
         self._unique_icons_path = os.path.join(DATA_DIR, "unique_icons.json")
         try:
             with open(self._unique_icons_path, "r", encoding="utf-8") as f:
@@ -421,11 +432,25 @@ class Api:
 
     # -- currency -> chaos rates via GGG's own bulk exchange ---------------------
     def exchange_rates(self, league, currencies_json):
-        """Median chaos rate for each currency, from live exchange offers.
-        Cached 30 min per league+currency. Returns {'ok', 'rates': {cur: chaos}}"""
+        """Chaos rate for each currency. Primary source: GGG's public hourly
+        currency-exchange feed (no trade-API quota). Fallback for anything the
+        feed lacks: median of live trade exchange offers, cached 30 min.
+        Returns {'ok', 'rates': {cur: chaos}, 'source': {cur: 'feed'|'trade'}}"""
         try:
             wanted = [c for c in json.loads(currencies_json) if c and c != "chaos"]
             rates = {"chaos": 1.0}
+            source = {}
+            ids = {c: self._currency_map[c]["id"] for c in wanted if c in self._currency_map}
+            if ids:
+                try:
+                    fed, _ = self._feed.rates(league, list(ids.values()))
+                    for cur, meta in ids.items():
+                        if meta in fed:
+                            rates[cur] = fed[meta]
+                            source[cur] = "feed"
+                except Exception:
+                    pass  # feed unreachable — the trade fallback below covers it
+            wanted = [c for c in wanted if c not in rates]
             now = time.time()
             cache = self._rate_cache.setdefault(league, {})
             for cur in wanted[:12]:
@@ -452,10 +477,28 @@ class Api:
                         ratios.sort()
                         rate = ratios[len(ratios) // 2]  # median beats troll offers
                         rates[cur] = rate
+                        source[cur] = "trade"
                         cache[cur] = (rate, now)
                 except Exception:
                     pass  # currency without offers — skip
-            return {"ok": True, "rates": rates}
+            return {"ok": True, "rates": rates, "source": source}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def cx_history(self, league, currencies_json, days=7):
+        """Price history (chaos) per trade currency code from the hourly feed:
+        {'ok', 'hour', 'series': {code: [[unix hour, chaos, volume], ...]},
+         'names': {code: name}}. First call downloads ~1 MB per missing point
+        (cached forever after) — call it off the critical path."""
+        try:
+            codes = [c for c in json.loads(currencies_json) if c in self._currency_map][:20]
+            days = max(1, min(int(days), 30))
+            ids = [self._currency_map[c]["id"] for c in codes]
+            series, hour = self._feed.history(league, ids, days=days,
+                                              step_hours=12 if days <= 7 else 24)
+            return {"ok": True, "hour": hour,
+                    "series": {c: series.get(self._currency_map[c]["id"], []) for c in codes},
+                    "names": {c: self._currency_map[c]["name"] for c in codes}}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
