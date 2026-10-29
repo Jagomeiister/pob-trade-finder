@@ -129,12 +129,39 @@ RePoE lives at `https://repoe-fork.github.io/<file>` (root path — not `/RePoE/
 - Craft vs buy: `tools/make_craftdata.py` → lazy-loaded `data/craftdata.js` (mods with
   spawn-weight lists, groups, required level, and their stats translated to trade-stat
   tails in the app's averaged value space; essences Screaming+; bench recipes; base
-  tags + influence tag prefix). Spawn weight = the FIRST tag in the mod's list that the
+  tags + influence tag prefix; fossils + resonators). Spawn weight = the FIRST tag in the mod's list that the
   item carries. Influence tags are `<class>_<shaper|elder|crusader|eyrie|basilisk|adjudicator>`
   (eyrie = Redeemer, basilisk = Hunter, adjudicator = Warlord); 2H weapons use
   `2h_axe` etc. `js/craft.js` samples 4/5/6 affixes at 8:3:1, ≤3 prefixes/suffixes, one
   mod per group, drawing over tier *families* for speed (~1.5M trials/s). It's validated
   against exact enumeration in `test/test_craft.js` — keep those passing when touching it
+- Fossils: RePoE `fossils.min.json` is a dict keyed by metadata id (also ~420
+  `RandomFossilOutcome*` rows = Tangled outcomes; ignored). Each fossil has
+  `positive_mod_weights` / `negative_mod_weights` (`[{tag, weight}]`), `added_mods`,
+  `forced_mods`, `corrupted_essence_chance`, `mirrors`, `rolls_lucky`, … Weights are
+  percentages (1000 = ×10, Prismatic 600 = ×6, Aetheric/Serrated "fewer" 15 = ×0.15,
+  0 = blocked) and match the mod's **`implicit_tags`** (`IncreasedLife*` → `life`,
+  armour/ES/evasion mods → `defences`, fire res → `elemental`,`fire`,`resistance`) —
+  not spawn-weight tags. Source: poewiki "Fossil" (+ Talk page, read via
+  `poewiki.net/w/api.php?action=parse&page=Fossil&prop=wikitext&format=json`; the HTML is
+  bot-gated). `make_craftdata.py` bundles a per-mod tag bitmask (`mods[i][6]`), the 18
+  pure weight-changing fossils (+ Faceted's added gem-level suffixes, flag 8) and the
+  resonator codes. `Craft.fossilMultiplier`: a fossil touches a mod once (a matching
+  fewer/no entry wins over its "more"); fewer/no multiply across fossils; "more" stacks
+  **additively** by default (CraftOfExile/poeDB default — the community disputes it;
+  `'multiplicative'` is supported). `Craft.fossilCombos(P)` rebuilds the family pool per
+  combo (~0.2 ms each): every fossil that changes the pool, then 2/3-combos of the best 7
+  by `roughOdds` (analytic, ranking only). The UI prices only the top 3 combos per size
+  (bounds trade-API fallbacks for fossils the feed lacks) and simulates the best one per
+  size by rough odds per chaos
+- Chaotic resonators: the currency feed trades the **stackable** rows
+  (`Metadata/Items/Delve/DelveStackableSocketableCurrencyReroll1..4`), not the
+  `DelveSocketableCurrencyReroll*` rows with the same names — `make_currencymap.py`
+  prefers stackable item classes for duplicate names
+- Not researched into code: alt-regal (no reliable source for the Orb of Alteration
+  1-vs-2 affix split) and a Craft of Exile export (its share link is an undocumented
+  querystring of CoE-internal ids — `b`, `bi`, `m`, `e`, `f`, `i`, `lv`, `req`=JSON, `l`
+  fossil stacking mode, …; the only public import is pasting Ctrl+Alt+C item text)
 - Thin markets: low-value orbs often see under 5k chaos traded per hour, so hourly
   samples swing ±30%. The market panel flags those rows "thin" rather than hiding it
 

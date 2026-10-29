@@ -741,7 +741,7 @@
     var kept = t.targets.filter(function (tg, i) {
       var idx = P.targets.findIndex(function (pt) { return pt.tail === tg.tail; });
       var r = P.reach[idx];
-      if (r && (r.random || r.essence || r.bench)) return true;
+      if (r && (r.random || r.essence || r.bench || r.fossil)) return true;
       unreachable.push(tg.line);
       return false;
     });
@@ -763,9 +763,25 @@
       });
     }).sort(function (a, b) { return b.level - a.level; }).slice(0, 6);
 
+    // fossil resonator combos (1–3 fossils): keep the top 3 per size by rough odds, so
+    // only a handful of fossil codes need prices (feed misses fall back to trade calls)
+    var perSize = {};
+    var combos = Craft.fossilCombos(P, { maxSize: 3 })
+      .sort(function (a, b) { return b.rough - a.rough; })
+      .filter(function (cb) {
+        var n = cb.fossils.length;
+        perSize[n] = (perSize[n] || 0) + 1;
+        return perSize[n] <= 3;
+      });
+
     var codes = ['divine'];
     essences.forEach(function (e) { codes.push(e.code); });
     P.bench.forEach(function (b) { Object.keys(b.cost).forEach(function (c) { if (codes.indexOf(c) === -1) codes.push(c); }); });
+    combos.forEach(function (cb) {
+      cb.fossils.forEach(function (fi) { var c = C.fossils[fi][1]; if (codes.indexOf(c) === -1) codes.push(c); });
+      var rc = C.resonators[cb.fossils.length - 1];
+      if (rc && codes.indexOf(rc) === -1) codes.push(rc);
+    });
     var rates = await craftRates(league, codes);
     if (seq !== state.craftSeq) return;
     var bench = [];
@@ -780,6 +796,24 @@
     essences.forEach(function (e) {
       methods.push({ label: e.name + ' spam', perTry: rates[e.code], forced: e.mod });
     });
+    // best fossil combo per resonator size: rough odds per chaos spent, priced first
+    var bestBySize = {};
+    combos.forEach(function (cb) {
+      var rc = C.resonators[cb.fossils.length - 1], cost = rc ? rates[rc] : undefined;
+      cb.fossils.forEach(function (fi) {
+        var r = rates[C.fossils[fi][1]];
+        cost = cost === undefined || r === undefined ? undefined : cost + r;
+      });
+      cb.perTry = cost;
+      cb.rank = cost !== undefined && cost > 0 ? cb.rough / cost : -1 / cb.rough;
+      var cur = bestBySize[cb.fossils.length];
+      if (!cur || cb.rank > cur.rank) bestBySize[cb.fossils.length] = cb;
+    });
+    Object.keys(bestBySize).sort().forEach(function (n) {
+      var cb = bestBySize[n];
+      methods.push({ label: 'Fossils: ' + cb.names.map(function (s) { return s.replace(/ Fossil$/, ''); }).join(' + '),
+                     perTry: cb.perTry, forced: null, P: cb.Q });
+    });
     var baseCost = parseFloat(state.craftBase.value);
     if (isNaN(baseCost)) baseCost = 0;
 
@@ -789,7 +823,7 @@
       var m = methods[mi];
       var st = { n: 0, s: 0, benchUses: {} }, t0 = Date.now();
       while (st.n < CRAFT_TRIALS_MAX && st.s < CRAFT_TARGET_HITS && Date.now() - t0 < CRAFT_MS_PER_METHOD) {
-        Craft.runBatch(P, { forced: m.forced, bench: bench, allowMissing: allowMissing }, 20000, st);
+        Craft.runBatch(m.P || P, { forced: m.forced, bench: bench, allowMissing: allowMissing }, 20000, st);
         progress.textContent = 'Simulating ' + m.label + '… ' + fmtCompact(st.n) + ' rolls';
         await new Promise(function (r) { setTimeout(r, 0); });
         if (seq !== state.craftSeq) return; // re-run superseded this one
@@ -880,7 +914,9 @@
     foot.textContent = 'Target: ' + P.targets.length + ' mod' + (P.targets.length > 1 ? 's' : '') +
       (allowMissing ? ' (any ' + (P.targets.length - allowMissing) + ', matching the card\'s match mode)' : '') +
       ' at your minimum rolls, ilvl ' + P.ilvl + ' (implicits come with the base and aren\'t counted). Totals include ' + (benchUsed ? 'a finishing bench craft where it helps, ' : '') +
-      'the base price you entered. Estimate only: models chaos and Screaming+ essence rerolls (4/5/6 affixes at 8:3:1) — not fossils, harvest, alt-regal, recombinators or fractured bases. ' +
+      'the base price you entered. Estimate only: models chaos, Screaming+ essence and fossil rerolls (4/5/6 affixes at 8:3:1; ' +
+      'the best 1-, 2- and 3-fossil resonator combo, priced as resonator + fossils, "more" multipliers stacked additively as CraftOfExile/poeDB do — disputed) — ' +
+      'not Glyphic, Tangled, Sanctified, Hollow, Fractured, Bloodstained or Gilded fossils, Opulent\'s tagless block, harvest, alt-regal, recombinators or fractured bases. ' +
       'Prices: GGG currency exchange.';
     out.appendChild(foot);
   }

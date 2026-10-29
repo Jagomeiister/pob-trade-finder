@@ -19,3 +19,4 @@ test/gui-stderr.log
 data/cx_cache/
 data/essences.min.json
 data/crafting_bench_options.min.json
+data/fossils.min.json
