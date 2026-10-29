@@ -23,7 +23,7 @@ import webview
 
 from currency_feed import CurrencyFeed
 
-VERSION = "1.9.0"
+VERSION = "1.10.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 

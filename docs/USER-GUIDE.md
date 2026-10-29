@@ -154,6 +154,29 @@ Works with the per-slot gear-set dropdowns, so you can compare against any mix.
   pending purchase, running total, and one-click whispers
 - **✔ Bought** marks a slot as purchased: the card dims and drops out of the build cost total
 
+### ⚒ Craft vs buy (rare gear cards)
+
+Estimates what it would cost to roll the ticked explicit mods yourself, then compares that
+with the cheapest listing from **Check price**.
+
+- It simulates hundreds of thousands of rerolls using the game's mod weights, tiers, mod
+  groups and the 3 prefix / 3 suffix limit. The methods it compares are **chaos spam**
+  and **essence spam** (Screaming and up; each essence that forces one of your mods).
+  When an affix is still free, a **bench craft** can supply one missing mod.
+- **Base ilvl** controls which tiers can roll (86 by default). **Base price** adds the cost
+  of the blank base; **Price base** looks it up with one trade search.
+- The table shows the odds per try, the cost per try, the **average** total, and an
+  **unlucky** total: what you'd have spent by the time 90% of crafters would have finished.
+  ★ marks the cheapest route. The headline says whether buying or crafting wins, and by
+  how much.
+- It honours the card's minimum rolls and **Match** mode, so "all but one" means any
+  N−1 of your mods count as a success.
+- Prices come from GGG's hourly currency exchange.
+- **It's an estimate.** Fossils, harvest, alt-regal, recombinators, metamods and fractured
+  bases aren't modelled, so a skilled crafter can often beat the number shown. Mods that
+  can't roll on the base (for example influence mods on a non-influenced base) are listed
+  and left out.
+
 ## 7. Live search
 
 **🔴 Go live** on any card watches that search (~30s polls). New listings **play a

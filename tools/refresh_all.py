@@ -21,8 +21,10 @@ STEPS = [
     [sys.executable, "tools/make_uniqueranges.py"],
     [sys.executable, "tools/make_gemtypes.py"],
     [sys.executable, "tools/make_currencymap.py"],  # after make_baseicons (needs base_items)
+    [sys.executable, "tools/make_craftdata.py", "--fetch"],  # after currencymap + ranges
     ["node", "test/test.js"],
     [sys.executable, "test/test_currency_feed.py"],
+    ["node", "test/test_craft.js"],
 ]
 
 

@@ -17,3 +17,5 @@ test/gui-stderr.log
 
 .claude/
 data/cx_cache/
+data/essences.min.json
+data/crafting_bench_options.min.json

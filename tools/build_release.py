@@ -24,6 +24,7 @@ SHIP = [
     "icon.ico",
     "js/pob.js",
     "js/matcher.js",
+    "js/craft.js",
     "js/app.js",
     "data/stats.js",
     "data/leagues.js",
@@ -35,6 +36,7 @@ SHIP = [
     "data/gemtypes.js",
     "data/basetypes.js",
     "data/currencymap.json",
+    "data/craftdata.js",
     "data/stats.json",
     "data/leagues.json",
 ]

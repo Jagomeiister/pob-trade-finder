@@ -244,6 +244,18 @@
   .market-panel td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--border-soft); color: var(--text); }
   .market-panel .num { text-align: right; font-variant-numeric: tabular-nums; }
   .market-panel .thin { color: var(--dim); font-size: 11px; }
+  .craft-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .craft-head b { color: var(--gold); margin-right: 4px; }
+  .craft-verdict { color: var(--text); font-weight: 600; margin: 4px 0 8px; }
+  .craft-note { color: var(--dim); font-size: 12px; margin: 6px 0; }
+  .craft-warn { color: var(--text); font-size: 12px; margin: 6px 0; padding: 4px 8px;
+    border-left: 2px solid var(--gold); background: var(--panel-deep); }
+  .craft-table { border-collapse: collapse; width: 100%; max-width: 720px; font-size: 13px; }
+  .craft-table th { text-align: left; color: var(--dim); font-weight: 500; font-size: 12px; padding: 4px 10px 4px 0;
+    border-bottom: 1px solid var(--border-soft); }
+  .craft-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--border-soft); color: var(--text); }
+  .craft-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .craft-table tr.best td:first-child::before { content: '★ '; color: var(--gold); }
   .slot-trend { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12px; }
   .trade-btn {
     background: linear-gradient(#b3903f, #8a6b25); color: #fff;
@@ -775,7 +787,7 @@
   var v = Date.now();
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
    'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js',
-   'js/pob.js', 'js/matcher.js', 'js/app.js'].forEach(function (src) {
+   'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/app.js'].forEach(function (src) {
     document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');
   });
 })();

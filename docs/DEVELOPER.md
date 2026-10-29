@@ -126,6 +126,15 @@ RePoE lives at `https://repoe-fork.github.io/<file>` (root path — not `/RePoE/
   `data/currencymap.json` (tools/make_currencymap.py) maps trade codes ("divine")
   to metadata ids by item name. `exchange_rates()` is feed-first and only falls
   back to the trade exchange API for codes the feed lacks
+- Craft vs buy: `tools/make_craftdata.py` → lazy-loaded `data/craftdata.js` (mods with
+  spawn-weight lists, groups, required level, and their stats translated to trade-stat
+  tails in the app's averaged value space; essences Screaming+; bench recipes; base
+  tags + influence tag prefix). Spawn weight = the FIRST tag in the mod's list that the
+  item carries. Influence tags are `<class>_<shaper|elder|crusader|eyrie|basilisk|adjudicator>`
+  (eyrie = Redeemer, basilisk = Hunter, adjudicator = Warlord); 2H weapons use
+  `2h_axe` etc. `js/craft.js` samples 4/5/6 affixes at 8:3:1, ≤3 prefixes/suffixes, one
+  mod per group, drawing over tier *families* for speed (~1.5M trials/s). It's validated
+  against exact enumeration in `test/test_craft.js` — keep those passing when touching it
 - Thin markets: low-value orbs often see under 5k chaos traded per hour, so hourly
   samples swing ±30%. The market panel flags those rows "thin" rather than hiding it
 
