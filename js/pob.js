@@ -314,6 +314,51 @@
       }
     }
 
+    // Main skill: <Build mainSocketGroup="N"> is the 1-based position among ALL
+    // <Skill> entries of the active skill set (disabled and item-granted ones count)
+    out.mainSkill = [];
+    if (bm && skillsBlock) {
+      var mainIdx = parseInt(attr(bm[1], 'mainSocketGroup') || '0', 10);
+      var activeSet3 = attr(skillsBlock[1], 'activeSkillSet') || '1';
+      var setRe3 = /<SkillSet\b([^>]*)>([\s\S]*?)<\/SkillSet>/g, ss3, scope3 = null;
+      while ((ss3 = setRe3.exec(skillsBlock[2]))) {
+        if (scope3 === null || attr(ss3[1], 'id') === activeSet3) scope3 = ss3[2];
+        if (attr(ss3[1], 'id') === activeSet3) break;
+      }
+      if (scope3 === null) scope3 = skillsBlock[2];
+      var skRe3 = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk3, n3 = 0;
+      while ((sk3 = skRe3.exec(scope3))) {
+        if (++n3 !== mainIdx) continue;
+        var gRe3 = /<Gem\b([^>]*)\/?>/g, g3;
+        while ((g3 = gRe3.exec(sk3[2]))) {
+          if (attr(g3[1], 'enabled') !== 'false' && attr(g3[1], 'nameSpec')) out.mainSkill.push(attr(g3[1], 'nameSpec'));
+        }
+      }
+    }
+
+    // Passive tree (active spec): allocated nodes, chosen masteries, jewel sockets
+    out.tree = { nodes: [], masteries: [], sockets: [], version: '' };
+    var treeTag = xml.match(/<Tree\b([^>]*)>([\s\S]*?)<\/Tree>/);
+    if (treeTag) {
+      var activeSpec = parseInt(attr(treeTag[1], 'activeSpec') || '1', 10);
+      var specRe = /<Spec\b([^>]*)>([\s\S]*?)<\/Spec>/g, sp, specN = 0, chosen = null;
+      while ((sp = specRe.exec(treeTag[2]))) {
+        specN++;
+        if (chosen === null || specN === activeSpec) chosen = sp;
+        if (specN === activeSpec) break;
+      }
+      if (chosen) {
+        out.tree.version = attr(chosen[1], 'treeVersion') || '';
+        out.tree.nodes = (attr(chosen[1], 'nodes') || '').split(',').filter(Boolean).map(Number);
+        var me = attr(chosen[1], 'masteryEffects') || '', mm, meRe = /\{(\d+),(\d+)\}/g;
+        while ((mm = meRe.exec(me))) out.tree.masteries.push([+mm[1], +mm[2]]);
+        var sRe = /<Socket\b([^>]*)\/?>/g, so;
+        while ((so = sRe.exec(chosen[2]))) {
+          out.tree.sockets.push({ nodeId: +attr(so[1], 'nodeId'), itemId: attr(so[1], 'itemId') || '0' });
+        }
+      }
+    }
+
     // Jewels socketed in the tree (Sockets under active Spec)
     var sockRe = /<Socket\b([^>]*)\/?>/g, skm;
     var seen = {};

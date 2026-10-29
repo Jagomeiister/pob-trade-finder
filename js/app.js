@@ -547,15 +547,20 @@
       section('gems').appendChild(makeGemsCard(build.gemGroups));
     }
 
-    var TAB_LABELS = { gear: 'Gear', jewels: 'Jewels & Clusters', flasks: 'Flasks', gems: 'Gems' };
-    var present = ['gear', 'jewels', 'flasks', 'gems'].filter(function (k) { return sections[k]; });
+    if (build.tree && build.tree.nodes && build.tree.nodes.length) {
+      section('finder').appendChild(makeJewelFinder(build));
+    }
+
+    var TAB_LABELS = { gear: 'Gear', jewels: 'Jewels & Clusters', flasks: 'Flasks', gems: 'Gems',
+                       finder: '💎 Jewel finder' };
+    var present = ['gear', 'jewels', 'flasks', 'gems', 'finder'].filter(function (k) { return sections[k]; });
     if (present.length > 1) {
       var bar = document.createElement('div');
       bar.className = 'tab-bar';
       ['all'].concat(present).forEach(function (k) {
         var btn = document.createElement('button');
         btn.className = 'tab-btn' + (k === 'all' ? ' active' : '');
-        var count = k === 'all' ? null : sections[k].children.length;
+        var count = (k === 'all' || k === 'finder') ? null : sections[k].children.length;
         btn.textContent = (k === 'all' ? 'All' : TAB_LABELS[k]) + (count ? ' (' + count + ')' : '');
         btn.addEventListener('click', function () {
           root.dataset.tab = k;
@@ -883,6 +888,340 @@
       'the base price you entered. Estimate only: models chaos and Screaming+ essence rerolls (4/5/6 affixes at 8:3:1) — not fossils, harvest, alt-regal, recombinators or fractured bases. ' +
       'Prices: GGG currency exchange.';
     out.appendChild(foot);
+  }
+
+  // ---- jewel finder --------------------------------------------------------------
+  // Reads the passive tree + main skill (js/jewels.js), ranks every rare/abyss
+  // jewel mod by how much THIS build wants it, then searches trade for the best
+  // jewels (weighted) or any-N-of combos. Plus a timeless jewel seed search.
+  var jewelDataPromise = null;
+  function ensureJewelData() {
+    if (window.POE_JEWELS) return Promise.resolve(window.POE_JEWELS);
+    if (!jewelDataPromise) {
+      jewelDataPromise = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = 'data/jeweldata.js?v=' + Date.now();
+        s.onload = function () { if (window.POE_JEWELS) resolve(window.POE_JEWELS); else reject(new Error('jewel data missing')); };
+        s.onerror = function () { jewelDataPromise = null; reject(new Error('could not load data/jeweldata.js')); };
+        document.head.appendChild(s);
+      });
+    }
+    return jewelDataPromise;
+  }
+
+  var FEATURE_LABEL = { spell: 'Spells', attack: 'Attacks', melee: 'Melee', projectile: 'Projectiles', area: 'Area',
+    fire: 'Fire', cold: 'Cold', lightning: 'Lightning', chaos: 'Chaos', physical: 'Physical', dot: 'Damage over time',
+    minion: 'Minions', totem: 'Totems', trap: 'Traps', mine: 'Mines', brand: 'Brands', staff: 'Staff', bow: 'Bow',
+    wand: 'Wand', shield: 'Shield', dualwield: 'Dual wield', twohand: 'Two-handed', crit: 'Crit',
+    life: 'Life', es: 'Energy shield', block: 'Block', suppress: 'Suppression', evasion: 'Evasion', armour: 'Armour' };
+  var JEWEL_KINDS = [
+    ['regular', 'Any jewel (Crimson / Viridian / Cobalt)', 7, null, false],
+    ['crimson', 'Crimson Jewel', 1, 'Crimson Jewel', false],
+    ['viridian', 'Viridian Jewel', 2, 'Viridian Jewel', false],
+    ['cobalt', 'Cobalt Jewel', 4, 'Cobalt Jewel', false],
+    ['murderous', 'Murderous Eye (abyss, melee)', 8, 'Murderous Eye Jewel', true],
+    ['searching', 'Searching Eye (abyss, ranged)', 16, 'Searching Eye Jewel', true],
+    ['hypnotic', 'Hypnotic Eye (abyss, caster)', 32, 'Hypnotic Eye Jewel', true],
+    ['ghastly', 'Ghastly Eye (abyss, minion)', 64, 'Ghastly Eye Jewel', true]
+  ];
+  var FINDER_DEFAULT_PICKS = 8, FINDER_SHOW = 24;
+
+  // a card-like state so price checks, paging, live search and pins all work
+  function makeFinderState(label, container, payloadFn) {
+    var st = { slot: label, item: { name: '', base: '', mods: [] }, rows: [], unique: false, card: null,
+               customPayload: payloadFn };
+    cards.push(st);
+    var btns = document.createElement('div');
+    btns.className = 'btns';
+    var pBtn = document.createElement('button');
+    pBtn.className = 'copy-btn gui-only';
+    pBtn.textContent = 'Check price';
+    pBtn.addEventListener('click', function () { checkPrice(st); });
+    var lBtn = document.createElement('button');
+    lBtn.className = 'copy-btn gui-only';
+    lBtn.textContent = '🔴 Go live';
+    lBtn.addEventListener('click', function () { toggleLive(st); });
+    var oBtn = document.createElement('button');
+    oBtn.className = 'trade-btn';
+    oBtn.textContent = 'Search on trade site ↗';
+    oBtn.addEventListener('click', function () { var u = buildTradeUrl(st); if (u) openUrl(u); });
+    btns.appendChild(pBtn); btns.appendChild(lBtn); btns.appendChild(oBtn);
+    container.appendChild(btns);
+    st.priceBtn = pBtn; st.liveBtn = lBtn;
+    var lBox = document.createElement('div');
+    lBox.className = 'price-box live-box hidden';
+    container.appendChild(lBox);
+    st.liveBox = lBox;
+    var prBox = document.createElement('div');
+    prBox.className = 'price-box hidden';
+    container.appendChild(prBox);
+    st.priceBox = prBox;
+    return st;
+  }
+
+  function finderOpts() {
+    return { status: document.getElementById('trade-status').value,
+             saleType: document.getElementById('sale-type').value };
+  }
+
+  function makeJewelFinder(b) {
+    var wrap = document.createElement('div');
+    wrap.className = 'card finder';
+    wrap.innerHTML = '<div class="finder-loading">Reading your passive tree…</div>';
+    ensureJewelData().then(function (J) { renderJewelFinder(wrap, b, J); }, function (e) {
+      wrap.textContent = '❌ ' + e.message;
+    });
+    return wrap;
+  }
+
+  function renderJewelFinder(wrap, b, J) {
+    wrap.textContent = '';
+    var P = Jewels.profile(b, J);
+
+    // ---- header: what the build is about, and its sockets
+    var head = document.createElement('div');
+    head.className = 'finder-head';
+    var h = document.createElement('h3');
+    h.textContent = '💎 Jewel finder';
+    head.appendChild(h);
+    var focus = document.createElement('div');
+    focus.className = 'finder-focus';
+    focus.appendChild(document.createTextNode('Build focus: '));
+    var keys = Object.keys(P.tally).filter(function (k) { return FEATURE_LABEL[k] && k !== 'life' && k !== 'es'; })
+      .sort(function (a, c) { return (P.mainQ[c] ? 1e6 : 0) + P.tally[c] - ((P.mainQ[a] ? 1e6 : 0) + P.tally[a]); })
+      .slice(0, 6);
+    var life = P.tally.life || 0, es = P.tally.es || 0;
+    keys.push(life + es ? (life > es * 1.5 ? 'life' : es > life * 1.5 ? 'es' : 'hybrid') : null);
+    keys.filter(Boolean).forEach(function (k) {
+      var chip = document.createElement('span');
+      chip.className = 'finder-chip' + (P.mainQ[k] ? ' main' : '');
+      chip.textContent = k === 'hybrid' ? 'Life + ES' : FEATURE_LABEL[k];
+      var src = (P.why[k] || []).join(', ');
+      chip.title = (P.mainQ[k] ? 'Your main skill is ' + FEATURE_LABEL[k].toLowerCase() + '. ' : '') +
+        (src ? 'From: ' + src : '');
+      focus.appendChild(chip);
+    });
+    head.appendChild(focus);
+    var socks = Jewels.socketReport(b, J);
+    var empty = socks.filter(function (s) { return !s.itemId; });
+    var sline = document.createElement('div');
+    sline.className = 'finder-sub';
+    sline.textContent = socks.length
+      ? socks.length + ' jewel socket' + (socks.length > 1 ? 's' : '') + ' allocated in your tree — ' +
+        (empty.length ? empty.length + ' empty (' + empty.map(function (s) { return s.name; }).join(', ') + ')' : 'all filled') +
+        (P.gems.length ? ' · main skill: ' + P.gems[0] : '')
+      : 'No jewel sockets allocated' + (P.gems.length ? ' · main skill: ' + P.gems[0] : '');
+    head.appendChild(sline);
+    wrap.appendChild(head);
+
+    // ---- controls
+    var ctr = document.createElement('div');
+    ctr.className = 'card-opts finder-opts';
+    var kindSel = makeMiniSelect(ctr, 'Jewel', JEWEL_KINDS.map(function (k) { return k[1]; }), JEWEL_KINDS[0][1]);
+    var hasAbyss = Object.keys(b.items).some(function (id) { return /Eye Jewel$/.test(b.items[id].base || ''); });
+    var modeSel = makeMiniSelect(ctr, 'Find', ['best for my build', 'at least N of these'], 'best for my build');
+    var nSel = makeMiniSelect(ctr, 'N', ['2', '3', '4'], '2');
+    var rollSel = makeMiniSelect(ctr, 'Min roll', ['any', '50%', '70%', '90%'], '50%');
+    var sortSel = makeMiniSelect(ctr, 'Sort', ['best score', 'cheapest'], 'best score');
+    var minQ = makeMiniSelect(ctr, 'Min quality', ['any', '30%', '45%', '60%'], '30%');
+    minQ.title = 'Weighted search: minimum share of the best possible score (all your picked mods max-rolled)';
+    var maxPrice = makeMiniInput(ctr, 'Max price', 'c');
+    wrap.appendChild(ctr);
+    if (hasAbyss) {
+      var note = document.createElement('div');
+      note.className = 'finder-sub';
+      note.textContent = 'Your gear has abyssal sockets — pick an Eye jewel type above for abyss jewels.';
+      wrap.appendChild(note);
+    }
+
+    // ---- ranked mod list
+    var list = document.createElement('div');
+    list.className = 'finder-mods';
+    wrap.appendChild(list);
+    var picks = {}; // tail -> {use, required, score}
+    var ranked = [];
+    var showAll = false;
+
+    function kind() { return JEWEL_KINDS.find(function (k) { return k[1] === kindSel.value; }) || JEWEL_KINDS[0]; }
+
+    function rerank(resetPicks) {
+      ranked = Jewels.rankMods(J, P, kind()[2]);
+      if (resetPicks) {
+        picks = {};
+        ranked.slice(0, FINDER_DEFAULT_PICKS).forEach(function (m) {
+          if (m.score >= 0.45) picks[m.tail] = { use: true, required: false, score: m.score };
+        });
+      }
+      renderList();
+    }
+
+    function renderList() {
+      list.textContent = '';
+      var table = document.createElement('table');
+      table.className = 'finder-table';
+      var thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th scope="col">Use</th><th scope="col">Must</th><th scope="col">Mod</th>' +
+        '<th scope="col" class="num">Best roll</th><th scope="col">Value to your build</th></tr>';
+      table.appendChild(thead);
+      var tbody = document.createElement('tbody');
+      (showAll ? ranked : ranked.slice(0, FINDER_SHOW)).forEach(function (m) {
+        var p = picks[m.tail];
+        var tr = document.createElement('tr');
+        if (p && p.use) tr.className = 'on';
+        var use = document.createElement('input');
+        use.type = 'checkbox'; use.checked = !!(p && p.use);
+        use.setAttribute('aria-label', 'Use ' + m.text);
+        var must = document.createElement('input');
+        must.type = 'checkbox'; must.checked = !!(p && p.required);
+        must.setAttribute('aria-label', 'Require ' + m.text);
+        use.addEventListener('change', function () {
+          picks[m.tail] = picks[m.tail] || { score: m.score };
+          picks[m.tail].use = use.checked;
+          if (!use.checked) { picks[m.tail].required = false; must.checked = false; }
+          tr.classList.toggle('on', use.checked);
+        });
+        must.addEventListener('change', function () {
+          picks[m.tail] = picks[m.tail] || { score: m.score };
+          picks[m.tail].required = must.checked;
+          if (must.checked) { picks[m.tail].use = true; use.checked = true; tr.classList.add('on'); }
+        });
+        var td1 = document.createElement('td'); td1.appendChild(use);
+        var td2 = document.createElement('td'); td2.appendChild(must);
+        var td3 = document.createElement('td'); td3.textContent = m.text;
+        var td4 = document.createElement('td'); td4.className = 'num'; td4.textContent = fmtCompact(m.max);
+        var td5 = document.createElement('td');
+        var val = document.createElement('input');
+        val.type = 'range'; val.min = '0'; val.max = '100'; val.step = '5';
+        val.value = String(Math.round(((p && p.score) || m.score) * 100));
+        val.className = 'finder-val';
+        val.setAttribute('aria-label', 'Value of ' + m.text + ' to your build');
+        var pct = document.createElement('span');
+        pct.className = 'finder-pct';
+        pct.textContent = val.value + '%';
+        val.addEventListener('input', function () {
+          pct.textContent = val.value + '%';
+          picks[m.tail] = picks[m.tail] || { use: false, score: m.score };
+          picks[m.tail].score = parseInt(val.value, 10) / 100;
+        });
+        td5.appendChild(val); td5.appendChild(pct);
+        [td1, td2, td3, td4, td5].forEach(function (td) { tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      list.appendChild(table);
+      if (ranked.length > FINDER_SHOW) {
+        var more = document.createElement('button');
+        more.className = 'copy-btn';
+        more.textContent = showAll ? 'Show top ' + FINDER_SHOW : 'Show all ' + ranked.length + ' mods';
+        more.addEventListener('click', function () { showAll = !showAll; renderList(); });
+        list.appendChild(more);
+      }
+    }
+
+    function selected() {
+      return ranked.filter(function (m) { return picks[m.tail] && picks[m.tail].use; }).map(function (m) {
+        return { tail: m.tail, max: m.max, score: picks[m.tail].score, required: !!picks[m.tail].required };
+      });
+    }
+
+    function payload(quiet) {
+      var sel = selected();
+      if (!sel.length) {
+        if (!quiet) alert('Tick at least one mod in the jewel finder first.');
+        return null;
+      }
+      var k = kind();
+      var opts = finderOpts();
+      opts.abyss = k[4];
+      opts.base = k[3];
+      var mp = parseFloat(maxPrice.value);
+      if (!isNaN(mp) && mp > 0) opts.maxPrice = mp;
+      if (modeSel.value === 'at least N of these') {
+        opts.count = parseInt(nSel.value, 10);
+        opts.minRoll = rollSel.value === 'any' ? 0 : parseInt(rollSel.value, 10) / 100;
+        return Jewels.countQuery(sel, opts);
+      }
+      var q = minQ.value === 'any' ? 0 : parseInt(minQ.value, 10) / 100;
+      if (q) opts.minScore = Math.round(Jewels.maxScore(sel.filter(function (s) { return !s.required; }).length
+        ? sel.filter(function (s) { return !s.required; }) : sel) * q);
+      opts.sort = sortSel.value === 'cheapest' ? 'price' : 'score';
+      return Jewels.weightedQuery(sel, opts);
+    }
+
+    function syncModeControls() {
+      var count = modeSel.value === 'at least N of these';
+      [nSel, rollSel].forEach(function (el) { el.parentElement.classList.toggle('hidden', !count); });
+      [sortSel, minQ].forEach(function (el) { el.parentElement.classList.toggle('hidden', count); });
+    }
+    modeSel.addEventListener('change', syncModeControls);
+    kindSel.addEventListener('change', function () { rerank(true); });
+    syncModeControls();
+    rerank(true);
+
+    var hint = document.createElement('div');
+    hint.className = 'finder-sub';
+    hint.textContent = '"Best for my build" scores every listed jewel by your picks (a max roll is worth its value % × 100) ' +
+      'and sorts by score — in-app checks of weighted searches need a saved POESESSID (higher query budget); ' +
+      'the trade-site link works while you are logged in there.';
+    wrap.appendChild(hint);
+    makeFinderState('Jewel finder', wrap, payload);
+
+    wrap.appendChild(makeTimelessPanel());
+  }
+
+  function makeTimelessPanel() {
+    var box = document.createElement('details');
+    box.className = 'finder-timeless';
+    var sum = document.createElement('summary');
+    sum.textContent = '⏳ Timeless jewel seed search';
+    box.appendChild(sum);
+    var p = document.createElement('div');
+    p.className = 'finder-sub';
+    p.appendChild(document.createTextNode('Find the seeds you want with the '));
+    var a = document.createElement('a');
+    a.href = '#';
+    a.textContent = 'timeless jewel calculator ↗';
+    a.addEventListener('click', function (e) { e.preventDefault(); openUrl('https://vilsol.github.io/timeless-jewels/tree'); });
+    p.appendChild(a);
+    p.appendChild(document.createTextNode(', then paste them here to see every listing with those seeds.'));
+    box.appendChild(p);
+    var ctr = document.createElement('div');
+    ctr.className = 'card-opts';
+    var names = Object.keys(Jewels.TIMELESS);
+    var jewelSel = makeMiniSelect(ctr, 'Jewel', names, names[0]);
+    var conqSel = makeMiniSelect(ctr, 'Conqueror', ['any'], 'any');
+    function fillConq() {
+      conqSel.innerHTML = '';
+      ['any'].concat(Jewels.TIMELESS[jewelSel.value]).forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c === 'any' ? 'any' : c.charAt(0).toUpperCase() + c.slice(1);
+        conqSel.appendChild(o);
+      });
+    }
+    jewelSel.addEventListener('change', fillConq);
+    fillConq();
+    var seeds = document.createElement('input');
+    seeds.type = 'text';
+    seeds.className = 'finder-seeds';
+    seeds.placeholder = 'Seeds, e.g. 4521, 7790, 12003';
+    seeds.setAttribute('aria-label', 'Timeless jewel seeds');
+    var lab = document.createElement('label');
+    lab.className = 'toggle';
+    lab.appendChild(document.createTextNode('Seeds '));
+    lab.appendChild(seeds);
+    ctr.appendChild(lab);
+    box.appendChild(ctr);
+    var warn = document.createElement('div');
+    warn.className = 'finder-sub';
+    box.appendChild(warn);
+    makeFinderState('Timeless jewel', box, function (quiet) {
+      var s = Jewels.parseSeeds(seeds.value);
+      if (!s.length) { if (!quiet) alert('Enter at least one seed number.'); return null; }
+      var q = Jewels.timelessQuery(jewelSel.value, s, conqSel.value === 'any' ? '' : conqSel.value, finderOpts());
+      warn.textContent = q.truncated ? 'Too many seed × conqueror combinations — searching the first 40. Pick a conqueror or fewer seeds.' : '';
+      return { query: q.query, sort: q.sort };
+    });
+    return box;
   }
 
   // ---- per-build search history ------------------------------------------------
@@ -2054,6 +2393,8 @@
 
   // ---- query building ---------------------------------------------------------
   function buildTradePayload(state, quiet) {
+    // finder panels (jewel finder, timeless seeds) build their own query
+    if (state.customPayload) return state.customPayload(quiet);
     // gem states search by gem name + level/quality, not by mods
     if (state.gemSpec) {
       return gemPayload(state.gemSpec.gem,

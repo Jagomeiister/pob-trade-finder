@@ -52,7 +52,7 @@ of hammering).
 **Download:** https://github.com/Jagomeiister/pob-trade-finder/releases/latest
 **Source (MIT):** https://github.com/Jagomeiister/pob-trade-finder
 
-PoE1 only for now (PoE2 is on the roadmap). Not affiliated with GGG — it uses
+PoE1 only. Not affiliated with GGG — it uses
 the public trade API and never automates anything against the site; every
 whisper/purchase is one click by you.
 

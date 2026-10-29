@@ -842,11 +842,14 @@ class Api:
             return {"ok": False, "error": str(e)}
 
     # -- open in system browser --------------------------------------------------
+    OPEN_URL_PREFIXES = ("https://www.pathofexile.com/",
+                         "https://vilsol.github.io/timeless-jewels/")  # timeless seed calculator
+
     def open_url(self, url):
-        if url.startswith("https://www.pathofexile.com/"):
+        if url.startswith(self.OPEN_URL_PREFIXES):
             webbrowser.open(url)
             return {"ok": True}
-        return {"ok": False, "error": "refusing to open non-trade URL"}
+        return {"ok": False, "error": "refusing to open that URL"}
 
 
 def main():
