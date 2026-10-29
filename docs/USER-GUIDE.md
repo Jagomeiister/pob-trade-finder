@@ -133,6 +133,34 @@ pins the whole combination to the basket.
   it becomes a purple-edged card at the top with all its mods matched, ready to
   price-check, sell-price, or compare against your character. The loaded build stays put
 
+## 5c. In-game price check (hotkey)
+
+Price an item without leaving the game:
+
+1. Keep PoB Trade Finder running and play in **Windowed** or **Windowed Fullscreen** mode
+   (an overlay can't draw over exclusive fullscreen)
+2. Hover an item in Path of Exile and press **Ctrl+D**
+3. A small always-on-top **Price check** window opens on the side of the screen away
+   from your cursor, shows the item's card and prices it straight away. The listings
+   work like the main window's: sort, page, whisper, pin, live search
+4. **Esc** or **✕** hides it and puts you back in the game
+
+Details:
+
+- The hotkey is only claimed while the Path of Exile window is focused, so Ctrl+D keeps
+  working normally in your browser and every other program
+- The app copies the item with Ctrl+C for you, then restores whatever text was on your
+  clipboard before
+- League, trade type and other filters come from the main window
+- Pressing the hotkey again on the same item within a minute reopens the existing results
+  instead of searching again, to save rate limit. Price checks from the overlay share the
+  main window's rate limiter
+- Change the key in **⚙ Settings → Price-check hotkey**: Ctrl+D, Ctrl+Shift+D, Alt+D or Off.
+  If another tool (for example Awakened PoE Trade) already uses that key, the settings
+  panel says so. Pick another key, or turn one of the tools off
+- PoE 1 items only. Currency stacks, maps and other non-gear items open a card but may
+  not produce a useful search
+
 ## 6b. Compare with your character
 
 Enter your account name (**Name#1234**) in the bar above the cards, load your characters,
@@ -213,6 +241,7 @@ say so and fall back to polling.
 - **Reduce motion** — disables flashes and animations
 - **High contrast** — brighter text and borders
 - **Colourblind-friendly sockets** — socket colours get letter labels (R/G/B/W/A)
+- **Price-check hotkey** — the in-game price-check key (§5c): Ctrl+D, Ctrl+Shift+D, Alt+D or Off
 
 All preferences persist across launches and updates.
 
@@ -238,6 +267,7 @@ league list and stat database and reloads. From source:
 | Unique shows base art | First lookup per unique takes a few seconds (rate-limited), then it's cached forever. `data/debug.log` records failures |
 | Link paste fails | Only pobb.in / pastebin / poe.ninja links are fetched (by design) — paste the raw code instead |
 | Browser version missing features | Live prices/whisper/etc. need the desktop app; also hard-refresh (Ctrl+F5) after updates |
+| Ctrl+D does nothing in game | Check ⚙ Settings → Price-check hotkey for a "taken by another program" warning. The game must be the focused window and in windowed / windowed-fullscreen mode. The item must be under the cursor |
 | Everything says "cooldown" | GGG rate limit — wait it out; the countdown is shown. Don't hammer the trade website meanwhile (same IP budget) |
 
 PoE 1 only for now. Not affiliated with Grinding Gear Games.
