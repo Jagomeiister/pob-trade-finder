@@ -103,6 +103,19 @@ RePoE lives at `https://repoe-fork.github.io/<file>` (root path — not `/RePoE/
   merged into `explicitMods` (new). The bridge re-normalizes to the old string
   contract in `Api._char_mods` — without it the gear diff sees zero equipped mods
   on rares and reports everything "missing"
+- Since 3.29 the trade **fetch** API does the same: no `craftedMods` /
+  `fracturedMods` arrays; those mods sit in `explicitMods` tagged
+  `domain: "crafted"|"fractured"` + `flags`. `Api._split_listing_mods` re-splits
+  them (rich objects kept intact) so colours, tiers and affix counts work
+- Rate limiting: `_read_quota` re-reads every rule from each response (policy
+  changes need no state). 429 → global hold from `Retry-After`; 5 pathofexile.com
+  4xx responses inside 60s → 60s global hold (GGG restricts clients that burst errors)
+- League day: `python tools/refresh_all.py` regenerates every data table and runs
+  the tests. Stats with `option` dropdowns are now only Temple rooms and eldritch
+  tier pseudos — gear stats (cluster jewels included) are numeric or value-in-id
+- Price history should use the public hourly feed
+  `https://web.poecdn.com/api/currency-exchange[/<realm>][/<id>]` (no auth, paged by
+  `next_change_id`) — never poll the trade API for it
 
 ## Auto-update
 

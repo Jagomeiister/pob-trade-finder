@@ -21,7 +21,7 @@ import zipfile
 
 import webview
 
-VERSION = "1.7.6"
+VERSION = "1.7.7"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -43,6 +43,7 @@ class Api:
         self._lock = threading.Lock()
         self._last_call = 0.0
         self._blocked_until = 0.0  # global hold-off from 429s / quota headers
+        self._err_times = []  # recent 4xx timestamps — GGG restricts clients that burst errors
         self._rate_cache = {}  # league -> {currency: (chaos_rate, fetched_at)}
         self._unique_icons_path = os.path.join(DATA_DIR, "unique_icons.json")
         try:
@@ -91,6 +92,7 @@ class Api:
         return hold
 
     BG_INTERVAL = 6.0  # background (icon prefetch) calls pace far gentler
+    ERR_BURST, ERR_WINDOW, ERR_HOLD = 5, 60.0, 60.0  # 5 errors in 60s -> 60s pause
 
     def _http(self, url, payload=None, background=False):
         with self._lock:
@@ -131,6 +133,14 @@ class Api:
                 with self._lock:
                     self._blocked_until = max(self._blocked_until, time.time() + retry)
                 raise RuntimeError("GGG rate limit hit — cooling down %ss, then try again" % retry)
+            if 400 <= e.code < 500 and "pathofexile.com" in url:
+                with self._lock:
+                    now = time.time()
+                    self._err_times = [t for t in self._err_times if now - t < self.ERR_WINDOW]
+                    self._err_times.append(now)
+                    if len(self._err_times) >= self.ERR_BURST:
+                        self._err_times = []
+                        self._blocked_until = max(self._blocked_until, now + self.ERR_HOLD)
             body = ""
             try:
                 body = e.read().decode("utf-8", "replace")[:200]
@@ -203,11 +213,7 @@ class Api:
             "tangled": bool(it.get("tangled")),
             "synthesised": bool(it.get("synthesised")),
             "veiledMods": it.get("veiledMods", []),
-            "implicitMods": it.get("implicitMods", []),
-            "enchantMods": it.get("enchantMods", []),
-            "fracturedMods": it.get("fracturedMods", []),
-            "explicitMods": it.get("explicitMods", []),
-            "craftedMods": it.get("craftedMods", []),
+            **Api._split_listing_mods(it),
             "amount": price.get("amount"),
             "currency": price.get("currency", ""),
             "priceType": price.get("type", ""),
@@ -215,6 +221,26 @@ class Api:
             "account": (li.get("account") or {}).get("name", ""),
             "whisper": li.get("whisper", ""),
         }
+
+    @staticmethod
+    def _split_listing_mods(it):
+        # since 3.29 the fetch API merges crafted/fractured mods into
+        # explicitMods (rich objects tagged by domain/flags) and drops the
+        # separate arrays; re-split them so colours, tiers and affix counts work
+        out = {"implicitMods": [], "enchantMods": [], "fracturedMods": [],
+               "explicitMods": [], "craftedMods": []}
+        for src in out:
+            for m in it.get(src, []) or []:
+                dest = src
+                if isinstance(m, dict) and src == "explicitMods":
+                    flags = m.get("flags") or {}
+                    domain = m.get("domain")
+                    if flags.get("crafted") or domain == "crafted":
+                        dest = "craftedMods"
+                    elif flags.get("fractured") or domain == "fractured":
+                        dest = "fracturedMods"
+                out[dest].append(m)
+        return out
 
     def trade_search(self, league, payload_json):
         """Run a trade search: first page of listings + the full id list so the
