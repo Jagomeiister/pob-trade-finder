@@ -1,15 +1,21 @@
 /* Layout: app shell (sidebar + main), top bar, landing, views, master–detail, overlay window. */
 
 /* ---- shell ---- */
-.app-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100vh; }
+/* --zoom = the Text size setting (body zoom); 100vh inside a zoomed body is zoom × the window,
+   so viewport-tall pieces divide by it or their bottoms end up below the window */
+.app-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-height: calc(100vh / var(--zoom, 1)); }
 body.has-build .app-shell { grid-template-columns: 240px minmax(0, 1fr); }
 .app-main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; }
+/* with the sidebar, content starts right beside it (no gap on wide screens);
+   the market page uses the full width for its chart and table */
+body.has-build .app-main { margin: 0; max-width: 1480px; }
+body.has-build[data-view="market"] .app-main { max-width: none; }
 body:not(.has-build) .app-main { max-width: 860px; padding-top: 28px; }
 .ctrl-spacer { flex: 1; }
 
 /* ---- sidebar ---- */
 .sidebar {
-  display: none; position: sticky; top: 0; z-index: 20; height: 100vh; overflow-y: auto;
+  display: none; position: sticky; top: 0; z-index: 20; height: calc(100vh / var(--zoom, 1)); overflow-y: auto;
   flex-direction: column; gap: 14px; padding: 14px 12px;
   background: var(--s1); border-right: 1px solid var(--border);
 }
@@ -36,7 +42,11 @@ body.has-build .sidebar { display: flex; }
 .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .nav-item[aria-current="page"] { background: var(--accent-soft); color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
 .nav-count { color: var(--text-3); font-weight: 500; font-variant-numeric: tabular-nums; }
-.side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+/* settings + market tile stay in view even when a big text size makes the nav scroll */
+.side-foot {
+  margin-top: auto; display: flex; flex-direction: column; gap: 8px;
+  position: sticky; bottom: -14px; padding: 8px 0 14px; background: var(--s1); border-top: 1px solid var(--border);
+}
 .side-foot .market-tile { flex-wrap: wrap; }
 #settings-btn-side { justify-content: flex-start; }
 
@@ -224,13 +234,12 @@ body:not(.has-build) .tab-section[data-tab="pasted"] { display: block; margin-to
 #view-planner:has(> #gear-value:not(.hidden)) #planner-empty,
 #view-planner:has(> #cost-summary:not(.hidden)) #planner-empty,
 #view-planner:has(> #basket:not(.hidden)) #planner-empty { display: none; }
-#view-market.has-data #market-empty, #view-market:not(.has-data) #market-panel { display: none; }
-.market-panel table { max-width: none; }
+#view-market.has-data #market-empty, #view-market:not(.has-data) #market-page { display: none; }
 
 /* ---- master–detail: slot list + one item ---- */
 .master-detail { grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start; }
 .slot-list {
-  position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto;
+  position: sticky; top: 72px; max-height: calc(100vh / var(--zoom, 1) - 88px); overflow-y: auto;
   display: flex; flex-direction: column;
   background: var(--s1); border: 1px solid var(--border); border-radius: var(--r-lg);
 }
@@ -339,7 +348,7 @@ body.overlay .btns > * { white-space: nowrap; }
   .build-card { flex: 1 1 220px; }
   .nav { flex: 2 1 320px; flex-direction: row; flex-wrap: wrap; }
   .nav-group { display: none; }
-  .side-foot { margin-top: 0; flex-direction: row; flex-wrap: wrap; }
+  .side-foot { margin-top: 0; flex-direction: row; flex-wrap: wrap; position: static; padding: 0; border-top: 0; background: none; }
   .master-detail { grid-template-columns: minmax(0, 1fr); }
   .topbar { flex-wrap: wrap; }
   .slot-list { position: static; max-height: 220px; }

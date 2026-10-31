@@ -6,7 +6,7 @@ feed (web.poecdn.com/api/currency-exchange) keys markets by metadata id
 /api/trade/data/static (code, name, image) x RePoE base_items (metadata id, name).
 
 Produces data/currencymap.json (read by the Python bridge):
-  { "divine": {"id": "Metadata/...", "name": "Divine Orb", "img": "/gen/image/..."} }
+  { "divine": {"id": "Metadata/...", "name": "Divine Orb", "img": "/gen/image/...", "cat": "Currency"} }
 
 Run: python tools/make_currencymap.py   (needs data/base_items.min.json — make_baseicons.py)
 """
@@ -45,7 +45,8 @@ def main():
             # path, then shortest
             metas.sort(key=lambda m: ("Stackable" not in (bases[m].get("item_class") or ""),
                                       "/Currency/" not in m, len(m)))
-            out[code] = {"id": metas[0], "name": name, "img": e.get("image", "")}
+            out[code] = {"id": metas[0], "name": name, "img": e.get("image", ""),
+                         "cat": group.get("label") or group.get("id") or ""}
 
     with open(os.path.join(DATA, "currencymap.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, separators=(",", ":"))

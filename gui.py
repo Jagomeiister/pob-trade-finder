@@ -625,11 +625,39 @@ class Api:
             codes = [c for c in json.loads(currencies_json) if c in self._currency_map][:20]
             days = max(1, min(int(days), 30))
             ids = [self._currency_map[c]["id"] for c in codes]
-            series, hour = self._feed.history(league, ids, days=days,
-                                              step_hours=12 if days <= 7 else 24)
-            return {"ok": True, "hour": hour,
+            series, hour = self._feed.history(league, ids, days=days, step_hours=self.cx_step(days))
+            return {"ok": True, "hour": hour, "step": self.cx_step(days),
                     "series": {c: series.get(self._currency_map[c]["id"], []) for c in codes},
                     "names": {c: self._currency_map[c]["name"] for c in codes}}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @staticmethod
+    def cx_step(days):
+        """History sampling: 2-hourly for a day, 6-hourly for a week, daily beyond.
+        The grids nest, so a finer view reuses the coarser views' cached hours."""
+        return 2 if days <= 1 else 6 if days <= 7 else 24
+
+    def cx_overview(self, league):
+        """Every currency-exchange item priced in the latest hour, with 7 days of
+        6-hourly history: {'ok', 'hour', 'items': {code: {name, cat, img, s: [[unix hour,
+        chaos, chaos volume], ...]}}}. One feed read covers all items (~28 cached hours)."""
+        try:
+            series, hour = self._feed.history(league, None, days=7, step_hours=self.cx_step(7))
+            by_id = {}
+            for code, m in self._currency_map.items():
+                prev = by_id.get(m["id"])
+                if prev is None or len(code) < len(prev):  # duplicate rows: shortest code
+                    by_id[m["id"]] = code
+            items = {}
+            for mid, pts in series.items():
+                code = by_id.get(mid)
+                if not code or not pts:
+                    continue
+                m = self._currency_map[code]
+                items[code] = {"name": m["name"], "cat": m.get("cat", ""), "img": m.get("img", ""),
+                               "s": [[h, float("%.4g" % v), int(vol)] for h, v, vol in pts]}
+            return {"ok": True, "hour": hour, "items": items}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

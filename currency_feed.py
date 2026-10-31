@@ -195,11 +195,11 @@ class CurrencyFeed:
                     missing.remove(i)
         return out, hour
 
-    def history(self, league, ids, days=7, step_hours=12):
-        """{metadata id: [[hour, chaos value, volume], ...]} oldest first, on an
-        aligned grid (so cached points are reused across sessions) plus the latest
-        hour. Points the feed lacks are skipped."""
-        latest = self.latest_hour()
+    @staticmethod
+    def grid(latest, days, step_hours):
+        """Hours to sample, oldest first: an aligned grid (multiples of the step, so
+        cached points are reused across sessions and coarser grids are subsets of finer
+        ones) plus the latest hour."""
         step = step_hours * HOUR
         hours = [latest]
         h = latest // step * step
@@ -208,9 +208,18 @@ class CurrencyFeed:
         while h > latest - days * 24 * HOUR:
             hours.append(h)
             h -= step
+        return sorted(hours)
+
+    def history(self, league, ids, days=7, step_hours=12):
+        """{metadata id: [[hour, chaos value, volume], ...]} oldest first, sampled on
+        grid(). Points the feed lacks are skipped. ids=None: every item priced in the
+        latest hour."""
+        latest = self.latest_hour()
+        snaps = [(h, (self.snapshot(h) or {}).get(league) or {}) for h in self.grid(latest, days, step_hours)]
+        if ids is None:
+            ids = list(snaps[-1][1]) if snaps else []
         series = {i: [] for i in ids}
-        for h in sorted(hours):
-            snap = (self.snapshot(h) or {}).get(league) or {}
+        for h, snap in snaps:
             for i in ids:
                 if i in snap:
                     series[i].append([h, snap[i][0], snap[i][1]])

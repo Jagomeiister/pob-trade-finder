@@ -80,7 +80,9 @@
     if (light) root.dataset.theme = 'light'; else delete root.dataset.theme;
     if (PREFS.accent && PREFS.accent !== 'gold') root.dataset.accent = PREFS.accent; else delete root.dataset.accent;
     if (PREFS.contrast) root.dataset.contrast = 'high'; else delete root.dataset.contrast;
-    document.body.style.zoom = (parseInt(PREFS.fontsize, 10) || 100) / 100;
+    var zoom = (parseInt(PREFS.fontsize, 10) || 100) / 100;
+    document.body.style.zoom = zoom;
+    root.style.setProperty('--zoom', zoom); // css/layout.css: viewport-tall pieces divide by it
     document.body.classList.toggle('compact', PREFS.density === 'compact');
     document.body.classList.toggle('reduce-motion', !!PREFS.motion);
     document.body.classList.toggle('cb-sockets', !!PREFS.cb);
@@ -663,6 +665,7 @@
 
   function setView(k) {
     document.body.dataset.view = k;
+    if (k === 'market') renderMarketPage(); // built lazily: hundreds of rows
     document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
     document.querySelectorAll('#nav .nav-item').forEach(function (b) {
       if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -3909,14 +3912,35 @@
   }
 
   // ---- market: GGG's hourly currency-exchange feed (no trade-API quota) -------
-  var MARKET_CODES = ['divine', 'exalted', 'mirror', 'annul', 'vaal', 'gcp', 'regal',
-                      'fusing', 'alch', 'chrome', 'scour', 'alt', 'jewellers', 'chance'];
-  var market = null; // {league, hour, series, names}
+  // One overview call prices every exchange item over 7 days (6-hourly); the big
+  // chart loads the 1-day and 30-day views for the selected item on demand.
+  var market = null; // {league, hour, items: {code: {name, cat, img, s: [[t, chaos, vol]], st}}, hist}
   var THIN_MARKET_CHAOS = 5000; // median chaos-equivalent traded per hour
   var marketSeq = 0;
+  var marketDirty = false;
+  var MK = { sel: 'divine', range: 7, cat: 'All', q: '', hideThin: false, movers: 24, showAll: false,
+             convAmt: '1', convCode: 'divine', els: null };
+  var CDN_ROOT = 'https://web.poecdn.com';
+  var MARKET_ROWS = 80;
+
+  function loadWatch() {
+    try { var w = JSON.parse(localStorage.getItem('pobtf-watch')); if (Array.isArray(w)) return w; }
+    catch (e) { /* default below */ }
+    return ['divine', 'exalted', 'mirror', 'annul'];
+  }
+  function saveWatch(w) { persist('pobtf-watch', JSON.stringify(w)); }
+  function toggleWatch(code) {
+    var w = loadWatch();
+    var i = w.indexOf(code);
+    if (i === -1) w.push(code); else w.splice(i, 1);
+    saveWatch(w);
+    renderWatch();
+    renderMarketTable();
+    renderChartCard();
+  }
 
   async function loadMarket() {
-    if (!isGui() || !window.pywebview.api.cx_history) return;
+    if (!isGui() || !window.pywebview.api.cx_overview) return;
     var league = document.getElementById('league').value;
     var seq = ++marketSeq;
     var tile = document.getElementById('market-tile');
@@ -3926,18 +3950,18 @@
       tile.querySelector('.mt-delta').textContent = 'loading 7-day history';
     }
     try {
-      var r = await window.pywebview.api.cx_history(league, JSON.stringify(MARKET_CODES), 7);
+      var r = await window.pywebview.api.cx_overview(league);
       if (seq !== marketSeq) return; // league switched mid-load
       if (!r || !r.ok) throw new Error((r && r.error) || 'feed unavailable');
-      market = { league: league, hour: r.hour, series: r.series, names: r.names };
-      // seed the rate cache: chaos equivalents render instantly, no trade-API calls
+      Object.keys(r.items).forEach(function (c) { r.items[c].st = marketStats(r.items[c]); });
+      market = { league: league, hour: r.hour, items: r.items, hist: {} };
+      if (!market.items[MK.sel]) MK.sel = market.items.divine ? 'divine' : Object.keys(market.items)[0];
+      // seed the rate cache: chaos equivalents for every exchange item, no trade-API calls
       RATES[league] = RATES[league] || {};
       RATES[league].chaos = 1;
-      Object.keys(r.series).forEach(function (c) {
-        var s = r.series[c];
-        if (s.length) RATES[league][c] = s[s.length - 1][1];
-      });
-      refreshEqDisplays(); // re-annotates listings and renders the market tile/panel
+      Object.keys(r.items).forEach(function (c) { RATES[league][c] = r.items[c].st.now; });
+      marketDirty = true;
+      refreshEqDisplays(); // re-annotates listings and renders the market tile/page
     } catch (e) {
       if (seq !== marketSeq) return;
       tile.querySelector('.mt-value').textContent = '—';
@@ -3946,15 +3970,156 @@
     }
   }
 
+  // now, typical volume, 24h / 7d change, 7-day range — from the 6-hourly series
+  function marketStats(it) {
+    var s = it.s, last = s[s.length - 1];
+    var vols = s.map(function (p) { return p[2]; }).sort(function (a, b) { return a - b; });
+    var med = vols[Math.floor(vols.length / 2)] || 0;
+    var dayAgo = null;
+    for (var i = s.length - 1; i >= 0; i--) { if (s[i][0] <= last[0] - 86400) { dayAgo = s[i]; break; } }
+    var vals = s.map(function (p) { return p[1]; });
+    return { now: last[1], vol: med, thin: med < THIN_MARKET_CHAOS,
+             ch24: dayAgo && dayAgo[1] ? (last[1] - dayAgo[1]) / dayAgo[1] : null,
+             ch7: s.length > 1 && s[0][1] ? (last[1] - s[0][1]) / s[0][1] : null,
+             lo: Math.min.apply(null, vals), hi: Math.max.apply(null, vals) };
+  }
+
   function marketPoints(code) {
-    return ((market && market.series[code]) || []).map(function (p) {
+    var it = market && market.items[code];
+    return ((it && it.s) || []).map(function (p) {
       return { t: p[0], v: p[1], sub: p[2] ? fmtCompact(p[2]) + 'c traded/h' : 'no trades that hour' };
     });
   }
 
+  // "▲ 12.3%": arrow + number, never colour alone
+  function pctChip(x) {
+    var span = UI.el('span', 'pct');
+    if (x === null || x === undefined || !isFinite(x)) { span.textContent = '—'; return span; }
+    var p = x * 100;
+    span.textContent = Math.abs(p) < 0.05 ? '±0.0%' : (p > 0 ? '▲ ' : '▼ ') + Math.abs(p).toFixed(1) + '%';
+    span.classList.add(Math.abs(p) < 0.05 ? 'flat' : p > 0 ? 'up' : 'down');
+    return span;
+  }
+
+  function mPrice(chaos) {
+    var dr = market && RATES[market.league] && RATES[market.league].divine;
+    return fmtCompact(chaos) + 'c' + (dr && chaos >= dr ? ' · ' + fmtCompact(chaos / dr) + ' div' : '');
+  }
+
+  function itemImg(it, cls) {
+    var img = UI.el('img', cls || 'mk-ic');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.src = it && it.img ? CDN_ROOT + it.img : BLANK_PX;
+    return img;
+  }
+
+  function selectMarketItem(code, scroll) {
+    MK.sel = code;
+    renderChartCard();
+    renderMarketTable();
+    if (scroll && MK.els) MK.els.chart.scrollIntoView({ block: 'nearest' });
+  }
+
+  // ---- price chart: line + area, labelled axes, crosshair tooltip, keyboard ----
+  function priceChart(points, opts) {
+    opts = opts || {};
+    var w = Math.max(320, opts.w || 640), h = opts.h || 220;
+    var pl = 56, pr = 12, pt = 10, pb = 26;
+    var wrap = UI.el('div', 'pc');
+    if (points.length < 2) { wrap.appendChild(UI.el('div', 'finder-sub', 'Not enough history yet.')); return wrap; }
+    var NS = 'http://www.w3.org/2000/svg';
+    function el(tag, attrs) {
+      var e = document.createElementNS(NS, tag);
+      Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+      return e;
+    }
+    var vals = points.map(function (p) { return p.v; });
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    var padV = (hi - lo) * 0.08 || hi * 0.05 || 1;
+    lo = Math.max(0, lo - padV); hi += padV;
+    var t0 = points[0].t, t1 = points[points.length - 1].t;
+    function x(t) { return pl + (t - t0) / Math.max(1, t1 - t0) * (w - pl - pr); }
+    function y(v) { return pt + (1 - (v - lo) / (hi - lo)) * (h - pt - pb); }
+    var svg = el('svg', { width: w, height: h, viewBox: '0 0 ' + w + ' ' + h, 'aria-hidden': 'true' });
+    // y grid + labels
+    for (var i = 0; i <= 4; i++) {
+      var v = lo + (hi - lo) * i / 4, yy = y(v);
+      svg.appendChild(el('line', { x1: pl, x2: w - pr, y1: yy, y2: yy, 'class': 'pc-grid' }));
+      var lab = el('text', { x: pl - 8, y: yy + 4, 'text-anchor': 'end', 'class': 'pc-label' });
+      lab.textContent = fmtCompact(v) + 'c';
+      svg.appendChild(lab);
+    }
+    // x labels: hours for a day, days for a week, dates for a month
+    var span = t1 - t0;
+    var stepT = span <= 2 * 86400 ? 4 * 3600 : span <= 8 * 86400 ? 86400 : 5 * 86400;
+    var first = Math.ceil(t0 / stepT) * stepT;
+    for (var tt = first; tt <= t1; tt += stepT) {
+      var d = new Date(tt * 1000);
+      var txt = span <= 2 * 86400 ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+        : span <= 8 * 86400 ? d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })
+        : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      var tl = el('text', { x: x(tt), y: h - 6, 'text-anchor': 'middle', 'class': 'pc-label' });
+      tl.textContent = txt;
+      svg.appendChild(tl);
+      svg.appendChild(el('line', { x1: x(tt), x2: x(tt), y1: h - pb, y2: h - pb + 4, 'class': 'pc-grid' }));
+    }
+    var d1 = points.map(function (p, k) { return (k ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' ');
+    svg.appendChild(el('path', { d: d1 + ' L' + x(t1).toFixed(1) + ' ' + (h - pb) + ' L' + pl + ' ' + (h - pb) + ' Z', 'class': 'pc-area' }));
+    svg.appendChild(el('path', { d: d1, 'class': 'pc-line' }));
+    var hair = el('line', { y1: pt, y2: h - pb, 'class': 'pc-hair' });
+    var dot = el('circle', { r: 4, 'class': 'pc-dot' });
+    var last = points[points.length - 1];
+    dot.setAttribute('cx', x(last.t)); dot.setAttribute('cy', y(last.v));
+    svg.appendChild(hair);
+    svg.appendChild(dot);
+    wrap.appendChild(svg);
+    var tip = UI.el('div', 'pc-tip hidden');
+    wrap.appendChild(tip);
+    var fmt = opts.fmt || function (vv) { return fmtCompact(vv) + 'c'; };
+    function show(k) {
+      var p = points[k], px = x(p.t);
+      hair.setAttribute('x1', px); hair.setAttribute('x2', px);
+      hair.classList.add('on');
+      dot.setAttribute('cx', px); dot.setAttribute('cy', y(p.v));
+      var when = new Date(p.t * 1000);
+      tip.textContent = '';
+      tip.appendChild(UI.el('b', null, fmt(p.v)));
+      tip.appendChild(document.createTextNode(' · ' + when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+        ' ' + when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + (p.sub ? ' · ' + p.sub : '')));
+      tip.classList.remove('hidden');
+      tip.style.left = Math.min(Math.max(0, px - 90), w - 200) + 'px';
+    }
+    function hide() {
+      hair.classList.remove('on');
+      dot.setAttribute('cx', x(last.t)); dot.setAttribute('cy', y(last.v));
+      tip.classList.add('hidden');
+    }
+    var idx = points.length - 1;
+    svg.addEventListener('pointermove', function (e) {
+      var r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (w / r.width), best = 0;
+      points.forEach(function (p, k) { if (Math.abs(x(p.t) - px) < Math.abs(x(points[best].t) - px)) best = k; });
+      idx = best; show(idx);
+    });
+    svg.addEventListener('pointerleave', hide);
+    wrap.tabIndex = 0;
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', (opts.label || 'Price') + ': from ' + fmt(points[0].v) + ' to ' + fmt(last.v) +
+      ', low ' + fmt(Math.min.apply(null, vals)) + ', high ' + fmt(Math.max.apply(null, vals)) + '. Arrow keys step through the points.');
+    wrap.addEventListener('focus', function () { show(idx); });
+    wrap.addEventListener('blur', hide);
+    wrap.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft') idx = Math.max(0, idx - 1);
+      else if (e.key === 'ArrowRight') idx = Math.min(points.length - 1, idx + 1);
+      else return;
+      e.preventDefault(); show(idx);
+    });
+    return wrap;
+  }
+
+  // ---- sidebar tile (always) + Market page (only while it is showing) ----------
   function renderMarket() {
     if (!market) return;
-    document.getElementById('view-market').classList.add('has-data');
     var league = market.league;
     var tile = document.getElementById('market-tile');
     var div = marketPoints('divine');
@@ -3966,51 +4131,298 @@
     sp.appendChild(sparkline(div, { label: 'Divine Orb in chaos, 7 days', fmt: function (v) { return fmtCompact(v) + 'c'; } }));
     var updated = new Date(market.hour * 1000);
     tile.title = 'Divine Orb price, 7 days — GGG currency exchange (' + league + '), hour of ' +
-      updated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + '. Click for more currencies.';
+      updated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + '. Click for the market.';
+    marketDirty = true;
+    if (document.body.dataset.view === 'market') renderMarketPage();
+  }
 
-    // Market page headline: the Divine Orb, large
-    var chart = document.getElementById('market-chart');
-    chart.textContent = '';
-    chart.appendChild(UI.el('div', 'mc-label', 'Divine Orb · 7 days · ' + league));
-    var big = UI.el('div', 'mc-value', lastDiv ? fmtCompact(lastDiv) + 'c' : '—');
-    if (div.length > 1) big.appendChild(UI.el('span', 'mc-delta', fmtDelta(div[0].v, lastDiv)));
-    chart.appendChild(big);
-    chart.appendChild(sparkline(div, { w: 720, h: 140, label: 'Divine Orb in chaos, 7 days',
-      fmt: function (v) { return fmtCompact(v) + 'c'; } }));
+  function renderMarketPage() {
+    if (!market || !marketDirty) return;
+    marketDirty = false;
+    document.getElementById('view-market').classList.add('has-data');
+    var page = document.getElementById('market-page');
+    page.textContent = '';
+    var updated = new Date(market.hour * 1000);
+    var head = UI.el('div', 'mk-head');
+    head.appendChild(UI.el('span', null, 'GGG currency exchange · ' + market.league + ' · ' +
+      Object.keys(market.items).length + ' items traded · updated ' +
+      updated.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })));
+    page.appendChild(head);
 
-    var panel = document.getElementById('market-panel');
-    var body = panel.querySelector('tbody');
-    body.textContent = '';
-    MARKET_CODES.forEach(function (c) {
-      var pts = marketPoints(c);
-      if (!pts.length) return;
-      var tr = document.createElement('tr');
-      var name = document.createElement('td');
-      name.textContent = market.names[c] || c;
-      var now = document.createElement('td');
-      now.className = 'num';
-      var cur = pts[pts.length - 1].v, dr = RATES[league] && RATES[league].divine;
-      now.textContent = fmtCompact(cur) + 'c' + (dr && cur >= dr && c !== 'divine' ? ' · ' + fmtCompact(cur / dr) + ' div' : '');
-      var delta = document.createElement('td');
-      delta.className = 'num';
-      delta.textContent = pts.length > 1 ? fmtDelta(pts[0].v, cur) : '';
-      // thin markets: hourly samples of a few thousand chaos swing on single trades
-      var vols = market.series[c].map(function (p) { return p[2]; }).sort(function (a, b) { return a - b; });
-      if (vols[Math.floor(vols.length / 2)] < THIN_MARKET_CHAOS) {
-        var thin = document.createElement('span');
-        thin.className = 'thin';
-        thin.textContent = ' · thin';
-        delta.title = 'Thin market — under ' + fmtCompact(THIN_MARKET_CHAOS) + 'c traded in a typical hour, so hourly samples are noisy';
-        delta.appendChild(thin);
-      }
-      var trend = document.createElement('td');
-      trend.appendChild(sparkline(pts, { label: (market.names[c] || c) + ' in chaos, 7 days',
-        fmt: function (v) { return fmtCompact(v) + 'c'; } }));
-      [name, now, delta, trend].forEach(function (td) { tr.appendChild(td); });
-      body.appendChild(tr);
+    var movers = UI.el('section', 'mk-movers panel');
+    var grid = UI.el('div', 'mk-grid');
+    var chart = UI.el('section', 'mk-chart panel');
+    var side = UI.el('div', 'mk-side');
+    var watch = UI.el('section', 'mk-watch panel');
+    var conv = UI.el('section', 'mk-conv panel');
+    side.appendChild(watch);
+    side.appendChild(conv);
+    grid.appendChild(chart);
+    grid.appendChild(side);
+    var table = UI.el('section', 'mk-table panel');
+    page.appendChild(movers);
+    page.appendChild(grid);
+    page.appendChild(table);
+    MK.els = { movers: movers, chart: chart, watch: watch, conv: conv, table: table };
+    renderMovers();
+    renderChartCard();
+    renderWatch();
+    renderConverter();
+    renderMarketTable();
+  }
+
+  function renderMovers() {
+    var box = MK.els.movers;
+    box.textContent = '';
+    var seg = UI.segmented([['24', '24 hours'], ['168', '7 days']], String(MK.movers === 24 ? 24 : 168), {
+      ariaLabel: 'Movers period', onChange: function (v) { MK.movers = v === '24' ? 24 : 168; renderMovers(); } });
+    box.appendChild(UI.sectionHeader('Biggest movers', [seg]));
+    var key = MK.movers === 24 ? 'ch24' : 'ch7';
+    // thin markets swing on single trades — movers only from markets with real volume
+    var codes = Object.keys(market.items).filter(function (c) {
+      var st = market.items[c].st;
+      return !st.thin && st[key] !== null && isFinite(st[key]);
     });
-    panel.querySelector('.mp-caption').textContent = 'GGG currency exchange · ' + league + ' · hourly, sampled every 12h · updated ' +
-      updated.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    codes.sort(function (a, b) { return market.items[b].st[key] - market.items[a].st[key]; });
+    var up = codes.slice(0, 4).filter(function (c) { return market.items[c].st[key] > 0; });
+    var down = codes.slice(-4).reverse().filter(function (c) { return market.items[c].st[key] < 0; });
+    var row = UI.el('div', 'mk-mover-row');
+    [['Rising', up], ['Falling', down]].forEach(function (grp) {
+      var col = UI.el('div', 'mk-mover-col');
+      col.appendChild(UI.el('div', 'mk-mover-label', grp[0]));
+      if (!grp[1].length) col.appendChild(UI.el('div', 'finder-sub', 'Nothing moved much.'));
+      grp[1].forEach(function (c) {
+        var it = market.items[c];
+        var b = UI.el('button', 'mk-mover');
+        b.type = 'button';
+        b.appendChild(itemImg(it));
+        var t = UI.el('span', 'mk-mover-txt');
+        t.appendChild(UI.el('span', 'mk-name', it.name));
+        t.appendChild(UI.el('span', 'mk-sub', mPrice(it.st.now)));
+        b.appendChild(t);
+        b.appendChild(pctChip(it.st[key]));
+        b.addEventListener('click', function () { selectMarketItem(c, true); });
+        col.appendChild(b);
+      });
+      row.appendChild(col);
+    });
+    box.appendChild(row);
+    box.appendChild(UI.el('div', 'finder-sub', 'Markets under ' + fmtCompact(THIN_MARKET_CHAOS) +
+      'c traded in a typical hour are left out — their price jumps on single trades.'));
+  }
+
+  async function renderChartCard() {
+    if (!MK.els) return;
+    var box = MK.els.chart;
+    var code = MK.sel, it = market.items[code];
+    box.textContent = '';
+    if (!it) return;
+    var head = UI.el('div', 'mk-chart-head');
+    head.appendChild(itemImg(it, 'mk-ic-lg'));
+    var id = UI.el('div', 'mk-id');
+    id.appendChild(UI.el('div', 'mk-cat', it.cat || 'Currency'));
+    id.appendChild(UI.el('h3', 'mk-title', it.name));
+    var price = UI.el('div', 'mk-price', mPrice(it.st.now));
+    id.appendChild(price);
+    head.appendChild(id);
+    var acts = UI.el('div', 'mk-chart-acts');
+    var watching = loadWatch().indexOf(code) !== -1;
+    var star = UI.button(watching ? 'secondary' : 'ghost', { label: watching ? '★ Watching' : '☆ Watch',
+      onClick: function () { toggleWatch(code); } });
+    star.setAttribute('aria-pressed', watching ? 'true' : 'false');
+    acts.appendChild(star);
+    var range = UI.segmented([['1', '1 day'], ['7', '7 days'], ['30', '30 days']], String(MK.range), {
+      ariaLabel: 'Chart range', onChange: function (v) { MK.range = parseInt(v, 10); renderChartCard(); } });
+    acts.appendChild(range);
+    head.appendChild(acts);
+    box.appendChild(head);
+
+    var body = UI.el('div', 'mk-chart-body');
+    box.appendChild(body);
+    var stats = UI.el('div', 'mk-stats');
+    box.appendChild(stats);
+    var pts;
+    if (MK.range === 7) pts = marketPoints(code);
+    else {
+      var key = code + ':' + MK.range;
+      if (!market.hist[key]) {
+        body.appendChild(UI.el('div', 'finder-loading', MK.range === 30
+          ? 'Loading 30 days (the first time downloads about 20 daily snapshots)…' : 'Loading the last day…'));
+        try {
+          var r = await window.pywebview.api.cx_history(market.league, JSON.stringify([code]), MK.range);
+          if (!r || !r.ok) throw new Error((r && r.error) || 'history unavailable');
+          market.hist[key] = r.series[code] || [];
+        } catch (e) {
+          body.textContent = '';
+          body.appendChild(UI.el('div', 'finder-sub', '❌ ' + (e.message || e)));
+          return;
+        }
+        if (MK.sel !== code || MK.els.chart !== box) return; // moved on meanwhile
+        body.textContent = '';
+      }
+      pts = market.hist[key].map(function (p) {
+        return { t: p[0], v: p[1], sub: p[2] ? fmtCompact(p[2]) + 'c traded/h' : 'no trades that hour' };
+      });
+    }
+    body.appendChild(priceChart(pts, { w: Math.max(320, body.clientWidth || 640), h: 230, label: it.name + ' in chaos' }));
+    if (pts.length > 1) {
+      var vals = pts.map(function (p) { return p.v; });
+      var first = pts[0].v, lastV = pts[pts.length - 1].v;
+      [['Change', pctChip(first ? (lastV - first) / first : null)],
+       ['Low', document.createTextNode(fmtCompact(Math.min.apply(null, vals)) + 'c')],
+       ['High', document.createTextNode(fmtCompact(Math.max.apply(null, vals)) + 'c')],
+       ['Typical volume', document.createTextNode(fmtCompact(it.st.vol) + 'c / hour')]].forEach(function (s) {
+        var cell = UI.el('div', 'mk-stat');
+        cell.appendChild(UI.el('span', 'mk-stat-label', s[0]));
+        var v = UI.el('span', 'mk-stat-value');
+        v.appendChild(s[1]);
+        cell.appendChild(v);
+        stats.appendChild(cell);
+      });
+      if (it.st.thin) stats.appendChild(UI.chip('Thin market — price is noisy', 'warn'));
+    }
+  }
+
+  function renderWatch() {
+    var box = MK.els.watch;
+    box.textContent = '';
+    box.appendChild(UI.sectionHeader('Watchlist'));
+    var list = UI.el('div', 'mk-watch-list');
+    var codes = loadWatch().filter(function (c) { return market.items[c]; });
+    if (!codes.length) list.appendChild(UI.el('div', 'finder-sub', 'Star items (☆) to keep them here.'));
+    codes.forEach(function (c) {
+      var it = market.items[c];
+      var b = UI.el('button', 'mk-watch-row' + (c === MK.sel ? ' on' : ''));
+      b.type = 'button';
+      b.appendChild(itemImg(it));
+      b.appendChild(UI.el('span', 'mk-name', it.name));
+      b.appendChild(UI.el('span', 'mk-num', mPrice(it.st.now)));
+      b.appendChild(pctChip(it.st.ch24));
+      b.title = it.name + ' — 24h change';
+      b.addEventListener('click', function () { selectMarketItem(c); renderWatch(); });
+      list.appendChild(b);
+    });
+    box.appendChild(list);
+  }
+
+  function renderConverter() {
+    var box = MK.els.conv;
+    box.textContent = '';
+    box.appendChild(UI.sectionHeader('Converter'));
+    var opts = Object.keys(market.items).sort(function (a, b) {
+      return market.items[a].name.localeCompare(market.items[b].name);
+    }).map(function (c) { return [c, market.items[c].name]; });
+    opts.unshift(['chaos', 'Chaos Orb']);
+    var amt = UI.input({ type: 'number', cls: 'min-input', value: MK.convAmt, ariaLabel: 'Amount', min: 0, step: 'any' });
+    var sel = UI.select(opts, MK.convCode, { ariaLabel: 'Currency to convert' });
+    var out = UI.el('div', 'mk-conv-out');
+    out.setAttribute('aria-live', 'polite');
+    function calc() {
+      MK.convAmt = amt.value; MK.convCode = sel.value;
+      var n = parseFloat(amt.value) || 0;
+      var each = sel.value === 'chaos' ? 1 : market.items[sel.value].st.now;
+      var chaos = n * each, dr = RATES[market.league] && RATES[market.league].divine;
+      out.textContent = '';
+      out.appendChild(UI.el('b', null, '= ' + fmtCompact(chaos) + ' chaos'));
+      if (dr) out.appendChild(UI.el('span', null, ' = ' + fmtCompact(chaos / dr) + ' divine'));
+    }
+    amt.addEventListener('input', calc);
+    sel.addEventListener('change', calc);
+    var row = UI.el('div', 'mk-conv-row');
+    row.appendChild(amt);
+    row.appendChild(sel);
+    box.appendChild(row);
+    box.appendChild(out);
+    calc();
+  }
+
+  function renderMarketTable() {
+    if (!MK.els) return;
+    var box = MK.els.table;
+    var focused = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.mk : null;
+    box.textContent = '';
+    var cats = {};
+    Object.keys(market.items).forEach(function (c) { var k = market.items[c].cat || 'Other'; cats[k] = (cats[k] || 0) + 1; });
+    var catOpts = [['All', 'All categories (' + Object.keys(market.items).length + ')'], ['Watchlist', 'Watchlist']]
+      .concat(Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; })
+        .map(function (k) { return [k, k + ' (' + cats[k] + ')']; }));
+    var bar = UI.el('div', 'mk-toolbar');
+    var q = UI.input({ type: 'search', value: MK.q, placeholder: 'Search items — e.g. "prismatic", "div", "scarab"',
+                       ariaLabel: 'Search market items' });
+    q.dataset.mk = 'q';
+    q.addEventListener('input', function () { MK.q = q.value; MK.showAll = false; renderMarketTable(); });
+    var cat = UI.select(catOpts, MK.cat, { ariaLabel: 'Category',
+      onChange: function () { MK.cat = this.value; MK.showAll = false; renderMarketTable(); } });
+    cat.dataset.mk = 'cat';
+    var thinLab = UI.el('label', 'check');
+    var thin = UI.input({ type: 'checkbox' });
+    thin.checked = MK.hideThin;
+    thin.dataset.mk = 'thin';
+    thin.addEventListener('change', function () { MK.hideThin = thin.checked; renderMarketTable(); });
+    thinLab.appendChild(thin);
+    thinLab.appendChild(document.createTextNode(' Hide thin markets'));
+    bar.appendChild(q);
+    bar.appendChild(cat);
+    bar.appendChild(thinLab);
+    box.appendChild(bar);
+
+    var watch = loadWatch();
+    var codes = Object.keys(market.items).filter(function (c) {
+      var it = market.items[c];
+      if (MK.cat === 'Watchlist' ? watch.indexOf(c) === -1 : MK.cat !== 'All' && (it.cat || 'Other') !== MK.cat) return false;
+      return !(MK.hideThin && it.st.thin);
+    });
+    if (MK.q.trim()) codes = fuzzyFilter(codes, MK.q.trim(), function (c) { return market.items[c].name + ' ' + (market.items[c].cat || ''); });
+    else codes.sort(function (a, b) { return market.items[b].st.vol - market.items[a].st.vol; }); // busiest first
+    var total = codes.length;
+    if (!MK.showAll) codes = codes.slice(0, MARKET_ROWS);
+    var rows = codes.map(function (c) { return { code: c, it: market.items[c] }; });
+    var t = UI.table([
+      { key: 'star', label: '', render: function (r) {
+        var on = watch.indexOf(r.code) !== -1;
+        var b = UI.iconButton(on ? '★' : '☆', (on ? 'Stop watching ' : 'Watch ') + r.it.name, { size: 'sm',
+          cls: 'mk-star' + (on ? ' on' : ''), onClick: function () { toggleWatch(r.code); } });
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        return b;
+      } },
+      { key: 'name', label: 'Item', sort: function (r) { return r.it.name; }, render: function (r) {
+        var b = UI.el('button', 'link-btn mk-item');
+        b.type = 'button';
+        b.appendChild(itemImg(r.it));
+        var txt = UI.el('span', 'mk-item-txt');
+        txt.appendChild(UI.el('span', 'mk-name', r.it.name));
+        txt.appendChild(UI.el('span', 'mk-sub', r.it.cat || ''));
+        b.appendChild(txt);
+        b.addEventListener('click', function () { selectMarketItem(r.code, true); });
+        return b;
+      } },
+      { key: 'now', label: 'Price', num: true, sort: function (r) { return r.it.st.now; }, render: function (r) { return mPrice(r.it.st.now); } },
+      { key: 'ch24', label: '24h', num: true, sort: function (r) { return r.it.st.ch24 === null ? -Infinity : r.it.st.ch24; },
+        render: function (r) { return pctChip(r.it.st.ch24); } },
+      { key: 'ch7', label: '7 days', num: true, sort: function (r) { return r.it.st.ch7 === null ? -Infinity : r.it.st.ch7; },
+        render: function (r) { return pctChip(r.it.st.ch7); } },
+      { key: 'range', label: '7-day range', num: true, sort: function (r) { return r.it.st.hi; },
+        render: function (r) { return fmtCompact(r.it.st.lo) + ' – ' + fmtCompact(r.it.st.hi) + 'c'; } },
+      { key: 'vol', label: 'Volume / h', num: true, sort: function (r) { return r.it.st.vol; }, render: function (r) {
+        var s = UI.el('span', null, fmtCompact(r.it.st.vol) + 'c');
+        if (r.it.st.thin) { s.appendChild(document.createTextNode(' ')); s.appendChild(UI.chip('thin', 'warn')); }
+        return s;
+      } },
+      { key: 'trend', label: 'Trend', render: function (r) {
+        return sparkline(marketPoints(r.code), { w: 110, h: 24, label: r.it.name + ' in chaos, 7 days',
+          fmt: function (v) { return fmtCompact(v) + 'c'; } });
+      } }
+    ], rows, { sortable: true, emptyText: 'Nothing matches.',
+               rowClass: function (r) { return r.code === MK.sel ? 'sel' : ''; } });
+    box.appendChild(t);
+    if (total > codes.length || MK.showAll && total > MARKET_ROWS) {
+      box.appendChild(UI.button('secondary', { label: MK.showAll ? 'Show the busiest ' + MARKET_ROWS : 'Show all ' + total,
+        onClick: function () { MK.showAll = !MK.showAll; renderMarketTable(); } }));
+    }
+    if (focused) {
+      var again = box.querySelector('[data-mk="' + focused + '"]');
+      if (again) { again.focus(); if (again.type === 'search') again.setSelectionRange(again.value.length, again.value.length); }
+    }
   }
 
   async function annotateChaosEq(state) {

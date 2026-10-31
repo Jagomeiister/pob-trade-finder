@@ -11,7 +11,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font: var(--fs-md)/1.5 var(--font);
-  min-height: 100vh;
+  min-height: calc(100vh / var(--zoom, 1));
 }
 button { font-family: inherit; }
 .hidden, #input-panel.hidden { display: none !important; }

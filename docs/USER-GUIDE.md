@@ -64,11 +64,28 @@ Once a build loads, the window has three parts:
 **Open all searches** opens every slot's search in browser tabs; **Check all prices**
 live-prices every slot in sequence (rate-limit safe).
 
-**Market** (sidebar, or click the Divine Orb tile) shows the Divine Orb's 7-day chart and
-a table of 14 common currencies with their 7-day change and trend line (hover or
-arrow-key through the points). Data is GGG's official hourly currency-exchange feed, so
-it doesn't use any trade-site rate limit. Rows marked *thin* trade so little per hour
-that their trend is mostly noise.
+**Market** (sidebar, or click the Divine Orb tile) covers every item traded on GGG's
+currency exchange in your league, around 480 of them: currency, fossils, essences, oils,
+scarabs, catalysts, divination cards and more.
+
+- **Biggest movers**: the largest risers and fallers over 24 hours or 7 days. Thin markets
+  (under 5,000c traded in a typical hour) are left out, because their price jumps on
+  single trades.
+- **Chart**: click any item to chart it, with price and date axes, and 1-day, 7-day
+  (6-hourly) and 30-day (daily) views. Hover, or arrow-key through the points, for the
+  exact price, time and traded volume. Below it: the change, low, high and typical
+  volume.
+- **Watchlist**: ☆ any item to keep it at the top right. Your list is remembered.
+- **Converter**: any amount of any item in chaos and divines.
+- **Table**: every item, busiest first, with price (and divines when it's worth more than
+  one), 24h and 7-day change, 7-day range, volume and a trend line. Search by name (fuzzy:
+  "prismatic", "div", "scarab"), filter by category or your watchlist, hide thin markets,
+  and click a column heading to sort.
+
+Data is GGG's official hourly currency-exchange feed, so it doesn't use any trade-site
+rate limit. The first visit downloads about 1 MB per sampled hour (about 28 for the
+7-day view); after that, everything is cached on your PC. The same prices give chaos
+equivalents for listings priced in any of these items.
 
 ## 4. The item card
 

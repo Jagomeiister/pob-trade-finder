@@ -51,5 +51,19 @@ check("no-trade hour falls back to ratio mid", L[THIN][0], 0.375)
 check("no-trade hour has zero volume", L[THIN][1], 0)
 check("leagues kept separate", snap["Other"][DIVINE][0], 100.0)
 
+# history grids: aligned, oldest first, latest last; finer grids contain the coarser ones,
+# so the 1-day / 7-day / 30-day views reuse each other's cached hours
+from currency_feed import CurrencyFeed, HOUR  # noqa: E402
+latest = 1793437200 + 5 * HOUR  # not on a 6h boundary
+g7 = CurrencyFeed.grid(latest, 7, 6)
+g1 = CurrencyFeed.grid(latest, 1, 2)
+g30 = CurrencyFeed.grid(latest, 30, 24)
+check("7-day grid: 28 six-hourly points + latest", len(g7), 29, 0)
+check("grid ends at the latest hour", g7[-1], latest, 0)
+check("grid is oldest first", 1 if g7 == sorted(g7) else 0, 1, 0)
+check("6h points sit on 6h boundaries", sum(h % (6 * HOUR) for h in g7[:-1]), 0, 0)
+check("daily grid is a subset of the 6-hourly one", len(set(g30[-8:-1]) - set(g7)), 0, 0)
+check("6-hourly grid (last day) is a subset of the 2-hourly one", len(set(g7[-5:-1]) - set(g1)), 0, 0)
+
 print("\nALL TESTS PASSED" if not failures else "\n%d FAILED" % failures)
 sys.exit(1 if failures else 0)
