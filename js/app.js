@@ -732,6 +732,13 @@
     });
   }
 
+  // art that arrives later (unique renders, atlas crops, disk cache) — one redraw per burst
+  var slotRefreshTimer = null;
+  function queueSlotRefresh() {
+    if (slotRefreshTimer) return;
+    slotRefreshTimer = setTimeout(function () { slotRefreshTimer = null; refreshSlotLists(); }, 300);
+  }
+
   function refreshSlotLists() {
     Object.keys(MASTER_DETAIL).forEach(function (k) {
       var sec = viewSection(k);
@@ -2224,6 +2231,7 @@
     var frames = Math.round(ratio);
     if (frames >= 2 && Math.abs(ratio - frames) < 0.12) {
       this.classList.add('atlas2');
+      if (this.classList.contains('card-icon')) queueSlotRefresh();
     }
   }
 
@@ -3004,6 +3012,7 @@
         img.src = res.icon;
         img.dataset.swapped = '1';
         img.classList.remove('atlas2');
+        if (img.classList.contains('card-icon')) queueSlotRefresh(); // slot list mirrors card art
       } else if (res && /cooldown/i.test(res.error || '') && tries < ICON_RETRIES) {
         setTimeout(function () { iconWithRetry(lookup, img, tries + 1); }, ICON_RETRY_MS);
       }
@@ -3063,7 +3072,8 @@
       }
     }
     // mod source is spelled out too, not colour alone
-    if (mod.crafted) label.appendChild(UI.chip('crafted', 'crafted'));
+    // PoB writes enchants (anoints, cluster and lab enchants) as crafted implicit lines
+    if (mod.crafted) label.appendChild(UI.chip(mod.kind === 'implicit' ? 'enchant' : 'crafted', 'crafted'));
     if (mod.fractured) label.appendChild(UI.chip('fractured', 'fractured'));
     if (mod.kind === 'implicit' && !mod.crafted) label.title = 'Implicit';
 

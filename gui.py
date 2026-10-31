@@ -109,6 +109,8 @@ class Api:
         self._hotkey = None
         self._overlay = None
         self._quitting = False
+        self._destroyed = set()  # window uids already closed (see _destroy_once)
+        self._destroy_lock = threading.Lock()
         try:
             spec = json.loads(self._storage.get("pobtf-prefs") or "{}").get("hotkey", "ctrl+d")
             price_hotkey.parse_hotkey(spec)
@@ -710,16 +712,28 @@ class Api:
     # window. On press: Ctrl+C the hovered item, restore the clipboard, push the
     # item into the always-on-top overlay window, which prices it through this
     # same Api instance — so the overlay shares the global GGG rate limiter.
+    def _destroy_once(self, window):
+        """Close a window exactly once. pywebview's WinForms backend deletes the window's
+        uid from its registry in the form's Closed event; a second close of the same
+        window raises KeyError('child_…') inside that .NET event, which Windows shows as
+        an "Unhandled exception" dialog (seen on Install & restart, which closed the
+        overlay twice: directly and via main_closed)."""
+        with self._destroy_lock:
+            if window.uid in self._destroyed:
+                return
+            self._destroyed.add(window.uid)
+        try:
+            window.destroy()
+        except Exception:
+            pass
+
     def _attach_windows(self, main_window, overlay):
         self._overlay = overlay
 
         def main_closed():
             # the hidden overlay would otherwise keep the app alive
             self._quitting = True
-            try:
-                overlay.destroy()
-            except Exception:
-                pass
+            self._destroy_once(overlay)
 
         def overlay_closing():
             if self._quitting:
@@ -1086,11 +1100,10 @@ class Api:
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL)
             self._quitting = True  # let the overlay window close too
-            for w in list(webview.windows):
-                try:
-                    w.destroy()
-                except Exception:
-                    pass
+            # overlay first, then the main window (whose closed event would close the
+            # overlay again) — each exactly once
+            for w in sorted(webview.windows, key=lambda w: w is not self._overlay):
+                self._destroy_once(w)
             threading.Timer(1.0, lambda: os._exit(0)).start()
             return {"ok": True}
         except Exception as e:
