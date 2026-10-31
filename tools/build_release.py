@@ -27,6 +27,7 @@ SHIP = [
     "css/base.css",
     "css/components.css",
     "css/layout.css",
+    "js/ui.js",
     "js/pob.js",
     "js/matcher.js",
     "js/craft.js",

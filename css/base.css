@@ -56,10 +56,11 @@ input[type=range] { accent-color: var(--accent); vertical-align: middle; }
 /* ---- desktop-app-only controls ---- */
 .gui-only { display: none; }
 body.gui .gui-only { display: inline-block; }
+body.gui .btn.gui-only { display: inline-flex; }
 
 /* ---- preference classes ---- */
 body.reduce-motion .live-new { animation: none; }
-body.reduce-motion .trade-btn:active, body.reduce-motion #decode-btn:active { transform: none; }
+body.reduce-motion .btn:active { transform: none; }
 body.reduce-motion * { scroll-behavior: auto !important; }
 
 @media (max-width: 640px) {

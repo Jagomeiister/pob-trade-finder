@@ -37,11 +37,11 @@
     </div>
     <span class="ctrl-spacer"></span>
     <span id="rate-chip" class="hidden" title="GGG API rate-limit cooldown — everything resumes automatically"></span>
-    <button id="settings-btn" class="copy-btn" aria-label="Settings" title="Settings — text size, sounds, accessibility">⚙</button>
+    <button id="settings-btn" class="btn btn-ghost btn-icon" aria-label="Settings" title="Settings — text size, sounds, accessibility">⚙</button>
   </header>
 
   <div id="settings-panel" class="hidden" role="dialog" aria-label="Settings">
-    <div class="settings-head">Settings <button id="settings-close" class="copy-btn" aria-label="Close settings">✕</button></div>
+    <div class="settings-head">Settings <button id="settings-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close settings">✕</button></div>
     <div class="settings-grid">
       <label>Theme
         <select id="pref-theme">
@@ -91,7 +91,7 @@
         <span id="hotkey-status" class="hotkey-status"></span>
       </span>
       <span class="gui-only">
-        <button id="check-updates-btn" class="copy-btn">Check for updates</button>
+        <button id="check-updates-btn" class="btn btn-secondary">Check for updates</button>
         <span id="update-check-status"></span>
       </span>
     </div>
@@ -99,7 +99,7 @@
 
   <div id="update-banner" class="hidden">
     <span id="update-label"></span>
-    <button id="update-btn" class="trade-btn">Install &amp; restart</button>
+    <button id="update-btn" class="btn btn-primary">Install &amp; restart</button>
   </div>
 
   <div id="input-panel">
@@ -113,15 +113,15 @@
         <li><b>In game:</b> hover an item and press <kbd>Ctrl+D</kbd> to price it (⚙ settings to change the key).</li>
       </ol>
       <div class="input-row">
-        <button id="welcome-sample" class="copy-btn">Try a sample build</button>
-        <button id="welcome-close" class="copy-btn">Got it</button>
+        <button id="welcome-sample" class="btn btn-secondary">Try a sample build</button>
+        <button id="welcome-close" class="btn btn-secondary">Got it</button>
       </div>
     </div>
     <textarea id="pob-input" placeholder="Paste your PoB export code or a pobb.in / pastebin / poe.ninja link…&#10;(PoB → Import/Export Build → Generate → Copy)"></textarea>
     <div class="input-row">
-      <button id="decode-btn">Decode build</button>
-      <select id="saved-builds"><option value="">Saved builds…</option></select>
-      <button id="delete-build" class="copy-btn" title="Remove the selected saved build">🗑</button>
+      <button id="decode-btn" class="btn btn-primary btn-lg">Decode build</button>
+      <select id="saved-builds" aria-label="Saved builds"><option value="">Saved builds…</option></select>
+      <button id="delete-build" class="btn btn-secondary btn-icon" title="Remove the selected saved build" aria-label="Delete selected saved build">🗑</button>
       <span class="input-hint">Pasting decodes automatically · Ctrl+Enter also works</span>
     </div>
     <div id="status"></div>
@@ -132,23 +132,23 @@
       <div id="build-label"></div>
       <div id="build-sub"></div>
     </div>
-    <button id="save-build" class="copy-btn" style="margin-left:auto" title="Keep this build in the library for one-click reload">☆ Save build</button>
-    <button id="new-build" style="margin-left:0">Load another build</button>
+    <button id="save-build" class="btn btn-secondary" style="margin-left:auto" title="Keep this build in the library for one-click reload">☆ Save build</button>
+    <button id="new-build" class="btn btn-secondary">Load another build</button>
   </div>
 
   <div id="char-bar" class="hidden gui-only-flex">
     <span class="char-label">Compare with your character:</span>
-    <input type="text" id="acct-input" placeholder="Account (Name#1234)">
-    <button id="acct-load" class="copy-btn">Load characters</button>
+    <input type="text" id="acct-input" aria-label="Account name" placeholder="Account (Name#1234)">
+    <button id="acct-load" class="btn btn-secondary">Load characters</button>
     <select id="char-select" class="hidden"></select>
-    <button id="char-compare" class="copy-btn hidden">Compare gear</button>
+    <button id="char-compare" class="btn btn-secondary hidden">Compare gear</button>
     <label class="toggle hidden" id="hide-matched-wrap"><input type="checkbox" id="hide-matched"> Hide matched slots</label>
-    <button id="value-gear" class="copy-btn hidden" title="Price what your character is wearing — one search per item, rate-limit safe">💰 Value my gear</button>
+    <button id="value-gear" class="btn btn-secondary hidden" title="Price what your character is wearing — one search per item, rate-limit safe">💰 Value my gear</button>
     <span id="char-status"></span>
     <span style="margin-left:auto"></span>
-    <input type="password" id="sessid-input" placeholder="POESESSID (optional)"
+    <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID (optional)"
       title="Paste your pathofexile.com POESESSID cookie to unlock instant WebSocket live-search alerts (same as the trade website). Stored only on this machine, sent only to pathofexile.com. Save empty to clear.">
-    <button id="sessid-save" class="copy-btn">Save</button>
+    <button id="sessid-save" class="btn btn-secondary">Save</button>
     <span id="sessid-status"></span>
   </div>
 
@@ -192,9 +192,9 @@
       <span class="mt-spark"></span>
     </div>
     <span class="ctrl-spacer"></span>
-    <button id="open-all" class="copy-btn">Open all searches</button>
-    <button id="check-all" class="copy-btn gui-only">Check all prices</button>
-    <button id="refresh-data" class="copy-btn gui-only" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
+    <button id="open-all" class="btn btn-secondary">Open all searches</button>
+    <button id="check-all" class="btn btn-secondary gui-only">Check all prices</button>
+    <button id="refresh-data" class="btn btn-secondary gui-only" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
   </div>
   <div id="market-panel" class="market-panel hidden">
     <table>
@@ -224,7 +224,7 @@
   var v = Date.now();
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
    'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/sample.js',
-   'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/app.js'].forEach(function (src) {
+   'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/app.js'].forEach(function (src) {
     document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');
   });
 })();

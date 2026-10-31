@@ -129,9 +129,25 @@ check('index.html: no colour literals', !/#[0-9a-f]{6}\b/i.test(html.replace(/<s
 ['tokens', 'base', 'components', 'layout'].forEach(function (n) {
   check('index.html loads css/' + n + '.css', html.indexOf("'css/" + n + ".css'") >= 0);
 });
+// ---- shared components (js/ui.js) replace hand-built buttons and alerts --------
+const app = fs.readFileSync(path.join(ROOT, 'js', 'app.js'), 'utf8');
+check('no legacy button classes (use UI.button)', !/copy-btn|trade-btn/.test(app + html));
+check('no alert() popups (use UI.toast)', !/[^.\w]alert\(/.test(app));
+check('index.html loads js/ui.js before app.js',
+  html.indexOf("'js/ui.js'") >= 0 && html.indexOf("'js/ui.js'") < html.indexOf("'js/app.js'"));
+const UI = require('../js/ui.js');
+['button', 'iconButton', 'select', 'input', 'field', 'chip', 'sectionHeader', 'panel', 'table', 'disclosure',
+ 'menu', 'popover', 'dialog', 'confirmDanger', 'toast', 'emptyState'].forEach(function (k) {
+  check('UI.' + k + ' exported', typeof UI[k] === 'function');
+});
+let threw = false;
+try { UI.iconButton('✕'); } catch (e) { threw = true; }
+check('UI.iconButton refuses a missing aria label', threw);
+
 const ship = fs.readFileSync(path.join(ROOT, 'tools', 'build_release.py'), 'utf8');
 check('release ships every css file', fs.readdirSync(cssDir).filter(function (f) { return /\.css$/.test(f); })
   .every(function (f) { return ship.indexOf('"css/' + f + '"') >= 0; }));
+check("release ships js/ui.js", ship.indexOf('"js/ui.js"') >= 0);
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL TESTS PASSED');
 process.exit(failures ? 1 : 0);

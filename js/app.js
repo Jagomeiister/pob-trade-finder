@@ -300,11 +300,18 @@
     document.getElementById('delete-build').addEventListener('click', function () {
       var sel = document.getElementById('saved-builds');
       var idx = parseInt(sel.value, 10);
-      if (isNaN(idx)) return;
+      if (isNaN(idx)) { UI.toast('Pick a saved build to delete first.', 'warn'); return; }
       var lib = loadBuildLib();
-      lib.splice(idx, 1);
-      saveBuildLib(lib);
-      refreshBuildSelect();
+      var name = (lib[idx] && lib[idx].name) || 'this build';
+      UI.confirmDanger('Delete saved build?', '"' + name + '" will be removed from your library.', 'Delete build')
+        .then(function (ok) {
+          if (!ok) return;
+          var cur = loadBuildLib();
+          cur.splice(idx, 1);
+          saveBuildLib(cur);
+          refreshBuildSelect();
+          UI.toast('Saved build deleted.', 'success');
+        });
     });
     document.getElementById('pct').addEventListener('input', function () {
       document.getElementById('pct-label').textContent = this.value + '%';
@@ -552,20 +559,10 @@
 
     // Gear-set picker — guide PoBs ship several (Leveling / Budget / Endgame…)
     if (sets.length > 1) {
-      var pickWrap = document.createElement('div');
-      pickWrap.className = 'set-picker';
-      pickWrap.appendChild(document.createTextNode('Gear set: '));
-      var pick = document.createElement('select');
-      sets.forEach(function (s, i) {
-        var o = document.createElement('option');
-        o.value = String(i);
-        o.textContent = s.title + (i === build.activeSetIndex ? ' (active in PoB)' : '');
-        pick.appendChild(o);
-      });
-      pick.value = String(setIndex);
-      pick.addEventListener('change', function () { renderBuild(parseInt(this.value, 10)); });
-      pickWrap.appendChild(pick);
-      root.appendChild(pickWrap);
+      var pick = UI.select(sets.map(function (s, i) {
+        return [String(i), s.title + (i === build.activeSetIndex ? ' (active in PoB)' : '')];
+      }), String(setIndex), { onChange: function () { renderBuild(parseInt(this.value, 10)); } });
+      root.appendChild(UI.field('Gear set', pick, { cls: 'set-picker' }));
     }
 
     // tabbed sections: gear / jewels & clusters / flasks / gems
@@ -717,15 +714,13 @@
     state.craftBase = makeMiniInput(head, 'Base price', 'c');
     state.craftBase.title = 'What the blank base costs you (chaos). Leave blank to ignore';
     if (isGui()) {
-      var pb = document.createElement('button');
-      pb.className = 'copy-btn';
+      var pb = UI.button('secondary');
       pb.textContent = 'Price base';
       pb.title = 'Look up the cheapest ' + (state.item.base || 'base') + ' at this item level on the trade site (one search)';
       pb.addEventListener('click', function () { priceCraftBase(state, pb); });
       head.appendChild(pb);
     }
-    var run = document.createElement('button');
-    run.className = 'copy-btn';
+    var run = UI.button('secondary');
     run.textContent = '↻ Re-run';
     run.addEventListener('click', function () { runCraft(state); });
     head.appendChild(run);
@@ -917,8 +912,7 @@
     } else if (best) {
       verdict.textContent = 'Best craft: ' + best.label + ', ' + fmtEq(best.expected, league) + ' on average. Check price to compare with buying.';
       if (state.priceBtn) {
-        var cb = document.createElement('button');
-        cb.className = 'copy-btn';
+        var cb = UI.button('secondary');
         cb.textContent = 'Check buy price';
         cb.addEventListener('click', async function () {
           cb.disabled = true;
@@ -1059,16 +1053,13 @@
     cards.push(st);
     var btns = document.createElement('div');
     btns.className = 'btns';
-    var pBtn = document.createElement('button');
-    pBtn.className = 'copy-btn gui-only';
+    var pBtn = UI.button('secondary', { cls: 'gui-only' });
     pBtn.textContent = 'Check price';
     pBtn.addEventListener('click', function () { checkPrice(st); });
-    var lBtn = document.createElement('button');
-    lBtn.className = 'copy-btn gui-only';
+    var lBtn = UI.button('secondary', { cls: 'gui-only' });
     lBtn.textContent = '🔴 Go live';
     lBtn.addEventListener('click', function () { toggleLive(st); });
-    var oBtn = document.createElement('button');
-    oBtn.className = 'trade-btn';
+    var oBtn = UI.button('primary');
     oBtn.textContent = 'Search on trade site ↗';
     oBtn.addEventListener('click', function () { var u = buildTradeUrl(st); if (u) openUrl(u); });
     btns.appendChild(pBtn); btns.appendChild(lBtn); btns.appendChild(oBtn);
@@ -1244,8 +1235,7 @@
       table.appendChild(tbody);
       list.appendChild(table);
       if (!q && ranked.length > FINDER_SHOW) {
-        var more = document.createElement('button');
-        more.className = 'copy-btn';
+        var more = UI.button('secondary');
         more.textContent = showAll ? 'Show top ' + FINDER_SHOW : 'Show all ' + ranked.length + ' mods';
         more.addEventListener('click', function () { showAll = !showAll; renderList(); });
         list.appendChild(more);
@@ -1261,7 +1251,7 @@
     function payload(quiet) {
       var sel = selected();
       if (!sel.length) {
-        if (!quiet) alert('Tick at least one mod in the jewel finder first.');
+        if (!quiet) UI.toast('Tick at least one mod in the jewel finder first.', 'warn');
         return null;
       }
       var k = kind();
@@ -1366,13 +1356,9 @@
     ctr.className = 'card-opts finder-opts';
     var jewelSel = makeMiniSelect(ctr, 'Jewel', TIMELESS_TYPES.map(function (t) { return t[1]; }), 'Brutal Restraint');
     // conqueror decides the keystone; the seed decides the notables
-    var conqSel = document.createElement('select');
-    var conqLab = document.createElement('label');
-    conqLab.className = 'toggle';
-    conqLab.title = 'The conqueror only changes the keystone. Pricing searches this conqueror, or all of them with "any".';
-    conqLab.appendChild(document.createTextNode('Conqueror '));
-    conqLab.appendChild(conqSel);
-    ctr.appendChild(conqLab);
+    var conqSel = UI.select([]);
+    UI.field('Conqueror', conqSel, { parent: ctr,
+      title: 'The conqueror only changes the keystone. Pricing searches this conqueror, or all of them with "any".' });
     function fillConquerors(prefer) {
       var keep = prefer !== undefined ? prefer : conqSel.value;
       conqSel.textContent = '';
@@ -1393,24 +1379,16 @@
       if (ts && ts.jewelTypeId === jtype()) return Jewels.pobConqueror(ts.jewelTypeId, ts.conquerorTypeId) || 'any';
       return 'any';
     }
-    var sockSel = document.createElement('select');
-    sockets.forEach(function (s) {
-      var o = document.createElement('option');
-      o.value = String(s.socket);
+    var sockSel = UI.select(sockets.map(function (s) {
       var names = s.notables.map(function (n) { return nodeName(J, n); });
       var mineHere = ownedAt(s.socket);
-      o.textContent = (mineHere ? '★ Your ' + mineHere.jewel + ' ' + mineHere.seed + ' — ' : '') + (names.length
+      var text = (mineHere ? '★ Your ' + mineHere.jewel + ' ' + mineHere.seed + ' — ' : '') + (names.length
         ? 'socket near ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' +' + (names.length - 3) : '') +
           ' (' + names.length + ' of your notables)'
         : 'socket ' + s.socket + ' (none of your notables in radius)');
-      o.textContent = o.textContent.charAt(0).toUpperCase() + o.textContent.slice(1);
-      sockSel.appendChild(o);
-    });
-    var sockLab = document.createElement('label');
-    sockLab.className = 'toggle';
-    sockLab.appendChild(document.createTextNode('Socket '));
-    sockLab.appendChild(sockSel);
-    ctr.appendChild(sockLab);
+      return [String(s.socket), text.charAt(0).toUpperCase() + text.slice(1)];
+    }));
+    UI.field('Socket', sockSel, { parent: ctr });
     var unalloc = makeToggle(ctr, 'Also count unallocated notables', false);
     unalloc.checkbox.parentElement.title = 'Include notables in radius you have not taken — a good seed can make pathing to them worth it';
     body.appendChild(ctr);
@@ -1422,8 +1400,7 @@
     importedNote.className = 'finder-sub';
     body.appendChild(importedNote);
     var outcomeSearch = makeFinderSearch(body, 'Search outcomes — e.g. "minion", "crit", "flask"', function () { if (info) renderOutcomes(); });
-    var suggestBtn = document.createElement('button');
-    suggestBtn.className = 'copy-btn';
+    var suggestBtn = UI.button('secondary');
     suggestBtn.textContent = '✨ Suggest for my build';
     suggestBtn.title = 'Tick the outcomes that match what your tree and main skill scale (value 50% or more)';
     suggestBtn.addEventListener('click', function () {
@@ -1431,8 +1408,7 @@
       Object.keys(values).forEach(function (k) { if (values[k].value >= 50) values[k].use = true; });
       renderOutcomes();
     });
-    var clearBtn = document.createElement('button');
-    clearBtn.className = 'copy-btn';
+    var clearBtn = UI.button('secondary');
     clearBtn.textContent = 'Clear';
     clearBtn.addEventListener('click', function () {
       if (!info) return;
@@ -1443,8 +1419,7 @@
     outcomeSearch.parentElement.appendChild(clearBtn);
     var outcomesBox = document.createElement('div');
     body.appendChild(outcomesBox);
-    var findBtn = document.createElement('button');
-    findBtn.className = 'trade-btn';
+    var findBtn = UI.button('primary');
     findBtn.textContent = '🔎 Find best seeds';
     var resultsBox = document.createElement('div');
     resultsBox.className = 'timeless-results';
@@ -1691,8 +1666,7 @@
       head.textContent = r.matches + ' seeds ' + (needTxt.length ? 'meet ' + needTxt.join(' and ') : 'give at least one wanted outcome') +
         ' on the ' + r.considered.length + ' notable' + (r.considered.length === 1 ? '' : 's') + ' counted. Best ' + r.results.length + ':';
       resultsBox.appendChild(head);
-      var priceTop = document.createElement('button');
-      priceTop.className = 'copy-btn';
+      var priceTop = UI.button('secondary');
       var oneConq = conqSel.value !== 'any';
       priceTop.textContent = '💰 Price the top ' + Math.min(timelessPriceSeeds(oneConq), r.results.length) + ' seeds' +
         (oneConq ? ' (' + conqSel.value.charAt(0).toUpperCase() + conqSel.value.slice(1) + ')' : ' (any conqueror)');
@@ -1741,8 +1715,7 @@
         });
         td3.appendChild(det);
         var td4 = document.createElement('td');
-        var pb = document.createElement('button');
-        pb.className = 'copy-btn';
+        var pb = UI.button('secondary');
         pb.textContent = 'Price';
         pb.title = 'Find listings of this ' + jewelSel.value + ' seed (' +
           (conqSel.value === 'any' ? 'any conqueror' : conqSel.value) + ')';
@@ -1764,7 +1737,7 @@
     // price box for the chosen seeds — the normal listing view, live search, pins
     var priceBlock = document.createElement('div');
     var priceState = makeFinderState('Timeless jewel', priceBlock, function (quiet) {
-      if (!priced.seeds.length) { if (!quiet) alert('Find seeds first, then price them.'); return null; }
+      if (!priced.seeds.length) { if (!quiet) UI.toast('Find seeds first, then price them.', 'warn'); return null; }
       var o = finderOpts(); o.anonymous = !HAS_SESSION;
       var q = Jewels.timelessQuery(priced.name, priced.seeds, priced.conqueror || '', o);
       return { query: q.query, sort: q.sort };
@@ -1853,23 +1826,15 @@
     }
     jewelSel.addEventListener('change', fillConq);
     fillConq();
-    var seeds = document.createElement('input');
-    seeds.type = 'text';
-    seeds.className = 'finder-seeds';
-    seeds.placeholder = 'Seeds, e.g. 4521, 7790, 12003';
-    seeds.setAttribute('aria-label', 'Timeless jewel seeds');
-    var lab = document.createElement('label');
-    lab.className = 'toggle';
-    lab.appendChild(document.createTextNode('Seeds '));
-    lab.appendChild(seeds);
-    ctr.appendChild(lab);
+    var seeds = UI.input({ cls: 'finder-seeds', placeholder: 'Seeds, e.g. 4521, 7790, 12003' });
+    UI.field('Seeds', seeds, { parent: ctr });
     box.appendChild(ctr);
     var warn = document.createElement('div');
     warn.className = 'finder-sub';
     box.appendChild(warn);
     makeFinderState('Timeless jewel', box, function (quiet) {
       var s = Jewels.parseSeeds(seeds.value);
-      if (!s.length) { if (!quiet) alert('Enter at least one seed number.'); return null; }
+      if (!s.length) { if (!quiet) UI.toast('Enter at least one seed number.', 'warn'); return null; }
       var q = Jewels.timelessQuery(jewelSel.value, s, conqSel.value === 'any' ? '' : conqSel.value, finderOpts());
       warn.textContent = q.truncated ? 'Too many seed × conqueror combinations — searching the first 40. Pick a conqueror or fewer seeds.' : '';
       return { query: q.query, sort: q.sort };
@@ -2210,8 +2175,7 @@
 
         var priceSpan = document.createElement('span');
         priceSpan.className = 'gem-price';
-        var openBtn = document.createElement('button');
-        openBtn.className = 'copy-btn';
+        var openBtn = UI.button('secondary');
         openBtn.textContent = '↗';
         openBtn.title = 'Open this gem search on the trade site';
         openBtn.setAttribute('aria-label', 'Open ' + gem.name + ' search on the trade site');
@@ -2292,18 +2256,15 @@
 
           var btns = document.createElement('div');
           btns.className = 'btns gem-panel-btns';
-          var pBtn = document.createElement('button');
-          pBtn.className = 'copy-btn gui-only';
+          var pBtn = UI.button('secondary', { cls: 'gui-only' });
           pBtn.textContent = 'Check price';
           pBtn.addEventListener('click', function () { checkPrice(gemState); });
           gemState.priceBtn = pBtn;
-          var lBtn = document.createElement('button');
-          lBtn.className = 'copy-btn gui-only';
+          var lBtn = UI.button('secondary', { cls: 'gui-only' });
           lBtn.textContent = '🔴 Go live';
           lBtn.addEventListener('click', function () { toggleLive(gemState); });
           gemState.liveBtn = lBtn;
-          var oBtn = document.createElement('button');
-          oBtn.className = 'trade-btn';
+          var oBtn = UI.button('primary');
           oBtn.textContent = 'Search on trade site ↗';
           oBtn.addEventListener('click', function () {
             var url = buildTradeUrl(gemState);
@@ -2322,8 +2283,7 @@
           gemState.priceBox = prBox;
           return gemState;
         }
-        var expandBtn = document.createElement('button');
-        expandBtn.className = 'copy-btn gem-expand';
+        var expandBtn = UI.button('secondary', { size: 'sm' });
         expandBtn.textContent = '▾';
         expandBtn.title = 'Expand: full listings, live search, pinning — like a gear card';
         expandBtn.setAttribute('aria-label', 'Expand ' + gem.name + ' listings');
@@ -2365,8 +2325,7 @@
     opts.className = 'card-opts';
     var btns = document.createElement('div');
     btns.className = 'btns';
-    var priceAll = document.createElement('button');
-    priceAll.className = 'copy-btn gui-only';
+    var priceAll = UI.button('secondary', { cls: 'gui-only' });
     priceAll.textContent = 'Price all gems';
     priceAll.addEventListener('click', async function () {
       if (!isGui()) return;
@@ -2418,8 +2377,7 @@
         : 'Price all gems';
       priceAll.disabled = false;
     });
-    var openAllG = document.createElement('button');
-    openAllG.className = 'copy-btn';
+    var openAllG = UI.button('secondary');
     openAllG.textContent = 'Open all gem searches';
     openAllG.addEventListener('click', function () {
       rows.forEach(function (r, i) {
@@ -2525,19 +2483,9 @@
     // per-slot gear-set dropdown — only when other sets hold a different item here
     var slotSets = (setIndex !== undefined) ? setsForSlot(slot) : [];
     if (slotSets.length) {
-      var setSel = document.createElement('select');
-      setSel.className = 'set-mini';
-      slotSets.forEach(function (o) {
-        var opt = document.createElement('option');
-        opt.value = String(o.setIndex);
-        opt.textContent = o.title;
-        setSel.appendChild(opt);
-      });
-      setSel.value = String(setIndex);
-      setSel.title = 'Show this slot from a different gear set';
-      setSel.addEventListener('change', function () {
-        swapCardSet(state, slot, parseInt(this.value, 10));
-      });
+      var setSel = UI.select(slotSets.map(function (o) { return [String(o.setIndex), o.title]; }), String(setIndex), {
+        cls: 'set-mini', title: 'Show this slot from a different gear set', ariaLabel: 'Gear set for this slot',
+        onChange: function () { swapCardSet(state, slot, parseInt(this.value, 10)); } });
       head.firstChild.appendChild(setSel);
     }
     card.appendChild(head);
@@ -2630,8 +2578,7 @@
     state.maxPriceInput = makeMiniInput(opts, 'Max price', 'c');
     state.maxPriceInput.title = 'Maximum price in chaos-equivalent — searches, price checks, and live alerts all respect it';
     // bought tracking: dims the card and drops it from the cost summary
-    var boughtBtn = document.createElement('button');
-    boughtBtn.className = 'copy-btn';
+    var boughtBtn = UI.button('secondary', { size: 'sm' });
     boughtBtn.textContent = '✔ Bought';
     boughtBtn.title = 'Mark this slot as purchased — removed from the build cost total';
     boughtBtn.addEventListener('click', function () {
@@ -2644,15 +2591,13 @@
     var btnWrap = document.createElement('div');
     btnWrap.className = 'btns';
 
-    var priceBtn = document.createElement('button');
-    priceBtn.className = 'copy-btn gui-only';
+    var priceBtn = UI.button('secondary', { cls: 'gui-only' });
     priceBtn.textContent = 'Check price';
     priceBtn.addEventListener('click', function () { checkPrice(state); });
     state.priceBtn = priceBtn;
     btnWrap.appendChild(priceBtn);
 
-    var liveBtn = document.createElement('button');
-    liveBtn.className = 'copy-btn gui-only';
+    var liveBtn = UI.button('secondary', { cls: 'gui-only' });
     liveBtn.textContent = '🔴 Go live';
     liveBtn.title = 'Watch this search — new listings appear here with a sound (checks ~20s)';
     liveBtn.addEventListener('click', function () { toggleLive(state); });
@@ -2661,8 +2606,7 @@
 
     if (state.unique && TIMELESS_TYPES.some(function (t) { return t[1] === state.resolvedName; }) &&
         build && build.tree && build.tree.nodes.length) {
-      var tsBtn = document.createElement('button');
-      tsBtn.className = 'copy-btn gui-only';
+      var tsBtn = UI.button('secondary', { cls: 'gui-only' });
       tsBtn.textContent = '⏳ Find seeds for this socket';
       tsBtn.title = 'Open the timeless jewel finder on the socket this jewel sits in — see what your seed does and find better ones';
       tsBtn.addEventListener('click', function () { openTimelessFor(state); });
@@ -2670,8 +2614,7 @@
     }
 
     if (item.rarity === 'RARE' && !/^(Jewel|Flask|Abyssal)/.test(slot)) {
-      var craftBtn = document.createElement('button');
-      craftBtn.className = 'copy-btn';
+      var craftBtn = UI.button('secondary');
       craftBtn.textContent = '⚒ Craft vs buy';
       craftBtn.title = 'Estimate what crafting this item would cost (chaos / essence spam + a bench craft) and compare it with buying';
       craftBtn.addEventListener('click', function () { openCraft(state); });
@@ -2679,15 +2622,13 @@
       btnWrap.appendChild(craftBtn);
     }
 
-    var openBtn = document.createElement('button');
-    openBtn.className = 'trade-btn';
+    var openBtn = UI.button('primary');
     openBtn.textContent = 'Search on trade site ↗';
     openBtn.addEventListener('click', function () {
       var url = buildTradeUrl(state);
       if (url) openUrl(url);
     });
-    var copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-btn';
+    var copyBtn = UI.button('secondary');
     copyBtn.textContent = 'Copy URL';
     copyBtn.addEventListener('click', function () {
       var url = buildTradeUrl(state);
@@ -2843,6 +2784,7 @@
     // timeless jewel's conqueror + seed).
     cb.checked = !!match && (!defaultOff || !!mod.variant) && !(mod.crafted && mod.kind === 'explicit');
     cb.disabled = !match;
+    cb.setAttribute('aria-label', 'Use: ' + mod.line);
 
     // trade-site convention: colour identifies the mod source, no text labels
     var label = document.createElement('span');
@@ -2879,6 +2821,7 @@
     minInput.type = 'number';
     minInput.className = 'min-input';
     minInput.step = 'any';
+    minInput.setAttribute('aria-label', 'Minimum for: ' + mod.line);
 
     var tag = document.createElement('span');
     tag.className = 'match-tag';
@@ -3028,32 +2971,15 @@
   }
 
   function makeModeSelect(parent, state) {
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.appendChild(document.createTextNode('Match: '));
-    var sel = document.createElement('select');
-    ['all mods', 'all but one', 'all but two'].forEach(function (t, i) {
-      var o = document.createElement('option');
-      o.value = String(i); o.textContent = t;
-      sel.appendChild(o);
-    });
-    sel.value = '1'; // "all but one" is the sweet spot for upgrade hunting
-    wrap.appendChild(sel);
-    parent.appendChild(wrap);
+    // "all but one" is the sweet spot for upgrade hunting
+    var sel = UI.select([['0', 'all mods'], ['1', 'all but one'], ['2', 'all but two']], '1');
+    UI.field('Match', sel, { parent: parent });
     return sel;
   }
 
   function makeMiniInput(parent, label, placeholder) {
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.appendChild(document.createTextNode(label + ' '));
-    var inp = document.createElement('input');
-    inp.type = 'number';
-    inp.className = 'min-input';
-    inp.placeholder = placeholder || '';
-    inp.style.width = '70px';
-    wrap.appendChild(inp);
-    parent.appendChild(wrap);
+    var inp = UI.input({ type: 'number', cls: 'min-input', placeholder: placeholder || '', width: '70px' });
+    UI.field(label, inp, { parent: parent });
     return inp;
   }
 
@@ -3081,36 +3007,16 @@
   function makeSearchBySelect(parent, slot, item, preferExact) {
     var options = searchByOptions(slot, item);
     if (!options.length) return null;
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.title = 'How strictly to match the item base — broader searches find more (and cheaper) listings';
-    wrap.appendChild(document.createTextNode('Search by '));
-    var sel = document.createElement('select');
-    options.forEach(function (o) {
-      var opt = document.createElement('option');
-      opt.value = o[0]; opt.textContent = o[1];
-      sel.appendChild(opt);
-    });
     var values = options.map(function (o) { return o[0]; });
-    sel.value = (preferExact && values.indexOf('exact') !== -1) ? 'exact' : values[values.length - 1];
-    wrap.appendChild(sel);
-    parent.appendChild(wrap);
+    var sel = UI.select(options, (preferExact && values.indexOf('exact') !== -1) ? 'exact' : values[values.length - 1]);
+    UI.field('Search by', sel, { parent: parent,
+      title: 'How strictly to match the item base — broader searches find more (and cheaper) listings' });
     return sel;
   }
 
   function makeMiniSelect(parent, label, options, value) {
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.appendChild(document.createTextNode(label + ' '));
-    var sel = document.createElement('select');
-    options.forEach(function (o) {
-      var opt = document.createElement('option');
-      opt.value = o; opt.textContent = o;
-      sel.appendChild(opt);
-    });
-    sel.value = value;
-    wrap.appendChild(sel);
-    parent.appendChild(wrap);
+    var sel = UI.select(options, value);
+    UI.field(label, sel, { parent: parent });
     return sel;
   }
 
@@ -3252,7 +3158,7 @@
         filters.push({ id: lone.id, value: { min: lone.min } });
       }
       if (!filters.length && !flexDiverted.length) {
-        if (!quiet) alert('No mods selected for this search.');
+        if (!quiet) UI.toast('No mods selected for this search.', 'warn');
         return null;
       }
 
@@ -3407,8 +3313,7 @@
       line.textContent = '✔ Cooldown over — safe to search again. ';
       var box = line.parentElement;
       if (box && box._cooldownRetry) {
-        var b = document.createElement('button');
-        b.className = 'copy-btn';
+        var b = UI.button('secondary');
         b.textContent = '↻ Retry';
         var fn = box._cooldownRetry;
         b.addEventListener('click', function () { fn(); });
@@ -4042,8 +3947,7 @@
     var lifeIn = makeMiniInput(bar, 'Total life ≥', '0');
     lifeIn.value = solverLifeTarget || '';
     lifeIn.addEventListener('change', function () { solverLifeTarget = parseFloat(this.value) || 0; });
-    var solveBtn = document.createElement('button');
-    solveBtn.className = 'copy-btn';
+    var solveBtn = UI.button('secondary', { size: 'sm' });
     solveBtn.textContent = 'Solve cheapest combo';
     solveBtn.addEventListener('click', function () {
       solverResult = solveBudget(solverResTarget || 0, solverLifeTarget || 0);
@@ -4077,8 +3981,7 @@
       (solverResult.met ? '' : ' — targets not reachable with the priced listings (price more pages/slots)') + '</span>' +
       '<span class="cost-amt">' + fmtEq(t.chaos, league) + '</span>';
     box.appendChild(sumRow);
-    var pinAll = document.createElement('button');
-    pinAll.className = 'copy-btn';
+    var pinAll = UI.button('secondary');
     pinAll.textContent = '☆ Pin combo to basket';
     pinAll.addEventListener('click', function () {
       solverResult.picks.forEach(function (p) { pinToBasket(p.cand.li, p.state); });
@@ -4120,8 +4023,7 @@
   // ---- shopping basket ------------------------------------------------------------
   // button that copies text built at click time, with a brief confirmation
   function copyButton(label, textFn) {
-    var btn = document.createElement('button');
-    btn.className = 'copy-btn';
+    var btn = UI.button('secondary');
     btn.textContent = label;
     btn.title = 'Copy as text — paste into Discord, notes, or a message to a friend';
     btn.addEventListener('click', function (e) {
@@ -4192,11 +4094,10 @@
       });
       return lines.join('\n');
     }));
-    var clear = document.createElement('button');
-    clear.className = 'copy-btn';
-    clear.textContent = 'Clear';
-    clear.addEventListener('click', function () { saveBasket([]); renderBasket(); });
-    head.appendChild(clear);
+    head.appendChild(UI.button('secondary', { size: 'sm', label: 'Clear', onClick: function () {
+      UI.confirmDanger('Clear the basket?', 'All ' + b.length + ' pinned item(s) will be removed.', 'Clear basket')
+        .then(function (ok) { if (ok) { saveBasket([]); renderBasket(); } });
+    } }));
     box.appendChild(head);
 
     b.forEach(function (it, idx) {
@@ -4212,31 +4113,28 @@
       row.appendChild(label);
       row.appendChild(price);
       if (it.tradeUrl) {
-        var tl = document.createElement('button');
-        tl.className = 'copy-btn';
+        var tl = UI.button('secondary', { size: 'sm' });
         tl.textContent = '↗ Trade';
         tl.title = 'Open the search that found this item on the trade site';
         tl.addEventListener('click', function () { openUrl(it.tradeUrl); });
         row.appendChild(tl);
       }
       if (it.whisper && isGui()) {
-        var w = document.createElement('button');
-        w.className = 'copy-btn';
+        var w = UI.button('secondary', { size: 'sm' });
         w.textContent = '⚡ Whisper';
         w.addEventListener('click', function () { sendPoeChat(w, it.whisper, '⚡ Whisper'); });
         row.appendChild(w);
       }
-      var del = document.createElement('button');
-      del.className = 'copy-btn';
-      del.textContent = '✕';
-      del.setAttribute('aria-label', 'Remove from basket');
-      del.addEventListener('click', function () {
-        var cur = loadBasket();
-        cur.splice(idx, 1);
-        saveBasket(cur);
-        renderBasket();
-      });
-      row.appendChild(del);
+      row.appendChild(UI.iconButton('✕', 'Remove from basket', { variant: 'secondary', size: 'sm', onClick: function () {
+        UI.confirmDanger('Remove from basket?', ((it.name ? it.name + ' ' : '') + it.base) + ' — ' + it.account, 'Remove')
+          .then(function (ok) {
+            if (!ok) return;
+            var cur = loadBasket();
+            cur.splice(idx, 1);
+            saveBasket(cur);
+            renderBasket();
+          });
+      } }));
       box.appendChild(row);
     });
   }
@@ -4355,9 +4253,9 @@
   }
 
   async function toggleLive(state) {
-    if (!isGui()) { alert('Live search needs the desktop app (run PoB Trade Finder.bat).'); return; }
+    if (!isGui()) { UI.toast('Live search needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
     if (state.live) { stopLive(state); return; }
-    if (liveCount >= 2) { alert('Max 2 live searches at once — GGG rate limits.'); return; }
+    if (liveCount >= 2) { UI.toast('Max 2 live searches at once — GGG rate limits.', 'warn'); return; }
     var payload = buildTradePayload(state);
     if (!payload) return;
     initAudio();
@@ -4523,7 +4421,7 @@
 
   // ---- live price checking (desktop app only) -----------------------------------
   async function checkPrice(state, quiet) {
-    if (!isGui()) { alert('Live price checking needs the desktop app (run PoB Trade Finder.bat).'); return; }
+    if (!isGui()) { UI.toast('Live price checking needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
     var payload = null;
     try { payload = buildTradePayload(state, quiet); } catch (e) { /* stale card after re-render */ }
     if (!payload) return;
@@ -4614,8 +4512,7 @@
       if (pageCount <= 1) return null;
       var nav = document.createElement('span');
       nav.className = 'price-nav';
-      var prev = document.createElement('button');
-      prev.className = 'copy-btn';
+      var prev = UI.button('secondary', { size: 'sm' });
       prev.textContent = '‹ Prev';
       prev.disabled = ps.page === 0 || !!ps.loading;
       prev.addEventListener('click', function () { gotoPage(state, ps.page - 1); });
@@ -4623,8 +4520,7 @@
       pageLbl.className = 'page-label';
       pageLbl.textContent = 'page ' + (ps.page + 1) + ' / ' + pageCount +
         (ps.total > ps.ids.length ? ' (first ' + ps.ids.length + ')' : '');
-      var next = document.createElement('button');
-      next.className = 'copy-btn';
+      var next = UI.button('secondary', { size: 'sm' });
       next.textContent = 'Next ›';
       next.disabled = ps.page >= pageCount - 1 || !!ps.loading;
       next.addEventListener('click', function () { gotoPage(state, ps.page + 1); });
@@ -4988,8 +4884,7 @@
 
     var side = document.createElement('div');
     side.className = 'listing-side';
-    var pinBtn = document.createElement('button');
-    pinBtn.className = 'copy-btn whisper-btn';
+    var pinBtn = UI.button('secondary', { size: 'sm' });
     pinBtn.textContent = '☆ Pin';
     pinBtn.title = 'Add to the shopping basket';
     pinBtn.addEventListener('click', function () {
@@ -5028,8 +4923,7 @@
       // "@CharName Hi, I would like to buy your…" -> character name for /hideout
       var charMatch = li.whisper.match(/^@(\S+)/);
 
-      var wBtn = document.createElement('button');
-      wBtn.className = 'copy-btn whisper-btn gui-only';
+      var wBtn = UI.button('secondary', { size: 'sm', cls: 'gui-only' });
       wBtn.textContent = '⚡ Whisper in game';
       wBtn.title = 'Pastes the whisper into the PoE chat and sends it';
       wBtn.addEventListener('click', function () { sendPoeChat(wBtn, li.whisper, '⚡ Whisper in game'); });
@@ -5038,16 +4932,14 @@
       // Hideout travel only makes sense for priced listings (set price, go get it);
       // unpriced listings are a negotiation — whisper only.
       if (charMatch && priced) {
-        var hBtn = document.createElement('button');
-        hBtn.className = 'copy-btn hideout-btn gui-only';
+        var hBtn = UI.button('secondary', { size: 'sm', cls: 'gui-only' });
         hBtn.textContent = '⌂ Hideout';
         hBtn.title = 'Sends /hideout ' + charMatch[1] + ' in game — works once the seller has partied you';
         hBtn.addEventListener('click', function () { sendPoeChat(hBtn, '/hideout ' + charMatch[1], '⌂ Hideout'); });
         side.appendChild(hBtn);
       }
 
-      var cBtn = document.createElement('button');
-      cBtn.className = 'copy-btn whisper-btn';
+      var cBtn = UI.button('secondary', { size: 'sm' });
       cBtn.textContent = 'Copy whisper';
       cBtn.dataset.role = 'copy-whisper';
       cBtn.addEventListener('click', function () {
@@ -5061,8 +4953,7 @@
     if (instant && state) {
       // Instant buyout flow: travel to the seller's hideout via the trade
       // site's "Travel to Hideout" (gold fee, seller can be offline).
-      var bBtn = document.createElement('button');
-      bBtn.className = 'copy-btn whisper-btn';
+      var bBtn = UI.button('secondary', { size: 'sm' });
       bBtn.textContent = '⌂ Go to hideout ↗';
       bBtn.title = 'Opens this search on the trade site — use its "Travel to Hideout" button there (fee ' +
                    (li.fee ? li.fee.toLocaleString() + ' gold' : 'applies') + '). Travel needs your logged-in session, so it happens on the site.';
@@ -5091,7 +4982,7 @@
   }
 
   async function checkAllPrices() {
-    if (!isGui()) { alert('Live price checking needs the desktop app (run PoB Trade Finder.bat).'); return; }
+    if (!isGui()) { UI.toast('Live price checking needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
     var btn = document.getElementById('check-all');
     btn.disabled = true;
     var snapshot = cards; // renderBuild() replaces `cards` if the user switches gear set mid-scan
@@ -5109,7 +5000,7 @@
 
   // ---- refresh bundled trade data (desktop app only) -----------------------------
   async function refreshData() {
-    if (!isGui()) { alert('Data refresh needs the desktop app — or run: node tools/make-data-js.js --fetch'); return; }
+    if (!isGui()) { UI.toast('Data refresh needs the desktop app — or run: node tools/make-data-js.js --fetch', 'warn'); return; }
     var btn = document.getElementById('refresh-data');
     btn.disabled = true;
     btn.textContent = 'Refreshing…';
@@ -5222,7 +5113,7 @@
     bar.id = 'overlay-bar';
     bar.innerHTML = '<span class="ov-title">Price check</span>' +
       '<span id="overlay-meta" class="ov-meta">Hover an item in Path of Exile and press the hotkey</span>' +
-      '<button id="overlay-close" class="copy-btn" aria-label="Close price check" title="Close (Esc)">✕</button>';
+      '<button id="overlay-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close price check" title="Close (Esc)">✕</button>';
     var container = document.querySelector('.container');
     container.insertBefore(bar, container.firstChild);
     document.getElementById('overlay-close').addEventListener('click', overlayClose);
