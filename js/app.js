@@ -2627,6 +2627,18 @@
     renderCharDiff(newState);
   }
 
+  var INFLUENCE_TONE = { 'Searing Exarch': 'tone-exarch', 'Eater of Worlds': 'tone-eater' };
+
+  // bought slots: dimmed, labelled, and out of the build cost total
+  function setBought(state, on) {
+    state.bought = on;
+    state.card.classList.toggle('bought', on);
+    var chip = state.metaEl && state.metaEl.querySelector('.bought-chip');
+    if (on && !chip && state.metaEl) state.metaEl.appendChild(UI.chip('✔ Bought', 'success', 'bought-chip'));
+    if (!on && chip) chip.remove();
+    renderCostSummary();
+  }
+
   function makeCard(slot, item, setIndex) {
     var card = document.createElement('div');
     card.className = 'card';
@@ -2654,18 +2666,25 @@
         'alt="" loading="lazy">'
       : '';
     head.innerHTML =
-      '<div>' + iconHtml + '<span class="slot-tag">' + esc(slot) + '</span>' +
+      '<div class="card-title">' + iconHtml + '<div class="card-id">' +
+      '<span class="slot-tag">' + esc(slot) + '</span>' +
       '<span class="item-name ' + rarityClass(item.rarity) + '">' + esc(item.name) + '</span>' +
+      '<span class="item-meta">' +
       (item.base && item.base !== item.name ? '<span class="item-base">' + esc(item.base) + '</span>' : '') +
-      (item.influences.length ? '<span class="infl-tag">' + esc(item.influences.join(' + ')) + '</span>' : '') +
-      '</div>';
+      (item.itemLevel ? '<span>ilvl ' + item.itemLevel + '</span>' : '') +
+      item.influences.map(function (inf) {
+        return '<span class="badge infl-tag ' + (INFLUENCE_TONE[inf] || 'tone-info') + '">' + esc(inf) + '</span>';
+      }).join('') +
+      '</span></div></div>';
+    var meta = head.querySelector('.item-meta');
+    state.metaEl = meta;
     // per-slot gear-set dropdown — only when other sets hold a different item here
     var slotSets = (setIndex !== undefined) ? setsForSlot(slot) : [];
     if (slotSets.length) {
       var setSel = UI.select(slotSets.map(function (o) { return [String(o.setIndex), o.title]; }), String(setIndex), {
         cls: 'set-mini', title: 'Show this slot from a different gear set', ariaLabel: 'Gear set for this slot',
         onChange: function () { swapCardSet(state, slot, parseInt(this.value, 10)); } });
-      head.firstChild.appendChild(setSel);
+      meta.appendChild(setSel);
     }
     card.appendChild(head);
 
@@ -2687,11 +2706,19 @@
     body.className = 'card-body';
     card.appendChild(body);
 
+    if (item.mods.length) {
+      var modHead = document.createElement('div');
+      modHead.className = 'mod-head';
+      modHead.setAttribute('aria-hidden', 'true'); // each control carries its own label
+      modHead.innerHTML = '<span class="mh-use">Use</span><span class="mh-mod">Mod</span>' +
+        '<span class="mh-min">Min</span><span class="mh-stat">Trade stat</span>';
+      body.appendChild(modHead);
+    }
     if (state.unique) {
       var note = document.createElement('div');
       note.className = 'unique-note';
-      note.textContent = 'Unique — searched by name. Tick mods below to also require minimum rolls (rolls matter on this one? tick them).';
-      body.appendChild(note);
+      note.textContent = 'Unique — searched by name. Tick a mod to also require a minimum roll.';
+      body.insertBefore(note, body.firstChild);
       addModRows(state, body, item, slot, true); // unticked by default
     } else {
       addModRows(state, body, item, slot, false);
@@ -2756,68 +2783,43 @@
     // budget cap: chaos-equivalent max price (applies to links, price checks, live)
     state.maxPriceInput = makeMiniInput(opts, 'Max price', 'c');
     state.maxPriceInput.title = 'Maximum price in chaos-equivalent — searches, price checks, and live alerts all respect it';
-    // bought tracking: dims the card and drops it from the cost summary
-    var boughtBtn = UI.button('secondary', { size: 'sm' });
-    boughtBtn.textContent = '✔ Bought';
-    boughtBtn.title = 'Mark this slot as purchased — removed from the build cost total';
-    boughtBtn.addEventListener('click', function () {
-      state.bought = !state.bought;
-      card.classList.toggle('bought', state.bought);
-      renderCostSummary();
-    });
-    opts.appendChild(boughtBtn);
+
+    // header actions: the main action, live watch, the trade site, everything else in ⋯
+    var actions = document.createElement('div');
+    actions.className = 'card-actions';
+    var priceBtn = UI.button('primary', { cls: 'gui-only', label: 'Check price',
+      onClick: function () { checkPrice(state); } });
+    state.priceBtn = priceBtn;
+    var liveBtn = UI.button('secondary', { cls: 'gui-only', label: '🔴 Go live',
+      title: 'Watch this search — new listings appear here with a sound (checks ~20s)',
+      onClick: function () { toggleLive(state); } });
+    state.liveBtn = liveBtn;
+    // in the browser (no Check price) this is the main action — CSS promotes it
+    var openBtn = UI.button('secondary', { cls: 'act-search', label: 'Search on trade ↗',
+      title: 'Open this search on pathofexile.com/trade',
+      onClick: function () { var url = buildTradeUrl(state); if (url) openUrl(url); } });
+    var isTimeless = state.unique && TIMELESS_TYPES.some(function (t) { return t[1] === state.resolvedName; }) &&
+      build && build.tree && build.tree.nodes.length;
+    var canCraft = item.rarity === 'RARE' && !/^(Jewel|Flask|Abyssal)/.test(slot);
+    var more = UI.menu(function () {
+      return [
+        { label: 'Copy search URL', onClick: function () {
+          var url = buildTradeUrl(state);
+          if (url) navigator.clipboard.writeText(url).then(function () { UI.toast('Search URL copied.', 'success'); });
+        } },
+        { label: '⚒ Craft vs buy', hidden: !canCraft, onClick: function () { openCraft(state); },
+          title: 'Estimate what crafting this item would cost (chaos / essence spam + a bench craft) and compare it with buying' },
+        { label: '⏳ Find seeds for this socket', hidden: !isTimeless || !isGui(), onClick: function () { openTimelessFor(state); },
+          title: 'Open the timeless jewel finder on the socket this jewel sits in' },
+        { label: state.bought ? 'Unmark bought' : '✔ Mark bought', onClick: function () { setBought(state, !state.bought); },
+          title: 'Bought slots drop out of the build cost total' }
+      ];
+    }, { ariaLabel: 'More actions for ' + slot });
+    [priceBtn, liveBtn, openBtn, more].forEach(function (b) { actions.appendChild(b); });
+    head.appendChild(actions);
 
     var btnWrap = document.createElement('div');
-    btnWrap.className = 'btns';
-
-    var priceBtn = UI.button('secondary', { cls: 'gui-only' });
-    priceBtn.textContent = 'Check price';
-    priceBtn.addEventListener('click', function () { checkPrice(state); });
-    state.priceBtn = priceBtn;
-    btnWrap.appendChild(priceBtn);
-
-    var liveBtn = UI.button('secondary', { cls: 'gui-only' });
-    liveBtn.textContent = '🔴 Go live';
-    liveBtn.title = 'Watch this search — new listings appear here with a sound (checks ~20s)';
-    liveBtn.addEventListener('click', function () { toggleLive(state); });
-    state.liveBtn = liveBtn;
-    btnWrap.appendChild(liveBtn);
-
-    if (state.unique && TIMELESS_TYPES.some(function (t) { return t[1] === state.resolvedName; }) &&
-        build && build.tree && build.tree.nodes.length) {
-      var tsBtn = UI.button('secondary', { cls: 'gui-only' });
-      tsBtn.textContent = '⏳ Find seeds for this socket';
-      tsBtn.title = 'Open the timeless jewel finder on the socket this jewel sits in — see what your seed does and find better ones';
-      tsBtn.addEventListener('click', function () { openTimelessFor(state); });
-      btnWrap.appendChild(tsBtn);
-    }
-
-    if (item.rarity === 'RARE' && !/^(Jewel|Flask|Abyssal)/.test(slot)) {
-      var craftBtn = UI.button('secondary');
-      craftBtn.textContent = '⚒ Craft vs buy';
-      craftBtn.title = 'Estimate what crafting this item would cost (chaos / essence spam + a bench craft) and compare it with buying';
-      craftBtn.addEventListener('click', function () { openCraft(state); });
-      state.craftBtn = craftBtn;
-      btnWrap.appendChild(craftBtn);
-    }
-
-    var openBtn = UI.button('primary');
-    openBtn.textContent = 'Search on trade site ↗';
-    openBtn.addEventListener('click', function () {
-      var url = buildTradeUrl(state);
-      if (url) openUrl(url);
-    });
-    var copyBtn = UI.button('secondary');
-    copyBtn.textContent = 'Copy URL';
-    copyBtn.addEventListener('click', function () {
-      var url = buildTradeUrl(state);
-      if (url) navigator.clipboard.writeText(url).then(function () {
-        copyBtn.textContent = 'Copied!';
-        setTimeout(function () { copyBtn.textContent = 'Copy URL'; }, 1200);
-      });
-    });
-    btnWrap.appendChild(openBtn);
-    btnWrap.appendChild(copyBtn);
+    btnWrap.className = 'card-meta';
     var histSel = document.createElement('select');
     histSel.className = 'hist-sel hidden';
     histSel.title = 'Earlier price checks for this slot in this build — pick one to reopen it on the trade site';
@@ -2834,8 +2836,21 @@
     state.trendBox = trendBox;
     btnWrap.appendChild(trendBox);
     renderHistorySelect(state);
-    opts.appendChild(btnWrap);
-    card.appendChild(opts);
+    card.appendChild(btnWrap);
+
+    // advanced filters fold away; the summary counts what differs from the defaults
+    var moreFilters = UI.disclosure('More filters', opts);
+    moreFilters.classList.add('card-more');
+    var fields = Array.prototype.slice.call(opts.querySelectorAll('select, input'));
+    var defaults = fields.map(function (f) { return f.type === 'checkbox' ? f.checked : f.value; });
+    function countChanged() {
+      moreFilters.setCount(fields.filter(function (f, i) {
+        return (f.type === 'checkbox' ? f.checked : f.value) !== defaults[i];
+      }).length);
+    }
+    opts.addEventListener('change', countChanged);
+    opts.addEventListener('input', countChanged);
+    card.appendChild(moreFilters);
 
     var liveBox = document.createElement('div');
     liveBox.className = 'price-box live-box hidden';
@@ -2985,8 +3000,9 @@
         label.appendChild(eldBadge);
       }
     }
-    if (mod.crafted) label.title = 'Crafted mod';
-    if (mod.fractured) label.title = 'Fractured mod';
+    // mod source is spelled out too, not colour alone
+    if (mod.crafted) label.appendChild(UI.chip('crafted', 'crafted'));
+    if (mod.fractured) label.appendChild(UI.chip('fractured', 'fractured'));
     if (mod.kind === 'implicit' && !mod.crafted) label.title = 'Implicit';
 
     // clicking anywhere on the row toggles the mod — not just the tiny checkbox
@@ -5069,15 +5085,6 @@
 
     var side = document.createElement('div');
     side.className = 'listing-side';
-    var pinBtn = UI.button('secondary', { size: 'sm' });
-    pinBtn.textContent = '☆ Pin';
-    pinBtn.title = 'Add to the shopping basket';
-    pinBtn.addEventListener('click', function () {
-      pinToBasket(li, state);
-      pinBtn.textContent = '★ Pinned';
-      setTimeout(function () { pinBtn.textContent = '☆ Pin'; }, 1200);
-    });
-    side.appendChild(pinBtn);
     var priced = (li.amount !== null && li.amount !== undefined);
     var amt = document.createElement('div');
     amt.className = 'price-amt' + (/divine/i.test(li.currency) ? ' divine' : '');
@@ -5104,52 +5111,61 @@
     acct.className = 'price-acct';
     acct.textContent = li.account;
     side.appendChild(acct);
-    if (li.whisper) {
-      // "@CharName Hi, I would like to buy your…" -> character name for /hideout
-      var charMatch = li.whisper.match(/^@(\S+)/);
 
-      var wBtn = UI.button('secondary', { size: 'sm', cls: 'gui-only' });
-      wBtn.textContent = '⚡ Whisper in game';
-      wBtn.title = 'Pastes the whisper into the PoE chat and sends it';
-      wBtn.addEventListener('click', function () { sendPoeChat(wBtn, li.whisper, '⚡ Whisper in game'); });
-      side.appendChild(wBtn);
-
-      // Hideout travel only makes sense for priced listings (set price, go get it);
-      // unpriced listings are a negotiation — whisper only.
-      if (charMatch && priced) {
-        var hBtn = UI.button('secondary', { size: 'sm', cls: 'gui-only' });
-        hBtn.textContent = '⌂ Hideout';
-        hBtn.title = 'Sends /hideout ' + charMatch[1] + ' in game — works once the seller has partied you';
-        hBtn.addEventListener('click', function () { sendPoeChat(hBtn, '/hideout ' + charMatch[1], '⌂ Hideout'); });
-        side.appendChild(hBtn);
-      }
-
-      var cBtn = UI.button('secondary', { size: 'sm' });
-      cBtn.textContent = 'Copy whisper';
-      cBtn.dataset.role = 'copy-whisper';
-      cBtn.addEventListener('click', function () {
-        navigator.clipboard.writeText(li.whisper).then(function () {
-          cBtn.textContent = 'Copied!';
-          setTimeout(function () { cBtn.textContent = 'Copy whisper'; }, 1200);
-        });
-      });
-      side.appendChild(cBtn);
+    // one main action per listing — the way this listing is bought — the rest in ⋯
+    // "@CharName Hi, I would like to buy your…" -> character name for /hideout
+    var charMatch = li.whisper && li.whisper.match(/^@(\S+)/);
+    var gui = isGui();
+    function openSearch() { var url = buildTradeUrl(state); if (url) openUrl(url); }
+    function copyWhisper() {
+      navigator.clipboard.writeText(li.whisper).then(function () { UI.toast('Whisper copied — paste it in game.', 'success'); });
     }
+    var main = null, mainKind = null;
     if (instant && state) {
-      // Instant buyout flow: travel to the seller's hideout via the trade
-      // site's "Travel to Hideout" (gold fee, seller can be offline).
-      var bBtn = UI.button('secondary', { size: 'sm' });
-      bBtn.textContent = '⌂ Go to hideout ↗';
-      bBtn.title = 'Opens this search on the trade site — use its "Travel to Hideout" button there (fee ' +
-                   (li.fee ? li.fee.toLocaleString() + ' gold' : 'applies') + '). Travel needs your logged-in session, so it happens on the site.';
-      bBtn.addEventListener('click', function () {
-        var url = buildTradeUrl(state);
-        if (url) openUrl(url);
-      });
-      side.appendChild(bBtn);
+      // Instant buyout: travel to the seller's hideout via the trade site's
+      // "Travel to Hideout" (gold fee, seller can be offline).
+      main = UI.button('primary', { size: 'sm', label: '⌂ Go to hideout ↗', onClick: openSearch,
+        title: 'Opens this search on the trade site — use its "Travel to Hideout" button there (fee ' +
+               (li.fee ? li.fee.toLocaleString() + ' gold' : 'applies') + '). Travel needs your logged-in session, so it happens on the site.' });
+      mainKind = 'travel';
+    } else if (li.whisper && gui) {
+      main = UI.button('primary', { size: 'sm', label: '⚡ Whisper', title: 'Pastes the whisper into the PoE chat and sends it',
+        onClick: function () { sendPoeChat(main, li.whisper, '⚡ Whisper'); } });
+      mainKind = 'whisper';
+    } else if (li.whisper) {
+      main = UI.button('primary', { size: 'sm', label: 'Copy whisper', onClick: copyWhisper });
+      mainKind = 'copy';
     }
+    var acts = document.createElement('div');
+    acts.className = 'listing-acts';
+    if (main) acts.appendChild(main);
+    acts.appendChild(UI.menu([
+      { label: '☆ Pin to basket', onClick: function () { pinToBasket(li, state); } },
+      { label: '⚡ Whisper in game', hidden: !li.whisper || !gui || mainKind === 'whisper',
+        onClick: function () { sendPoeChatToast(li.whisper, 'Whisper sent.'); } },
+      { label: 'Copy whisper', hidden: !li.whisper || mainKind === 'copy', onClick: copyWhisper },
+      // hideout travel only makes sense for priced listings (set price, go get it);
+      // unpriced listings are a negotiation — whisper only
+      { label: '⌂ /hideout ' + (charMatch ? charMatch[1] : ''), hidden: !gui || !charMatch || !priced,
+        title: 'Works once the seller has partied you',
+        onClick: function () { sendPoeChatToast('/hideout ' + charMatch[1], 'Sent /hideout.'); } },
+      { label: '⌂ Go to hideout ↗', hidden: !instant || !state || mainKind === 'travel', onClick: openSearch }
+    ], { size: 'sm', ariaLabel: 'More actions for this listing' }));
+    side.appendChild(acts);
     card.appendChild(side);
     return card;
+  }
+
+  // chat commands fired from a menu: no button to relabel, so report with a toast
+  async function sendPoeChatToast(text, okMsg) {
+    if (!isGui()) return;
+    try {
+      var res = await window.pywebview.api.poe_chat(text);
+      if (res && res.ok) UI.toast(okMsg, 'success');
+      else UI.toast('Could not send: ' + ((res && res.error) || 'failed'), 'danger');
+    } catch (e) {
+      UI.toast('Could not send: ' + e.message, 'danger');
+    }
   }
 
   async function sendPoeChat(btn, text, restoreLabel) {

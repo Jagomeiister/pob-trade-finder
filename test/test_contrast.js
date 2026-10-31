@@ -63,7 +63,7 @@ const TEXT = ['--text', '--text-2', '--text-3', '--accent', '--unique', '--rare'
   '--success', '--warn', '--danger', '--info'];
 const SURFACES = ['--bg', '--s1', '--s2'];
 // chips/badges paint their own colour at --chip-tint over the panel (components.css .badge)
-const CHIP = ['--accent', '--magic', '--crafted', '--exarch', '--eater', '--gem', '--divine',
+const CHIP = ['--accent', '--magic', '--crafted', '--fractured', '--exarch', '--eater', '--gem', '--divine',
   '--success', '--warn', '--danger', '--info', '--text-2', '--unique'];
 
 const STATES = [];

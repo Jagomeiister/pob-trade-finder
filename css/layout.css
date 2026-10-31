@@ -43,13 +43,17 @@ body.has-build .sidebar { display: flex; }
 /* ---- top bar ---- */
 .topbar {
   display: none; position: sticky; top: 0; z-index: 5;
-  align-items: center; gap: 10px; flex-wrap: wrap;
+  align-items: center; gap: 10px; flex-wrap: nowrap;
   margin: 0 -24px 16px; padding: 10px 24px;
   background: var(--bg); border-bottom: 1px solid var(--border);
 }
 body.has-build .topbar { display: flex; }
 .view-title { margin: 0; font-size: var(--fs-xl); font-weight: 600; color: var(--text); }
-.context-chips { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.context-chips {
+  display: flex; gap: 6px; flex: 1 1 0; min-width: 0; overflow: hidden;
+  mask-image: linear-gradient(90deg, black calc(100% - 24px), transparent);
+}
+.topbar > .btn, .view-title { flex: none; }
 .context-chips .badge { flex: none; }
 .context-chips .badge { margin-left: 0; }
 .search-settings #controls { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 300px; }
@@ -104,9 +108,26 @@ body.has-build #input-panel { display: none; }
 }
 .card:hover { border-color: var(--border-strong); }
 .card.pasted { border-color: var(--accent); }
-.card-head { padding: 10px 14px; background: var(--s2); border-bottom: 1px solid var(--border); }
+.card-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; background: var(--s2); border-bottom: 1px solid var(--border);
+}
 .card-head > div { display: flex; align-items: center; flex-wrap: wrap; }
 .set-mini { margin-left: auto; font-size: var(--fs-xs); padding: 3px 8px; border-color: var(--accent); }
+/* item header: art · slot / name / base, ilvl, influence · actions */
+.card-head > .card-title { flex: 1 1 260px; min-width: 0; flex-wrap: nowrap; gap: 12px; }
+.card-id { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.card-id .slot-tag { margin-right: 0; }
+.card-id .item-name { font-size: var(--fs-xl); line-height: 1.2; }
+.card-title .card-icon { height: 44px; max-width: 48px; margin-right: 0; }
+.card-title .card-icon.atlas2 { width: 44px; height: 44px; }
+.item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--text-2); font-size: var(--fs-sm); }
+.item-meta .item-base, .item-meta .badge, .item-meta .set-mini { margin-left: 0; }
+.card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+.card-meta { display: flex; gap: 10px; align-items: center; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--border); }
+.card-meta:not(:has(> :not(.hidden))) { display: none; }
+.card-more { padding: 0 16px; background: var(--s2); border-top: 1px solid var(--border); }
+.card-more .card-opts { padding: 0 0 12px; background: none; border-top: 0; }
 .slot-tag {
   color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase;
   letter-spacing: 1.5px; margin-right: 10px;
@@ -123,7 +144,29 @@ body.has-build #input-panel { display: none; }
 }
 .card-icon.atlas2 { width: 30px; height: 30px; object-fit: cover; object-position: 0 50%; }
 
-.card-body { padding: 8px 14px; }
+.card-body { padding: 4px 16px 8px; container-type: inline-size; }
+/* mods table: Use · Mod · Min (· Trade stat when the card is wide enough; otherwise
+   the matched stat sits under the mod text) — header columns share the row grid */
+.mod-head, .mod-row:not(.gem-row) {
+  display: grid; grid-template-columns: 26px minmax(0, 1fr) 128px; column-gap: 10px; align-items: center;
+}
+.mod-head {
+  padding: 6px 6px 4px; margin: 0 -6px;
+  border-bottom: 1px solid var(--border); color: var(--text-3);
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+.mh-min { text-align: right; padding-right: 34px; }
+.mh-stat { display: none; text-align: right; }
+.mod-row > input[type=checkbox] { width: 16px; height: 16px; margin: 0 5px; }
+.mod-row:not(.gem-row) .match-tag { grid-column: 2 / -1; width: auto; text-align: left; margin-top: -2px; }
+@container (min-width: 760px) {
+  .mod-head, .mod-row:not(.gem-row) { grid-template-columns: 26px minmax(0, 1fr) 128px 220px; }
+  .mh-stat { display: block; }
+  .mod-row:not(.gem-row) .match-tag { grid-column: auto; text-align: right; margin-top: 0; }
+}
+.mod-text .badge { margin-left: 6px; }
+.mod-row .sort-btn:not(.active) { opacity: 0; }
+.mod-row:hover .sort-btn, .mod-row .sort-btn:focus-visible { opacity: 1; }
 .mod-row {
   display: flex; align-items: center; gap: 10px;
   padding: 4px 6px; margin: 0 -6px;
@@ -146,7 +189,7 @@ body.has-build #input-panel { display: none; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .match-tag.no-match { color: var(--danger); }
-@media (max-width: 860px) { .match-tag { width: 150px; } }
+@media (max-width: 860px) { .gem-row .match-tag { width: 150px; } }
 
 .card-opts {
   display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
@@ -161,8 +204,7 @@ body.has-build #input-panel { display: none; }
 .btns { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
 .hist-sel { max-width: 200px; }
 .unique-note { color: var(--text-2); font-style: italic; padding: 6px 0; }
-.card.bought { opacity: .45; }
-.card.bought .card-head::after { content: ' ✔ bought'; color: var(--success); font-size: var(--fs-xs); }
+.card.bought .card-body, .card.bought .card-more, .card.bought .card-meta { opacity: .5; }
 
 /* ---- views: body[data-view] picks one section ---- */
 .tab-section, .view-panel { display: none; }
@@ -275,6 +317,7 @@ body.overlay .btns > * { white-space: nowrap; }
   .nav-group { display: none; }
   .side-foot { margin-top: 0; flex-direction: row; flex-wrap: wrap; }
   .master-detail { grid-template-columns: minmax(0, 1fr); }
+  .topbar { flex-wrap: wrap; }
   .slot-list { position: static; max-height: 220px; }
 }
 
@@ -287,5 +330,5 @@ body.compact .listing { padding: 6px; margin-bottom: 5px; }
 
 @media (max-width: 640px) {
   .btns { margin-left: 0; width: 100%; }
-  .match-tag { display: none; }
+  .gem-row .match-tag { display: none; }
 }

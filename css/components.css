@@ -18,6 +18,8 @@
 .btn-secondary { background: var(--s2); border-color: var(--border-strong); color: var(--text-2); }
 .btn-secondary:hover:not(:disabled) { background: var(--s3); color: var(--text); }
 .btn-ghost { background: transparent; color: var(--text-2); }
+/* browser mode has no in-app price check: the trade-site search is the main action */
+body:not(.gui) .btn.act-search { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .btn-ghost:hover:not(:disabled) { background: var(--s2); color: var(--text); }
 .btn-danger { background: var(--danger); border-color: var(--danger); color: var(--bg); }
 .btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
@@ -48,6 +50,7 @@
 .tone-danger { --c: var(--danger); } .tone-info { --c: var(--info); } .tone-magic { --c: var(--magic); }
 .tone-crafted { --c: var(--crafted); } .tone-exarch { --c: var(--exarch); } .tone-eater { --c: var(--eater); }
 .tone-gem { --c: var(--gem); } .tone-divine { --c: var(--divine); } .tone-unique { --c: var(--unique); }
+.tone-fractured { --c: var(--fractured); }
 .badge.links, .badge.open-affix, .badge.deal { --c: var(--success); }
 .badge.qual { --c: var(--magic); }
 .badge.qual.qual-hi, .badge.exceptional-badge { --c: var(--crafted); }
@@ -226,7 +229,7 @@
 .price-nav { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
 .page-label { color: var(--text-2); font-size: var(--fs-xs); }
 .price-hint { color: var(--text-3); font-size: var(--fs-xs); margin: -2px 0 8px; }
-.price-amt { color: var(--price); font-weight: 700; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
+.price-amt { color: var(--price); font-weight: 700; font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
 .price-amt.divine { color: var(--divine); }
 .chaos-eq { color: var(--text-3); font-size: var(--fs-xs); font-weight: 400; margin-left: 2px; }
 .fee-tag { color: var(--warn); font-size: var(--fs-xs); }
@@ -267,8 +270,9 @@
 .listing-mods { font-size: var(--fs-sm); line-height: 1.55; }
 .listing-side {
   flex: none; text-align: right; display: flex; flex-direction: column; gap: 4px;
-  align-items: flex-end; min-width: 120px;
+  align-items: flex-end; min-width: 140px;
 }
+.listing-acts { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .base-pct { font-variant: small-caps; letter-spacing: .3px; }
 .base-pct.roll-hi, .roll-range.roll-hi { color: var(--success); }
 .base-pct.roll-lo, .roll-range.roll-lo { color: var(--danger); }

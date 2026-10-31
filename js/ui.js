@@ -81,7 +81,7 @@
     return w;
   }
 
-  var TONES = { neutral: 1, accent: 1, success: 1, warn: 1, danger: 1, info: 1, magic: 1, crafted: 1,
+  var TONES = { neutral: 1, accent: 1, success: 1, warn: 1, danger: 1, info: 1, magic: 1, crafted: 1, fractured: 1,
                 exarch: 1, eater: 1, gem: 1, divine: 1, unique: 1 };
 
   // Chip/badge: soft tinted pill with words, never colour alone
