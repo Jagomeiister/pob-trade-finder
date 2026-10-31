@@ -1306,6 +1306,8 @@
       return;
     }
     sockets.sort(function (x, y) { return y.notables.length - x.notables.length; });
+    // timeless jewels the build already has socketed: {socket, jewel, seed}
+    var owned = ownedTimeless(b);
     var ctr = document.createElement('div');
     ctr.className = 'card-opts finder-opts';
     var jewelSel = makeMiniSelect(ctr, 'Jewel', TIMELESS_TYPES.map(function (t) { return t[1]; }), 'Brutal Restraint');
@@ -1376,6 +1378,9 @@
     currentBox.className = 'timeless-current';
     function showCurrentSeed(my) {
       currentBox.textContent = '';
+      // explicit preset (from a card), else a jewel the build already has in this socket
+      var mine = owned.find(function (o) { return String(o.socket) === sockSel.value && o.jewel === jewelSel.value; });
+      if ((!currentSeed || currentSeed.jewel !== jewelSel.value) && mine) currentSeed = { jewel: mine.jewel, seed: mine.seed };
       if (!currentSeed || currentSeed.jewel !== jewelSel.value) return;
       window.pywebview.api.timeless_seed(jtype(), parseInt(sockSel.value, 10), JSON.stringify(b.tree.nodes),
                                          currentSeed.seed, unalloc.checkbox.checked).then(function (r) {
@@ -1421,8 +1426,10 @@
       outcomesBox.textContent = '';
       var table = document.createElement('table');
       table.className = 'finder-table';
-      table.innerHTML = '<thead><tr><th scope="col">Use</th><th scope="col">Outcome on a notable</th>' +
-        '<th scope="col" class="num">Chance</th><th scope="col" class="num" title="Minimum number of your notables that must get this — seeds with fewer are dropped">Need ×</th>' +
+      table.innerHTML = '<caption class="finder-sub">Everything a ' + esc(jewelSel.value) + ' can do to a notable here, across all seeds — ' +
+        'tick what you want, then <b>Find best seeds</b>. Small passives always get: ' + esc(info.small) + '.</caption>' +
+        '<thead><tr><th scope="col">Use</th><th scope="col">Possible outcome on a notable</th>' +
+        '<th scope="col" class="num" title="Share of (seed, notable) pairs at this socket that get this outcome">Chance</th><th scope="col" class="num" title="Minimum number of your notables that must get this — seeds with fewer are dropped">Need ×</th>' +
         '<th scope="col">Value to your build (left = avoid)</th></tr></thead>';
       var tbody = document.createElement('tbody');
       var maxNeed = Math.max(1, info.notables.filter(function (n) { return n.allocated || unalloc.checkbox.checked; }).length);
@@ -1609,8 +1616,28 @@
     });
 
     [jewelSel, sockSel].forEach(function (el) { el.addEventListener('change', load); });
+    if (!timelessPending && owned.length) {
+      // open on the build's own timeless jewel: its type, its socket, its seed
+      timelessPending = { jewel: owned[0].jewel, socket: owned[0].socket, seed: owned[0].seed };
+    }
     if (timelessPending) { var pend = timelessPending; timelessPending = null; timelessApplyPreset(pend); }
     else load();
+  }
+
+  // Timeless jewels socketed in the build's tree, with their seeds read from the mod text
+  var TIMELESS_SEED_RE = /^(?:Bathed in the blood of|Commanded leadership over|Denoted service of|Carved to glorify|Commissioned|Remembrancing) (\d+)/i;
+  function ownedTimeless(b) {
+    var out = [];
+    ((b.tree && b.tree.sockets) || []).forEach(function (s) {
+      var item = s.itemId && b.items[s.itemId];
+      if (!item) return;
+      var name = resolveUniqueName(item.name);
+      if (!TIMELESS_TYPES.some(function (t) { return t[1] === name; })) return;
+      var seed = null;
+      (item.mods || []).some(function (m) { var x = TIMELESS_SEED_RE.exec(m.line); if (x) seed = parseInt(x[1], 10); return !!x; });
+      if (seed) out.push({ socket: s.nodeId, jewel: name, seed: seed });
+    });
+    return out;
   }
 
   // "Find seeds for this socket" on a timeless jewel card → Timeless tab, preset
