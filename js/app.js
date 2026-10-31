@@ -2260,140 +2260,180 @@
     }
   }
 
+  // Gems page: a summary bar (price / open everything), then the same master–detail
+  // shape as the gear pages — link groups on the left, one group's gem table on the right
   function makeGemsCard(gemGroups) {
     var totalGems = 0;
     gemGroups.forEach(function (g) { totalGems += g.gems.length; });
-    var card = document.createElement('div');
-    card.className = 'card';
-    var head = document.createElement('div');
-    head.className = 'card-head';
-    head.innerHTML = '<div><span class="slot-tag">Skill Gems</span>' +
-      '<span class="item-name normal">' + gemGroups.length +
-      (gemGroups.length === 1 ? ' link group' : ' link groups') + ' · ' + gemsWord(totalGems) + '</span></div>';
-    card.appendChild(head);
+    var view = document.createElement('div');
+    view.className = 'gems-view';
+    var rows = [];             // every gem row: {gem, lvlIn, qIn, priceSpan, group}
+    var groupStatus = [];      // per group: the status cell in its list row
+    var mainName = (build && build.mainSkill && build.mainSkill[0]) || '';
+    // open on the main skill's group (★), else the first one
+    var startGroup = Math.max(0, gemGroups.findIndex(function (g) {
+      return !!mainName && g.gems.some(function (x) { return x.name === mainName; });
+    }));
 
-    var body = document.createElement('div');
-    body.className = 'card-body';
-    var rows = [];
+    // ---- summary bar
+    var summary = document.createElement('div');
+    summary.className = 'gems-summary';
+    summary.appendChild(UI.el('span', 'gems-count',
+      gemGroups.length + (gemGroups.length === 1 ? ' link group' : ' link groups') + ' · ' + gemsWord(totalGems)));
+    var totalEl = UI.el('span', 'gems-total');
+    summary.appendChild(totalEl);
+    summary.appendChild(UI.el('span', 'ctrl-spacer'));
+    var priceAll = UI.button('primary', { cls: 'gui-only', label: 'Price all gems',
+      title: 'Cheapest listing for every gem at its level and quality (one search each, rate-limit safe)' });
+    var openAllG = UI.button('secondary', { label: 'Open all gem searches ↗' });
+    summary.appendChild(priceAll);
+    summary.appendChild(openAllG);
+    view.appendChild(summary);
 
-    // two levels: gear piece -> link groups socketed in it
-    var bySlot = {}, slotOrder = [];
-    gemGroups.forEach(function (g) {
-      var key = g.slot || 'Unassigned';
-      if (!bySlot[key]) { bySlot[key] = []; slotOrder.push(key); }
-      bySlot[key].push(g);
-    });
+    var layout = document.createElement('div');
+    layout.className = 'master-detail gems-layout';
+    var list = document.createElement('div');
+    list.className = 'slot-list';
+    var detail = document.createElement('div');
+    detail.className = 'slot-detail';
+    layout.appendChild(list);
+    layout.appendChild(detail);
+    view.appendChild(layout);
+    var head = UI.el('div', 'slot-list-head');
+    head.appendChild(UI.el('b', null, 'Link groups'));
+    head.appendChild(UI.el('span', 'slot-label', String(gemGroups.length)));
+    list.appendChild(head);
 
-    slotOrder.forEach(function (slotKey) {
-      var slotTotal = bySlot[slotKey].reduce(function (n, g) { return n + g.gems.length; }, 0);
-      var sh = document.createElement('div');
-      sh.className = 'gem-gear-head';
-      sh.innerHTML = '<span class="gem-gear-name">' + esc(slotKey) + '</span>' +
-        '<span class="gem-count">' + gemsWord(slotTotal) + '</span>';
-      body.appendChild(sh);
+    function gemFlags(name) {
+      var isVaal = /^Vaal /.test(name);
+      // transfigured: "Skill of Variant" — excluding naturally "of"-named skills
+      var NATURAL_OF = /^(Herald of|Purity of|Wave of Conviction|Orb of Storms|Sigil of Power|Eye of Winter|Tornado of|Fist of War)/;
+      return {
+        vaal: isVaal,
+        awakened: /^Awakened /.test(name),
+        exceptional: /^(Empower|Enlighten|Enhance)( Support)?$/.test(name),
+        transfigured: / of /.test(name) && !isVaal && !NATURAL_OF.test(name) && !/Support$/.test(name) &&
+                      name.split(' of ')[1] && name.split(' ').length >= 3
+      };
+    }
 
-      bySlot[slotKey].forEach(function (group) {
-      var gh = document.createElement('div');
-      gh.className = 'gem-group-head';
-      gh.innerHTML = esc(group.title) +
-        '<span class="gem-count"> · ' + gemsWord(group.gems.length) + '</span>';
-      body.appendChild(gh);
+    function gemImg(gem, cls) {
+      var path = gemArtPath(gem.name);
+      if (!path && !GEM_ICONS[gem.name] && !isGui()) return null;
+      var img = document.createElement('img');
+      img.className = cls;
+      img.dataset.gem = gem.name;
+      if (GEM_ICONS[gem.name]) {
+        img.src = GEM_ICONS[gem.name];
+        img.dataset.swapped = '1';
+      } else if (isGui()) {
+        // atlas frames can't be told apart from wide single-frame art —
+        // hold a blank slot until the cached trade render arrives
+        img.src = BLANK_PX;
+        img.classList.add('pending');
+        img.title = 'Gem art loads once from the trade site, then it\'s cached forever';
+      } else {
+        img.src = 'https://web.poecdn.com/image/' + path + '?scale=1';
+        img.onload = markAtlas;
+      }
+      img.loading = 'lazy';
+      img.alt = '';
+      return img;
+    }
+
+    var listRows = [];
+    gemGroups.forEach(function (group, gi) {
+      var isMain = !!mainName && group.gems.some(function (g) { return g.name === mainName; });
+      var card = document.createElement('div');
+      card.className = 'card gem-group-card';
+      var groupRows = [];
+
+      // ---- detail header: the group, its gear piece, its actions
+      var ch = document.createElement('div');
+      ch.className = 'card-head';
+      var title = document.createElement('div');
+      title.className = 'card-title';
+      var mainIcon = gemImg(group.gems[0], 'card-icon gem-head-icon');
+      if (mainIcon) title.appendChild(mainIcon);
+      var id = UI.el('div', 'card-id');
+      id.appendChild(UI.el('span', 'slot-tag', (group.slot || 'No gear slot') + ' · ' + gemsWord(group.gems.length)));
+      id.appendChild(UI.el('span', 'item-name gem-name', group.title));
+      if (isMain) {
+        var meta = UI.el('span', 'item-meta');
+        meta.appendChild(UI.chip('★ Main skill', 'accent'));
+        id.appendChild(meta);
+      }
+      title.appendChild(id);
+      ch.appendChild(title);
+      var acts = UI.el('div', 'card-actions');
+      var priceGroup = UI.button('primary', { cls: 'gui-only', label: 'Price this group' });
+      priceGroup.addEventListener('click', function () { priceRows(groupRows, priceGroup, 'Price this group'); });
+      acts.appendChild(priceGroup);
+      acts.appendChild(UI.button('secondary', { label: 'Open searches ↗', title: 'Open every gem in this group on the trade site',
+        onClick: function () { openRows(groupRows); } }));
+      ch.appendChild(acts);
+      card.appendChild(ch);
+
+      // ---- gem table
+      var body = document.createElement('div');
+      body.className = 'card-body';
+      var th = UI.el('div', 'gem-head');
+      th.setAttribute('aria-hidden', 'true');
+      th.innerHTML = '<span></span><span>Gem</span><span>Level / quality</span><span class="num">Cheapest</span><span></span>';
+      body.appendChild(th);
 
       group.gems.forEach(function (gem) {
+        var f = gemFlags(gem.name);
+        var corruptOnly = gem.level >= 21 || gem.quality >= 23 || f.vaal;
         var row = document.createElement('div');
-        row.className = 'mod-row gem-row';
-        var isVaal = /^Vaal /.test(gem.name);
-        var isAwakened = /^Awakened /.test(gem.name);
-        var isExceptional = /^(Empower|Enlighten|Enhance)( Support)?$/.test(gem.name);
-        // transfigured: "Skill of Variant" — excluding naturally "of"-named skills
-        var NATURAL_OF = /^(Herald of|Purity of|Wave of Conviction|Orb of Storms|Sigil of Power|Eye of Winter|Tornado of|Fist of War)/;
-        var isTransfigured = / of /.test(gem.name) && !isVaal && !NATURAL_OF.test(gem.name) &&
-                             !/Support$/.test(gem.name) && gem.name.split(' of ')[1] &&
-                             gem.name.split(' ').length >= 3;
-        var corruptOnly = gem.level >= 21 || gem.quality >= 23 || isVaal;
-        var gemIconPath = gemArtPath(gem.name);
-        if (gemIconPath || GEM_ICONS[gem.name] || isGui()) {
-          var gIcon = document.createElement('img');
-          gIcon.className = 'gem-icon';
-          gIcon.dataset.gem = gem.name;
-          if (GEM_ICONS[gem.name]) {
-            gIcon.src = GEM_ICONS[gem.name];
-            gIcon.dataset.swapped = '1';
-          } else if (isGui()) {
-            // atlas frames can't be told apart from wide single-frame art —
-            // hold a blank slot until the cached trade render arrives
-            gIcon.src = BLANK_PX;
-            gIcon.classList.add('pending');
-            gIcon.title = 'Gem art loads once from the trade site, then it\'s cached forever';
-          } else if (gemIconPath) {
-            gIcon.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
-            gIcon.onload = markAtlas;
-          }
-          gIcon.loading = 'lazy';
-          gIcon.alt = '';
-          row.appendChild(gIcon);
-        }
+        row.className = 'gem-row';
+        var ic = gemImg(gem, 'gem-icon');
+        row.appendChild(ic || UI.el('span', 'gem-icon'));
+
         var label = document.createElement('span');
-        label.className = 'mod-text gem-name' + (isVaal ? ' vaal' : '');
+        label.className = 'gem-name' + (f.vaal ? ' vaal' : '');
         label.textContent = gem.name + (gem.count > 1 ? ' ×' + gem.count : '');
-        if (isVaal) {
-          var vb = document.createElement('span');
-          vb.className = 'badge vaal-badge';
-          vb.textContent = 'vaal';
-          label.appendChild(vb);
-        }
-        if (isAwakened) {
-          var ab = document.createElement('span');
-          ab.className = 'badge awakened-badge';
-          ab.textContent = 'awakened';
+        if (f.vaal) label.appendChild(UI.chip('vaal', 'danger', 'vaal-badge'));
+        if (f.awakened) {
+          var ab = UI.chip('awakened', 'unique', 'awakened-badge');
           ab.title = 'Awakened support — expensive, drops from Maven content';
           label.appendChild(ab);
         }
-        if (isExceptional) {
-          var eb = document.createElement('span');
-          eb.className = 'badge exceptional-badge';
-          eb.textContent = 'exceptional';
+        if (f.exceptional) {
+          var eb = UI.chip('exceptional', 'crafted', 'exceptional-badge');
           eb.title = 'Empower/Enlighten/Enhance — level matters far more than quality';
           label.appendChild(eb);
         }
-        if (isTransfigured) {
-          var tb = document.createElement('span');
-          tb.className = 'badge transfigured-badge';
-          tb.textContent = 'transfigured';
+        if (f.transfigured) {
+          var tb = UI.chip('transfigured', 'divine', 'transfigured-badge');
           tb.title = 'Transfigured version — obtained from the Lab font, tradeable by exact name';
           label.appendChild(tb);
         }
         if (corruptOnly) {
-          var cb2 = document.createElement('span');
-          cb2.className = 'badge corrupt';
-          cb2.textContent = 'corrupted';
-          cb2.title = isVaal ? 'Vaal gems are always corrupted'
-                             : 'Only corrupted gems reach this level/quality (21/23+)';
+          var cb2 = UI.chip('corrupted', 'danger', 'corrupt');
+          cb2.title = f.vaal ? 'Vaal gems are always corrupted' : 'Only corrupted gems reach this level/quality (21/23+)';
           label.appendChild(cb2);
         }
         row.appendChild(label);
 
-        var lvlIn = document.createElement('input');
-        lvlIn.type = 'number'; lvlIn.className = 'min-input gem-in';
-        lvlIn.value = gem.level; lvlIn.title = 'Minimum gem level';
-        var qIn = document.createElement('input');
-        qIn.type = 'number'; qIn.className = 'min-input gem-in';
-        qIn.value = gem.quality; qIn.title = 'Minimum quality';
-        row.appendChild(lvlIn);
-        row.appendChild(document.createTextNode('/'));
-        row.appendChild(qIn);
+        var lq = UI.el('span', 'gem-lq');
+        var lvlIn = UI.input({ type: 'number', cls: 'min-input gem-in', value: gem.level,
+                               ariaLabel: 'Minimum level for ' + gem.name });
+        lvlIn.title = 'Minimum gem level';
+        var qIn = UI.input({ type: 'number', cls: 'min-input gem-in', value: gem.quality,
+                             ariaLabel: 'Minimum quality for ' + gem.name });
+        qIn.title = 'Minimum quality';
+        lq.appendChild(lvlIn);
+        lq.appendChild(UI.el('span', 'gem-sep', '/'));
+        lq.appendChild(qIn);
+        row.appendChild(lq);
 
-        var priceSpan = document.createElement('span');
-        priceSpan.className = 'gem-price';
-        var openBtn = UI.button('secondary');
-        openBtn.textContent = '↗';
-        openBtn.title = 'Open this gem search on the trade site';
-        openBtn.setAttribute('aria-label', 'Open ' + gem.name + ' search on the trade site');
-        openBtn.addEventListener('click', function () {
-          openUrl(gemUrl(gemPayload(gem, parseInt(lvlIn.value, 10) || 1, parseInt(qIn.value, 10) || 0)));
-        });
+        var priceSpan = UI.el('span', 'gem-price');
         row.appendChild(priceSpan);
-        row.appendChild(openBtn);
+
+        var rowActs = UI.el('span', 'row-acts');
+        rowActs.appendChild(UI.iconButton('↗', 'Open ' + gem.name + ' search on the trade site', { variant: 'secondary', size: 'sm',
+          onClick: function () { openUrl(gemUrl(gemPayload(gem, parseInt(lvlIn.value, 10) || 1, parseInt(qIn.value, 10) || 0))); } }));
 
         // expandable panel: full listings / live search / basket, like gear cards
         var panel = document.createElement('div');
@@ -2409,53 +2449,12 @@
           };
           cards.push(gemState); // joins price summary + sold watcher
 
-          // trade-style header: big gem art + name + current minimums
-          var ph = document.createElement('div');
-          ph.className = 'gem-panel-head';
-          if (gemIconPath || GEM_ICONS[gem.name] || isGui()) {
-            var big = document.createElement('img');
-            big.className = 'gem-big-icon';
-            big.dataset.gem = gem.name;
-            if (GEM_ICONS[gem.name]) {
-              big.src = GEM_ICONS[gem.name];
-              big.dataset.swapped = '1';
-            } else if (isGui()) {
-              big.src = BLANK_PX;
-              big.classList.add('pending');
-            } else if (gemIconPath) {
-              big.src = 'https://web.poecdn.com/image/' + gemIconPath + '?scale=1';
-              big.onload = markAtlas;
-            }
-            big.alt = '';
-            ph.appendChild(big);
-          }
-          var pht = document.createElement('div');
-          var sub = document.createElement('div');
-          sub.className = 'gem-panel-sub';
+          var sub = UI.el('div', 'gem-panel-sub');
           function updateSub() {
             sub.textContent = 'min level ' + (parseInt(lvlIn.value, 10) || 1) +
-              ' · min quality ' + (parseInt(qIn.value, 10) || 0) +
-              (corruptOnly ? ' · corrupted' : '');
+              ' · min quality ' + (parseInt(qIn.value, 10) || 0) + (corruptOnly ? ' · corrupted' : '');
           }
           updateSub();
-          pht.innerHTML = '<div class="gem-panel-name' + (isVaal ? ' vaal' : '') + '">' + esc(gem.name) + '</div>';
-          pht.appendChild(sub);
-          ph.appendChild(pht);
-          panel.appendChild(ph);
-
-          // swap the RePoE atlas art for the trade site's single-frame render
-          if (isGui() && window.pywebview.api.gem_icon) {
-            gemIconLookup(gem.name).then(function (res) {
-              if (res && res.ok && res.icon) {
-                GEM_ICONS[gem.name] = res.icon;
-                var bigEl = ph.querySelector('.gem-big-icon');
-                if (bigEl) bigEl.src = res.icon;
-                var rowIcon = row.querySelector('.gem-icon');
-                if (rowIcon) rowIcon.src = res.icon;
-              }
-            }).catch(function () { /* keep placeholder */ });
-          }
-
           // loosening level/quality re-runs an open price check automatically
           [lvlIn, qIn].forEach(function (inp) {
             inp.addEventListener('change', function () {
@@ -2463,25 +2462,17 @@
               if (isGui() && gemState.priceState) checkPrice(gemState, true);
             });
           });
-
-          var btns = document.createElement('div');
-          btns.className = 'btns gem-panel-btns';
-          var pBtn = UI.button('secondary', { cls: 'gui-only' });
-          pBtn.textContent = 'Check price';
-          pBtn.addEventListener('click', function () { checkPrice(gemState); });
+          var bar = UI.el('div', 'gem-panel-btns');
+          bar.appendChild(sub);
+          bar.appendChild(UI.el('span', 'ctrl-spacer'));
+          var pBtn = UI.button('primary', { cls: 'gui-only', label: 'Check price', onClick: function () { checkPrice(gemState); } });
           gemState.priceBtn = pBtn;
-          var lBtn = UI.button('secondary', { cls: 'gui-only' });
-          lBtn.textContent = '🔴 Go live';
-          lBtn.addEventListener('click', function () { toggleLive(gemState); });
+          var lBtn = UI.button('secondary', { cls: 'gui-only', label: '🔴 Go live', onClick: function () { toggleLive(gemState); } });
           gemState.liveBtn = lBtn;
-          var oBtn = UI.button('primary');
-          oBtn.textContent = 'Search on trade site ↗';
-          oBtn.addEventListener('click', function () {
-            var url = buildTradeUrl(gemState);
-            if (url) openUrl(url);
-          });
-          btns.appendChild(pBtn); btns.appendChild(lBtn); btns.appendChild(oBtn);
-          panel.appendChild(btns);
+          var oBtn = UI.button('secondary', { cls: 'act-search', label: 'Search on trade ↗',
+            onClick: function () { var url = buildTradeUrl(gemState); if (url) openUrl(url); } });
+          bar.appendChild(pBtn); bar.appendChild(lBtn); bar.appendChild(oBtn);
+          panel.appendChild(bar);
 
           var lBox = document.createElement('div');
           lBox.className = 'price-box live-box hidden';
@@ -2493,34 +2484,55 @@
           gemState.priceBox = prBox;
           return gemState;
         }
-        var expandBtn = UI.button('secondary', { size: 'sm' });
-        expandBtn.textContent = '▾';
-        expandBtn.title = 'Expand: full listings, live search, pinning — like a gear card';
-        expandBtn.setAttribute('aria-label', 'Expand ' + gem.name + ' listings');
-        function togglePanel() {
-          if (panel.classList.contains('hidden')) {
-            ensureGemPanel();
-            panel.classList.remove('hidden');
-            expandBtn.textContent = '▴';
-          } else {
-            panel.classList.add('hidden');
-            expandBtn.textContent = '▾';
-          }
-          expandBtn.setAttribute('aria-expanded', panel.classList.contains('hidden') ? 'false' : 'true');
-        }
+        var expandBtn = UI.iconButton('▾', 'Listings for ' + gem.name, { variant: 'secondary', size: 'sm',
+          title: 'Listings, live search and pinning for this gem' });
         expandBtn.setAttribute('aria-expanded', 'false');
-        expandBtn.addEventListener('click', togglePanel);
-        label.style.cursor = 'pointer';
-        label.addEventListener('click', togglePanel);
-        row.appendChild(expandBtn);
+        expandBtn.addEventListener('click', function () {
+          var opening = panel.classList.contains('hidden');
+          if (opening) ensureGemPanel();
+          panel.classList.toggle('hidden', !opening);
+          expandBtn.textContent = opening ? '▴' : '▾';
+          expandBtn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+        });
+        rowActs.appendChild(expandBtn);
+        row.appendChild(rowActs);
 
         body.appendChild(row);
         body.appendChild(panel);
-        rows.push({ gem: gem, lvlIn: lvlIn, qIn: qIn, priceSpan: priceSpan });
+        var r = { gem: gem, lvlIn: lvlIn, qIn: qIn, priceSpan: priceSpan, group: gi };
+        rows.push(r);
+        groupRows.push(r);
       });
+      card.appendChild(body);
+      if (gi === startGroup) card.classList.add('is-active');
+      detail.appendChild(card);
+
+      // ---- list row
+      var lr = UI.el('button', 'slot-row');
+      lr.type = 'button';
+      lr.slotCard = card;
+      var lic = gemImg(group.gems[0], 'slot-ic');
+      if (lic) { lic.classList.remove('pending'); lr.appendChild(lic); } else lr.appendChild(UI.el('span', 'slot-ic'));
+      var txt = UI.el('span', 'slot-txt');
+      txt.appendChild(UI.el('span', 'slot-label', (isMain ? '★ ' : '') + (group.slot || 'No gear slot') +
+        ' · ' + gemsWord(group.gems.length)));
+      txt.appendChild(UI.el('span', 'slot-name gem-name', group.title));
+      lr.appendChild(txt);
+      var st = UI.el('span', 'slot-status');
+      lr.appendChild(st);
+      groupStatus[gi] = st;
+      if (gi === startGroup) lr.setAttribute('aria-current', 'true');
+      lr.addEventListener('click', function () { selectSlot(layout, card); });
+      lr.addEventListener('keydown', function (e) {
+        var i = listRows.indexOf(lr);
+        var j = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : -1;
+        if (j < 0 || j >= listRows.length) return;
+        e.preventDefault();
+        selectSlot(layout, listRows[j].slotCard, true);
       });
+      listRows.push(lr);
+      list.appendChild(lr);
     });
-    card.appendChild(body);
 
     // background: replace atlas art with proper single-frame trade renders
     var uniqueNames = [];
@@ -2533,41 +2545,50 @@
     // uncached art trickles in on the gentle background pace, cached is instant
     setTimeout(function () { resolveGemIcons(uniqueNames); }, 4000);
 
-    var opts = document.createElement('div');
-    opts.className = 'card-opts';
-    var btns = document.createElement('div');
-    btns.className = 'btns';
-    var priceAll = UI.button('secondary', { cls: 'gui-only' });
-    priceAll.textContent = 'Price all gems';
-    priceAll.addEventListener('click', async function () {
+    function openRows(subset) {
+      subset.forEach(function (r, i) {
+        setTimeout(function () {
+          openUrl(gemUrl(gemPayload(r.gem, parseInt(r.lvlIn.value, 10) || 1, parseInt(r.qIn.value, 10) || 0)));
+        }, i * 400);
+      });
+    }
+
+    // cheapest listing per gem; group and page totals in the display currency
+    async function priceRows(subset, btn, idleLabel) {
       if (!isGui()) return;
-      priceAll.disabled = true;
+      btn.disabled = true;
       var league = document.getElementById('league').value;
-      var cheapest = []; // {amount, currency, count}
-      for (var i = 0; i < rows.length; i++) {
-        var r = rows[i];
-        priceAll.textContent = 'Pricing ' + (i + 1) + '/' + rows.length + '…';
+      for (var i = 0; i < subset.length; i++) {
+        var r = subset[i];
+        btn.textContent = 'Pricing ' + (i + 1) + '/' + subset.length + '…';
         r.priceSpan.textContent = '…';
+        r.cheapest = null;
         try {
           var res = await window.pywebview.api.trade_search(league,
             JSON.stringify(gemPayload(r.gem, parseInt(r.lvlIn.value, 10) || 1, parseInt(r.qIn.value, 10) || 0)));
           if (res.ok && res.listings.length) {
             var li = res.listings[0];
-            r.priceSpan.textContent = li.amount + ' ' + li.currency + ' · ' + res.total + ' listed';
+            r.priceSpan.textContent = li.amount + ' ' + li.currency;
+            r.priceSpan.title = res.total + ' listed';
             if (li.amount !== null && li.amount !== undefined) {
-              cheapest.push({ amount: li.amount, currency: li.currency, count: r.gem.count || 1 });
+              r.cheapest = { amount: li.amount, currency: li.currency, count: r.gem.count || 1 };
             }
           } else {
-            r.priceSpan.textContent = res.ok ? 'none listed' : '❌ ' + (res.error || '').slice(0, 40);
+            r.priceSpan.textContent = '';
+            r.priceSpan.appendChild(res.ok ? UI.chip('None listed', 'danger') : UI.chip('Failed', 'danger'));
+            if (!res.ok) r.priceSpan.title = res.error || '';
           }
         } catch (e) {
-          r.priceSpan.textContent = '❌ ' + e.message.slice(0, 40);
+          r.priceSpan.textContent = '';
+          r.priceSpan.appendChild(UI.chip('Failed', 'danger'));
+          r.priceSpan.title = e.message;
         }
       }
       // fetch any missing rates once, then total in the display currency
       var needCur = [];
-      cheapest.forEach(function (c) {
-        if (!(RATES[league] && RATES[league][c.currency] !== undefined) && needCur.indexOf(c.currency) === -1) needCur.push(c.currency);
+      rows.forEach(function (r) {
+        var c = r.cheapest;
+        if (c && !(RATES[league] && RATES[league][c.currency] !== undefined) && needCur.indexOf(c.currency) === -1) needCur.push(c.currency);
       });
       if (eqMode() === 'divine' && !divRate(league) && needCur.indexOf('divine') === -1) needCur.push('divine');
       if (needCur.length) {
@@ -2579,30 +2600,29 @@
           }
         } catch (e) { /* totals stay partial */ }
       }
-      var totalChaos = 0, known = 0;
-      cheapest.forEach(function (c) {
-        var rate = RATES[league] && RATES[league][c.currency];
-        if (rate !== undefined) { totalChaos += c.amount * rate * c.count; known++; }
+      function total(subsetRows) {
+        var t = 0, known = 0, priced = 0;
+        subsetRows.forEach(function (r) {
+          if (!r.cheapest) return;
+          priced++;
+          var rate = RATES[league] && RATES[league][r.cheapest.currency];
+          if (rate !== undefined) { t += r.cheapest.amount * rate * r.cheapest.count; known++; }
+        });
+        return known ? fmtEq(t, league) + (known < priced ? ' (partial)' : '') : '';
+      }
+      gemGroups.forEach(function (g, gi) {
+        var gr = rows.filter(function (r) { return r.group === gi; });
+        var attempted = gr.some(function (r) { return r.priceSpan.textContent; });
+        groupStatus[gi].textContent = total(gr) || (attempted ? '—' : '');
       });
-      priceAll.textContent = known
-        ? 'Gems ≈ ' + fmtEq(totalChaos, league) + (known < cheapest.length ? ' (partial)' : '')
-        : 'Price all gems';
-      priceAll.disabled = false;
-    });
-    var openAllG = UI.button('secondary');
-    openAllG.textContent = 'Open all gem searches';
-    openAllG.addEventListener('click', function () {
-      rows.forEach(function (r, i) {
-        setTimeout(function () {
-          openUrl(gemUrl(gemPayload(r.gem, parseInt(r.lvlIn.value, 10) || 1, parseInt(r.qIn.value, 10) || 0)));
-        }, i * 400);
-      });
-    });
-    btns.appendChild(priceAll);
-    btns.appendChild(openAllG);
-    opts.appendChild(btns);
-    card.appendChild(opts);
-    return card;
+      var all = total(rows);
+      totalEl.textContent = all ? 'Gems ≈ ' + all : '';
+      btn.textContent = idleLabel;
+      btn.disabled = false;
+    }
+    priceAll.addEventListener('click', function () { priceRows(rows, priceAll, 'Price all gems'); });
+    openAllG.addEventListener('click', function () { openRows(rows); });
+    return view;
   }
 
   // ---- pasted in-game item -------------------------------------------------------

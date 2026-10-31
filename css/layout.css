@@ -147,7 +147,7 @@ body.has-build #input-panel { display: none; }
 .card-body { padding: 4px 16px 8px; container-type: inline-size; }
 /* mods table: Use · Mod · Min (· Trade stat when the card is wide enough; otherwise
    the matched stat sits under the mod text) — header columns share the row grid */
-.mod-head, .mod-row:not(.gem-row) {
+.mod-head, .mod-row {
   display: grid; grid-template-columns: 26px minmax(0, 1fr) 128px; column-gap: 10px; align-items: center;
 }
 .mod-head {
@@ -158,11 +158,11 @@ body.has-build #input-panel { display: none; }
 .mh-min { text-align: right; padding-right: 34px; }
 .mh-stat { display: none; text-align: right; }
 .mod-row > input[type=checkbox] { width: 16px; height: 16px; margin: 0 5px; }
-.mod-row:not(.gem-row) .match-tag { grid-column: 2 / -1; width: auto; text-align: left; margin-top: -2px; }
+.mod-row .match-tag { grid-column: 2 / -1; width: auto; text-align: left; margin-top: -2px; }
 @container (min-width: 760px) {
-  .mod-head, .mod-row:not(.gem-row) { grid-template-columns: 26px minmax(0, 1fr) 128px 220px; }
+  .mod-head, .mod-row { grid-template-columns: 26px minmax(0, 1fr) 128px 220px; }
   .mh-stat { display: block; }
-  .mod-row:not(.gem-row) .match-tag { grid-column: auto; text-align: right; margin-top: 0; }
+  .mod-row .match-tag { grid-column: auto; text-align: right; margin-top: 0; }
 }
 .mod-text .badge { margin-left: 6px; }
 .mod-row .sort-btn:not(.active) { opacity: 0; }
@@ -189,7 +189,6 @@ body.has-build #input-panel { display: none; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .match-tag.no-match { color: var(--danger); }
-@media (max-width: 860px) { .gem-row .match-tag { width: 150px; } }
 
 .card-opts {
   display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
@@ -355,5 +354,4 @@ body.compact .listing { padding: 6px; margin-bottom: 5px; }
 
 @media (max-width: 640px) {
   .btns { margin-left: 0; width: 100%; }
-  .gem-row .match-tag { display: none; }
 }

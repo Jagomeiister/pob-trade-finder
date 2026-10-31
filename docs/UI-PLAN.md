@@ -13,8 +13,8 @@ Changes from the plan below:
   running state (⏹ Stop live).
 - **Trade stat** sits under the mod text unless the card is at least 760px wide (a
   container query). A fixed column squeezed the mod text at common window widths.
-- **Gems** keeps its existing layout. The slot-list version (§5.2) is deferred until after
-  league start.
+- **Gems** got its slot-list layout after v2.0.0 shipped: link groups on the left, with
+  the main skill marked ★ and opened first, and the selected group's gem table on the right.
 - The desktop window now opens at **1280×900** (it was 1060 wide). Between 1001 and 1180px
   the sidebar becomes a 64px icon rail, and **☰** opens the build card as a flyout.
 - **POESESSID** moved from the compare pop-up to Settings → Account.

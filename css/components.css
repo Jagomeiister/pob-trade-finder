@@ -308,42 +308,39 @@ body.cb-sockets .sock-B::after { content: 'B'; }
 body.cb-sockets .sock-W::after { content: 'W'; color: var(--on-sock-light); text-shadow: none; }
 body.cb-sockets .sock-A::after { content: 'A'; }
 
-/* ---- gems ---- */
-.gem-row { gap: 8px; }
+/* ---- gems page: summary bar, link-group list, gem table ---- */
+.gems-summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 14px;
+  background: var(--s1); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.gems-count { color: var(--text-2); font-size: var(--fs-sm); }
+.gems-total { color: var(--price); font-weight: 700; font-variant-numeric: tabular-nums; }
+.gems-layout { display: grid; }
+.gem-head, .gem-row {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) 128px 112px auto; column-gap: 10px; align-items: center;
+}
+.gem-head {
+  padding: 6px 0 4px; border-bottom: 1px solid var(--border); color: var(--text-3);
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+.gem-head .num { text-align: right; }
+.gem-row { min-height: 42px; padding: 5px 0; border-bottom: 1px dotted var(--border); }
 .gem-name { color: var(--gem); }
-.gem-name.vaal, .gem-panel-name.vaal { color: var(--danger); }
-.gem-count { color: var(--text-3); font-weight: 400; }
-.gem-group-head {
-  margin: 10px -6px 2px; padding: 5px 8px; border-radius: var(--r-sm);
-  background: var(--s2); color: var(--accent); font-size: var(--fs-sm); font-weight: 600;
-}
-.gem-group-head:first-child { margin-top: 2px; }
-.gem-gear-head {
-  display: flex; align-items: center; gap: 10px;
-  margin: 16px -14px 6px; padding: 7px 14px;
-  background: linear-gradient(90deg, var(--s2), transparent);
-  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-}
-.gem-gear-head:first-child { margin-top: 0; border-top: none; }
-.gem-gear-name {
-  color: var(--accent); font-size: var(--fs-xs); font-weight: 700;
-  text-transform: uppercase; letter-spacing: 1.6px;
-}
-.gem-panel { margin: 2px 0 8px; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-.gem-panel.hidden { display: none; }
-.gem-panel-btns { padding: 8px 12px; background: var(--s2); justify-content: flex-end; display: flex; gap: 8px; }
-.gem-panel-head {
-  display: flex; align-items: center; gap: 14px;
-  padding: 12px 14px; border-bottom: 1px solid var(--border);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--gem) 10%, var(--s2)), var(--s2) 60%);
-}
-.gem-panel-name { color: var(--gem); font-size: var(--fs-lg); font-weight: 600; font-variant: small-caps; letter-spacing: .4px; }
-.gem-panel-sub { color: var(--text-2); font-size: var(--fs-xs); }
+.gem-name.vaal { color: var(--danger); }
+.gem-row .gem-name .badge { margin-left: 6px; }
+.gem-lq { display: inline-flex; align-items: center; gap: 4px; }
+.gem-sep { color: var(--text-3); }
+.gem-in { width: 52px !important; }
+.gem-price { color: var(--price); font-size: var(--fs-sm); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.gem-price .badge { margin-left: 0; }
 .gem-icon { width: 30px; height: 30px; object-fit: contain; flex: none; filter: drop-shadow(0 0 2px var(--shadow)); }
-.gem-big-icon { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gem) 35%, transparent)); }
-/* multi-frame atlas art: crop to the first frame until the real render arrives */
-.gem-icon.atlas2, .gem-big-icon.atlas2 { object-fit: cover; object-position: 0 50%; }
-.gem-icon.pending, .gem-big-icon.pending { background: var(--s3); border-radius: var(--r-sm); }
+.gem-icon.atlas2, .slot-ic.atlas2, .gem-head-icon.atlas2 { object-fit: cover; object-position: 0 50%; }
+.gem-icon.pending { background: var(--s3); border-radius: var(--r-sm); }
+.card-title .gem-head-icon { width: 44px; height: 44px; object-fit: contain; }
+.gem-panel { margin: 4px 0 10px; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.gem-panel.hidden { display: none; }
+.gem-panel-btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--s2); }
+.gem-panel-sub { color: var(--text-2); font-size: var(--fs-xs); }
 .gem-exp { display: flex; align-items: center; gap: 8px; margin: 3px 0 5px; }
 .gem-exp-bar {
   width: 140px; height: 6px; border-radius: 3px; background: var(--s3);
@@ -351,8 +348,13 @@ body.cb-sockets .sock-A::after { content: 'A'; }
 }
 .gem-exp-fill { height: 100%; background: var(--gem); }
 .gem-exp-label { color: var(--text-3); font-size: var(--fs-xs); }
-.gem-in { width: 48px !important; }
-.gem-price { color: var(--price); font-size: var(--fs-xs); min-width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+/* narrow detail pane: level/quality and price drop under the gem name */
+@container (max-width: 520px) {
+  .gem-head { display: none; }
+  .gem-row { grid-template-columns: 32px minmax(0, 1fr) auto; row-gap: 4px; }
+  .gem-row .gem-lq, .gem-row .gem-price { grid-column: 2; text-align: left; }
+  .gem-row .row-acts { grid-row: 1; grid-column: 3; }
+}
 
 /* ---- fields (UI.field): inline label + control ---- */
 .field {

@@ -183,9 +183,13 @@ main button for the way that listing is bought. Everything else is under **⋯**
 ## 5b. Gems and pasted items
 
 - Abyssal-socket jewels live under **Jewels & clusters**
-- **Gems** — every skill gem in the build (active skill set, deduped with ×N counts).
-  Each row has editable min level/quality, a search link, and a price; **Price all gems**
-  totals the whole setup ("Gems ≈ 3.2 div")
+- **Gems** — every skill gem in the build (active skill set, deduped with ×N counts),
+  laid out like the gear pages: **link groups** on the left (gear piece, gem count, and
+  their total once priced; your main skill's group is marked ★ and opens first), the
+  selected group's gems on the right. Each gem has editable min level/quality, the
+  cheapest price, **↗** to open its search, and **▾** for full listings, live search and
+  pinning. **Price this group** / **Price all gems** fill in the prices and totals
+  ("Gems ≈ 3.2 div"); **Open searches ↗** opens a group's (or every) gem search
 - **Paste an in-game item** — Ctrl+C any item in the client and paste it into the build
   box (Switch build → paste): it opens on a **Pasted item** page with all its mods
   matched, ready to price-check, sell-price, or compare against your character. The
