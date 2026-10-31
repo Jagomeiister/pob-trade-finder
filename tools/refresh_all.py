@@ -31,6 +31,7 @@ STEPS = [
     ["node", "test/test_contrast.js"],
     [sys.executable, "test/test_price_hotkey.py"],
     [sys.executable, "test/test_timeless.py"],
+    [sys.executable, "test/test_gui_windows.py"],
 ]
 
 
