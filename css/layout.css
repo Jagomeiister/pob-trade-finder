@@ -3,8 +3,8 @@
 /* ---- shell ---- */
 .app-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100vh; }
 body.has-build .app-shell { grid-template-columns: 240px minmax(0, 1fr); }
-.main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; }
-body:not(.has-build) .main { max-width: 860px; padding-top: 28px; }
+.app-main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; }
+body:not(.has-build) .app-main { max-width: 860px; padding-top: 28px; }
 .ctrl-spacer { flex: 1; }
 
 /* ---- sidebar ---- */
@@ -248,7 +248,7 @@ body:not(.gui) #char-bar { display: none !important; }
 /* ---- in-game price-check overlay (index.html?overlay=1) ---- */
 #overlay-bar { display: none; }
 body.overlay { min-height: 0; }
-body.overlay .main { padding: 8px 10px 12px; max-width: none; }
+body.overlay .app-main { padding: 8px 10px 12px; max-width: none; }
 body.overlay .sidebar, body.overlay .topbar, body.overlay #settings-panel, body.overlay #update-banner,
 body.overlay #input-panel, body.overlay .view-panel, body.overlay .footer,
 body.overlay #results > :not(.tab-section[data-tab="pasted"]) { display: none !important; }

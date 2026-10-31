@@ -58,5 +58,5 @@ body.reduce-motion .btn:active { transform: none; }
 body.reduce-motion * { scroll-behavior: auto !important; }
 
 @media (max-width: 640px) {
-  .main { padding-left: 12px; padding-right: 12px; }
+  .app-main { padding-left: 12px; padding-right: 12px; }
 }
