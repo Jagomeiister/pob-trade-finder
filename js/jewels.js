@@ -224,6 +224,25 @@
     'Elegant Hubris': ['cadiro', 'victario', 'caspiro', 'chitus'],
     'Heroic Tragedy': ['vorana', 'uhtred', 'medved']
   };
+  // the keystone each conqueror's version of the jewel grants (PoB unique data);
+  // the fourth conqueror of each jewel is a legacy pre-3.11 variant
+  var KEYSTONES = {
+    doryani: 'Corrupted Soul', xibaqua: 'Divine Flesh', ahuana: 'Immortal Ambition', zerphi: 'Eternal Youth (legacy)',
+    kaom: 'Strength of Blood', rakiata: 'Tempered by War', akoya: 'Chainbreaker', kiloava: 'Glancing Blows (legacy)',
+    asenath: 'Dance with Death', nasima: 'Second Sight', balbala: 'The Traitor', deshret: 'Wind Dancer (legacy)',
+    avarius: 'Power of Purpose', dominus: 'Inner Conviction', maxarius: 'Transcendence', venarius: 'The Agnostic (legacy)',
+    cadiro: 'Supreme Decadence', victario: 'Supreme Grandstanding', caspiro: 'Supreme Ostentation', chitus: 'Supreme Ego (legacy)',
+    vorana: 'Black Scythe Training', uhtred: 'Celestial Mathematics', medved: 'The Unbreaking Circle'
+  };
+  // PoB's TimelessData conquerorTypeId: 1 = Any, then these in order (per jewel type id)
+  var POB_CONQUERORS = { 1: ['doryani', 'xibaqua', 'ahuana'], 2: ['kaom', 'rakiata', 'akoya'],
+                         3: ['asenath', 'nasima', 'balbala'], 4: ['avarius', 'dominus', 'maxarius'],
+                         5: ['cadiro', 'victario', 'caspiro'], 6: ['vorana', 'uhtred', 'medved'] };
+  function pobConqueror(jewelTypeId, conquerorTypeId) {
+    var list = POB_CONQUERORS[jewelTypeId];
+    return list && conquerorTypeId > 1 ? list[conquerorTypeId - 2] || '' : '';
+  }
+
   // trade 'query too complex' budget: 20 filters anonymously, 40 logged in (measured)
   var MAX_TIMELESS_FILTERS = 40, MAX_TIMELESS_FILTERS_ANON = 20;
 
@@ -325,6 +344,7 @@
   return { features: features, profile: profile, scoreText: scoreText, rankMods: rankMods,
            weightedQuery: weightedQuery, countQuery: countQuery, weightFor: weightFor, maxScore: maxScore,
            timelessQuery: timelessQuery, parseSeeds: parseSeeds, socketReport: socketReport, fuzzyScore: fuzzyScore,
+           KEYSTONES: KEYSTONES, pobConqueror: pobConqueror,
            TIMELESS: TIMELESS, MAX_TIMELESS_FILTERS: MAX_TIMELESS_FILTERS,
            MAX_TIMELESS_FILTERS_ANON: MAX_TIMELESS_FILTERS_ANON, QUALIFIERS: QUALIFIERS, EFFECTS: EFFECTS };
 });

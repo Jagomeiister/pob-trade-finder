@@ -42,34 +42,103 @@ class TimelessData:
         return self._d
 
     # -- lookup tables ------------------------------------------------------------
+    def _fetch_part(self, info, jname):
+        """One downloaded file, cached and sha256-checked."""
+        path = os.path.join(self.cache_dir, info["file"])
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                blob = f.read()
+            if hashlib.sha256(blob).hexdigest() == info["sha256"]:
+                return blob
+        if not info["url"].startswith(LUT_URL_PREFIX):
+            raise RuntimeError("refusing to download timeless data from " + info["url"])
+        req = urllib.request.Request(info["url"], headers={"User-Agent": self.ua})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            blob = r.read()
+        if hashlib.sha256(blob).hexdigest() != info["sha256"]:
+            raise RuntimeError("timeless data for %s failed its checksum" % jname)
+        os.makedirs(self.cache_dir, exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(blob)
+        os.replace(tmp, path)
+        return blob
+
     def lut(self, jtype):
         jtype = str(jtype)
         with self._lock:
             if jtype in self._luts:
                 return self._luts[jtype]
-            info = self.d["jewels"][jtype]["lut"]
-            path = os.path.join(self.cache_dir, info["file"])
-            blob = None
-            if os.path.exists(path):
-                with open(path, "rb") as f:
-                    blob = f.read()
-                if hashlib.sha256(blob).hexdigest() != info["sha256"]:
-                    blob = None  # stale or corrupt — fetch again
-            if blob is None:
-                if not info["url"].startswith(LUT_URL_PREFIX):
-                    raise RuntimeError("refusing to download timeless data from " + info["url"])
-                req = urllib.request.Request(info["url"], headers={"User-Agent": self.ua})
-                with urllib.request.urlopen(req, timeout=120) as r:
-                    blob = r.read()
-                if hashlib.sha256(blob).hexdigest() != info["sha256"]:
-                    raise RuntimeError("timeless data for %s failed its checksum" % self.d["jewels"][jtype]["name"])
-                os.makedirs(self.cache_dir, exist_ok=True)
-                tmp = path + ".tmp"
-                with open(tmp, "wb") as f:
-                    f.write(blob)
-                os.replace(tmp, path)
+            j = self.d["jewels"][jtype]
+            parts = j["lut"].get("parts") or [j["lut"]]  # Glorious Vanity ships in 5 parts
+            blob = b"".join(self._fetch_part(p, j["name"]) for p in parts)
             self._luts[jtype] = zlib.decompress(blob)
             return self._luts[jtype]
+
+    # -- Glorious Vanity: variable-length entries ---------------------------------
+    # Layout (PoB DataLegionLookUpTableHelper): a sizes block of rows*seeds bytes
+    # (entry length per row/seed), then each row's entries back to back, rows in
+    # index order (row byte counts in gvRowBytes). Notable entries are 3 bytes
+    # (replacement id + rolls) or 6/8 (Might/Legacy of the Vaal: addition ids then
+    # their rolls); small passives are 2 bytes.
+    GV = "1"
+    MIGHT, LEGACY = 76, 77      # legion nodes "Might of the Vaal" / "Legacy of the Vaal"
+    GV_OFFENCE_MAX = 21         # addition ids <= 21 are offensive (decides Might vs Legacy)
+
+    def _gv(self):
+        if getattr(self, "_gv_cache", None) is None:
+            data = self.lut(self.GV)
+            seeds = self.seed_count(self.GV)
+            rows = self.d["gvRows"]
+            start, pos = [], rows * seeds
+            for b in self.d["gvRowBytes"]:
+                start.append(pos)
+                pos += b
+            self._gv_cache = {"data": data, "seeds": seeds, "start": start, "offsets": {}}
+        return self._gv_cache
+
+    def _gv_entry(self, row, s):
+        g = self._gv()
+        offs = g["offsets"].get(row)
+        if offs is None:
+            sizes = g["data"][row * g["seeds"]:(row + 1) * g["seeds"]]
+            offs = [0]
+            for n in sizes:
+                offs.append(offs[-1] + n)
+            g["offsets"][row] = offs
+        a = g["start"][row] + offs[s]
+        return g["data"][a:a + offs[s + 1] - offs[s]]
+
+    def outcomes_at(self, jtype, node_id, s):
+        """What seed offset s does to a notable: [(outcome key, roll or None), ...]
+        — one entry for most jewels; Might/Legacy of the Vaal adds its additions."""
+        jtype = str(jtype)
+        if jtype != self.GV:
+            o = self.outcome(jtype, node_id, s)
+            return [(o[0] + str(o[1]), None)] if o else []
+        row = self.d["nodeIndex"].get(str(node_id))
+        if row is None:
+            return []
+        e = self._gv_entry(row, s)
+        l2g = self.d["localToGlobal"].get(self.GV, {})
+        n_add = self.d["additionsCount"]
+        if len(e) in (2, 3):
+            rid = l2g.get(str(e[0]), e[0])
+            if rid < n_add:
+                return []
+            rolls = list(e[1:])
+            return [("n%d" % (rid - n_add), rolls[0] if len(rolls) == 1 else rolls)]
+        if len(e) in (6, 8):
+            half = len(e) // 2
+            ids = [l2g.get(str(x), x) for x in e[:half]]
+            bias = sum(1 if i <= self.GV_OFFENCE_MAX else -1 for i in ids)
+            out = [("n%d" % (self.MIGHT if bias >= 0 else self.LEGACY), None)]
+            summed = {}
+            for i, roll in zip(ids, e[half:]):
+                summed[i] = summed.get(i, 0) + roll
+            out.extend(("a%d" % i, v) for i, v in summed.items())
+            return out
+        return []
 
     def seed_count(self, jtype):
         j = self.d["jewels"][str(jtype)]
@@ -126,11 +195,11 @@ class TimelessData:
             if row is None or row >= self.d["sizeNotable"]:
                 continue
             for s in range(seeds):
-                o = self.outcome(jtype, nid, s)
-                if o:
-                    key = o[0] + str(o[1])
+                for key, _ in self.outcomes_at(jtype, nid, s):
                     counts[key] = counts.get(key, 0) + 1
-        total = sum(counts.values()) or 1
+        # share = how often a notable gets this, so Might/Legacy additions don't inflate
+        total = sum(c for k, c in counts.items()
+                    if not (jtype == self.GV and k[0] == "a")) or 1
         outcomes = []
         for key, c in sorted(counts.items(), key=lambda kv: -kv[1]):
             o = self.describe(key)
@@ -159,10 +228,20 @@ class TimelessData:
         for n, k in self.in_radius(socket_id):
             if k != 1 or not (include_unallocated or n in alloc):
                 continue
-            o = self.outcome(jtype, n, s)
-            if o:
-                out.append({"node": n, "key": o[0] + str(o[1])})
+            entry = self._notable_entry(jtype, n, s, None)
+            if entry:
+                out.append(entry)
         return {"seed": int(seed), "notables": out}
+
+    def _notable_entry(self, jtype, node, s, weights):
+        """{node, key (primary), keys, rolls, weight} for display."""
+        got = self.outcomes_at(jtype, node, s)
+        if not got:
+            return None
+        weights = weights or {}
+        return {"node": node, "key": got[0][0], "keys": [k for k, _ in got],
+                "rolls": {k: r for k, r in got if r is not None},
+                "weight": sum(weights.get(k, 0) for k, _ in got)}
 
     def _byte_key(self, key):
         kind, idx = key[0], int(key[1:])
@@ -199,32 +278,53 @@ class TimelessData:
                 continue
             if v > 0:
                 need[self._byte_key(k)] = v
-        offsets = [r * seeds for _, r in rows]
         scored = []
-        for s in range(seeds):
-            score = 0.0
-            counts = {}
-            for off in offsets:
-                b = data[off + s]
-                b = l2g.get(b, b)
-                score += w.get(b, 0.0)
-                if b in need:
-                    counts[b] = counts.get(b, 0) + 1
-            if any(counts.get(b, 0) < n for b, n in need.items()):
-                continue
-            if score > 0 or (need and score >= 0):
-                scored.append((score, s))
+        if jtype == self.GV:
+            # variable-length entries: decode per (seed, notable); keys are strings
+            wk = {k: float(v) for k, v in (weights or {}).items() if v}
+            nk = {k: int(v) for k, v in (mins or {}).items() if int(v or 0) > 0}
+            for s in range(seeds):
+                score, counts = 0.0, {}
+                for n, _ in rows:
+                    for key, _ in self.outcomes_at(jtype, n, s):
+                        score += wk.get(key, 0.0)
+                        if key in nk:
+                            counts[key] = counts.get(key, 0) + 1
+                if any(counts.get(k, 0) < v for k, v in nk.items()):
+                    continue
+                if score > 0 or (nk and score >= 0):
+                    scored.append((score, s))
+        else:
+            offsets = [r * seeds for _, r in rows]
+            for s in range(seeds):
+                score = 0.0
+                counts = {}
+                for off in offsets:
+                    b = data[off + s]
+                    b = l2g.get(b, b)
+                    score += w.get(b, 0.0)
+                    if b in need:
+                        counts[b] = counts.get(b, 0) + 1
+                if any(counts.get(b, 0) < n for b, n in need.items()):
+                    continue
+                if score > 0 or (need and score >= 0):
+                    scored.append((score, s))
         scored.sort(key=lambda t: (-t[0], t[1]))
         j = self.d["jewels"][jtype]
         out = []
         for score, s in scored[:top]:
             seed = (j["seedMin"] + s) * j["seedStep"]
-            per, counts = [], {}
+            per, counts, totals = [], {}, {}
             for n, _ in rows:
-                o = self.outcome(jtype, n, s)
-                if o:
-                    key = o[0] + str(o[1])
-                    counts[key] = counts.get(key, 0) + 1
-                    per.append({"node": n, "key": key, "weight": (weights or {}).get(key, 0)})
-            out.append({"seed": seed, "score": round(score, 3), "notables": per, "counts": counts})
+                entry = self._notable_entry(jtype, n, s, weights)
+                if not entry:
+                    continue
+                per.append(entry)
+                for k in entry["keys"]:
+                    counts[k] = counts.get(k, 0) + 1
+                    r = entry["rolls"].get(k)
+                    if isinstance(r, (int, float)):
+                        totals[k] = totals.get(k, 0) + r
+            out.append({"seed": seed, "score": round(score, 3), "notables": per, "counts": counts,
+                        "rollTotals": totals})
         return {"results": out, "considered": [n for n, _ in rows], "matches": len(scored)}

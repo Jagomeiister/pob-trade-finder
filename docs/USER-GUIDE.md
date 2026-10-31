@@ -164,44 +164,55 @@ Details:
 ## 5d. ⏳ Timeless jewels
 
 Finds the timeless jewel seed that does the most for the notables around one of
-your sockets, then prices it.
+your sockets, then prices it. All six are supported: Glorious Vanity, Lethal Pride,
+Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy.
 
-1. Load your build and open the **⏳ Timeless jewels** tab.
-2. Pick a **jewel**: Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris or
-   Heroic Tragedy. Glorious Vanity isn't supported yet.
-3. Pick a **socket**. Your allocated sockets are listed, with the ones covering most of
-   your notables first. The summary shows how many notables, small passives and
-   keystones sit in the jewel's radius, and what the jewel does to small passives.
-4. The outcome table lists everything the seed can do to a notable on this jewel, for
-   example *Add Global Crit Chance* or *Becomes Supreme Ego*, with how often each one
-   comes up. Outcomes that suit your build are pre-ticked with a value. Untick or
-   adjust anything.
+**It starts from your build.** If your build link has a timeless jewel socketed, the
+tab opens on that jewel, its socket (marked ★ and listed first), its **conqueror** and
+its seed. A line at the top shows what your current seed does to each notable, e.g.
+*Mystic Bulwark → Add Flask Charges*. Builds whose author filled in Path of Building's
+own *Find Timeless Jewel* search are imported too: their outcome weights are ticked for
+you ("✔ Imported … from this build's Path of Building timeless search").
+
+1. **Jewel**, **Conqueror** and **Socket**. The conqueror only changes the keystone
+   (listed next to each one, e.g. *Balbala — The Traitor*); the seed decides the
+   notables. The summary shows the notables, small passives and keystones in radius,
+   and what small passives always get.
+2. The outcome table lists **every possible outcome across all seeds**, not what your
+   current jewel does, with how often each comes up. Nothing is ticked unless it was
+   imported. Type in the **search box** (fuzzy: "flask", "crit multi", "minon dmg"), tick
+   what you want, or press **✨ Suggest for my build** to tick what your tree and main
+   skill scale. **Clear** unticks everything.
    - **Need ×** sets a hard minimum: *Minion Damage ×2* plus *Aura Effect ×1* keeps only
-     seeds that give at least two of your notables Minion Damage **and** at least one Aura
-     Effect.
+     seeds that give at least two of your notables Minion Damage **and** at least one
+     Aura Effect.
    - Drag a value slider **left of zero to avoid** an outcome, for example a replacement
      that would wipe a notable you rely on.
-5. **Find best seeds** checks every seed and ranks them by the total value of what they
-   do to your notables. Each result leads with totals such as *Minion Damage ×3 (60%) ·
-   Aura Effect ×1 (8%)*; open *per notable* to see exactly what each notable becomes.
+3. **Find best seeds** checks every seed and ranks them by the total value of what they
+   do to your notables. Each result leads with totals such as *Minion Damage ×3 (60%)*;
+   open *per notable* to see exactly what each notable becomes.
+4. **Price** a seed, or **Price the top seeds**. With a conqueror chosen it searches that
+   conqueror only (20 seeds per search, 30 with a saved POESESSID); with *any* it
+   searches all four (5 seeds, or 10 with a POESESSID).
 
-Already have a timeless jewel in your build? Its card has **⏳ Find seeds for this
-socket**. That opens this finder on the jewel's socket and shows what your current seed
-does there, so you can compare it with the best alternatives.
-6. **Price** a single seed, or **Price the top seeds**. This searches every conqueror,
-   because the conqueror only changes the keystone. Without a saved POESESSID the trade
-   site allows 5 seeds per check; with one, 10.
+**Glorious Vanity** works a little differently. A notable either becomes a specific
+Vaal notable, shown with its rolls (e.g. *Ritual of Flesh [8/27]*), or becomes **Might /
+Legacy of the Vaal**, a bundle of stacked additions with their rolls (e.g. *Might of the
+Vaal: Fire Damage 11, Spell Damage 10*). You can tick and require (Need ×) individual
+additions, and result totals add up the rolls. Its small passives also change, but only
+notables are counted here. The first use downloads its ~22 MB table.
 
 Tick **Also count unallocated notables** to see seeds that would make pathing to an
 untaken notable worthwhile.
 
 The outcome data comes from Path of Building's timeless jewel tables. The first use of
-each jewel downloads them (about 2 MB) from PoB's repository and checks them against a
-stored checksum. To cross-check a seed, socket that jewel and seed into the same
-socket in PoB and compare the notables.
+each jewel downloads them (about 2 MB; Glorious Vanity ~22 MB) from PoB's repository
+and checks them against a stored checksum. Checked against PoB itself: Brutal Restraint
+2582 gives Mystic Bulwark *10% increased Flask Charges gained*, exactly as PoB shows.
 
 Already know your seeds? Expand **Price seeds you already have** at the bottom of the
-tab and paste them.
+tab and paste them. A timeless jewel's card in the build also has **⏳ Find seeds for
+this socket**, which opens this finder on that jewel's socket.
 
 ## 5e. 💎 Jewel finder (rare and abyss jewels)
 

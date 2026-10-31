@@ -359,6 +359,27 @@
       }
     }
 
+    // PoB's own "Find Timeless Jewel" settings, if the build author filled them in:
+    // searchList lines are "<legion passive id>, <weight1>, <weight2>, <minimum>"
+    out.timelessSearch = null;
+    var td = xml.match(/<TimelessData\b([^>]*)\/?>/);
+    if (td) {
+      var parseList = function (s) {
+        return (s || '').split(/\r?\n/).map(function (line) {
+          var f = line.split(/[,\s]+/).filter(Boolean);
+          return f.length ? { id: f[0], weight1: parseFloat(f[1]) || 0, weight2: parseFloat(f[2]) || 0,
+                              minimum: parseFloat(f[3]) || 0 } : null;
+        }).filter(Boolean);
+      };
+      out.timelessSearch = {
+        jewelTypeId: parseInt(attr(td[1], 'jewelTypeId') || '0', 10) || null,
+        conquerorTypeId: parseInt(attr(td[1], 'conquerorTypeId') || '0', 10) || null,
+        socketId: parseInt(attr(td[1], 'jewelSocketId') || '0', 10) || null,
+        searchList: parseList(attr(td[1], 'searchList')),
+        searchListFallback: parseList(attr(td[1], 'searchListFallback'))
+      };
+    }
+
     // Passive tree (active spec): allocated nodes, chosen masteries, jewel sockets
     out.tree = { nodes: [], masteries: [], sockets: [], version: '' };
     var treeTag = xml.match(/<Tree\b([^>]*)>([\s\S]*?)<\/Tree>/);

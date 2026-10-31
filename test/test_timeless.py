@@ -94,11 +94,47 @@ r = T.search(5, 61419, alloc, {key: 1}, top=3)["results"]
 check("hubris: seeds are multiples of 20 in range", all(x["seed"] % 20 == 0 and 2000 <= x["seed"] <= 160000 for x in r),
       [x["seed"] for x in r])
 
+# Glorious Vanity: variable-length table
+gv = T.lut("1")
+d = T.d
+gv_seeds = T.seed_count("1")
+check("GV: table = sizes block + every row's bytes",
+      len(gv) == d["gvRows"] * gv_seeds + sum(d["gvRowBytes"]), len(gv))
+row0 = [gv[i] for i in range(0, gv_seeds)]
+check("GV: row 0 seed lengths sum to its declared size", sum(row0) == d["gvRowBytes"][0])
+lens = set(gv[r * gv_seeds + s] for r in range(0, d["sizeNotable"], 37) for s in range(0, gv_seeds, 53))
+check("GV: notable entries are 3 (replace) or 6/8 (Might/Legacy) bytes", lens <= {3, 6, 8}, sorted(lens))
+gv_inf = T.info(1, 61419, [])
+check("GV: every outcome is a Vaal passive", all(o["id"].startswith("vaal_") for o in gv_inf["outcomes"]),
+      [o["id"] for o in gv_inf["outcomes"] if not o["id"].startswith("vaal_")][:3])
+names = {o["dn"] for o in gv_inf["outcomes"]}
+check("GV: Might and Legacy of the Vaal both appear", {"Might of the Vaal", "Legacy of the Vaal"} <= names)
+gv_alloc = [n["id"] for n in gv_inf["notables"]]
+# Might/Legacy entries: bias rule decides which, additions carry rolls
+found = None
+for s in range(gv_seeds):
+    got = T.outcomes_at(1, gv_alloc[0], s)
+    if len(got) > 1:
+        found = got
+        break
+check("GV: Might/Legacy entry lists its additions with rolls",
+      found and found[0][0] in ("n76", "n77") and all(k.startswith("a") and v > 0 for k, v in found[1:]), found)
+gv_need = T.search(1, 61419, gv_alloc[:3], {"n76": 1}, mins={"n76": 2}, top=20)
+brute = sum(1 for s in range(gv_seeds)
+            if sum(1 for n in gv_alloc[:3] if any(k == "n76" for k, _ in T.outcomes_at(1, n, s))) >= 2)
+check("GV: Need x matches a brute-force count", gv_need["matches"] == brute, (gv_need["matches"], brute))
+check("GV: results carry roll totals for additions",
+      any(x["rollTotals"] for x in T.search(1, 61419, gv_alloc, {"n76": 1}, top=3)["results"]))
+
 # downloads are pinned to PoB's repo and checksummed
 for jt in FAMILY:
     info = T.d["jewels"][jt]["lut"]
     check(T.d["jewels"][jt]["name"] + ": pinned PoB URL + sha256",
           info["url"].startswith(timeless.LUT_URL_PREFIX) and T.d["source"]["commit"] in info["url"] and len(info["sha256"]) == 64)
+gv_parts = T.d["jewels"]["1"]["lut"]["parts"]
+check("Glorious Vanity: all 5 parts pinned + sha256",
+      len(gv_parts) == 5 and all(p["url"].startswith(timeless.LUT_URL_PREFIX) and T.d["source"]["commit"] in p["url"]
+                                 and len(p["sha256"]) == 64 for p in gv_parts))
 
 print("\n%d FAILED" % failures if failures else "\nALL TESTS PASSED")
 sys.exit(1 if failures else 0)

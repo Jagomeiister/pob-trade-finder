@@ -35,6 +35,7 @@ UA = "Mozilla/5.0 PoB-Trade-Finder/1.0"
 REPO = "PathOfBuildingCommunity/PathOfBuilding"
 PINNED_COMMIT = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 ADDITIONS = 337  # PoB data.timelessJewelAdditions
+GV_PARTS = 5     # GloriousVanity.zip.part0..4
 TIMELESS_RADIUS = 1800  # "Large" on 3.16+ trees
 
 # PoB jewel type ids; Glorious Vanity (1) uses a different, 22 MB variable-length LUT
@@ -121,13 +122,18 @@ def lua_return_table(text):
 
 
 def parse_node_index(text):
-    index, l2g = {}, {}
+    """-> (node id -> LUT row, row count with notables, local->global ids,
+    total row count, per-row byte size of Glorious Vanity node data in row order)"""
+    index, l2g, gv_sizes = {}, {}, {}
     size_notable = int(re.search(r'nodeIDList\["sizeNotable"\]\s*=\s*(\d+)', text).group(1))
-    for m in re.finditer(r"nodeIDList\[(\d+)\]\s*=\s*\{\s*index\s*=\s*(\d+)", text):
+    size_all = int(re.search(r'nodeIDList\["size"\]\s*=\s*(\d+)', text).group(1))
+    for m in re.finditer(r"nodeIDList\[(\d+)\]\s*=\s*\{\s*index\s*=\s*(\d+)(?:,\s*size\s*=\s*(\d+))?", text):
         index[m.group(1)] = int(m.group(2))
+        if m.group(3):
+            gv_sizes[int(m.group(2))] = int(m.group(3))
     for m in re.finditer(r'nodeIDList\["localIdToGlobalId"\]\[(\d+)\]\[(\d+)\]\s*=\s*(\d+)', text):
         l2g.setdefault(m.group(1), {})[m.group(2)] = int(m.group(3))
-    return index, size_notable, l2g
+    return index, size_notable, l2g, size_all, [gv_sizes[i] for i in range(size_all)]
 
 
 def geometry(tree):
@@ -176,7 +182,7 @@ def main():
     raw = "https://raw.githubusercontent.com/%s/%s/src/Data/TimelessJewelData/" % (REPO, commit)
 
     legion = lua_return_table(get(raw + "LegionPassives.lua").decode("utf-8"))
-    index, size_notable, l2g = parse_node_index(get(raw + "NodeIndexMapping.lua").decode("utf-8"))
+    index, size_notable, l2g, size_all, gv_row_bytes = parse_node_index(get(raw + "NodeIndexMapping.lua").decode("utf-8"))
     with open(os.path.join(DATA, "tree.min.json"), "r", encoding="utf-8") as f:
         tree = json.load(f)  # cached by tools/make_jeweldata.py
 
@@ -191,6 +197,18 @@ def main():
         }
         print("  %-16s %7d KB  sha256 %s" % (j["name"], len(blob) // 1024, jewels[str(t)]["lut"]["sha256"][:16]))
 
+    # Glorious Vanity: a variable-length table split into numbered parts
+    parts = []
+    for i in range(GV_PARTS):
+        name = "GloriousVanity.zip.part%d" % i
+        blob = get(raw + name)
+        parts.append({"file": name, "sha256": hashlib.sha256(blob).hexdigest(), "size": len(blob), "url": raw + name})
+    jewels["1"] = {"name": "Glorious Vanity", "seedMin": 100, "seedMax": 8000, "seedStep": 1,
+                   "conquerors": ["doryani", "xibaqua", "ahuana", "zerphi"],
+                   "small": "replaced by Vaal small passives (not counted here)",
+                   "lut": {"parts": parts}}
+    print("  %-16s %7d KB  in %d parts" % ("Glorious Vanity", sum(p["size"] for p in parts) // 1024, len(parts)))
+
     def slim(e):
         return {"id": e.get("id", ""), "dn": e.get("dn", ""), "sd": e.get("sd") or [], "ks": bool(e.get("ks"))}
 
@@ -202,6 +220,7 @@ def main():
         "additions": [slim(e) for e in legion["additions"]],
         "nodes": [slim(e) for e in legion["nodes"]],
         "nodeIndex": index, "sizeNotable": size_notable, "localToGlobal": l2g,
+        "gvRows": size_all, "gvRowBytes": gv_row_bytes,
         "geometry": geometry(tree), "treeVersion": tree.get("tree", ""),
     }
     assert len(out["additions"]) == ADDITIONS, "PoB changed the additions count: %d" % len(out["additions"])

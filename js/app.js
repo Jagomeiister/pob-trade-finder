@@ -1289,10 +1289,13 @@
   // Python bridge (timeless.py) reads Path of Building's timeless lookup tables:
   // for a chosen jewel + socket it lists every outcome the seed can give the
   // notables in radius, then ranks all seeds by the outcomes you value.
-  var TIMELESS_TYPES = [[2, 'Lethal Pride'], [3, 'Brutal Restraint'], [4, 'Militant Faith'],
+  var TIMELESS_TYPES = [[1, 'Glorious Vanity'], [2, 'Lethal Pride'], [3, 'Brutal Restraint'], [4, 'Militant Faith'],
                         [5, 'Elegant Hubris'], [6, 'Heroic Tragedy']];
   // seeds per price check: x4 conquerors must fit the trade site's filter budget
-  function timelessPriceSeeds() { return HAS_SESSION ? 10 : 5; }
+  // one conqueror = 1 filter per seed instead of up to 4
+  function timelessPriceSeeds(oneConqueror) {
+    return oneConqueror ? (HAS_SESSION ? 30 : 20) : (HAS_SESSION ? 10 : 5);
+  }
 
   function makeTimelessFinder(b) {
     var wrap = document.createElement('div');
@@ -1345,6 +1348,34 @@
     var ctr = document.createElement('div');
     ctr.className = 'card-opts finder-opts';
     var jewelSel = makeMiniSelect(ctr, 'Jewel', TIMELESS_TYPES.map(function (t) { return t[1]; }), 'Brutal Restraint');
+    // conqueror decides the keystone; the seed decides the notables
+    var conqSel = document.createElement('select');
+    var conqLab = document.createElement('label');
+    conqLab.className = 'toggle';
+    conqLab.title = 'The conqueror only changes the keystone. Pricing searches this conqueror, or all of them with "any".';
+    conqLab.appendChild(document.createTextNode('Conqueror '));
+    conqLab.appendChild(conqSel);
+    ctr.appendChild(conqLab);
+    function fillConquerors(prefer) {
+      var keep = prefer !== undefined ? prefer : conqSel.value;
+      conqSel.textContent = '';
+      ['any'].concat(Jewels.TIMELESS[jewelSel.value] || []).forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c;
+        o.textContent = c === 'any' ? 'any (keystone doesn\'t matter)'
+          : c.charAt(0).toUpperCase() + c.slice(1) + ' — ' + (Jewels.KEYSTONES[c] || '');
+        conqSel.appendChild(o);
+      });
+      conqSel.value = Array.prototype.some.call(conqSel.options, function (o) { return o.value === keep; }) ? keep : 'any';
+    }
+    // default conqueror for the current jewel + socket: your jewel's, else PoB's saved search
+    function defaultConqueror() {
+      var mine = owned.find(function (o) { return String(o.socket) === sockSel.value && o.jewel === jewelSel.value; });
+      if (mine && mine.conqueror) return mine.conqueror;
+      var ts = b.timelessSearch;
+      if (ts && ts.jewelTypeId === jtype()) return Jewels.pobConqueror(ts.jewelTypeId, ts.conquerorTypeId) || 'any';
+      return 'any';
+    }
     var sockSel = document.createElement('select');
     sockets.forEach(function (s) {
       var o = document.createElement('option');
@@ -1370,7 +1401,29 @@
     var summary = document.createElement('div');
     summary.className = 'finder-sub';
     body.appendChild(summary);
+    var importedNote = document.createElement('div');
+    importedNote.className = 'finder-sub';
+    body.appendChild(importedNote);
     var outcomeSearch = makeFinderSearch(body, 'Search outcomes — e.g. "minion", "crit", "flask"', function () { if (info) renderOutcomes(); });
+    var suggestBtn = document.createElement('button');
+    suggestBtn.className = 'copy-btn';
+    suggestBtn.textContent = '✨ Suggest for my build';
+    suggestBtn.title = 'Tick the outcomes that match what your tree and main skill scale (value 50% or more)';
+    suggestBtn.addEventListener('click', function () {
+      if (!info) return;
+      Object.keys(values).forEach(function (k) { if (values[k].value >= 50) values[k].use = true; });
+      renderOutcomes();
+    });
+    var clearBtn = document.createElement('button');
+    clearBtn.className = 'copy-btn';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', function () {
+      if (!info) return;
+      Object.keys(values).forEach(function (k) { values[k].use = false; values[k].need = 0; });
+      renderOutcomes();
+    });
+    outcomeSearch.parentElement.appendChild(suggestBtn);
+    outcomeSearch.parentElement.appendChild(clearBtn);
     var outcomesBox = document.createElement('div');
     body.appendChild(outcomesBox);
     var findBtn = document.createElement('button');
@@ -1386,18 +1439,39 @@
 
     function load() {
       var my = ++seq;
-      summary.textContent = 'Loading ' + jewelSel.value + ' data (the first time downloads ~2 MB from Path of Building)…';
+      summary.textContent = 'Loading ' + jewelSel.value + ' data (the first time downloads ' +
+        (jtype() === 1 ? '~22 MB' : '~2 MB') + ' from Path of Building)…';
       outcomesBox.textContent = '';
       resultsBox.textContent = '';
+      fillConquerors(defaultConqueror());
       window.pywebview.api.timeless_info(jtype(), parseInt(sockSel.value, 10), JSON.stringify(b.tree.nodes)).then(function (r) {
         if (my !== seq) return;
         if (!r || !r.ok) { summary.textContent = '❌ ' + ((r && r.error) || 'failed'); return; }
         info = r;
+        // nothing is picked for you unless the build carries PoB's own timeless search
+        // weights; values are pre-filled from what the build scales, Suggest ticks them
         values = {};
         r.outcomes.forEach(function (o) {
-          var v = Math.round(Jewels.scoreText(P, o.sd.join('\n')) * 100);
-          values[o.key] = { use: v >= 45, value: v };
+          values[o.key] = { use: false, value: Math.round(Jewels.scoreText(P, o.sd.join('\n')) * 100), need: 0 };
         });
+        importedNote.textContent = '';
+        var ts = b.timelessSearch;
+        if (ts && ts.searchList.length && (!ts.jewelTypeId || ts.jewelTypeId === jtype())) {
+          var maxW = Math.max.apply(null, ts.searchList.map(function (x) { return Math.abs(x.weight1) || 0; }).concat([1]));
+          var n = 0;
+          ts.searchList.forEach(function (row) {
+            var o = r.outcomes.find(function (x) { return x.id === row.id; });
+            if (!o) return;
+            values[o.key] = { use: true, value: Math.max(-100, Math.min(100, Math.round(100 * row.weight1 / maxW))),
+                              need: row.minimum > 0 ? 1 : 0 };
+            n++;
+          });
+          if (n) importedNote.textContent = '✔ Imported ' + n + ' outcome weight' + (n > 1 ? 's' : '') +
+            ' from this build\'s Path of Building timeless search.';
+        }
+        if (!importedNote.textContent) {
+          importedNote.textContent = 'Nothing is ticked yet: tick the outcomes you want (search below), or let ✨ Suggest pick from what your build scales.';
+        }
         var allocN = r.notables.filter(function (n) { return n.allocated; }).length;
         var allocS = r.smalls.filter(function (n) { return n.allocated; }).length;
         summary.textContent = r.notables.length + ' notables in radius (' + allocN + ' yours) · ' +
@@ -1427,12 +1501,11 @@
         title.textContent = 'Your jewel (seed ' + r.seed + ') here: ';
         currentBox.appendChild(title);
         r.notables.forEach(function (p, i) {
-          var v = values[p.key];
-          var w = v && v.use ? v.value / 100 : 0;
+          var w = entryWeight(p);
           score += w;
           var span = document.createElement('span');
           span.className = w > 0 ? 'ts-hit' : w < 0 ? 'ts-avoid' : 'ts-miss';
-          span.textContent = nodeName(J, p.node) + ' → ' + outcomeLabel(p.key);
+          span.textContent = nodeName(J, p.node) + ' → ' + entryLabel(p);
           if (i) currentBox.appendChild(document.createTextNode(' · '));
           currentBox.appendChild(span);
         });
@@ -1558,9 +1631,29 @@
 
     // "Minion Damage ×3 (60%)": count, plus the summed value when the outcome is
     // a single fixed number ("Minions deal 20% increased Damage")
-    function outcomeTotal(key, n) {
+    // one notable's result: "Might of the Vaal: Fire Damage 12, Life 3" / "Ritual of Flesh [8/27]"
+    function entryLabel(p) {
+      var keys = p.keys || [p.key];
+      function rollTxt(k) {
+        var r = p.rolls && p.rolls[k];
+        return r === undefined || r === null ? '' : Array.isArray(r) ? ' [' + r.join('/') + ']' : ' ' + r;
+      }
+      var head = outcomeLabel(keys[0]) + rollTxt(keys[0]);
+      return keys.length > 1 ? head + ': ' + keys.slice(1).map(function (k) { return outcomeLabel(k) + rollTxt(k); }).join(', ') : head;
+    }
+    function entryWeight(p) {
+      return (p.keys || [p.key]).reduce(function (s, k) {
+        var v = values[k];
+        return s + (v && v.use ? v.value / 100 : 0);
+      }, 0);
+    }
+
+    function outcomeTotal(key, n, rollTotal) {
       var o = info.outcomes.find(function (x) { return x.key === key; });
       var label = (o ? o.dn.replace(/^Add /, '') : key) + ' ×' + n;
+      if (rollTotal) { // Glorious Vanity rolls: show the summed value
+        return label + ' (+' + rollTotal + (o && /%/.test(o.sd.join(' ')) ? '%' : '') + ')';
+      }
       if (o && o.sd.length === 1) {
         var m = o.sd[0].match(/([+-]?)(\d+(?:\.\d+)?)(%?)/);
         if (m && !/\(\d/.test(o.sd[0])) label += ' (' + m[1] + (Math.round(parseFloat(m[2]) * n * 10) / 10) + m[3] + ')';
@@ -1583,11 +1676,14 @@
       resultsBox.appendChild(head);
       var priceTop = document.createElement('button');
       priceTop.className = 'copy-btn';
-      priceTop.textContent = '💰 Price the top ' + Math.min(timelessPriceSeeds(), r.results.length) + ' seeds';
-      if (!HAS_SESSION) priceTop.title = 'Saving a POESESSID raises the trade site query budget to 10 seeds per check';
+      var oneConq = conqSel.value !== 'any';
+      priceTop.textContent = '💰 Price the top ' + Math.min(timelessPriceSeeds(oneConq), r.results.length) + ' seeds' +
+        (oneConq ? ' (' + conqSel.value.charAt(0).toUpperCase() + conqSel.value.slice(1) + ')' : ' (any conqueror)');
+      if (!HAS_SESSION) priceTop.title = 'Saving a POESESSID raises how many seeds fit in one trade search';
       priceTop.addEventListener('click', function () {
         priced.name = jewelSel.value;
-        priced.seeds = r.results.slice(0, timelessPriceSeeds()).map(function (x) { return x.seed; });
+        priced.conqueror = conqSel.value === 'any' ? '' : conqSel.value;
+        priced.seeds = r.results.slice(0, timelessPriceSeeds(!!priced.conqueror)).map(function (x) { return x.seed; });
         checkPrice(priceState);
       });
       resultsBox.appendChild(priceTop);
@@ -1609,7 +1705,7 @@
           .forEach(function (k, i) {
             var chip = document.createElement('span');
             chip.className = values[k].value < 0 ? 'ts-avoid' : 'ts-hit';
-            chip.textContent = outcomeTotal(k, x.counts[k]);
+            chip.textContent = outcomeTotal(k, x.counts[k], x.rollTotals && x.rollTotals[k]);
             if (i) tot.appendChild(document.createTextNode(' · '));
             tot.appendChild(chip);
           });
@@ -1622,7 +1718,7 @@
         x.notables.forEach(function (p, i) {
           var span = document.createElement('span');
           span.className = p.weight > 0 ? 'ts-hit' : p.weight < 0 ? 'ts-avoid' : 'ts-miss';
-          span.textContent = nodeName(J, p.node) + ' → ' + outcomeLabel(p.key);
+          span.textContent = nodeName(J, p.node) + ' → ' + entryLabel(p);
           if (i) det.appendChild(document.createTextNode(' · '));
           det.appendChild(span);
         });
@@ -1631,9 +1727,11 @@
         var pb = document.createElement('button');
         pb.className = 'copy-btn';
         pb.textContent = 'Price';
-        pb.title = 'Find listings of this ' + jewelSel.value + ' seed (any conqueror)';
+        pb.title = 'Find listings of this ' + jewelSel.value + ' seed (' +
+          (conqSel.value === 'any' ? 'any conqueror' : conqSel.value) + ')';
         pb.addEventListener('click', function () {
           priced.name = jewelSel.value;
+          priced.conqueror = conqSel.value === 'any' ? '' : conqSel.value;
           priced.seeds = [x.seed];
           checkPrice(priceState);
         });
@@ -1651,7 +1749,7 @@
     var priceState = makeFinderState('Timeless jewel', priceBlock, function (quiet) {
       if (!priced.seeds.length) { if (!quiet) alert('Find seeds first, then price them.'); return null; }
       var o = finderOpts(); o.anonymous = !HAS_SESSION;
-      var q = Jewels.timelessQuery(priced.name, priced.seeds, '', o);
+      var q = Jewels.timelessQuery(priced.name, priced.seeds, priced.conqueror || '', o);
       return { query: q.query, sort: q.sort };
     });
 
@@ -1659,6 +1757,10 @@
     if (!timelessPending && owned.length) {
       // open on the build's own timeless jewel: its type, its socket, its seed
       timelessPending = { jewel: owned[0].jewel, socket: owned[0].socket, seed: owned[0].seed };
+    } else if (!timelessPending && b.timelessSearch && b.timelessSearch.jewelTypeId) {
+      // no jewel yet, but the build author set up PoB's timeless search: start there
+      var tsType = TIMELESS_TYPES.find(function (t) { return t[0] === b.timelessSearch.jewelTypeId; });
+      if (tsType) timelessPending = { jewel: tsType[1], socket: b.timelessSearch.socketId || null, seed: null };
     }
     if (timelessPending) { var pend = timelessPending; timelessPending = null; timelessApplyPreset(pend); }
     else load();
@@ -1673,9 +1775,17 @@
       if (!item) return;
       var name = resolveUniqueName(item.name);
       if (!TIMELESS_TYPES.some(function (t) { return t[1] === name; })) return;
-      var seed = null;
-      (item.mods || []).some(function (m) { var x = TIMELESS_SEED_RE.exec(m.line); if (x) seed = parseInt(x[1], 10); return !!x; });
-      if (seed) out.push({ socket: s.nodeId, jewel: name, seed: seed });
+      var seed = null, conq = '';
+      (item.mods || []).some(function (m) {
+        var x = TIMELESS_SEED_RE.exec(m.line);
+        if (!x) return false;
+        seed = parseInt(x[1], 10);
+        // the line ends with the conqueror: "…in the akhara of Balbala"
+        var last = (m.line.match(/(\w+)\s*$/) || [])[1];
+        if (last && (Jewels.TIMELESS[name] || []).indexOf(last.toLowerCase()) !== -1) conq = last.toLowerCase();
+        return true;
+      });
+      if (seed) out.push({ socket: s.nodeId, jewel: name, seed: seed, conqueror: conq });
     });
     return out;
   }
