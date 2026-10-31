@@ -100,6 +100,16 @@ body > .search-settings, body > .char-pop { display: none; }
 .saved-name { display: block; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .saved-meta { display: block; font-size: var(--fs-xs); color: var(--text-3); }
 .saved-build .btn-icon { align-self: center; margin-right: 6px; }
+.saved-build .btn-icon + .btn-icon { margin-left: -4px; }
+.saved-track { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; font-size: var(--fs-xs); color: var(--text-2); }
+.track-form {
+  display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding: 10px 12px;
+  background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.track-form[hidden] { display: none; }
+.track-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.track-row .min-input { width: 80px; }
+.track-form .btn { align-self: flex-start; }
 .how-steps { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0; margin: 24px 0 0; }
 .how-steps li { display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px dashed var(--border-strong); border-radius: var(--r-lg); }
 .how-steps b { color: var(--accent); font-size: var(--fs-sm); }
@@ -267,6 +277,29 @@ body:not(.has-build) .tab-section[data-tab="pasted"] { display: block; margin-to
 .slot-row.bought .slot-name { text-decoration: line-through; color: var(--text-3); }
 .slot-detail > .card { display: none; }
 .slot-detail > .card.is-active { display: block; }
+.card-main, .card-side { min-width: 0; }
+/* re-imported build: what changed, above the item views */
+.build-diff { margin-bottom: 16px; padding: 10px 14px; }
+body:not([data-view="gear"]):not([data-view="jewels"]):not([data-view="flasks"]) .build-diff { display: none; }
+.build-diff .data-table { margin: 6px 0; }
+.diff-what { color: var(--text-2); font-size: var(--fs-sm); }
+
+/* wide windows (ultrawide): item pages use the room, and an item with listings shows
+   them beside its mods instead of below */
+@media (min-width: 1800px) {
+  body.has-build:is([data-view="gear"], [data-view="jewels"], [data-view="flasks"], [data-view="pasted"]) .app-main {
+    max-width: 2600px;
+  }
+  body.has-build[data-view="planner"] .app-main { max-width: 1800px; }
+  .slot-detail > .card.is-active:has(> .card-side > .price-box:not(.hidden)),
+  .tab-section[data-tab="pasted"] > .card:has(> .card-side > .price-box:not(.hidden)) {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start;
+  }
+  .card > .card-head, .card > .char-diff { grid-column: 1 / -1; }
+  .card:has(> .card-side > .price-box:not(.hidden)) > .card-side {
+    border-left: 1px solid var(--border); align-self: stretch;
+  }
+}
 
 .char-diff {
   padding: 6px 14px; font-size: var(--fs-sm); border-bottom: 1px solid var(--border);

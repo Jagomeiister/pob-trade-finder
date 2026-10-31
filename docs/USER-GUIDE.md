@@ -26,6 +26,18 @@ The start screen has one big paste box.
 - **Or paste a link** — pobb.in, pastebin, and poe.ninja/pob links are fetched for you
 - **Saved builds** appear as cards under the paste box: click one to load it, 🗑 to
   delete it (it asks first). Save the current build with **☆ Save** in the sidebar
+- **📈 Daily price tracking** (on a saved build card): tick *Re-price this build once a
+  day* and optionally set *Alert at or under* a price. While the app is open, once a day
+  it re-runs your last search for each slot you priced, slowly and never during a
+  rate-limit cooldown, and the card shows the total and the change. When the total drops
+  to your price you get a message and a Windows notification. Price the build once first
+  (**Check all prices**) so it knows what to search for
+- **Loading a newer version of a build** (same class, most items the same): a **Changed
+  since the version you loaded…** list appears above the gear. For each changed slot it
+  shows what changed (the item, or the mod lines added and removed), what it cost when you
+  last priced the old version, and, after **Price changed slots**, what it costs now and
+  the difference. Changed slots are marked in the slot list, and the unchanged slots keep
+  their cost history
 - **Gear sets:** guide builds usually contain several (Leveling / Budget / Endgame…) —
   pick which one to shop for with the **Gear set** dropdown in the sidebar; it defaults to
   whatever the build creator had active
@@ -48,7 +60,9 @@ Once a build loads, the window has three parts:
   **Check all prices**
 - **The page** — on Gear, Jewels and Flasks: a **slot list** on the left (each slot's art,
   name, and its price once checked, or a status such as *Bought*, *None listed*,
-  *Equipped*, *Missing*) and the selected item on the right. Click a slot, or use ↑/↓
+  *Equipped*, *Missing*) and the selected item on the right. Click a slot, or use ↑/↓.
+  On very wide windows (ultrawide), item pages use the extra room and a priced item shows
+  its listings beside its mods instead of below them
 
 **Search settings ▾** (top bar) holds the settings every search shares:
 
@@ -83,6 +97,13 @@ scarabs, catalysts, divination cards and more.
   button, plus a Windows notification when the app is in the background. Items with an
   alert are added to your watchlist and show 🔔 there.
 - **Converter**: what any amount of any item is worth in chaos and divines.
+- **Chaos ↔ divine price gaps**: items that traded against both chaos and divines last
+  hour at noticeably different prices (the divine side converted at that hour's divine
+  rate), with which way round was cheaper and how much traded. Only markets with at least
+  the chosen volume are shown (2,000c an hour by default); hover a price for the hour's
+  range. These are last hour's averages, not a promise: check the live exchange before
+  trading, since gaps close, cheap items bought with divines trade in batches, and every
+  trade costs gold.
 - **Table**: every item, busiest first, with price (and divines when it's worth more than
   one), 24h and 7-day change, 7-day range, volume and a trend line. Search by name (fuzzy:
   "prismatic", "div", "scarab"), filter by category or your watchlist, hide thin markets,
@@ -476,7 +497,7 @@ issue. Your POESESSID, other tokens and your Windows user name are removed.
 | Symptom | Fix |
 |---|---|
 | "no trade-stat match" on a real mod | The matcher handles plurals, sign flips, and known aliases — if one slips through, open an issue with the exact mod text |
-| Unique shows base art | First lookup per unique takes a few seconds (rate-limited), then it's cached forever. `data/debug.log` records failures |
+| Unique shows base art | First lookup per unique takes a few seconds (rate-limited), then it's cached forever. A lookup that fails for good (unknown name, nothing ever listed) isn't retried for a week, so it doesn't cost trade calls on every launch. `data/debug.log` records failures |
 | Link paste fails | Only pobb.in / pastebin / poe.ninja links are fetched (by design) — paste the raw code instead |
 | Browser version missing features | Live prices/whisper/etc. need the desktop app; also hard-refresh (Ctrl+F5) after updates |
 | Ctrl+D does nothing in game | Check ⚙ Settings → Price-check hotkey for a "taken by another program" warning. The game must be the focused window and in windowed / windowed-fullscreen mode. The item must be under the cursor |

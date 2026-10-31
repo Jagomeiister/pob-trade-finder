@@ -95,6 +95,48 @@ def distill(raw):
     return out
 
 
+def pair_digest(raw):
+    """Raw snapshot -> {league: {"div": chaos per divine, "items": {id: {"c": [chaos per item,
+    chaos volume, low, high], "d": [divines per item, chaos-equivalent volume, low, high]}}}}
+    for items that traded against chaos and/or divine that hour (low/high = the hour's
+    ratio range, same unit as the price). Powers the chaos ↔ divine flip view."""
+    by_league = {}
+    for m in raw.get("markets") or []:
+        pair = m.get("market_pair") or []
+        if len(pair) == 2 and m.get("league"):
+            by_league.setdefault(m["league"], []).append(m)
+    out = {}
+    for league, markets in by_league.items():
+        div_rate = None
+        for m in markets:
+            if set(m["market_pair"]) == {CHAOS, DIVINE}:
+                div_rate = _price(m, CHAOS, DIVINE)[0]
+        items = {}
+        for m in markets:
+            a, b = m["market_pair"]
+            if CHAOS in (a, b) and DIVINE not in (a, b):
+                quote, key, to_chaos = CHAOS, "c", 1.0
+            elif DIVINE in (a, b) and CHAOS not in (a, b) and div_rate:
+                quote, key, to_chaos = DIVINE, "d", div_rate
+            else:
+                continue
+            other = b if a == quote else a
+            vol = m.get("volume_traded") or {}
+            vq, vo = vol.get(quote) or 0, vol.get(other) or 0
+            if not (vq > 0 and vo > 0):
+                continue  # no trades: a ratio range alone isn't a price you could have got
+            ratios = []
+            for k in ("lowest_ratio", "highest_ratio"):
+                r = m.get(k) or {}
+                if (r.get(quote) or 0) > 0 and (r.get(other) or 0) > 0:
+                    ratios.append(r[quote] / r[other])
+            items.setdefault(other, {})[key] = [round(vq / vo, 6), round(vq * to_chaos),
+                                                round(min(ratios), 6) if ratios else None,
+                                                round(max(ratios), 6) if ratios else None]
+        out[league] = {"div": div_rate, "items": items}
+    return out
+
+
 class CurrencyFeed:
     PACE = 1.0          # seconds between feed downloads (a CDN, but be polite)
     LATEST_TTL = 600    # re-probe for a newer hour every 10 minutes
@@ -147,12 +189,37 @@ class CurrencyFeed:
             return None
         snap = distill(raw)
         os.makedirs(self.cache_dir, exist_ok=True)
-        tmp = self._path(hour) + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(snap, f, separators=(",", ":"))
-        os.replace(tmp, self._path(hour))
+        self._write(self._path(hour), snap)
+        self._write(self._pairs_path(hour), pair_digest(raw))  # small; saves a re-download for flips
         self._mem[hour] = snap
         return snap
+
+    @staticmethod
+    def _write(path, obj):
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(obj, f, separators=(",", ":"))
+        os.replace(tmp, path)
+
+    def _pairs_path(self, hour):
+        return os.path.join(self.cache_dir, "%d.pairs.json" % hour)
+
+    def pairs(self, league):
+        """The latest hour's pair_digest for a league: ({"div", "items"}, hour). Hours
+        cached before pair digests existed are downloaded once more."""
+        hour = self.latest_hour()
+        path = self._pairs_path(hour)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                digest = json.load(f)
+        except (OSError, ValueError):
+            raw = self._download(hour)
+            if raw is None:
+                raise RuntimeError("currency feed hour %d unavailable" % hour)
+            digest = pair_digest(raw)
+            os.makedirs(self.cache_dir, exist_ok=True)
+            self._write(path, digest)
+        return digest.get(league) or {"div": None, "items": {}}, hour
 
     def latest_hour(self):
         hour, checked = self._latest
@@ -226,13 +293,21 @@ class CurrencyFeed:
         return series, latest
 
     def prune(self):
-        """Drop snapshots past KEEP_DAYS and any from an older distill FORMAT."""
+        """Drop snapshots past KEEP_DAYS and any from an older distill FORMAT; pair
+        digests are only read for the latest hour, so they go after a day."""
         cutoff = time.time() - self.KEEP_DAYS * 86400
+        pairs_cutoff = time.time() - 86400
         current = ".v%d.json" % self.FORMAT
         try:
             for fn in os.listdir(self.cache_dir):
                 stem = fn.split(".")[0]
-                if stem.isdigit() and (int(stem) < cutoff or not fn.endswith(current)):
+                if not stem.isdigit():
+                    continue
+                if fn.endswith(".pairs.json"):
+                    stale = int(stem) < pairs_cutoff
+                else:
+                    stale = int(stem) < cutoff or not fn.endswith(current)
+                if stale:
                     os.remove(os.path.join(self.cache_dir, fn))
         except OSError:
             pass

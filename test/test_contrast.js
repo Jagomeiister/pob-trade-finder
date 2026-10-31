@@ -130,11 +130,19 @@ check('index.html: no colour literals', !/#[0-9a-f]{6}\b/i.test(html.replace(/<s
   check('index.html loads css/' + n + '.css', html.indexOf("'css/" + n + ".css'") >= 0);
 });
 // ---- shared components (js/ui.js) replace hand-built buttons and alerts --------
-const app = fs.readFileSync(path.join(ROOT, 'js', 'app.js'), 'utf8');
+// js/app/: one program split by feature into ordered files (docs/DEVELOPER.md)
+const appDir = path.join(ROOT, 'js', 'app');
+const appFiles = fs.readdirSync(appDir).filter(function (f) { return /\.js$/.test(f); }).sort();
+const app = appFiles.map(function (f) { return fs.readFileSync(path.join(appDir, f), 'utf8'); }).join('\n');
 check('no legacy button classes (use UI.button)', !/copy-btn|trade-btn/.test(app + html));
 check('no alert() popups (use UI.toast)', !/[^.\w]alert\(/.test(app));
-check('index.html loads js/ui.js before app.js',
-  html.indexOf("'js/ui.js'") >= 0 && html.indexOf("'js/ui.js'") < html.indexOf("'js/app.js'"));
+const loadList = (html.match(/var APP = \[([\s\S]*?)\]/) || [])[1] || '';
+const loaded = (loadList.match(/'[^']+'/g) || []).map(function (s) { return s.slice(1, -1) + '.js'; });
+check('index.html loads every js/app file, in file-name order',
+  JSON.stringify(loaded) === JSON.stringify(appFiles), loaded.join(','));
+check('index.html loads js/ui.js before the app files',
+  html.indexOf("'js/ui.js'") >= 0 && html.indexOf("'js/ui.js'") < html.indexOf('.concat(APP'));
+check('no js/app.js left behind (it was split into js/app/)', !fs.existsSync(path.join(ROOT, 'js', 'app.js')));
 const UI = require('../js/ui.js');
 ['button', 'iconButton', 'select', 'input', 'field', 'chip', 'sectionHeader', 'panel', 'table', 'disclosure',
  'menu', 'popover', 'dialog', 'confirmDanger', 'toast', 'emptyState', 'segmented'].forEach(function (k) {
@@ -148,6 +156,8 @@ const ship = fs.readFileSync(path.join(ROOT, 'tools', 'build_release.py'), 'utf8
 check('release ships every css file', fs.readdirSync(cssDir).filter(function (f) { return /\.css$/.test(f); })
   .every(function (f) { return ship.indexOf('"css/' + f + '"') >= 0; }));
 check("release ships js/ui.js", ship.indexOf('"js/ui.js"') >= 0);
+check('release ships every js/app file', appFiles.every(function (f) { return ship.indexOf('"js/app/' + f + '"') >= 0; }),
+  appFiles.filter(function (f) { return ship.indexOf('"js/app/' + f + '"') < 0; }).join(', '));
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL TESTS PASSED');
 process.exit(failures ? 1 : 0);

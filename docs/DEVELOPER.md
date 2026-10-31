@@ -22,7 +22,13 @@ index.html + js/*  ──────────────►  any browser   
   then fallbacks: `(Local)` twin on weapon/armour slots → plural drift ("3 Charges" vs
   "# Charge") → sign drift (`-#` vs `+#` templates) → phrase aliases ("Chance to Block" →
   "… Attack Damage") → increased↔reduced flip with value negation.
-- **`js/app.js`** — UI + query construction + all async features. Key invariants:
+- **`js/app/*.js`** — UI + query construction + all async features: one program split by
+  feature into 16 ordered files (`01-state.js` … `16-overlay.js`). They are plain scripts
+  (no modules, no build step) loaded in order by `index.html` and share their top-level
+  names, so a function in one file can call any other. Top-level code that *runs* at load
+  (rather than declaring) may only use names from the same or an earlier file; everything
+  else runs from `DOMContentLoaded` or later. New files go in the `index.html` script list
+  and `tools/build_release.py` `SHIP` (test_contrast.js checks both). Key invariants:
   - `buildTradePayload(state)` is the single source of query JSON; every consumer
     (trade links, price checks, live search, sold watcher) goes through it
   - Long-lived pollers **freeze `payloadStr` + league at start** and hold a session
@@ -36,7 +42,7 @@ index.html + js/*  ──────────────►  any browser   
 | Method | Purpose |
 |---|---|
 | `fetch_pob_link(url)` | Fetch a PoB code from pobb.in/pastebin/poe.ninja (host-allowlisted) |
-| `trade_search(league, payloadJson)` | POST search; returns first 10 listings + up to 100 ids |
+| `trade_search(league, payloadJson, background=False)` | POST search; returns first 10 listings + up to 100 ids. `background` (saved-build daily re-pricing) paces at `BG_INTERVAL` and is refused during any cooldown |
 | `trade_fetch(searchId, idsJson)` | One further page (≤10 ids, ids validated) |
 | `exchange_rates(league, currenciesJson)` | Median chaos rate per currency from GGG bulk exchange, 30-min cache |
 | `unique_icon(name, base)` | Unique art via one Standard-league lookup, cached forever in `data/unique_icons.json` |
@@ -45,6 +51,10 @@ index.html + js/*  ──────────────►  any browser   
 | `overlay_hide()` | Hide the price-check overlay and refocus the game |
 | `open_url(url)` | System browser (pathofexile.com only) |
 | `refresh_data()` | Re-download stats + leagues, regenerate `data/*.js` |
+| `league_check()` | Live PC trade leagues vs the bundled list (one background call) → new-league banner |
+| `cx_overview(league)` / `cx_history(…)` | Market page: every exchange item, 7 days 6-hourly / one item's 1- or 30-day series (currency feed, no trade quota) |
+| `cx_flips(league)` | Latest hour's chaos-market vs divine-market price per item (`CurrencyFeed.pairs`, `<hour>.pairs.json`) |
+| `diagnostics()` | Bug-report text: version, OS, data dates, log tails; POESESSID, 32-hex tokens and the Windows user name redacted |
 | `check_update()` / `apply_update(url)` | GitHub Releases auto-update (see below) |
 
 ## In-game price check (hotkey + overlay)
@@ -79,7 +89,7 @@ index.html + js/*  ──────────────►  any browser   
   `Api._quitting` is set. Closing the main window sets `_quitting` and destroys the
   overlay. Without that, the hidden window would keep `webview.start()` running.
   `apply_update` sets `_quitting` too
-- `js/app.js` overlay mode is the delimited block at the end of the file. `markGui()`
+- Overlay mode is `js/app/16-overlay.js`. `markGui()`
   hands off to `overlayReady()`, so no update checks, market loads or session polling run
   in the overlay. `__overlayItem` re-hydrates settings from bridge storage, so league
   changes made in the main window apply, and then reuses `renderPastedItem` +
@@ -263,6 +273,16 @@ fallbacks). UI and bridge behaviour are exercised via stubbed `window.pywebview`
 browser; `gui.py` quota/updater logic has offline unit checks (see git history for
 examples). `python test/test_price_hotkey.py` and `python test/test_currency_feed.py`
 cover the Python side. Run tests before every release.
+
+`python test/e2e/run_e2e.py [filter…]` — end-to-end UI tests (about 20 s): headless
+Chrome driven over the DevTools protocol (`test/e2e/cdp.py`, no extra dependencies)
+against the real front end, served from 127.0.0.1 with the bridge stubbed
+(`window.pywebview.api` Proxy injected before page scripts; listings come from
+`test/fixture-fetch.json`, the build from `test/fixture-realbuild.txt`). All other network
+is blocked. 11 scenarios: landing, decode, price check, pasted item + sell hint, market,
+settings + diagnostics, keyboard, wide layout, flips, re-import diff, saved-build
+tracking. A scenario fails on any uncaught page exception. Filter by number or name:
+`run_e2e.py 3 diff`. `tools/refresh_all.py` runs it with the rest.
 
 `node test/test_contrast.js` guards the design tokens: every text colour in
 `css/tokens.css` must reach WCAG AA (4.5:1) on `--bg`/`--s1`/`--s2` and as a tinted chip,

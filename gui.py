@@ -26,7 +26,7 @@ from currency_feed import CurrencyFeed
 from timeless import TimelessData
 from art_cache import ArtCache
 
-VERSION = "2.0.3"
+VERSION = "2.0.4"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -303,18 +303,20 @@ class Api:
                 out[dest].append(m)
         return out
 
-    def trade_search(self, league, payload_json):
+    def trade_search(self, league, payload_json, background=False):
         """Run a trade search: first page of listings + the full id list so the
-        UI can page through the rest via trade_fetch."""
+        UI can page through the rest via trade_fetch. background=True (saved-build
+        re-pricing) paces gently and is skipped during any rate-limit cooldown."""
         try:
             payload = json.loads(payload_json)
-            search = self._http("%s/search/%s" % (TRADE_BASE, urllib.request.quote(league)), payload)
+            bg = bool(background)
+            search = self._http("%s/search/%s" % (TRADE_BASE, urllib.request.quote(league)), payload, background=bg)
             ids = search.get("result", [])[:100]
             total = search.get("total", len(search.get("result", [])))
             listings = []
             if ids:
                 fetched = self._http("%s/fetch/%s?query=%s"
-                                     % (TRADE_BASE, ",".join(ids[:self.PAGE_SIZE]), search["id"]))
+                                     % (TRADE_BASE, ",".join(ids[:self.PAGE_SIZE]), search["id"]), background=bg)
                 listings = [self._listing_from(r) for r in fetched.get("result", []) if r]
             return {"ok": True, "total": total, "searchId": search["id"],
                     "ids": ids, "pageSize": self.PAGE_SIZE, "listings": listings}
@@ -414,8 +416,29 @@ class Api:
     ICON_RECHECK_DAYS = 30
     ICON_RECHECKS_PER_RUN = 5   # keep background trade calls rare
 
+    ICON_FAIL_DAYS = 7  # a lookup with a definite "no" isn't retried for a week
+
+    def _save_icon_meta(self):
+        try:
+            with open(self._icon_meta_path, "w", encoding="utf-8") as f:
+                json.dump(self._icon_meta, f)
+        except Exception:
+            pass
+
+    def _failed_recently(self, key):
+        ts = self._icon_meta.get("fail::" + key)
+        return ts is not None and time.time() - ts < self.ICON_FAIL_DAYS * 86400
+
+    def _remember_failure(self, key, error):
+        """Remember definite failures (unknown name, nothing listed) — not rate limits or
+        network trouble, which are worth retrying next run."""
+        if re.match(r"(HTTP 400|no listings|no icon)", str(error)):
+            self._icon_meta["fail::" + key] = int(time.time())
+            self._save_icon_meta()
+
     def _remember_icon(self, key, icon):
         self._unique_icons[key] = icon
+        self._icon_meta.pop("fail::" + key, None)
         self._icon_meta[key] = int(time.time())
         try:
             with open(self._unique_icons_path, "w", encoding="utf-8") as f:
@@ -467,6 +490,8 @@ class Api:
             if cached and not _refresh:
                 self._maybe_recheck(name, lambda: self.unique_icon(name, base, True))
                 return {"ok": True, "icon": cached}
+            if not cached and self._failed_recently(name):
+                return {"ok": False, "error": "lookup failed recently — retried after %d days" % self.ICON_FAIL_DAYS}
             query = {"query": {"status": {"option": "any"}, "name": name}}
             if base and base != name:
                 query["query"]["type"] = base
@@ -474,7 +499,7 @@ class Api:
             search = self._http(TRADE_BASE + "/search/Standard", query, background=True)
             ids = search.get("result", [])[:1]
             if not ids:
-                return {"ok": False, "error": "no listings found"}
+                raise RuntimeError("no listings found")
             fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ids[0], search["id"]),
                                  background=True)
             for r in fetched.get("result", []):
@@ -482,13 +507,11 @@ class Api:
                 if icon:
                     self._remember_icon(name, icon)
                     return {"ok": True, "icon": icon}
-            return {"ok": False, "error": "no icon in listing"}
+            raise RuntimeError("no icon in listing")
         except Exception as e:
-            try:
-                with open(os.path.join(DATA_DIR, "debug.log"), "a", encoding="utf-8") as f:
-                    f.write("%s unique_icon(%r): %s\n" % (time.strftime("%H:%M:%S"), name, e))
-            except Exception:
-                pass
+            _debug_log("unique_icon(%r): %s" % (name, e))
+            if not _refresh:
+                self._remember_failure(name, e)
             return {"ok": False, "error": str(e)}
 
     def gem_icon(self, name, disc_type=None, disc=None, _refresh=False):
@@ -502,13 +525,15 @@ class Api:
             if cached and not _refresh:
                 self._maybe_recheck(key, lambda: self.gem_icon(name, disc_type, disc, True))
                 return {"ok": True, "icon": cached}
+            if not cached and self._failed_recently(key):
+                return {"ok": False, "error": "lookup failed recently — retried after %d days" % self.ICON_FAIL_DAYS}
             qtype = {"option": disc_type, "discriminator": disc} if (disc_type and disc) else name
             search = self._http(TRADE_BASE + "/search/Standard",
                                 {"query": {"status": {"option": "any"}, "type": qtype}},
                                 background=True)
             ids = search.get("result", [])[:1]
             if not ids:
-                return {"ok": False, "error": "no listings"}
+                raise RuntimeError("no listings")
             fetched = self._http("%s/fetch/%s?query=%s" % (TRADE_BASE, ids[0], search["id"]),
                                  background=True)
             for r in fetched.get("result", []):
@@ -516,8 +541,10 @@ class Api:
                 if icon:
                     self._remember_icon(key, icon)
                     return {"ok": True, "icon": icon}
-            return {"ok": False, "error": "no icon"}
+            raise RuntimeError("no icon")
         except Exception as e:
+            if not _refresh:
+                self._remember_failure(key, e)
             return {"ok": False, "error": str(e)}
 
     # -- currency -> chaos rates via GGG's own bulk exchange ---------------------
@@ -669,6 +696,43 @@ class Api:
                 items[code] = {"name": m["name"], "cat": m.get("cat", ""), "img": m.get("img", ""),
                                "s": [[h, float("%.4g" % v), int(vol)] for h, v, vol in pts]}
             return {"ok": True, "hour": hour, "items": items}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def _codes_by_id(self):
+        by_id = {}
+        for code, m in self._currency_map.items():
+            prev = by_id.get(m["id"])
+            if prev is None or len(code) < len(prev):  # duplicate rows: shortest code
+                by_id[m["id"]] = code
+        return by_id
+
+    def cx_flips(self, league):
+        """Items that traded against BOTH chaos and divines in the latest hour, with the
+        price in each market (chaos; the divine side converted at that hour's divine rate):
+        {'ok', 'hour', 'div', 'rows': [{code, name, cat, img, viaChaos, viaDiv, divEach, gap,
+        buyWith: 'chaos'|'divine', volume, cRange, dRange}]}. gap = how much more the dearer
+        market paid (0.05 = 5%); volume = the thinner market's chaos traded that hour."""
+        try:
+            digest, hour = self._feed.pairs(league)
+            div = digest.get("div")
+            by_id = self._codes_by_id()
+            rows = []
+            for mid, mk in (digest.get("items") or {}).items():
+                c, d, code = mk.get("c"), mk.get("d"), by_id.get(mid)
+                if not (c and d and code and div):
+                    continue
+                via_chaos, via_div = c[0], d[0] * div
+                if via_chaos <= 0 or via_div <= 0:
+                    continue
+                m = self._currency_map[code]
+                rows.append({"code": code, "name": m["name"], "cat": m.get("cat", ""), "img": m.get("img", ""),
+                             "viaChaos": round(via_chaos, 4), "viaDiv": round(via_div, 4), "divEach": d[0],
+                             "gap": round(max(via_chaos, via_div) / min(via_chaos, via_div) - 1, 4),
+                             "buyWith": "chaos" if via_chaos < via_div else "divine",
+                             "volume": min(c[1], d[1]), "cRange": c[2:4], "dRange": d[2:4]})
+            rows.sort(key=lambda r: -r["gap"])
+            return {"ok": True, "hour": hour, "div": div, "rows": rows}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

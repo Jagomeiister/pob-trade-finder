@@ -305,9 +305,15 @@
 // query forces a fresh read on every launch (all local files — no real cost).
 (function () {
   var v = Date.now();
+  // js/app/: one program split by feature — order matters (docs/DEVELOPER.md)
+  var APP = ['01-state', '02-init', '03-shell', '04-library', '05-craft', '06-jewels', '07-history-gems',
+             '08-cards', '09-query', '10-character', '11-market', '12-cost', '13-builds-tracking',
+             '14-basket-live', '15-price-check', '16-overlay'];
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
    'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/sample.js',
-   'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/app.js'].forEach(function (src) {
+   'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js'].concat(APP.map(function (n) {
+    return 'js/app/' + n + '.js';
+  })).forEach(function (src) {
     document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');
   });
 })();

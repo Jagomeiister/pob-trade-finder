@@ -65,5 +65,16 @@ check("6h points sit on 6h boundaries", sum(h % (6 * HOUR) for h in g7[:-1]), 0,
 check("daily grid is a subset of the 6-hourly one", len(set(g30[-8:-1]) - set(g7)), 0, 0)
 check("6-hourly grid (last day) is a subset of the 2-hourly one", len(set(g7[-5:-1]) - set(g1)), 0, 0)
 
+# pair digest (chaos <-> divine gap view): per-market prices for one item
+from currency_feed import pair_digest  # noqa: E402
+PD = pair_digest(RAW)["L"]
+check("pair digest keeps the divine rate", PD["div"], 300.0)
+check("exalted chaos-market price (chaos each)", PD["items"][EX]["c"][0], 3.0)
+check("exalted chaos-market volume (chaos)", PD["items"][EX]["c"][1], 300, 0)
+check("exalted divine-market price (divines each)", PD["items"][EX]["d"][0], 2 / 300)
+check("exalted divine-market volume in chaos", PD["items"][EX]["d"][1], 600, 0)
+check("no-trade hour has no market entry", 1 if THIN not in PD["items"] else 0, 1, 0)
+check("divine-only item has only a divine market", 1 if list(PD["items"][MIRROR]) == ["d"] else 0, 1, 0)
+
 print("\nALL TESTS PASSED" if not failures else "\n%d FAILED" % failures)
 sys.exit(1 if failures else 0)
