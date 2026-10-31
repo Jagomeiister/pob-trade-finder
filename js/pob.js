@@ -117,6 +117,18 @@
     var implicitsSeen = 0;
     var bodyStart = i;
 
+    // Variant uniques (Impossible Escape, Watcher's Eye-style rolls, legacy versions)
+    // list EVERY variant's lines tagged {variant:1,2}; keep only the selected one(s)
+    var selVariant = null, selAlt = null, hasAlt = false;
+    lines.forEach(function (l) {
+      var sv = l.match(/^Selected Variant:\s*(\d+)/i);
+      if (sv) selVariant = parseInt(sv[1], 10);
+      var sa = l.match(/^Selected Alt Variant:\s*(\d+)/i);
+      if (sa) selAlt = parseInt(sa[1], 10);
+      if (/^Has Alt Variant:\s*true/i.test(l)) hasAlt = true;
+    });
+    if (!hasAlt) selAlt = null;
+
     for (; i < lines.length; i++) {
       var line = lines[i];
       var sm = line.match(/^Sockets:\s*(.+)$/i);
@@ -140,7 +152,7 @@
       if (!pastImplicitMarker) continue; // pre-implicit metadata we don't recognise
 
       // Mod line: peel off {tag} prefixes
-      var crafted = false, fractured = false, tagRange = null;
+      var crafted = false, fractured = false, tagRange = null, variants = null;
       var raw = line;
       var tagMatch;
       while ((tagMatch = line.match(/^\{([^}]*)\}/))) {
@@ -148,12 +160,21 @@
         if (tag === 'crafted') crafted = true;
         else if (tag === 'fractured') fractured = true;
         else if (tag.indexOf('range:') === 0) tagRange = parseFloat(tag.slice(6));
-        // {tags:...}, {custom}, {variant:...} are ignored
+        else if (tag.indexOf('variant:') === 0) variants = tag.slice(8).split(',').map(Number);
+        // {tags:...}, {custom} are ignored
         line = line.slice(tagMatch[0].length);
       }
       line = line.trim();
       if (!line) continue;
       var isRanged = RANGE_PATTERN.test(line);
+      if (variants && selVariant !== null && variants.indexOf(selVariant) === -1 &&
+          !(selAlt !== null && variants.indexOf(selAlt) !== -1)) {
+        // another variant's line: skip it, but keep the implicit/roll counters in
+        // step — PoB counts every listed line for both
+        if (implicitsSeen < implicitCount) implicitsSeen++;
+        if (isRanged) rangedSeen++;
+        continue;
+      }
       var bounds = null;
       if (isRanged) {
         // capture the roll bounds (avg-space for multi-range "Adds (a-b) to (c-d)")
@@ -177,8 +198,10 @@
 
       var kind = (implicitsSeen < implicitCount) ? 'implicit' : 'explicit';
       if (implicitsSeen < implicitCount) implicitsSeen++;
+      // variant: the line came from the selected {variant:N} — it's what tells
+      // this copy of the unique apart from the others (keystone, conqueror…)
       item.mods.push({ line: line, raw: raw, kind: kind, crafted: crafted,
-                       fractured: fractured, ranged: isRanged, bounds: bounds });
+                       fractured: fractured, ranged: isRanged, bounds: bounds, variant: !!variants });
     }
 
     // Defensive fallback: no "Implicits: N" marker at all (hand-edited or

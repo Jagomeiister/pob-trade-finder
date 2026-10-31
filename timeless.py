@@ -147,9 +147,33 @@ class TimelessData:
             "outcomes": outcomes,
         }
 
-    def search(self, jtype, socket_id, allocated, weights, include_unallocated=False, top=30):
-        """Rank every seed by the summed weight of what it does to the notables.
-        weights: {outcome key: weight}. Returns the best seeds with per-notable outcomes."""
+    def seed_outcomes(self, jtype, socket_id, allocated, seed, include_unallocated=False):
+        """What one seed does to the notables at a socket (for a jewel you already own)."""
+        jtype = str(jtype)
+        j = self.d["jewels"][jtype]
+        s = int(seed) // j["seedStep"] - j["seedMin"]
+        if not 0 <= s < self.seed_count(jtype) or int(seed) % j["seedStep"]:
+            raise ValueError("seed %s is outside %s's range" % (seed, j["name"]))
+        alloc = set(int(a) for a in allocated)
+        out = []
+        for n, k in self.in_radius(socket_id):
+            if k != 1 or not (include_unallocated or n in alloc):
+                continue
+            o = self.outcome(jtype, n, s)
+            if o:
+                out.append({"node": n, "key": o[0] + str(o[1])})
+        return {"seed": int(seed), "notables": out}
+
+    def _byte_key(self, key):
+        kind, idx = key[0], int(key[1:])
+        return (self.d["additionsCount"] + idx) if kind == "n" else idx
+
+    def search(self, jtype, socket_id, allocated, weights, include_unallocated=False, top=30, mins=None):
+        """Rank every seed by what it does to the notables in radius.
+        weights: {outcome key: weight} — negative weights mean "avoid".
+        mins:    {outcome key: n} — the seed must give that outcome to at least n
+                 notables (e.g. Minion Damage x2 AND Aura Effect x1), else it's dropped.
+        Each result carries per-outcome counts and the per-notable outcomes."""
         jtype = str(jtype)
         alloc = set(int(a) for a in allocated)
         notables = [n for n, k in self.in_radius(socket_id) if k == 1 and (include_unallocated or n in alloc)]
@@ -157,36 +181,50 @@ class TimelessData:
         rows = [(n, r) for n, r in rows if r is not None and r < self.d["sizeNotable"]]
         data = self.lut(jtype)
         seeds = self.seed_count(jtype)
-        l2g = self.d["localToGlobal"].get(jtype, {})
+        l2g = {int(k): v for k, v in self.d["localToGlobal"].get(jtype, {}).items()}
         n_add = self.d["additionsCount"]
         w = {}
-        for k, v in weights.items():
+        for k, v in (weights or {}).items():
             try:
                 v = float(v)
             except (TypeError, ValueError):
                 continue
             if v:
-                kind, idx = k[0], int(k[1:])
-                w[(n_add + idx) if kind == "n" else idx] = v
+                w[self._byte_key(k)] = v
+        need = {}
+        for k, v in (mins or {}).items():
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                continue
+            if v > 0:
+                need[self._byte_key(k)] = v
+        offsets = [r * seeds for _, r in rows]
         scored = []
         for s in range(seeds):
             score = 0.0
-            for _, r in rows:
-                b = data[r * seeds + s]
-                b = l2g.get(str(b), b)
+            counts = {}
+            for off in offsets:
+                b = data[off + s]
+                b = l2g.get(b, b)
                 score += w.get(b, 0.0)
-            if score > 0:
+                if b in need:
+                    counts[b] = counts.get(b, 0) + 1
+            if any(counts.get(b, 0) < n for b, n in need.items()):
+                continue
+            if score > 0 or (need and score >= 0):
                 scored.append((score, s))
         scored.sort(key=lambda t: (-t[0], t[1]))
         j = self.d["jewels"][jtype]
         out = []
         for score, s in scored[:top]:
             seed = (j["seedMin"] + s) * j["seedStep"]
-            per = []
+            per, counts = [], {}
             for n, _ in rows:
                 o = self.outcome(jtype, n, s)
                 if o:
                     key = o[0] + str(o[1])
-                    per.append({"node": n, "key": key, "weight": weights.get(key, 0)})
-            out.append({"seed": seed, "score": round(score, 3), "notables": per})
+                    counts[key] = counts.get(key, 0) + 1
+                    per.append({"node": n, "key": key, "weight": (weights or {}).get(key, 0)})
+            out.append({"seed": seed, "score": round(score, 3), "notables": per, "counts": counts})
         return {"results": out, "considered": [n for n, _ in rows], "matches": len(scored)}

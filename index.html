@@ -268,8 +268,18 @@
   .finder-timeless summary { cursor: pointer; color: var(--gold); }
   .finder-seeds { width: 240px; }
   .timeless-seeds td { vertical-align: top; }
+  .timeless-current { margin: 6px 0 10px; padding: 6px 10px; border-left: 2px solid var(--gold);
+    background: var(--panel-deep); font-size: 13px; color: var(--dim); }
+  .timeless-current:empty { display: none; }
+  .timeless-current .ts-hit { color: var(--gold-hi); }
   .timeless-seeds .ts-hit { color: var(--gold-hi); }
   .timeless-seeds .ts-miss { color: var(--dim); }
+  .timeless-seeds .ts-avoid, .timeless-current .ts-avoid { color: #d9534f; }
+  .timeless-seeds details { margin-top: 2px; font-size: 12px; color: var(--dim); }
+  .timeless-seeds summary { cursor: pointer; }
+  .ts-totals { font-weight: 600; }
+  .ts-need { width: 52px; }
+  .finder-pct.avoid { color: #d9534f; width: 74px; }
   .craft-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
   .craft-head b { color: var(--gold); margin-right: 4px; }
   .craft-verdict { color: var(--text); font-weight: 600; margin: 4px 0 8px; }

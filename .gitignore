@@ -24,3 +24,5 @@ data/tree.min.json
 test/fixture-realbuild.txt
 data/fossils.min.json
 data/timeless_cache/
+data/art_cache/
+data/unique_icons_meta.json

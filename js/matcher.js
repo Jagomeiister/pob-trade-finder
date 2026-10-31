@@ -54,13 +54,24 @@
         // multi-line stats (2000+ in the DB, e.g. flask suffixes): items show the
         // lines separately, so index every line to the parent stat as well
         if (entry.text.indexOf('\n') !== -1) {
-          entry.text.split('\n').forEach(function (lineText) {
+          var lines = entry.text.split('\n');
+          lines.forEach(function (lineText) {
             var lk = normalize(lineText);
             if (!lk || lk === nk) return;
             if (!index.norm[lk]) index.norm[lk] = {};
             if (!index.norm[lk][secId]) index.norm[lk][secId] = [];
             index.norm[lk][secId].push(entry);
           });
+          // leading lines joined: PoB writes some wrapped stats on one line, and a
+          // few GGG texts carry a trailing extra line (Impossible Escape's
+          // "…connected to your tree\nPassage")
+          for (var k = 2; k < lines.length; k++) {
+            var jk = normalize(lines.slice(0, k).join(' '));
+            if (!jk || jk === nk) continue;
+            if (!index.norm[jk]) index.norm[jk] = {};
+            if (!index.norm[jk][secId]) index.norm[jk][secId] = [];
+            index.norm[jk][secId].push(entry);
+          }
         }
         index.byId[entry.id] = entry;
       }

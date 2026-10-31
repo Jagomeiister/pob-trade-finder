@@ -24,8 +24,9 @@ import webview
 import price_hotkey
 from currency_feed import CurrencyFeed
 from timeless import TimelessData
+from art_cache import ArtCache
 
-VERSION = "1.12.1"
+VERSION = "1.13.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -78,6 +79,16 @@ class Api:
                 self._unique_icons = json.load(f)
         except Exception:
             self._unique_icons = {}
+        # when each art link was last confirmed against the trade site (re-checked
+        # after ICON_RECHECK_DAYS so changed art is picked up)
+        self._icon_meta_path = os.path.join(DATA_DIR, "unique_icons_meta.json")
+        try:
+            with open(self._icon_meta_path, "r", encoding="utf-8") as f:
+                self._icon_meta = json.load(f)
+        except Exception:
+            self._icon_meta = {}
+        self._art = ArtCache(DATA_DIR, "PoBTradeFinder/%s (+https://github.com/%s/%s)"
+                             % (VERSION, GITHUB_OWNER, GITHUB_REPO))
         self._session_path = os.path.join(DATA_DIR, "session.json")
         self._poesessid = ""
         try:
@@ -387,12 +398,61 @@ class Api:
         return out
 
     # -- unique item art: one trade lookup per unique, cached on disk forever ----
-    def unique_icon(self, name, base):
+    ICON_RECHECK_DAYS = 30
+    ICON_RECHECKS_PER_RUN = 5   # keep background trade calls rare
+
+    def _remember_icon(self, key, icon):
+        self._unique_icons[key] = icon
+        self._icon_meta[key] = int(time.time())
+        try:
+            with open(self._unique_icons_path, "w", encoding="utf-8") as f:
+                json.dump(self._unique_icons, f)
+            with open(self._icon_meta_path, "w", encoding="utf-8") as f:
+                json.dump(self._icon_meta, f)
+        except Exception:
+            pass
+
+    def _maybe_recheck(self, key, lookup):
+        """Art links are saved forever, but GGG can change art: confirm a link again
+        once it is ICON_RECHECK_DAYS old, in the background, a few per run. A changed
+        link means changed art, which the image cache then downloads once."""
+        checked = self._icon_meta.get(key)
+        if checked is None:  # saved before re-checks existed — start the clock now
+            self._icon_meta[key] = int(time.time())
+            try:
+                with open(self._icon_meta_path, "w", encoding="utf-8") as f:
+                    json.dump(self._icon_meta, f)
+            except Exception:
+                pass
+            return
+        if time.time() - checked < self.ICON_RECHECK_DAYS * 86400:
+            return
+        if getattr(self, "_rechecks", 0) >= self.ICON_RECHECKS_PER_RUN:
+            return
+        self._rechecks = getattr(self, "_rechecks", 0) + 1
+        threading.Thread(target=lookup, daemon=True).start()
+
+    # -- art images cached on disk (see art_cache.py) --------------------------------
+    def art_manifest(self):
+        try:
+            return {"ok": True, "art": self._art.manifest()}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def cache_art(self, urls_json):
+        try:
+            urls = json.loads(urls_json)[:40]
+            return {"ok": True, "art": self._art.cache(urls)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def unique_icon(self, name, base, _refresh=False):
         try:
             if not name:
                 return {"ok": False, "error": "no name"}
             cached = self._unique_icons.get(name)
-            if cached:
+            if cached and not _refresh:
+                self._maybe_recheck(name, lambda: self.unique_icon(name, base, True))
                 return {"ok": True, "icon": cached}
             query = {"query": {"status": {"option": "any"}, "name": name}}
             if base and base != name:
@@ -407,12 +467,7 @@ class Api:
             for r in fetched.get("result", []):
                 icon = (r or {}).get("item", {}).get("icon", "")
                 if icon:
-                    self._unique_icons[name] = icon
-                    try:
-                        with open(self._unique_icons_path, "w", encoding="utf-8") as f:
-                            json.dump(self._unique_icons, f)
-                    except Exception:
-                        pass
+                    self._remember_icon(name, icon)
                     return {"ok": True, "icon": icon}
             return {"ok": False, "error": "no icon in listing"}
         except Exception as e:
@@ -423,7 +478,7 @@ class Api:
                 pass
             return {"ok": False, "error": str(e)}
 
-    def gem_icon(self, name, disc_type=None, disc=None):
+    def gem_icon(self, name, disc_type=None, disc=None, _refresh=False):
         """Proper single-frame gem art via one trade lookup (RePoE gem art is
         often a multi-frame atlas). Cached forever alongside unique icons.
         Transfigured gems are a discriminated base type on the trade API —
@@ -431,7 +486,8 @@ class Api:
         try:
             key = "gem::" + name
             cached = self._unique_icons.get(key)
-            if cached:
+            if cached and not _refresh:
+                self._maybe_recheck(key, lambda: self.gem_icon(name, disc_type, disc, True))
                 return {"ok": True, "icon": cached}
             qtype = {"option": disc_type, "discriminator": disc} if (disc_type and disc) else name
             search = self._http(TRADE_BASE + "/search/Standard",
@@ -445,12 +501,7 @@ class Api:
             for r in fetched.get("result", []):
                 icon = (r or {}).get("item", {}).get("icon", "")
                 if icon:
-                    self._unique_icons[key] = icon
-                    try:
-                        with open(self._unique_icons_path, "w", encoding="utf-8") as f:
-                            json.dump(self._unique_icons, f)
-                    except Exception:
-                        pass
+                    self._remember_icon(key, icon)
                     return {"ok": True, "icon": icon}
             return {"ok": False, "error": "no icon"}
         except Exception as e:
@@ -478,10 +529,20 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-    def timeless_search(self, jewel_type, socket_id, nodes_json, weights_json, include_unallocated=False):
+    def timeless_seed(self, jewel_type, socket_id, nodes_json, seed, include_unallocated=False):
+        try:
+            r = self._timeless.seed_outcomes(int(jewel_type), int(socket_id), json.loads(nodes_json),
+                                             int(seed), bool(include_unallocated))
+            return dict(ok=True, **r)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def timeless_search(self, jewel_type, socket_id, nodes_json, weights_json, include_unallocated=False,
+                        mins_json="{}"):
         try:
             r = self._timeless.search(int(jewel_type), int(socket_id), json.loads(nodes_json),
-                                      json.loads(weights_json), bool(include_unallocated))
+                                      json.loads(weights_json), bool(include_unallocated),
+                                      mins=json.loads(mins_json or "{}"))
             return dict(ok=True, **r)
         except Exception as e:
             return {"ok": False, "error": str(e)}

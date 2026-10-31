@@ -176,9 +176,18 @@ your sockets, then prices it.
    example *Add Global Crit Chance* or *Becomes Supreme Ego*, with how often each one
    comes up. Outcomes that suit your build are pre-ticked with a value. Untick or
    adjust anything.
+   - **Need ×** sets a hard minimum: *Minion Damage ×2* plus *Aura Effect ×1* keeps only
+     seeds that give at least two of your notables Minion Damage **and** at least one Aura
+     Effect.
+   - Drag a value slider **left of zero to avoid** an outcome, for example a replacement
+     that would wipe a notable you rely on.
 5. **Find best seeds** checks every seed and ranks them by the total value of what they
-   do to your notables. Each result shows what each of your notables becomes; the
-   outcomes you wanted are highlighted.
+   do to your notables. Each result leads with totals such as *Minion Damage ×3 (60%) ·
+   Aura Effect ×1 (8%)*; open *per notable* to see exactly what each notable becomes.
+
+Already have a timeless jewel in your build? Its card has **⏳ Find seeds for this
+socket**. That opens this finder on the jewel's socket and shows what your current seed
+does there, so you can compare it with the best alternatives.
 6. **Price** a single seed, or **Price the top seeds**. This searches every conqueror,
    because the conqueror only changes the keystone. Without a saved POESESSID the trade
    site allows 5 seeds per check; with one, 10.

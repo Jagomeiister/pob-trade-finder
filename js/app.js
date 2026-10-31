@@ -342,6 +342,7 @@
       });
     });
     function markGui() {
+      startArtCache(); // both windows load art from the on-disk cache
       if (OVERLAY) { overlayReady(hydrateFromBridge); return; } // price-check overlay: see block at the end
       document.body.classList.add('gui');
       checkForUpdates();
@@ -1365,24 +1366,88 @@
           (r.keystones.length ? ' · keystones in radius: ' + r.keystones.map(function (k) { return nodeName(J, k); }).join(', ') +
             ' (changed by the conqueror, not the seed)' : '');
         renderOutcomes();
+        showCurrentSeed(my);
       }, function (e) { if (my === seq) summary.textContent = '❌ ' + e; });
     }
+
+    // the jewel the build already has in this socket (opened from its card)
+    var currentSeed = null; // {jewel, seed}
+    var currentBox = document.createElement('div');
+    currentBox.className = 'timeless-current';
+    function showCurrentSeed(my) {
+      currentBox.textContent = '';
+      if (!currentSeed || currentSeed.jewel !== jewelSel.value) return;
+      window.pywebview.api.timeless_seed(jtype(), parseInt(sockSel.value, 10), JSON.stringify(b.tree.nodes),
+                                         currentSeed.seed, unalloc.checkbox.checked).then(function (r) {
+        if (my !== seq || !r || !r.ok) { if (r && !r.ok) currentBox.textContent = '❌ ' + r.error; return; }
+        var score = 0;
+        var title = document.createElement('b');
+        title.textContent = 'Your jewel (seed ' + r.seed + ') here: ';
+        currentBox.appendChild(title);
+        r.notables.forEach(function (p, i) {
+          var v = values[p.key];
+          var w = v && v.use ? v.value / 100 : 0;
+          score += w;
+          var span = document.createElement('span');
+          span.className = w > 0 ? 'ts-hit' : w < 0 ? 'ts-avoid' : 'ts-miss';
+          span.textContent = nodeName(J, p.node) + ' → ' + outcomeLabel(p.key);
+          if (i) currentBox.appendChild(document.createTextNode(' · '));
+          currentBox.appendChild(span);
+        });
+        currentBox.appendChild(document.createTextNode('  — score ' + score.toFixed(2) +
+          ' with your current picks. Find best seeds to compare.'));
+      });
+    }
+    outcomesBox.parentNode.insertBefore(currentBox, outcomesBox);
+
+    // open on a given jewel/socket (from a timeless jewel card in the build)
+    timelessApplyPreset = function (p) {
+      if (p.jewel && TIMELESS_TYPES.some(function (t) { return t[1] === p.jewel; })) jewelSel.value = p.jewel;
+      if (p.socket) {
+        var sv = String(p.socket);
+        if (!Array.prototype.some.call(sockSel.options, function (o) { return o.value === sv; })) {
+          var o = document.createElement('option');
+          o.value = sv;
+          o.textContent = 'Socket ' + sv + ' (your jewel\'s socket)';
+          sockSel.appendChild(o);
+        }
+        sockSel.value = sv;
+      }
+      currentSeed = p.seed ? { jewel: p.jewel, seed: p.seed } : null;
+      load();
+    };
 
     function renderOutcomes() {
       outcomesBox.textContent = '';
       var table = document.createElement('table');
       table.className = 'finder-table';
-      table.innerHTML = '<thead><tr><th scope="col">Want</th><th scope="col">Outcome on a notable</th>' +
-        '<th scope="col" class="num">Chance</th><th scope="col">Value to your build</th></tr></thead>';
+      table.innerHTML = '<thead><tr><th scope="col">Use</th><th scope="col">Outcome on a notable</th>' +
+        '<th scope="col" class="num">Chance</th><th scope="col" class="num" title="Minimum number of your notables that must get this — seeds with fewer are dropped">Need ×</th>' +
+        '<th scope="col">Value to your build (left = avoid)</th></tr></thead>';
       var tbody = document.createElement('tbody');
+      var maxNeed = Math.max(1, info.notables.filter(function (n) { return n.allocated || unalloc.checkbox.checked; }).length);
       info.outcomes.forEach(function (o) {
         var st = values[o.key];
         var tr = document.createElement('tr');
         if (st.use) tr.className = 'on';
         var cb = document.createElement('input');
         cb.type = 'checkbox'; cb.checked = st.use;
-        cb.setAttribute('aria-label', 'Want ' + o.dn);
-        cb.addEventListener('change', function () { st.use = cb.checked; tr.classList.toggle('on', cb.checked); });
+        cb.setAttribute('aria-label', 'Use ' + o.dn);
+        cb.addEventListener('change', function () {
+          st.use = cb.checked; tr.classList.toggle('on', cb.checked);
+          if (!cb.checked) { st.need = 0; need.value = ''; }
+        });
+        var need = document.createElement('input');
+        need.type = 'number'; need.min = '0'; need.max = String(maxNeed); need.step = '1';
+        need.className = 'min-input ts-need';
+        need.placeholder = '–';
+        need.value = st.need ? String(st.need) : '';
+        need.setAttribute('aria-label', 'At least this many notables with ' + o.dn);
+        need.addEventListener('change', function () {
+          st.need = Math.max(0, Math.min(maxNeed, parseInt(need.value, 10) || 0));
+          need.value = st.need ? String(st.need) : '';
+          if (st.need) { st.use = true; cb.checked = true; tr.classList.add('on'); }
+        });
         var td1 = document.createElement('td'); td1.appendChild(cb);
         var td2 = document.createElement('td');
         var name = document.createElement('b');
@@ -1391,17 +1456,23 @@
         td2.appendChild(document.createTextNode(' — ' + o.sd.join(' · ')));
         var td3 = document.createElement('td'); td3.className = 'num';
         td3.textContent = (o.share * 100).toFixed(1) + '%';
+        var tdN = document.createElement('td'); tdN.className = 'num'; tdN.appendChild(need);
         var td4 = document.createElement('td');
         var val = document.createElement('input');
-        val.type = 'range'; val.min = '0'; val.max = '100'; val.step = '5'; val.value = String(st.value);
+        val.type = 'range'; val.min = '-100'; val.max = '100'; val.step = '5'; val.value = String(st.value);
         val.className = 'finder-val';
-        val.setAttribute('aria-label', 'Value of ' + o.dn);
+        val.setAttribute('aria-label', 'Value of ' + o.dn + ' (negative avoids it)');
         var pct = document.createElement('span');
         pct.className = 'finder-pct';
-        pct.textContent = st.value + '%';
-        val.addEventListener('input', function () { st.value = parseInt(val.value, 10); pct.textContent = val.value + '%'; });
+        function showVal() { pct.textContent = st.value < 0 ? 'avoid ' + (-st.value) + '%' : st.value + '%'; pct.classList.toggle('avoid', st.value < 0); }
+        showVal();
+        val.addEventListener('input', function () {
+          st.value = parseInt(val.value, 10);
+          showVal();
+          if (st.value < 0 && !st.use) { st.use = true; cb.checked = true; tr.classList.add('on'); }
+        });
         td4.appendChild(val); td4.appendChild(pct);
-        [td1, td2, td3, td4].forEach(function (td) { tr.appendChild(td); });
+        [td1, td2, td3, tdN, td4].forEach(function (td) { tr.appendChild(td); });
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -1412,13 +1483,20 @@
 
     findBtn.addEventListener('click', function () {
       if (!info) return;
-      var weights = {};
-      Object.keys(values).forEach(function (k) { if (values[k].use && values[k].value > 0) weights[k] = values[k].value / 100; });
-      if (!Object.keys(weights).length) { resultsBox.textContent = 'Tick at least one outcome you want.'; return; }
+      var weights = {}, mins = {};
+      Object.keys(values).forEach(function (k) {
+        if (!values[k].use) return;
+        if (values[k].value) weights[k] = values[k].value / 100;
+        if (values[k].need > 0) mins[k] = values[k].need;
+      });
+      var anyWant = Object.keys(weights).some(function (k) { return weights[k] > 0; }) || Object.keys(mins).length;
+      if (!anyWant) { resultsBox.textContent = 'Tick at least one outcome you want (or set a Need ×).'; return; }
       var my = ++seq;
       resultsBox.textContent = 'Checking every ' + jewelSel.value + ' seed…';
+      lastMins = mins;
       window.pywebview.api.timeless_search(jtype(), parseInt(sockSel.value, 10), JSON.stringify(b.tree.nodes),
-                                           JSON.stringify(weights), unalloc.checkbox.checked).then(function (r) {
+                                           JSON.stringify(weights), unalloc.checkbox.checked,
+                                           JSON.stringify(mins)).then(function (r) {
         if (my !== seq) return;
         if (!r || !r.ok) { resultsBox.textContent = '❌ ' + ((r && r.error) || 'failed'); return; }
         renderSeeds(r);
@@ -1428,6 +1506,19 @@
     function outcomeLabel(key) {
       var o = info.outcomes.find(function (x) { return x.key === key; });
       return o ? o.dn : key;
+    }
+    var lastMins = {};
+
+    // "Minion Damage ×3 (60%)": count, plus the summed value when the outcome is
+    // a single fixed number ("Minions deal 20% increased Damage")
+    function outcomeTotal(key, n) {
+      var o = info.outcomes.find(function (x) { return x.key === key; });
+      var label = (o ? o.dn.replace(/^Add /, '') : key) + ' ×' + n;
+      if (o && o.sd.length === 1) {
+        var m = o.sd[0].match(/([+-]?)(\d+(?:\.\d+)?)(%?)/);
+        if (m && !/\(\d/.test(o.sd[0])) label += ' (' + m[1] + (Math.round(parseFloat(m[2]) * n * 10) / 10) + m[3] + ')';
+      }
+      return label;
     }
 
     function renderSeeds(r) {
@@ -1439,8 +1530,9 @@
       }
       var head = document.createElement('div');
       head.className = 'finder-sub';
-      head.textContent = r.matches + ' seeds give at least one wanted outcome on the ' + r.considered.length +
-        ' notable' + (r.considered.length === 1 ? '' : 's') + ' counted. Best ' + r.results.length + ':';
+      var needTxt = Object.keys(lastMins).map(function (k) { return outcomeLabel(k).replace(/^Add /, '') + ' ×' + lastMins[k] + '+'; });
+      head.textContent = r.matches + ' seeds ' + (needTxt.length ? 'meet ' + needTxt.join(' and ') : 'give at least one wanted outcome') +
+        ' on the ' + r.considered.length + ' notable' + (r.considered.length === 1 ? '' : 's') + ' counted. Best ' + r.results.length + ':';
       resultsBox.appendChild(head);
       var priceTop = document.createElement('button');
       priceTop.className = 'copy-btn';
@@ -1462,13 +1554,32 @@
         var td1 = document.createElement('td'); td1.className = 'num'; td1.textContent = x.seed;
         var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = x.score.toFixed(2);
         var td3 = document.createElement('td');
+        // headline: totals of the outcomes you care about (wanted first, then avoided)
+        var tot = document.createElement('div');
+        tot.className = 'ts-totals';
+        Object.keys(x.counts || {}).filter(function (k) { return values[k] && values[k].use; })
+          .sort(function (a, c) { return (values[c].value - values[a].value) || (x.counts[c] - x.counts[a]); })
+          .forEach(function (k, i) {
+            var chip = document.createElement('span');
+            chip.className = values[k].value < 0 ? 'ts-avoid' : 'ts-hit';
+            chip.textContent = outcomeTotal(k, x.counts[k]);
+            if (i) tot.appendChild(document.createTextNode(' · '));
+            tot.appendChild(chip);
+          });
+        if (!tot.childNodes.length) tot.textContent = '—';
+        td3.appendChild(tot);
+        var det = document.createElement('details');
+        var sm = document.createElement('summary');
+        sm.textContent = 'per notable';
+        det.appendChild(sm);
         x.notables.forEach(function (p, i) {
           var span = document.createElement('span');
-          span.className = p.weight > 0 ? 'ts-hit' : 'ts-miss';
+          span.className = p.weight > 0 ? 'ts-hit' : p.weight < 0 ? 'ts-avoid' : 'ts-miss';
           span.textContent = nodeName(J, p.node) + ' → ' + outcomeLabel(p.key);
-          if (i) td3.appendChild(document.createTextNode(' · '));
-          td3.appendChild(span);
+          if (i) det.appendChild(document.createTextNode(' · '));
+          det.appendChild(span);
         });
+        td3.appendChild(det);
         var td4 = document.createElement('td');
         var pb = document.createElement('button');
         pb.className = 'copy-btn';
@@ -1498,7 +1609,23 @@
     });
 
     [jewelSel, sockSel].forEach(function (el) { el.addEventListener('change', load); });
-    load();
+    if (timelessPending) { var pend = timelessPending; timelessPending = null; timelessApplyPreset(pend); }
+    else load();
+  }
+
+  // "Find seeds for this socket" on a timeless jewel card → Timeless tab, preset
+  var timelessApplyPreset = null, timelessPending = null;
+  function openTimelessFor(state) {
+    var itemId = build && Object.keys(build.items).find(function (k) { return build.items[k] === state.item; });
+    var sock = itemId && build.tree && build.tree.sockets.find(function (s) { return s.itemId === itemId; });
+    var seedRow = state.rows.find(function (r) { return r.match && /^explicit\.pseudo_timeless_jewel_/.test(r.match.entry.id); });
+    var seed = seedRow ? Math.round(parseFloat(seedRow.minInput.value)) : null;
+    var preset = { jewel: state.resolvedName, socket: sock ? sock.nodeId : null, seed: seed && !isNaN(seed) ? seed : null };
+    var tab = Array.prototype.find.call(document.querySelectorAll('.tab-btn'), function (t) { return /Timeless/.test(t.textContent); });
+    if (tab) tab.click();
+    if (timelessApplyPreset) timelessApplyPreset(preset);
+    else timelessPending = preset;
+    window.scrollTo(0, 0);
   }
 
   function makeTimelessPanel() {
@@ -1697,8 +1824,10 @@
     if (T[name]) return name;
     var best = null;
     for (var k in T) {
-      if (name.length > k.length && name.slice(-k.length) === k &&
-          (!best || k.length > best.length)) best = k;
+      if (name.length <= k.length || (best && k.length <= best.length)) continue;
+      // "Foulborn The Red Nightmare" (prefix) or PoB's renamed copies like
+      // "Brutal Restraint 2582; 3; Minion Instability" (suffix after a space)
+      if (name.slice(-k.length) === k || name.slice(0, k.length + 1) === k + ' ') best = k;
     }
     return best || name;
   }
@@ -1740,8 +1869,10 @@
 
   // background: swap every gem row to the trade site's single-frame art.
   // First run costs throttled lookups; afterwards it's all disk cache.
-  async function resolveGemIcons(names) {
+  async function resolveGemIcons(names, round) {
     if (!isGui() || !window.pywebview.api.gem_icon) return;
+    round = round || 0;
+    var skipped = [];
     for (var i = 0; i < names.length; i++) {
       var name = names[i];
       if (GEM_ICONS[name]) { applyGemIcon(name, GEM_ICONS[name]); continue; }
@@ -1750,8 +1881,13 @@
         if (res && res.ok && res.icon) {
           GEM_ICONS[name] = res.icon;
           applyGemIcon(name, res.icon);
+        } else if (res && /cooldown/i.test(res.error || '')) {
+          skipped.push(name); // lookups yield to rate limits — try these again later
         }
       } catch (e) { return; /* bridge gone — stop quietly */ }
+    }
+    if (skipped.length && round < ICON_RETRIES) {
+      setTimeout(function () { resolveGemIcons(skipped, round + 1); }, ICON_RETRY_MS);
     }
   }
 
@@ -2217,24 +2353,13 @@
     // uniques: swap base art for the real unique art (trade lookup, disk-cached)
     if (isUnique && isGui()) {
       if (iconEl) {
-        window.pywebview.api.unique_icon(state.resolvedName || item.name, item.base).then(function (res) {
-          if (res && res.ok && res.icon && iconEl.isConnected) {
-            iconEl.src = res.icon;
-            iconEl.dataset.swapped = '1';
-            iconEl.classList.remove('atlas2');
-          }
-        }).catch(function () { /* keep base art */ });
+        iconWithRetry(function () { return window.pywebview.api.unique_icon(state.resolvedName || item.name, item.base); },
+                      iconEl);
       }
     } else if (iconEl && (flaskBase || /flask|tincture/i.test(item.base || '')) && isGui() && window.pywebview.api.gem_icon) {
       // flasks: fetch the trade site's single-frame render (cached forever)
       var fb = flaskBase || item.base;
-      window.pywebview.api.gem_icon(fb).then(function (res) {
-        if (res && res.ok && res.icon && iconEl.isConnected) {
-          iconEl.src = res.icon;
-          iconEl.dataset.swapped = '1';
-          iconEl.classList.remove('atlas2');
-        }
-      }).catch(function () { /* keep cropped art */ });
+      iconWithRetry(function () { return window.pywebview.api.gem_icon(fb); }, iconEl);
     }
 
     var body = document.createElement('div');
@@ -2340,6 +2465,16 @@
     state.liveBtn = liveBtn;
     btnWrap.appendChild(liveBtn);
 
+    if (state.unique && TIMELESS_TYPES.some(function (t) { return t[1] === state.resolvedName; }) &&
+        build && build.tree && build.tree.nodes.length) {
+      var tsBtn = document.createElement('button');
+      tsBtn.className = 'copy-btn gui-only';
+      tsBtn.textContent = '⏳ Find seeds for this socket';
+      tsBtn.title = 'Open the timeless jewel finder on the socket this jewel sits in — see what your seed does and find better ones';
+      tsBtn.addEventListener('click', function () { openTimelessFor(state); });
+      btnWrap.appendChild(tsBtn);
+    }
+
     if (item.rarity === 'RARE' && !/^(Jewel|Flask|Abyssal)/.test(slot)) {
       var craftBtn = document.createElement('button');
       craftBtn.className = 'copy-btn';
@@ -2407,6 +2542,83 @@
 
   // Render an item's mod rows with a trade-site style separator between the
   // implicit block and the explicit mods.
+  var DESCRIPTIVE_LINES = /^Passives in radius are Conquered by the /i;
+
+  // ---- art from GGG's CDN, kept on disk ------------------------------------------
+  // The WebView forgets its HTTP cache on exit, so the bridge saves each image to
+  // data/art_cache once (art_cache.py); later launches load the local copy. Keyed by
+  // the exact URL — GGG's art URLs change when the art does, so changed art is
+  // simply a new download. One observer covers every <img> the app creates.
+  var ART = {}, artQueue = [], artQueued = {}, artTimer = null;
+  var CDN = 'https://web.poecdn.com/';
+
+  function artSwap(img) {
+    var src = img.getAttribute('src') || '';
+    if (src.indexOf(CDN) !== 0) return;
+    if (ART[src]) {
+      img.dataset.remote = src;
+      img.setAttribute('src', ART[src]);
+    } else if (!artQueued[src]) {
+      artQueued[src] = true;
+      artQueue.push(src);
+      if (!artTimer) artTimer = setTimeout(flushArt, 1500);
+    }
+  }
+
+  function flushArt() {
+    artTimer = null;
+    var batch = artQueue.splice(0, 40);
+    if (!batch.length) return;
+    window.pywebview.api.cache_art(JSON.stringify(batch)).then(function (r) {
+      if (r && r.ok) Object.keys(r.art).forEach(function (u) { ART[u] = r.art[u]; });
+    }, function () {}).then(function () {
+      if (artQueue.length && !artTimer) artTimer = setTimeout(flushArt, 1500);
+    });
+  }
+
+  function startArtCache() {
+    if (!isGui() || !window.pywebview.api.art_manifest) return;
+    window.pywebview.api.art_manifest().then(function (r) {
+      if (r && r.ok) ART = r.art || {};
+      document.querySelectorAll('img').forEach(artSwap);
+      new MutationObserver(function (muts) {
+        muts.forEach(function (m) {
+          if (m.type === 'attributes') { if (m.target.tagName === 'IMG') artSwap(m.target); return; }
+          m.addedNodes.forEach(function (n) {
+            if (n.nodeType !== 1) return;
+            if (n.tagName === 'IMG') artSwap(n);
+            else n.querySelectorAll && n.querySelectorAll('img').forEach(artSwap);
+          });
+        });
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
+      // a cached file that went missing: fall back to the CDN and forget the entry
+      document.addEventListener('error', function (e) {
+        var img = e.target;
+        if (img && img.tagName === 'IMG' && img.dataset.remote && img.getAttribute('src') !== img.dataset.remote) {
+          delete ART[img.dataset.remote];
+          img.setAttribute('src', img.dataset.remote);
+        }
+      }, true);
+    }, function () {});
+  }
+
+  // Art lookups are background trade calls that yield to any rate-limit cooldown;
+  // when skipped, try again later instead of leaving the card without art.
+  var ICON_RETRY_MS = 30000, ICON_RETRIES = 10;
+  function iconWithRetry(lookup, img, tries) {
+    tries = tries || 0;
+    lookup().then(function (res) {
+      if (!img.isConnected) return;
+      if (res && res.ok && res.icon) {
+        img.src = res.icon;
+        img.dataset.swapped = '1';
+        img.classList.remove('atlas2');
+      } else if (res && /cooldown/i.test(res.error || '') && tries < ICON_RETRIES) {
+        setTimeout(function () { iconWithRetry(lookup, img, tries + 1); }, ICON_RETRY_MS);
+      }
+    }).catch(function () { /* keep base art */ });
+  }
+
   function addModRows(state, body, item, slot, defaultOff) {
     var prevKind = null;
     item.mods.forEach(function (mod) {
@@ -2417,6 +2629,9 @@
       }
       prevKind = mod.kind;
       var match = Matcher.matchMod(statIndex, mod, slot);
+      // descriptive unique text with no trade stat (timeless jewels' "Passives in
+      // radius are Conquered by the …") — not searchable, so don't list it as an error
+      if (!match && DESCRIPTIVE_LINES.test(mod.line)) return;
       body.appendChild(makeModRow(state, mod, match, defaultOff));
     });
   }
@@ -2429,7 +2644,10 @@
     cb.type = 'checkbox';
     // Bench crafts (crafted explicits) start off — you'll re-craft those. Crafted
     // implicits (cluster jewel passive count / small-passive grants) must stay on.
-    cb.checked = !!match && !defaultOff && !(mod.crafted && mod.kind === 'explicit');
+    // On uniques (defaultOff), lines from the selected variant start ON: they're what
+    // makes this copy the one the build wants (Impossible Escape's keystone, a
+    // timeless jewel's conqueror + seed).
+    cb.checked = !!match && (!defaultOff || !!mod.variant) && !(mod.crafted && mod.kind === 'explicit');
     cb.disabled = !match;
 
     // trade-site convention: colour identifies the mod source, no text labels
@@ -2480,7 +2698,9 @@
     var showInput = false;
     var rangeHint = null;
     if (match) {
-      rowState.exactCount = !!EXACT_COUNT_TEXTS[match.entry.text];
+      // timeless jewel seeds are identities, not rolls: search the exact number
+      rowState.exactCount = !!EXACT_COUNT_TEXTS[match.entry.text] ||
+                            /^explicit\.pseudo_timeless_jewel_/.test(match.entry.id);
       var pseudoOn = document.getElementById('pseudo').checked;
       var eff = effectiveMatch(rowState, pseudoOn);
       var pct = parseInt(document.getElementById('pct').value, 10) / 100;

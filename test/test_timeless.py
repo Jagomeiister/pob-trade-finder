@@ -67,6 +67,26 @@ check("search: reported outcome matches a direct lookup", again[0] + str(again[1
 only_alloc = T.search(3, 61419, alloc[:2], {target: 1}, top=3)
 check("search: only allocated notables count unless asked", len(only_alloc["considered"]) == 2)
 
+# minimum counts ("need Minion Damage x3 AND Aura Effect x2") and avoid weights
+second = inf["outcomes"][1]["key"]
+need = T.search(3, 61419, alloc, {target: 1, second: 0.5}, mins={target: 3, second: 2}, top=50)
+check("mins: every result meets every minimum",
+      need["results"] and all(x["counts"].get(target, 0) >= 3 and x["counts"].get(second, 0) >= 2 for x in need["results"]),
+      need["matches"])
+brute = 0
+for s in range(T.seed_count(3)):
+    c = {}
+    for n in alloc:
+        o = T.outcome(3, n, s)
+        if o:
+            c[o[0] + str(o[1])] = c.get(o[0] + str(o[1]), 0) + 1
+    if c.get(target, 0) >= 3 and c.get(second, 0) >= 2:
+        brute += 1
+check("mins: match count equals a brute-force count", need["matches"] == brute, (need["matches"], brute))
+avoid = T.search(3, 61419, alloc, {target: 1, second: -5}, top=10)
+check("avoid: top seeds don't carry the avoided outcome", all(x["counts"].get(second, 0) == 0 for x in avoid["results"]))
+check("mins: impossible requirement finds nothing", T.search(3, 61419, alloc, {}, mins={target: 99})["matches"] == 0)
+
 # Elegant Hubris seeds are stored /20; real seeds are multiples of 20 in 2000..160000
 eh = T.info(5, 61419, alloc)
 key = eh["outcomes"][0]["key"]
