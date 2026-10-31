@@ -203,10 +203,7 @@
       document.getElementById(id).addEventListener('change', updateContextChips);
     });
     document.getElementById('pct').addEventListener('input', updateContextChips);
-    document.getElementById('settings-btn-side').addEventListener('click', function () {
-      document.getElementById('settings-panel').classList.toggle('hidden');
-      window.scrollTo(0, 0);
-    });
+    document.getElementById('settings-btn-side').addEventListener('click', function () { openSettings(this); });
     // character import
     if (saved.account) document.getElementById('acct-input').value = saved.account;
     document.getElementById('acct-load').addEventListener('click', async function () {
@@ -331,11 +328,11 @@
       document.getElementById('pob-input').value = window.POE_SAMPLE_BUILD;
       document.getElementById('decode-btn').click();
     });
-    document.getElementById('settings-btn').addEventListener('click', function () {
-      document.getElementById('settings-panel').classList.toggle('hidden');
-    });
-    document.getElementById('settings-close').addEventListener('click', function () {
-      document.getElementById('settings-panel').classList.add('hidden');
+    document.getElementById('settings-btn').addEventListener('click', function () { openSettings(this); });
+    document.getElementById('settings-close').addEventListener('click', closeSettings);
+    document.getElementById('settings-backdrop').addEventListener('click', closeSettings);
+    document.getElementById('settings-panel').addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); closeSettings(); }
     });
     document.getElementById('check-updates-btn').addEventListener('click', function () {
       checkForUpdates(true);
@@ -612,6 +609,21 @@
     setView(present.indexOf(keep) !== -1 || keep === 'planner' || keep === 'market' ? keep : present[0] || 'planner');
     renderCostSummary(); // clears stale summary — fresh cards have no prices yet
     applyCharDiff();     // re-annotate fresh cards if a character is loaded
+  }
+
+  // ---- settings drawer: slides in from the right, focus stays inside until closed ----
+  var settingsOpener = null;
+  function openSettings(opener) {
+    settingsOpener = opener || null;
+    document.getElementById('settings-backdrop').classList.remove('hidden');
+    var panel = document.getElementById('settings-panel');
+    panel.classList.remove('hidden');
+    document.getElementById('settings-close').focus();
+  }
+  function closeSettings() {
+    document.getElementById('settings-backdrop').classList.add('hidden');
+    document.getElementById('settings-panel').classList.add('hidden');
+    if (settingsOpener) settingsOpener.focus();
   }
 
   // ---- app shell: views, sidebar nav, slot lists, search context ---------------
@@ -1223,16 +1235,11 @@
                customPayload: payloadFn };
     cards.push(st);
     var btns = document.createElement('div');
-    btns.className = 'btns';
-    var pBtn = UI.button('secondary', { cls: 'gui-only' });
-    pBtn.textContent = 'Check price';
-    pBtn.addEventListener('click', function () { checkPrice(st); });
-    var lBtn = UI.button('secondary', { cls: 'gui-only' });
-    lBtn.textContent = '🔴 Go live';
-    lBtn.addEventListener('click', function () { toggleLive(st); });
-    var oBtn = UI.button('primary');
-    oBtn.textContent = 'Search on trade site ↗';
-    oBtn.addEventListener('click', function () { var u = buildTradeUrl(st); if (u) openUrl(u); });
+    btns.className = 'btns finder-actions';
+    var pBtn = UI.button('primary', { cls: 'gui-only', label: 'Check price', onClick: function () { checkPrice(st); } });
+    var lBtn = UI.button('secondary', { cls: 'gui-only', label: '🔴 Go live', onClick: function () { toggleLive(st); } });
+    var oBtn = UI.button('secondary', { cls: 'act-search', label: 'Search on trade ↗',
+      onClick: function () { var u = buildTradeUrl(st); if (u) openUrl(u); } });
     btns.appendChild(pBtn); btns.appendChild(lBtn); btns.appendChild(oBtn);
     container.appendChild(btns);
     st.priceBtn = pBtn; st.liveBtn = lBtn;
@@ -1247,6 +1254,18 @@
     return st;
   }
 
+  // numbered step panel: the jewel tools read top to bottom as 1 → 2 → 3 → 4
+  function finderStep(parent, n, title, hint) {
+    var sec = UI.el('section', 'finder-step');
+    var h = UI.el('h3', 'step-title');
+    h.appendChild(UI.el('span', 'step-num', String(n)));
+    h.appendChild(document.createTextNode(title));
+    sec.appendChild(h);
+    if (hint) sec.appendChild(UI.el('div', 'finder-sub step-hint', hint));
+    parent.appendChild(sec);
+    return sec;
+  }
+
   function finderOpts() {
     return { status: document.getElementById('trade-status').value,
              saleType: document.getElementById('sale-type').value };
@@ -1254,7 +1273,7 @@
 
   function makeJewelFinder(b) {
     var wrap = document.createElement('div');
-    wrap.className = 'card finder';
+    wrap.className = 'finder';
     wrap.innerHTML = '<div class="finder-loading">Reading your passive tree…</div>';
     ensureJewelData().then(function (J) { renderJewelFinder(wrap, b, J); }, function (e) {
       wrap.textContent = '❌ ' + e.message;
@@ -1266,12 +1285,8 @@
     wrap.textContent = '';
     var P = Jewels.profile(b, J);
 
-    // ---- header: what the build is about, and its sockets
-    var head = document.createElement('div');
-    head.className = 'finder-head';
-    var h = document.createElement('h3');
-    h.textContent = '💎 Jewel finder';
-    head.appendChild(h);
+    // ---- 1: what the build is about, and its sockets
+    var head = finderStep(wrap, 1, 'Your build', 'What your tree and main skill scale — mods are ranked by this.');
     var focus = document.createElement('div');
     focus.className = 'finder-focus';
     focus.appendChild(document.createTextNode('Build focus: '));
@@ -1300,9 +1315,9 @@
         (P.gems.length ? ' · main skill: ' + P.gems[0] : '')
       : 'No jewel sockets allocated' + (P.gems.length ? ' · main skill: ' + P.gems[0] : '');
     head.appendChild(sline);
-    wrap.appendChild(head);
 
-    // ---- controls
+    // ---- 2: what kind of jewel, and how to search
+    var step2 = finderStep(wrap, 2, 'Jewel and search type');
     var ctr = document.createElement('div');
     ctr.className = 'card-opts finder-opts';
     var kindSel = makeMiniSelect(ctr, 'Jewel', JEWEL_KINDS.map(function (k) { return k[1]; }), JEWEL_KINDS[0][1]);
@@ -1318,19 +1333,21 @@
     var minQ = makeMiniSelect(ctr, 'Min quality', ['any', '30%', '45%', '60%'], '30%');
     minQ.title = 'Weighted search: minimum share of the best possible score (all your picked mods max-rolled)';
     var maxPrice = makeMiniInput(ctr, 'Max price', 'c');
-    wrap.appendChild(ctr);
+    step2.appendChild(ctr);
     if (hasAbyss) {
       var note = document.createElement('div');
       note.className = 'finder-sub';
       note.textContent = 'Your gear has abyssal sockets — pick an Eye jewel type above for abyss jewels.';
-      wrap.appendChild(note);
+      step2.appendChild(note);
     }
 
-    // ---- ranked mod list
-    var modSearch = makeFinderSearch(wrap, 'Search mods — e.g. "crit multi", "es recharge", "minion dmg"', function () { renderList(); });
+    // ---- 3: ranked mod list
+    var step3 = finderStep(wrap, 3, 'Pick mods',
+      'Want = counts toward the search · Must = every result has it. Best for your build is at the top.');
+    var modSearch = makeFinderSearch(step3, 'Search mods — e.g. "crit multi", "es recharge", "minion dmg"', function () { renderList(); });
     var list = document.createElement('div');
     list.className = 'finder-mods';
-    wrap.appendChild(list);
+    step3.appendChild(list);
     var picks = {}; // tail -> {use, required, score}
     var ranked = [];
     var showAll = false;
@@ -1353,7 +1370,7 @@
       var table = document.createElement('table');
       table.className = 'finder-table';
       var thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th scope="col">Use</th><th scope="col">Must</th><th scope="col">Mod</th>' +
+      thead.innerHTML = '<tr><th scope="col">Pick</th><th scope="col">Mod</th>' +
         '<th scope="col" class="num">Best roll</th><th scope="col">Value to your build</th></tr>';
       table.appendChild(thead);
       var tbody = document.createElement('tbody');
@@ -1364,25 +1381,17 @@
         var p = picks[m.tail];
         var tr = document.createElement('tr');
         if (p && p.use) tr.className = 'on';
-        var use = document.createElement('input');
-        use.type = 'checkbox'; use.checked = !!(p && p.use);
-        use.setAttribute('aria-label', 'Use ' + m.text);
-        var must = document.createElement('input');
-        must.type = 'checkbox'; must.checked = !!(p && p.required);
-        must.setAttribute('aria-label', 'Require ' + m.text);
-        use.addEventListener('change', function () {
-          picks[m.tail] = picks[m.tail] || { score: m.score };
-          picks[m.tail].use = use.checked;
-          if (!use.checked) { picks[m.tail].required = false; must.checked = false; }
-          tr.classList.toggle('on', use.checked);
-        });
-        must.addEventListener('change', function () {
-          picks[m.tail] = picks[m.tail] || { score: m.score };
-          picks[m.tail].required = must.checked;
-          if (must.checked) { picks[m.tail].use = true; use.checked = true; tr.classList.add('on'); }
-        });
-        var td1 = document.createElement('td'); td1.appendChild(use);
-        var td2 = document.createElement('td'); td2.appendChild(must);
+        var pick = UI.segmented([['off', 'Off'], ['want', 'Want'], ['must', 'Must']],
+          p && p.required ? 'must' : p && p.use ? 'want' : 'off', {
+            ariaLabel: m.text,
+            titles: { want: 'Counts toward the search', must: 'Every result must have this mod' },
+            onChange: function (v) {
+              picks[m.tail] = picks[m.tail] || { score: m.score };
+              picks[m.tail].use = v !== 'off';
+              picks[m.tail].required = v === 'must';
+              tr.classList.toggle('on', v !== 'off');
+            } });
+        var td1 = document.createElement('td'); td1.appendChild(pick);
         var td3 = document.createElement('td'); td3.textContent = m.text;
         var td4 = document.createElement('td'); td4.className = 'num'; td4.textContent = fmtCompact(m.max);
         var td5 = document.createElement('td');
@@ -1400,7 +1409,7 @@
           picks[m.tail].score = parseInt(val.value, 10) / 100;
         });
         td5.appendChild(val); td5.appendChild(pct);
-        [td1, td2, td3, td4, td5].forEach(function (td) { tr.appendChild(td); });
+        [td1, td3, td4, td5].forEach(function (td) { tr.appendChild(td); });
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -1422,7 +1431,7 @@
     function payload(quiet) {
       var sel = selected();
       if (!sel.length) {
-        if (!quiet) UI.toast('Tick at least one mod in the jewel finder first.', 'warn');
+        if (!quiet) UI.toast('Set at least one mod to Want or Must first.', 'warn');
         return null;
       }
       var k = kind();
@@ -1453,13 +1462,12 @@
     syncModeControls();
     rerank(true);
 
-    var hint = document.createElement('div');
-    hint.className = 'finder-sub';
-    hint.textContent = '"Best for my build" scores every listed jewel by your picks (a max roll is worth its value % × 100) ' +
+    // ---- 4: search
+    var step4 = finderStep(wrap, 4, 'Find jewels',
+      '"Best for my build" scores every listed jewel by your picks (a max roll is worth its value % × 100) ' +
       'and sorts by score — in-app checks of weighted searches need a saved POESESSID (higher query budget); ' +
-      'the trade-site link works while you are logged in there.';
-    wrap.appendChild(hint);
-    makeFinderState('Jewel finder', wrap, payload);
+      'the trade-site link works while you are logged in there.');
+    makeFinderState('Jewel finder', step4, payload);
 
   }
 
@@ -1477,12 +1485,9 @@
 
   function makeTimelessFinder(b) {
     var wrap = document.createElement('div');
-    wrap.className = 'card finder timeless-finder';
-    var h = document.createElement('h3');
-    h.textContent = '⏳ Timeless jewel finder';
-    wrap.appendChild(h);
+    wrap.className = 'finder timeless-finder';
     var intro = document.createElement('div');
-    intro.className = 'finder-sub';
+    intro.className = 'finder-sub finder-intro';
     intro.textContent = 'Pick a socket from your tree: every seed is checked against the notables in its radius, ' +
       'ranked by the outcomes your build wants, and the best seeds can be priced in one click. ' +
       'Covers all six: Glorious Vanity, Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy.';
@@ -1562,15 +1567,19 @@
     UI.field('Socket', sockSel, { parent: ctr });
     var unalloc = makeToggle(ctr, 'Also count unallocated notables', false);
     unalloc.checkbox.parentElement.title = 'Include notables in radius you have not taken — a good seed can make pathing to them worth it';
-    body.appendChild(ctr);
+    var step1 = finderStep(body, 1, 'Jewel and socket',
+      'The seed decides what each notable in the radius becomes; the conqueror only changes the keystone.');
+    step1.appendChild(ctr);
 
     var summary = document.createElement('div');
     summary.className = 'finder-sub';
-    body.appendChild(summary);
+    step1.appendChild(summary);
+    var step2 = finderStep(body, 2, 'What you want',
+      'Tick the outcomes you want. Need × drops seeds with fewer; drag a value left of zero to avoid an outcome.');
     var importedNote = document.createElement('div');
     importedNote.className = 'finder-sub';
-    body.appendChild(importedNote);
-    var outcomeSearch = makeFinderSearch(body, 'Search outcomes — e.g. "minion", "crit", "flask"', function () { if (info) renderOutcomes(); });
+    step2.appendChild(importedNote);
+    var outcomeSearch = makeFinderSearch(step2, 'Search outcomes — e.g. "minion", "crit", "flask"', function () { if (info) renderOutcomes(); });
     var suggestBtn = UI.button('secondary');
     suggestBtn.textContent = '✨ Suggest for my build';
     suggestBtn.title = 'Tick the outcomes that match what your tree and main skill scale (value 50% or more)';
@@ -1589,11 +1598,14 @@
     outcomeSearch.parentElement.appendChild(suggestBtn);
     outcomeSearch.parentElement.appendChild(clearBtn);
     var outcomesBox = document.createElement('div');
-    body.appendChild(outcomesBox);
+    step2.appendChild(outcomesBox);
     var findBtn = UI.button('primary');
     findBtn.textContent = '🔎 Find best seeds';
     var resultsBox = document.createElement('div');
     resultsBox.className = 'timeless-results';
+    var step3 = finderStep(body, 3, 'Best seeds', 'Every seed is scored against your picks; price the top ones in one click.');
+    step3.appendChild(findBtn);
+    step3.appendChild(resultsBox);
 
     var info = null, values = {}, seq = 0;
     var priced = { name: '', seeds: [] };
@@ -1676,7 +1688,7 @@
           ' with your current picks. Find best seeds to compare.'));
       });
     }
-    outcomesBox.parentNode.insertBefore(currentBox, outcomesBox);
+    step1.appendChild(currentBox);
 
     // open on a given jewel/socket (from a timeless jewel card in the build)
     timelessApplyPreset = function (p) {
@@ -1760,8 +1772,6 @@
       });
       table.appendChild(tbody);
       outcomesBox.appendChild(table);
-      outcomesBox.appendChild(findBtn);
-      outcomesBox.appendChild(resultsBox);
     }
 
     findBtn.addEventListener('click', function () {
@@ -3896,6 +3906,16 @@
     tile.title = 'Divine Orb price, 7 days — GGG currency exchange (' + league + '), hour of ' +
       updated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + '. Click for more currencies.';
 
+    // Market page headline: the Divine Orb, large
+    var chart = document.getElementById('market-chart');
+    chart.textContent = '';
+    chart.appendChild(UI.el('div', 'mc-label', 'Divine Orb · 7 days · ' + league));
+    var big = UI.el('div', 'mc-value', lastDiv ? fmtCompact(lastDiv) + 'c' : '—');
+    if (div.length > 1) big.appendChild(UI.el('span', 'mc-delta', fmtDelta(div[0].v, lastDiv)));
+    chart.appendChild(big);
+    chart.appendChild(sparkline(div, { w: 720, h: 140, label: 'Divine Orb in chaos, 7 days',
+      fmt: function (v) { return fmtCompact(v) + 'c'; } }));
+
     var panel = document.getElementById('market-panel');
     var body = panel.querySelector('tbody');
     body.textContent = '';
@@ -4099,34 +4119,47 @@
     var rows = cards.filter(function (s) { return s.cheapestChaos !== undefined && !s.bought; });
     if (!rows.length) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
-    box.innerHTML = '<div class="cost-head">Build cost — cheapest listing per checked slot</div>';
-    box.firstChild.appendChild(copyButton('📋 Copy', function () {
+    box.innerHTML = '';
+    box.appendChild(UI.sectionHeader('Build cost — cheapest listing per checked slot', [copyButton('📋 Copy', function () {
       var lines = ['Build cost (' + league + ') — cheapest listing per slot'];
       var t = 0;
       rows.forEach(function (s) { t += s.cheapestChaos; lines.push(s.slot + ': ' + (s.item.name || s.item.base || '') + ' — ' + fmtEq(s.cheapestChaos, league)); });
       lines.push('TOTAL: ' + fmtEq(t, league) + ' for ' + rows.length + ' slot(s)');
       return lines.join('\n');
-    }));
+    })]));
     var total = 0;
-    rows.forEach(function (s) {
-      total += s.cheapestChaos;
-      var row = document.createElement('div');
-      row.className = 'cost-row';
-      row.innerHTML = '<span class="cost-slot">' + esc(s.slot) + '</span>' +
-        '<span class="cost-item">' + esc(s.item.name) + '</span>' +
-        '<span class="cost-amt">' + fmtEq(s.cheapestChaos, league) + '</span>';
-      box.appendChild(row);
-    });
+    rows.forEach(function (s) { total += s.cheapestChaos; });
+    box.appendChild(UI.table([
+      { key: 'slot', label: 'Slot', render: function (s) { return s.slot; }, sort: function (s) { return s.slot; } },
+      { key: 'item', label: 'Item', render: function (s) { return slotLink(s); }, sort: function (s) { return s.item.name || ''; } },
+      { key: 'price', label: 'Cheapest', num: true, render: function (s) { return fmtEq(s.cheapestChaos, league); },
+        sort: function (s) { return s.cheapestChaos; } }
+    ], rows, { sortable: true }));
     var dr = divRate(league);
     var secondary = eqMode() === 'divine'
       ? '  (' + fmtChaos(total) + ')'
       : (dr ? '  (' + (Math.round(total / dr * 10) / 10) + ' div)' : '');
     var totalRow = document.createElement('div');
-    totalRow.className = 'cost-row cost-total';
-    totalRow.innerHTML = '<span class="cost-slot">TOTAL</span><span class="cost-item">' +
-      rows.length + ' slot(s) priced</span><span class="cost-amt">' + fmtEq(total, league) + secondary + '</span>';
+    totalRow.className = 'cost-total';
+    totalRow.innerHTML = '<span>Total · ' + rows.length + ' slot(s) priced</span><span class="cost-amt">' +
+      fmtEq(total, league) + esc(secondary) + '</span>';
     box.appendChild(totalRow);
     renderSolver(box, league);
+  }
+
+  // item name that jumps to its slot (planner tables)
+  function slotLink(state) {
+    var b = UI.el('button', 'link-btn', state.resolvedName || state.item.name || state.item.base || state.slot);
+    b.type = 'button';
+    b.title = 'Show this slot';
+    b.addEventListener('click', function () {
+      var sec = state.card && state.card.closest('.tab-section');
+      if (!sec) return;
+      setView(sec.dataset.tab);
+      if (sec.classList.contains('master-detail')) selectSlot(sec, state.card);
+      window.scrollTo(0, 0);
+    });
+    return b;
   }
 
   var solverResTarget = 300, solverLifeTarget = 0, solverResult = null;
@@ -4275,17 +4308,13 @@
     box.classList.remove('hidden');
     box.innerHTML = '';
     var league = document.getElementById('league').value;
-    var head = document.createElement('div');
-    head.className = 'basket-head';
     var total = 0, totalKnown = true;
     b.forEach(function (it) {
       var rate = RATES[league] && RATES[league][it.currency];
       if (it.amount !== null && it.amount !== undefined && rate !== undefined) total += it.amount * rate;
       else totalKnown = false;
     });
-    head.textContent = 'Shopping basket — ' + b.length + ' item(s)' +
-      (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : '');
-    head.appendChild(copyButton('📋 Copy list', function () {
+    var copyList = copyButton('📋 Copy list', function () {
       var lines = ['Shopping list (' + league + ')' + (total ? ' — ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : '')];
       b.forEach(function (it) {
         lines.push('- ' + ((it.name ? it.name + ' ' : '') + it.base) + ' — ' + it.account + ' — ' +
@@ -4294,25 +4323,16 @@
         if (it.tradeUrl) lines.push('  ' + it.tradeUrl);
       });
       return lines.join('\n');
-    }));
-    head.appendChild(UI.button('secondary', { size: 'sm', label: 'Clear', onClick: function () {
+    });
+    var clear = UI.button('secondary', { label: 'Clear', onClick: function () {
       UI.confirmDanger('Clear the basket?', 'All ' + b.length + ' pinned item(s) will be removed.', 'Clear basket')
         .then(function (ok) { if (ok) { saveBasket([]); renderBasket(); } });
-    } }));
-    box.appendChild(head);
+    } });
+    box.appendChild(UI.sectionHeader('Shopping basket — ' + b.length + ' item(s)' +
+      (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : ''), [copyList, clear]));
 
-    b.forEach(function (it, idx) {
-      var row = document.createElement('div');
-      row.className = 'basket-row';
-      var label = document.createElement('span');
-      label.className = 'basket-item';
-      label.textContent = ((it.name ? it.name + ' ' : '') + it.base) + '  —  ' + it.account;
-      var price = document.createElement('span');
-      price.className = 'basket-price';
-      price.textContent = (it.amount !== null && it.amount !== undefined)
-        ? it.amount + ' ' + it.currency : 'no price';
-      row.appendChild(label);
-      row.appendChild(price);
+    function basketActions(it, idx) {
+      var row = UI.el('span', 'row-acts');
       if (it.tradeUrl) {
         var tl = UI.button('secondary', { size: 'sm' });
         tl.textContent = '↗ Trade';
@@ -4336,8 +4356,17 @@
             renderBasket();
           });
       } }));
-      box.appendChild(row);
-    });
+      return row;
+    }
+    var indexed = b.map(function (it, idx) { return { it: it, idx: idx }; });
+    box.appendChild(UI.table([
+      { key: 'item', label: 'Item', render: function (r) { return (r.it.name ? r.it.name + ' ' : '') + r.it.base; } },
+      { key: 'seller', label: 'Seller', render: function (r) { return r.it.account; } },
+      { key: 'price', label: 'Price', num: true, render: function (r) {
+        return (r.it.amount !== null && r.it.amount !== undefined) ? r.it.amount + ' ' + r.it.currency : 'no price';
+      } },
+      { key: 'acts', label: '', render: function (r) { return basketActions(r.it, r.idx); } }
+    ], indexed));
   }
 
   // ---- sold watcher: periodically re-check open results, grey out listings ------
@@ -5305,8 +5334,8 @@
           refreshHotkeyStatus(window.pywebview.api.set_price_hotkey(this.value));
         }
       });
-      document.getElementById('settings-btn').addEventListener('click', function () {
-        refreshHotkeyStatus();
+      ['settings-btn', 'settings-btn-side'].forEach(function (id) {
+        document.getElementById(id).addEventListener('click', function () { refreshHotkeyStatus(); });
       });
     }
     if (!OVERLAY) return;

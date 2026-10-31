@@ -69,17 +69,24 @@
       <button id="check-all" class="btn btn-primary gui-only">Check all prices</button>
     </div>
 
-    <div id="settings-panel" class="hidden" role="dialog" aria-label="Settings">
-      <div class="settings-head">Settings <button id="settings-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close settings">✕</button></div>
-      <div class="settings-grid">
-        <label>Theme
+    <div id="settings-backdrop" class="drawer-backdrop hidden"></div>
+    <aside id="settings-panel" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="drawer-head">
+        <h2 id="settings-title">Settings</h2>
+        <button id="settings-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close settings">✕</button>
+      </div>
+      <section class="settings-section">
+        <h3>Appearance</h3>
+        <label class="field">
+          <span class="field-label">Theme</span>
           <select id="pref-theme">
             <option value="dark">Dark</option>
             <option value="light">Light</option>
             <option value="system">Match Windows</option>
           </select>
         </label>
-        <label>Accent
+        <label class="field">
+          <span class="field-label">Accent</span>
           <select id="pref-accent">
             <option value="gold">Gold</option>
             <option value="crimson">Crimson</option>
@@ -88,7 +95,8 @@
             <option value="green">Green</option>
           </select>
         </label>
-        <label>Text size
+        <label class="field">
+          <span class="field-label">Text size</span>
           <select id="pref-fontsize">
             <option value="90">Small</option>
             <option value="100">Normal</option>
@@ -96,38 +104,57 @@
             <option value="125">Extra large</option>
           </select>
         </label>
-        <label>Density
+        <label class="field">
+          <span class="field-label">Density</span>
           <select id="pref-density">
             <option value="comfortable">Comfortable</option>
             <option value="compact">Compact</option>
           </select>
         </label>
-        <label><input type="checkbox" id="pref-sound" checked> Sound alerts (live-search ding)</label>
-        <label class="gui-only"><input type="checkbox" id="pref-notify" checked> Windows notification for live hits while the app is in the background</label>
-        <label>Alert volume <input type="range" id="pref-volume" min="5" max="100" value="25"></label>
-        <label><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
-        <label><input type="checkbox" id="pref-contrast"> High contrast text</label>
-        <label><input type="checkbox" id="pref-cb"> Colourblind-friendly sockets (letter labels)</label>
-        <span class="gui-only">
-          <label>Price-check hotkey
-            <select id="pref-hotkey" title="Hover an item in Path of Exile and press this to price it in a small overlay. Only active while the game window is focused.">
-              <option value="ctrl+d">Ctrl+D</option>
-              <option value="ctrl+shift+d">Ctrl+Shift+D</option>
-              <option value="alt+d">Alt+D</option>
-              <option value="off">Off</option>
-            </select>
-          </label>
-          <span id="hotkey-status" class="hotkey-status"></span>
-        </span>
-        <span class="gui-only">
+      </section>
+      <section class="settings-section">
+        <h3>Accessibility</h3>
+        <label class="check"><input type="checkbox" id="pref-contrast"> High contrast text</label>
+        <label class="check"><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
+        <label class="check"><input type="checkbox" id="pref-cb"> Colourblind-friendly sockets (letter labels)</label>
+      </section>
+      <section class="settings-section">
+        <h3>Alerts</h3>
+        <label class="check"><input type="checkbox" id="pref-sound" checked> Sound for live-search hits</label>
+        <label class="field"><span class="field-label">Volume</span> <input type="range" id="pref-volume" min="5" max="100" value="25"></label>
+        <label class="check gui-only"><input type="checkbox" id="pref-notify" checked> Windows notification when the app is in the background</label>
+      </section>
+      <section class="settings-section gui-only">
+        <h3>In game</h3>
+        <label class="field">
+          <span class="field-label">Price-check hotkey</span>
+          <select id="pref-hotkey" title="Hover an item in Path of Exile and press this to price it in a small overlay. Only active while the game window is focused.">
+            <option value="ctrl+d">Ctrl+D</option>
+            <option value="ctrl+shift+d">Ctrl+Shift+D</option>
+            <option value="alt+d">Alt+D</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <div id="hotkey-status" class="hotkey-status"></div>
+      </section>
+      <section class="settings-section gui-only">
+        <h3>Account</h3>
+        <p class="settings-note">Optional. Your pathofexile.com POESESSID cookie unlocks instant live-search alerts and bigger searches. It is stored only on this PC and sent only to pathofexile.com. Save empty to clear.</p>
+        <div class="char-sessid">
+          <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID">
+          <button id="sessid-save" class="btn btn-secondary">Save</button>
+        </div>
+        <div id="sessid-status"></div>
+      </section>
+      <section class="settings-section gui-only">
+        <h3>Data and updates</h3>
+        <div class="settings-row">
           <button id="refresh-data" class="btn btn-secondary" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
-        </span>
-        <span class="gui-only">
           <button id="check-updates-btn" class="btn btn-secondary">Check for updates</button>
-          <span id="update-check-status"></span>
-        </span>
-      </div>
-    </div>
+        </div>
+        <div id="update-check-status" class="settings-note"></div>
+      </section>
+    </aside>
 
     <div id="update-banner" class="hidden">
       <span id="update-label"></span>
@@ -204,6 +231,7 @@
         <div class="empty-title">No market data yet</div>
         <div class="empty-text">Currency history comes from GGG's hourly exchange feed in the desktop app.</div>
       </div>
+      <section id="market-chart" class="market-chart" aria-label="Divine Orb price, 7 days"></section>
       <div id="market-panel" class="market-panel">
         <table>
           <caption class="mp-caption"></caption>
@@ -260,12 +288,6 @@
     <label class="toggle hidden" id="hide-matched-wrap"><input type="checkbox" id="hide-matched"> Hide matched slots</label>
     <button id="value-gear" class="btn btn-secondary hidden" title="Price what your character is wearing — one search per item, rate-limit safe">💰 Value my gear</button>
     <span id="char-status"></span>
-    <div class="char-sessid">
-      <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID (optional)"
-        title="Paste your pathofexile.com POESESSID cookie to unlock instant WebSocket live-search alerts (same as the trade website). Stored only on this machine, sent only to pathofexile.com. Save empty to clear.">
-      <button id="sessid-save" class="btn btn-secondary">Save</button>
-      <span id="sessid-status"></span>
-    </div>
   </div>
 </div>
 <script>

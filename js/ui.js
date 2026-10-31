@@ -360,6 +360,49 @@
     return t;
   }
 
+  // Segmented choice (radio group of buttons). options: [['off', 'Off'], ...]
+  // opts: { ariaLabel, onChange(value), titles: { value: tooltip } }. el.value / el.setValue(v)
+  function segmented(options, value, opts) {
+    opts = opts || {};
+    var g = el('div', 'segmented');
+    g.setAttribute('role', 'radiogroup');
+    if (opts.ariaLabel) g.setAttribute('aria-label', opts.ariaLabel);
+    var buttons = [];
+    function set(v) {
+      g.value = v;
+      buttons.forEach(function (b) {
+        var on = b.dataset.value === v;
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        b.tabIndex = on ? 0 : -1;
+      });
+    }
+    options.forEach(function (o, i) {
+      var b = el('button', 'seg', o[1]);
+      b.type = 'button';
+      b.dataset.value = o[0];
+      b.setAttribute('role', 'radio');
+      if (opts.titles && opts.titles[o[0]]) b.title = opts.titles[o[0]];
+      b.addEventListener('click', function () {
+        if (g.value === o[0]) return;
+        set(o[0]);
+        if (opts.onChange) opts.onChange(o[0]);
+      });
+      b.addEventListener('keydown', function (e) {
+        var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (!d) return;
+        e.preventDefault();
+        var next = buttons[(i + d + buttons.length) % buttons.length];
+        next.focus();
+        next.click();
+      });
+      buttons.push(b);
+      g.appendChild(b);
+    });
+    g.setValue = set;
+    set(value);
+    return g;
+  }
+
   // Empty state: { title, text, action (Node) }
   function emptyState(opts) {
     var e = el('div', 'empty-state');
@@ -372,7 +415,7 @@
   var UI = { el: el, button: button, iconButton: iconButton, select: select, input: input, field: field,
              chip: chip, sectionHeader: sectionHeader, panel: panel, table: table, disclosure: disclosure,
              menu: menu, popover: popover, closePopups: closeLayer, dialog: dialog, confirmDanger: confirmDanger,
-             toast: toast, emptyState: emptyState };
+             toast: toast, emptyState: emptyState, segmented: segmented };
   if (typeof module !== 'undefined' && module.exports) module.exports = UI;
   else root.UI = UI;
 })(typeof window !== 'undefined' ? window : this);

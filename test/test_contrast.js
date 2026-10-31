@@ -137,7 +137,7 @@ check('index.html loads js/ui.js before app.js',
   html.indexOf("'js/ui.js'") >= 0 && html.indexOf("'js/ui.js'") < html.indexOf("'js/app.js'"));
 const UI = require('../js/ui.js');
 ['button', 'iconButton', 'select', 'input', 'field', 'chip', 'sectionHeader', 'panel', 'table', 'disclosure',
- 'menu', 'popover', 'dialog', 'confirmDanger', 'toast', 'emptyState'].forEach(function (k) {
+ 'menu', 'popover', 'dialog', 'confirmDanger', 'toast', 'emptyState', 'segmented'].forEach(function (k) {
   check('UI.' + k + ' exported', typeof UI[k] === 'function');
 });
 let threw = false;
