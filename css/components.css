@@ -507,3 +507,6 @@ body.cb-sockets .sock-A::after { content: 'A'; }
 body.gui .settings-section.gui-only { display: flex; }
 .settings-section .char-sessid { border-top: 0; padding-top: 0; }
 .finder-step + .finder-step { margin-top: 12px; }
+/* timeless outcomes: wanted / avoided are marked, not just coloured */
+.ts-hit::before { content: '✓ '; }
+.ts-avoid::before { content: '✗ '; }

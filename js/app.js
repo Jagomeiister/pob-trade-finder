@@ -195,6 +195,20 @@
       ta.select();
     });
     document.getElementById('back-to-build').addEventListener('click', showBuild);
+    // narrow windows: the sidebar is an icon rail and the build card opens as a flyout
+    var sidebar = document.getElementById('sidebar');
+    var railBtn = document.getElementById('rail-build-btn');
+    function setFlyout(on) {
+      sidebar.classList.toggle('show-build', on);
+      railBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    }
+    railBtn.addEventListener('click', function () { setFlyout(!sidebar.classList.contains('show-build')); });
+    document.addEventListener('mousedown', function (e) {
+      if (sidebar.classList.contains('show-build') && !e.target.closest('#build-bar, #rail-build-btn, .popover')) setFlyout(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && sidebar.classList.contains('show-build')) { setFlyout(false); railBtn.focus(); }
+    });
     UI.popover(document.getElementById('search-settings-btn'), document.getElementById('search-settings'),
       { label: 'Search settings', cls: 'popover-search' });
     UI.popover(document.getElementById('compare-btn'), document.getElementById('char-pop'),
@@ -332,7 +346,15 @@
     document.getElementById('settings-close').addEventListener('click', closeSettings);
     document.getElementById('settings-backdrop').addEventListener('click', closeSettings);
     document.getElementById('settings-panel').addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { e.preventDefault(); closeSettings(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeSettings(); return; }
+      if (e.key !== 'Tab') return;
+      // modal drawer: Tab wraps around inside it
+      var f = Array.prototype.filter.call(this.querySelectorAll('button, select, input'), function (el) {
+        return !el.disabled && el.offsetParent !== null;
+      });
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     });
     document.getElementById('check-updates-btn').addEventListener('click', function () {
       checkForUpdates(true);
@@ -498,6 +520,7 @@
       renderBuild();
       showBuild();
     } catch (err) {
+      UI.toast('Could not load that build — see the message under the paste box.', 'danger');
       status.textContent = '❌ ' + err.message +
         (/^https?:\/\//i.test(input) && !isGui()
           ? ' — link fetching can be blocked by the site (CORS). Open the link, copy the PoB export code, and paste the code itself.'
@@ -632,6 +655,9 @@
   var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                       timeless: 'Timeless jewels', finder: 'Jewel finder', pasted: 'Pasted item',
                       planner: 'Upgrade planner', market: 'Market' };
+  // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
+  var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
+                     timeless: '⏳', finder: '🔍', market: '📈' };
 
   function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
 
@@ -661,7 +687,11 @@
       var b = UI.el('button', 'nav-item');
       b.type = 'button';
       b.dataset.view = k;
-      b.appendChild(UI.el('span', null, VIEW_LABELS[k]));
+      b.title = VIEW_LABELS[k];
+      var ic = UI.el('span', 'nav-icon', VIEW_ICONS[k] || '•');
+      ic.setAttribute('aria-hidden', 'true');
+      b.appendChild(ic);
+      b.appendChild(UI.el('span', 'nav-label', VIEW_LABELS[k]));
       b.appendChild(UI.el('span', 'nav-count', navCount(k)));
       b.addEventListener('click', function () { setView(k); window.scrollTo(0, 0); });
       nav.appendChild(b);
@@ -2476,7 +2506,9 @@
             panel.classList.add('hidden');
             expandBtn.textContent = '▾';
           }
+          expandBtn.setAttribute('aria-expanded', panel.classList.contains('hidden') ? 'false' : 'true');
         }
+        expandBtn.setAttribute('aria-expanded', 'false');
         expandBtn.addEventListener('click', togglePanel);
         label.style.cursor = 'pointer';
         label.addEventListener('click', togglePanel);
@@ -5093,7 +5125,12 @@
           // click any listing mod to sort all results by it
           line.classList.add('sortable');
           line.title = 'Click to sort results by this mod (again for lowest, again to clear)';
+          line.tabIndex = 0;
+          line.setAttribute('role', 'button');
           line.addEventListener('click', function () { cycleSort(state, m.hash, m.text); });
+          line.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleSort(state, m.hash, m.text); }
+          });
         }
         modsEl.appendChild(line);
       });

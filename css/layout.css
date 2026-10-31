@@ -9,7 +9,7 @@ body:not(.has-build) .app-main { max-width: 860px; padding-top: 28px; }
 
 /* ---- sidebar ---- */
 .sidebar {
-  display: none; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  display: none; position: sticky; top: 0; z-index: 20; height: 100vh; overflow-y: auto;
   flex-direction: column; gap: 14px; padding: 14px 12px;
   background: var(--s1); border-right: 1px solid var(--border);
 }
@@ -307,6 +307,31 @@ body.overlay #overlay-bar {
 body.overlay .card.pasted { margin-bottom: 0; }
 body.overlay .btns { margin-left: 0; width: 100%; flex-wrap: wrap; }
 body.overlay .btns > * { white-space: nowrap; }
+
+/* ---- medium windows (the app opens 1280 wide; users shrink it): icon rail ---- */
+.nav-icon { display: none; width: 18px; text-align: center; flex: none; }
+.nav-item .nav-label { flex: 1; }
+#rail-build-btn { display: none; }
+@media (min-width: 1001px) and (max-width: 1180px) {
+  body.has-build .app-shell { grid-template-columns: 64px minmax(0, 1fr); }
+  .sidebar { padding: 12px 8px; align-items: center; }
+  .brand span { display: none; }
+  #rail-build-btn { display: inline-flex; }
+  .sidebar .build-card { display: none; }
+  .sidebar.show-build .build-card:not(.hidden) {
+    display: flex; position: fixed; left: 72px; top: 12px; width: 260px; z-index: 30;
+    border: 1px solid var(--border-strong); box-shadow: 0 8px 24px var(--shadow);
+  }
+  .nav { align-items: center; }
+  .nav-group { display: none; }
+  .nav-item { width: 44px; justify-content: center; padding: 0; }
+  .nav-item .nav-label, .nav-item .nav-count, #settings-btn-side .nav-label { display: none; }
+  .nav-icon { display: inline; font-size: var(--fs-lg); }
+  .side-foot { align-items: center; }
+  .side-foot .market-tile { display: none !important; }
+  #settings-btn-side { width: 44px; padding: 0; justify-content: center; }
+  .master-detail { grid-template-columns: 220px minmax(0, 1fr); }
+}
 
 /* ---- narrow windows: sidebar on top, slot list above the item ---- */
 @media (max-width: 1000px) {
