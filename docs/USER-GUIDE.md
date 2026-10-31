@@ -222,6 +222,19 @@ Cards get a coloured edge — green (matched, rolls included), gold (close), red
 and **Hide matched slots** collapses what you already own so you only shop the gaps.
 Works with the per-slot gear-set dropdowns, so you can compare against any mix.
 
+**⬆ Upgrades only** (on each rare card's strip) raises every ticked mod's minimum to
+what you're wearing. Searches, price checks and live alerts then only show items at
+least as good as yours on every stat you care about, and the card re-checks prices
+straight away.
+
+**💰 Value my gear** prices everything the character wears, one search per item:
+- **Uniques** search by name. The cheapest copy is a floor, because roll quality matters.
+- **Rares** search for similar items: same base, any N−1 of their mods at 85% or more of
+  your rolls.
+
+Each result links to its listings, and the total is an estimate. Rares are hard to price
+automatically, so treat it as a guide.
+
 ## 6c. Budget, deals, basket
 
 - **Max price** (per card, chaos-equivalent) filters searches, price checks, *and* live
@@ -272,6 +285,14 @@ with the cheapest listing from **Check price**.
 ding** and appear at the top with a red flash and timestamp. Maximum 2 live searches at
 once. The query is frozen at go-live, so changing filters mid-watch can't corrupt it.
 Press ⏹ to stop.
+
+**Price alerts:** set the card's **Max price**, then **Go live**. Any new listing under that
+price dings, and if the app is in the background you also get a **Windows notification**
+naming the item and price (turn this off in ⚙ settings).
+
+**📋 Copy** on the build cost summary and the shopping basket copies them as plain text.
+The basket copy includes each seller's whisper and trade link, ready for Discord or a
+friend.
 
 ### 7b. Instant alerts (POESESSID)
 

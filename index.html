@@ -216,6 +216,11 @@
   .btns .trade-btn, .btns .copy-btn { height: 32px; padding-top: 0; padding-bottom: 0; }
   button { font-family: inherit; }
   .hist-sel { max-width: 200px; }
+  .welcome { border: 1px solid var(--border-hi); border-radius: 8px; background: var(--panel-deep);
+    padding: 12px 16px; margin-bottom: 12px; }
+  .welcome-title { color: var(--gold); font-weight: 600; margin-bottom: 6px; }
+  .welcome ol { margin: 0 0 8px 18px; padding: 0; color: var(--text); line-height: 1.6; }
+  .welcome kbd { border: 1px solid var(--border-hi); border-radius: 3px; padding: 0 4px; font-size: 12px; }
   /* sparklines: de-emphasis line, accent latest point, crosshair on hover/focus */
   .spark { position: relative; display: inline-block; vertical-align: middle; line-height: 0; }
   .spark:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
@@ -713,6 +718,7 @@
         </select>
       </label>
       <label><input type="checkbox" id="pref-sound" checked> Sound alerts (live-search ding)</label>
+      <label class="gui-only"><input type="checkbox" id="pref-notify" checked> Windows notification for live hits while the app is in the background</label>
       <label>Alert volume <input type="range" id="pref-volume" min="5" max="100" value="25"></label>
       <label><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
       <label><input type="checkbox" id="pref-contrast"> High contrast text</label>
@@ -741,6 +747,20 @@
   </div>
 
   <div id="input-panel">
+    <div id="welcome" class="welcome hidden">
+      <div class="welcome-title">👋 Welcome to PoB Trade Finder</div>
+      <ol>
+        <li><b>Paste a build:</b> in Path of Building, use Import/Export Build → Generate → Copy, then paste the code (or a pobb.in link) below.</li>
+        <li><b>Shop it:</b> every slot becomes a card with the build's mods pre-filled. Use <i>Search on trade site</i>, or <i>Check price</i> to see listings here.</li>
+        <li><b>Find upgrades:</b> load your character to see what each slot is missing, then tick <i>⬆ Upgrades only</i>.</li>
+        <li><b>Jewels:</b> the <i>⏳ Timeless jewels</i> tab finds the best seed for your sockets; <i>💎 Jewel finder</i> ranks jewel mods for your build.</li>
+        <li><b>In game:</b> hover an item and press <kbd>Ctrl+D</kbd> to price it (⚙ settings to change the key).</li>
+      </ol>
+      <div class="input-row">
+        <button id="welcome-sample" class="copy-btn">Try a sample build</button>
+        <button id="welcome-close" class="copy-btn">Got it</button>
+      </div>
+    </div>
     <textarea id="pob-input" placeholder="Paste your PoB export code or a pobb.in / pastebin / poe.ninja link…&#10;(PoB → Import/Export Build → Generate → Copy)"></textarea>
     <div class="input-row">
       <button id="decode-btn">Decode build</button>
@@ -767,6 +787,7 @@
     <select id="char-select" class="hidden"></select>
     <button id="char-compare" class="copy-btn hidden">Compare gear</button>
     <label class="toggle hidden" id="hide-matched-wrap"><input type="checkbox" id="hide-matched"> Hide matched slots</label>
+    <button id="value-gear" class="copy-btn hidden" title="Price what your character is wearing — one search per item, rate-limit safe">💰 Value my gear</button>
     <span id="char-status"></span>
     <span style="margin-left:auto"></span>
     <input type="password" id="sessid-input" placeholder="POESESSID (optional)"
@@ -775,6 +796,7 @@
     <span id="sessid-status"></span>
   </div>
 
+  <div id="gear-value" class="hidden"></div>
   <div id="cost-summary" class="hidden"></div>
   <div id="basket" class="hidden"></div>
 
@@ -845,7 +867,7 @@
 (function () {
   var v = Date.now();
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
-   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js',
+   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/sample.js',
    'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/app.js'].forEach(function (src) {
     document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');
   });

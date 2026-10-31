@@ -25,7 +25,7 @@ import price_hotkey
 from currency_feed import CurrencyFeed
 from timeless import TimelessData
 
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -739,6 +739,36 @@ class Api:
                   "error": None if sys.platform == "win32" else "Windows only"}
         st["ok"] = True
         return st
+
+    # -- desktop notifications (live-search hits while the app is in the background) --
+    # Windows toast via PowerShell's built-in WinRT bindings — no extra dependency.
+    # Text travels in environment variables and is XML-escaped inside the script,
+    # so listing text can never become script or markup.
+    NOTIFY_MIN_GAP = 4.0
+    _TOAST_PS = (
+        "[void][Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime];"
+        "[void][Windows.Data.Xml.Dom.XmlDocument,Windows.Data.Xml.Dom.XmlDocument,ContentType=WindowsRuntime];"
+        "$t=[Security.SecurityElement]::Escape($env:PTF_TITLE);$b=[Security.SecurityElement]::Escape($env:PTF_BODY);"
+        "$x=New-Object Windows.Data.Xml.Dom.XmlDocument;"
+        "$x.LoadXml(\"<toast><visual><binding template='ToastGeneric'><text>$t</text><text>$b</text></binding></visual></toast>\");"
+        "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("
+        "'{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe')"
+        ".Show([Windows.UI.Notifications.ToastNotification]::new($x))"
+    )
+
+    def notify(self, title, body):
+        try:
+            now = time.time()
+            if now - getattr(self, "_last_notify", 0.0) < self.NOTIFY_MIN_GAP:
+                return {"ok": False, "error": "throttled"}
+            self._last_notify = now
+            env = dict(os.environ, PTF_TITLE=str(title)[:120], PTF_BODY=str(body)[:240])
+            subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", self._TOAST_PS],
+                             env=env, creationflags=0x08000000,  # CREATE_NO_WINDOW
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     # -- rate-limit visibility -------------------------------------------------------
     def rate_status(self):

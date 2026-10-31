@@ -41,6 +41,7 @@ SHIP = [
     "data/craftdata.js",
     "data/jeweldata.js",
     "data/timeless.json",
+    "data/sample.js",
     "data/stats.json",
     "data/leagues.json",
 ]
