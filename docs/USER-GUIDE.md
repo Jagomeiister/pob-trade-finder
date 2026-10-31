@@ -175,6 +175,11 @@ The **Upgrade planner** page (sidebar) collects the shopping side:
 - **Build cost** — a table of the cheapest listing per priced slot, with a total in chaos
   and divines. Click a column heading to sort; click an item name to jump to its slot.
   Run **Check all prices** to fill it
+- **Cost over time** — every pricing session is remembered per build (checks under an
+  hour apart count as one session). Below the total: the change since your last check,
+  plus a chart, always comparing the *same* slots, so pricing more slots never looks
+  like a price change. The sidebar build card shows the cost and change too, and when
+  you reload a saved build it shows what the build cost when you last priced it
 - **Shopping basket** — everything you've pinned (§6c)
 - **Value my gear** results (§6b)
 
@@ -228,7 +233,12 @@ Price an item without leaving the game:
 3. A small always-on-top **Price check** window opens on the side of the screen away
    from your cursor, shows the item's card and prices it straight away. The listings
    work like the main window's: sort, page, whisper, pin, live search
-4. **Esc** or **✕** hides it and puts you back in the game
+4. Selling it? The **List at ~X** line above the listings suggests a price. It matches
+   the cheapest *real* competitor: listings under 60% of the typical price on the first
+   page are bait or price fixers and are ignored. **Open full search ↗** opens the same
+   search on the trade site. The suggestion also shows for items you paste (Ctrl+C) into
+   the main window
+5. **Esc** or **✕** hides it and puts you back in the game
 
 Details:
 
@@ -458,6 +468,10 @@ To refresh by hand, press **⚙ Settings → Refresh trade data**. From source:
 `python tools/make_baseicons.py --fetch` when patches add new mods/bases.
 
 ## 10. Troubleshooting
+
+Reporting a bug: **⚙ Settings → Copy diagnostics** copies the app version, Windows
+version, data dates, recent errors and the last log lines. Paste that into the GitHub
+issue. Your POESESSID, other tokens and your Windows user name are removed.
 
 | Symptom | Fix |
 |---|---|

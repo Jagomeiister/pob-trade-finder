@@ -7,6 +7,24 @@
   var build = null;         // parsed build
   var cards = [];           // per-item UI state
 
+  // ---- recent errors, for Settings → Copy diagnostics ------------------------------
+  var RECENT_ERRORS = [];
+  function noteError(msg) {
+    RECENT_ERRORS.push(new Date().toLocaleTimeString() + ' ' + String(msg).slice(0, 300));
+    if (RECENT_ERRORS.length > 15) RECENT_ERRORS.shift();
+  }
+  window.addEventListener('error', function (e) {
+    noteError('JS error: ' + e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    noteError('JS error (async): ' + ((e.reason && e.reason.message) || e.reason));
+  });
+  var uiToast = UI.toast; // warnings and errors the user was shown
+  UI.toast = function (message, tone, opts) {
+    if (tone === 'danger' || tone === 'warn') noteError('shown: ' + message);
+    return uiToast(message, tone, opts);
+  };
+
   // ---- slot -> trade category ---------------------------------------------
   var SLOT_CATEGORY = {
     'Helmet': 'armour.helmet',
@@ -361,6 +379,7 @@
     document.getElementById('check-updates-btn').addEventListener('click', function () {
       checkForUpdates(true);
     });
+    document.getElementById('copy-diagnostics').addEventListener('click', copyDiagnostics);
     if (LIGHT_QUERY && LIGHT_QUERY.addEventListener) {
       LIGHT_QUERY.addEventListener('change', function () { if (PREFS.theme === 'system') applyPrefs(); });
     }
@@ -488,6 +507,41 @@
     }).catch(function () { /* offline — skip */ });
   }
 
+  // ---- Settings → Copy diagnostics ---------------------------------------------------
+  // Bridge summary (version, OS, data dates, log tails — redacted in gui.py) plus what
+  // the page knows: view, league, build size, display settings, recent errors.
+  async function copyDiagnostics() {
+    var btn = document.getElementById('copy-diagnostics');
+    btn.disabled = true;
+    var parts = [];
+    if (isGui() && window.pywebview.api.diagnostics) {
+      try {
+        var r = await window.pywebview.api.diagnostics();
+        parts.push(r && r.ok ? r.text : 'desktop diagnostics failed: ' + ((r && r.error) || 'unknown'));
+      } catch (e) { parts.push('desktop diagnostics failed: ' + e.message); }
+    } else {
+      parts.push('PoB Trade Finder (browser mode, no desktop app)');
+    }
+    var page = ['', '--- page ---',
+      'View: ' + (document.body.dataset.view || 'start') + ' · League: ' + document.getElementById('league').value,
+      'Build: ' + (build ? (build.ascendClass || build.className || '?') + ', ' + Object.keys(build.items).length +
+        ' items, ' + cards.length + ' cards' : 'none loaded'),
+      'Display: theme ' + PREFS.theme + ', text ' + (PREFS.fontsize || 100) + '%, window ' + window.innerWidth + '×' +
+        window.innerHeight + ', ' + navigator.userAgent.replace(/^.*?(Edg\/[\d.]+|Chrome\/[\d.]+).*$/, '$1'),
+      'Market: ' + (market ? Object.keys(market.items).length + ' items, feed hour ' +
+        new Date(market.hour * 1000).toISOString().slice(0, 16) : 'not loaded')];
+    page.push('', '--- recent errors (' + RECENT_ERRORS.length + ') ---');
+    page = page.concat(RECENT_ERRORS.length ? RECENT_ERRORS : ['none']);
+    var text = parts.concat(page).join('\n');
+    var done = function () {
+      btn.disabled = false;
+      UI.toast('Diagnostics copied. Paste them into your bug report.', 'success');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+    } else { fallbackCopy(text); done(); }
+  }
+
   // ---- new league autopilot ------------------------------------------------------
   // On launch and every 6h the live trade-league list (one background call) is compared
   // with the bundled one. A challenge league the user hasn't been offered yet gets a
@@ -587,6 +641,7 @@
       var nSets = (build.itemSets || []).length;
       document.getElementById('build-sub').textContent =
         Object.keys(build.items).length + ' items' + (nSets > 1 ? ' · ' + nSets + ' gear sets' : '');
+      showLastBuildCost();
       renderBuild();
       showBuild();
     } catch (err) {
@@ -4198,12 +4253,13 @@
   }
 
   // "▲ 12.3%": arrow + number, never colour alone
-  function pctChip(x) {
+  // costly: a rise is bad news (build cost), so it takes the "down" colour
+  function pctChip(x, costly) {
     var span = UI.el('span', 'pct');
     if (x === null || x === undefined || !isFinite(x)) { span.textContent = '—'; return span; }
     var p = x * 100;
     span.textContent = Math.abs(p) < 0.05 ? '±0.0%' : (p > 0 ? '▲ ' : '▼ ') + Math.abs(p).toFixed(1) + '%';
-    span.classList.add(Math.abs(p) < 0.05 ? 'flat' : p > 0 ? 'up' : 'down');
+    span.classList.add(Math.abs(p) < 0.05 ? 'flat' : (p > 0) !== !!costly ? 'up' : 'down');
     return span;
   }
 
@@ -4706,6 +4762,12 @@
         }
       });
     }
+    // pasted / Ctrl+D items: you're selling — suggest a list price from the cheapest page
+    var psSell = state.priceState;
+    if (state === pastedState && psSell && !state.sortSpec) {
+      if (psSell.page === 0) psSell.sell = sellSuggestion(priced.map(function (p) { return p.chaos; }));
+      if (psSell.sell !== undefined) renderSellHint(state);
+    }
     if (cheapest !== null) {
       // merge across pages — later pages must never raise the "cheapest"
       var ps2 = state.priceState;
@@ -4717,6 +4779,39 @@
       }
       renderCostSummary();
     }
+  }
+
+  // ---- selling: suggested list price ------------------------------------------------
+  // From the first page (the cheapest listings at the card's filters): listings under
+  // 60% of the page median are bait or price fixers (the 🔥 deal rule), so the
+  // suggestion matches the cheapest listing that's left.
+  function sellSuggestion(values) {
+    var v = values.slice().sort(function (a, b) { return a - b; });
+    if (v.length < 3) return null;
+    var median = v[Math.floor(v.length / 2)];
+    var real = v.filter(function (x) { return x >= median * 0.6; });
+    return { price: real[0], median: median, count: v.length, skipped: v.length - real.length };
+  }
+
+  function renderSellHint(state) {
+    var box = state.priceBox, ps = state.priceState, sug = ps.sell;
+    var old = box.querySelector('.sell-hint');
+    if (old) old.remove();
+    var hint = UI.el('div', 'sell-hint');
+    if (!sug) {
+      hint.appendChild(UI.el('span', 'sell-note', 'Only ' + ps.total + ' listed with these filters, too few to suggest a ' +
+        'price. Lower the min roll % to compare with more listings.'));
+    } else {
+      hint.appendChild(UI.el('span', 'sell-label', 'List at'));
+      hint.appendChild(UI.el('b', 'sell-price', '~' + fmtEq(sug.price, ps.league)));
+      hint.appendChild(UI.el('span', 'sell-note', 'the cheapest real competitor of ' + ps.total + ' listed. ' +
+        'The middle of the cheapest ' + sug.count + ' is ' + fmtEq(sug.median, ps.league) + '.' +
+        (sug.skipped ? ' Ignored ' + sug.skipped + ' suspiciously cheap listing' + (sug.skipped > 1 ? 's' : '') + '.' : '')));
+    }
+    hint.appendChild(UI.button('ghost', { label: 'Open full search ↗', size: 'sm',
+      title: 'Open this search on pathofexile.com/trade', onClick: function () { openUrl(tradeUrlFor(ps.league, ps.payloadStr)); } }));
+    var head = box.querySelector('.price-head');
+    if (head) head.after(hint); else box.insertBefore(hint, box.firstChild);
   }
 
   // ---- budget solver: cheapest listing combo meeting build-wide targets ----------
@@ -4845,7 +4940,129 @@
     totalRow.innerHTML = '<span>Total · ' + rows.length + ' slot(s) priced</span><span class="cost-amt">' +
       fmtEq(total, league) + esc(secondary) + '</span>';
     box.appendChild(totalRow);
+    var trend = buildCostTrend(recordBuildCost(rows, league), league);
+    renderBuildCostCard(trend, league);
+    if (trend && trend.points.length > 1) box.appendChild(costTrendPanel(trend, league));
     renderSolver(box, league);
+  }
+
+  // ---- build cost history ------------------------------------------------------------
+  // pobtf-costhist: { buildKey: { _ts, snaps: [{ ts, league, slots: {slotKey: chaos}}] } }.
+  // One snapshot per pricing session (checks less than an hour apart refine the same
+  // one). Sessions are compared on the slots priced now, so pricing more or fewer slots
+  // never looks like a price change.
+  var COST_SESSION_MS = 3600 * 1000, COST_SNAPS = 60, COST_BUILDS = 30;
+  function loadCostHist() {
+    try { var h = JSON.parse(localStorage.getItem('pobtf-costhist')); if (h && typeof h === 'object') return h; }
+    catch (e) { /* none yet */ }
+    return {};
+  }
+
+  function recordBuildCost(rows, league) {
+    if (!build) return null;
+    var slots = {}, n = 0;
+    rows.forEach(function (s) {
+      if (s === pastedState) return; // a pasted item isn't part of the build
+      slots[slotKey(s)] = Math.round(s.cheapestChaos * 10) / 10;
+      n++;
+    });
+    var all = loadCostHist(), bk = buildKey();
+    var h = all[bk] = all[bk] || { snaps: [] };
+    if (!n) return h;
+    var now = Date.now(), last = h.snaps[h.snaps.length - 1];
+    if (last && last.league === league && now - last.ts < COST_SESSION_MS) {
+      if (JSON.stringify(last.slots) === JSON.stringify(slots)) return h; // nothing new to store
+      last.slots = slots;
+      last.ts = now;
+    } else {
+      h.snaps.push({ ts: now, league: league, slots: slots });
+      h.snaps = h.snaps.slice(-COST_SNAPS);
+    }
+    h._ts = now;
+    var keys = Object.keys(all).sort(function (a, b) { return (all[b]._ts || 0) - (all[a]._ts || 0); });
+    keys.slice(COST_BUILDS).forEach(function (k) { delete all[k]; });
+    try { persist('pobtf-costhist', JSON.stringify(all)); } catch (e) { /* storage full */ }
+    return h;
+  }
+
+  // the latest snapshot's slots, summed in every earlier session (same league) that
+  // priced all of them
+  function buildCostTrend(h, league) {
+    if (!h || !h.snaps.length) return null;
+    var cur = h.snaps[h.snaps.length - 1];
+    if (cur.league !== league) return null;
+    var keys = Object.keys(cur.slots);
+    var points = [];
+    h.snaps.forEach(function (s) {
+      if (s.league !== league) return;
+      var sum = 0;
+      for (var i = 0; i < keys.length; i++) {
+        if (s.slots[keys[i]] === undefined) return;
+        sum += s.slots[keys[i]];
+      }
+      points.push({ t: Math.round(s.ts / 1000), v: sum });
+    });
+    var now = points[points.length - 1], prev = points.length > 1 ? points[points.length - 2] : null;
+    return { points: points, now: now.v, slots: keys.length, prev: prev,
+             change: prev && prev.v ? (now.v - prev.v) / prev.v : null };
+  }
+
+  function fmtShortDate(t) {
+    return new Date(t * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+
+  // the planner is often hidden while prices come in (width 0): assume its usual width
+  function costChartWidth() {
+    var cw = document.getElementById('cost-summary').clientWidth;
+    return cw > 360 ? cw - 40 : 720;
+  }
+
+  function costTrendPanel(trend, league) {
+    var wrap = UI.el('div', 'cost-trend');
+    var line = UI.el('div', 'cost-trend-line');
+    line.appendChild(UI.el('span', null, 'Since your last check (' + fmtShortDate(trend.prev.t) + ', was ' +
+      fmtEq(trend.prev.v, league) + ') '));
+    line.appendChild(pctChip(trend.change, true));
+    line.appendChild(UI.el('span', 'finder-sub', ' · same ' + trend.slots + ' slot' + (trend.slots > 1 ? 's' : '') +
+      ', cheapest listing each'));
+    wrap.appendChild(line);
+    wrap.appendChild(priceChart(trend.points.map(function (p) {
+      return { t: p.t, v: p.v, sub: fmtEq(p.v, league) };
+    }), { w: costChartWidth(), h: 150,
+          label: 'Build cost over time in chaos' }));
+    return wrap;
+  }
+
+  // sidebar build card: total + change since the last session
+  function renderBuildCostCard(trend, league) {
+    var el = document.getElementById('build-cost');
+    if (!el) return;
+    el.textContent = '';
+    if (!trend) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.appendChild(UI.el('span', null, 'Cost ' + fmtEq(trend.now, league) + ' '));
+    if (trend.change !== null) {
+      el.appendChild(pctChip(trend.change, true));
+      el.title = 'Cheapest listings for the ' + trend.slots + ' priced slots, vs. ' + fmtShortDate(trend.prev.t);
+    } else {
+      el.title = 'Cheapest listings for the ' + trend.slots + ' priced slots';
+    }
+  }
+
+  // on build load: show what it cost when it was last priced
+  function showLastBuildCost() {
+    var el = document.getElementById('build-cost');
+    if (!el) return;
+    var league = document.getElementById('league').value;
+    var h = loadCostHist()[buildKey()];
+    var last = h && h.snaps.filter(function (s) { return s.league === league; }).pop();
+    el.textContent = '';
+    if (!last) { el.classList.add('hidden'); return; }
+    var sum = 0, n = 0;
+    Object.keys(last.slots).forEach(function (k) { sum += last.slots[k]; n++; });
+    el.classList.remove('hidden');
+    el.textContent = 'Last priced ' + fmtShortDate(last.ts / 1000) + ': ' + fmtEq(sum, league);
+    el.title = 'Cheapest listings for ' + n + ' slot' + (n > 1 ? 's' : '') + '. Check prices to compare with today.';
   }
 
   // item name that jumps to its slot (planner tables)

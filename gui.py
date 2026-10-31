@@ -26,7 +26,7 @@ from currency_feed import CurrencyFeed
 from timeless import TimelessData
 from art_cache import ArtCache
 
-VERSION = "2.0.2"
+VERSION = "2.0.3"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -47,10 +47,20 @@ OVERLAY_TITLE = "PoB Trade Finder - Price check"
 OVERLAY_SIZE = (560, 700)
 
 
+DEBUG_LOG_MAX = 256 * 1024
+
+
 def _debug_log(msg):
     try:
-        with open(os.path.join(DATA_DIR, "debug.log"), "a", encoding="utf-8") as f:
-            f.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
+        path = os.path.join(DATA_DIR, "debug.log")
+        if os.path.exists(path) and os.path.getsize(path) > DEBUG_LOG_MAX:
+            with open(path, "rb") as f:
+                f.seek(-DEBUG_LOG_MAX // 2, os.SEEK_END)
+                keep = f.read().split(b"\n", 1)[-1]  # drop the partial first line
+            with open(path, "wb") as f:
+                f.write(keep)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write("%s %s\n" % (time.strftime("%m-%d %H:%M:%S"), msg))
     except Exception:
         pass
 
@@ -176,6 +186,7 @@ class Api:
                         self._blocked_until = max(self._blocked_until, time.time() + hold)
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
+            _debug_log("HTTP %s %s %s" % (e.code, "POST" if data else "GET", urllib.parse.urlsplit(url).path))
             if e.code == 429:
                 retry = int(e.headers.get("Retry-After", "60"))
                 # global lockout: EVERY caller (price checks, live, watcher, icons)
@@ -916,6 +927,56 @@ class Api:
     def rate_status(self):
         hold = max(0.0, self._blocked_until - time.time())
         return {"ok": True, "cooldownSeconds": int(hold)}
+
+    # -- bug-report diagnostics ----------------------------------------------------------
+    @staticmethod
+    def _tail(path, n):
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                return [l.rstrip("\n") for l in f.readlines()[-n:]]
+        except Exception:
+            return []
+
+    def _redact(self, text):
+        """Never hand out the session cookie, other 32-hex tokens or the Windows user name."""
+        if self._poesessid:
+            text = text.replace(self._poesessid, "<POESESSID>")
+        text = re.sub(r"\b[0-9a-fA-F]{32}\b", "<redacted>", text)
+        return re.sub(r"(?i)([a-z]:\\users\\)[^\\/\s]+", r"\1<user>", text)
+
+    def diagnostics(self):
+        """Plain-text app/environment summary + log tails for bug reports (Settings →
+        Copy diagnostics). Redacted: no cookie, tokens or user name."""
+        try:
+            import platform
+            try:
+                from importlib.metadata import version as pkg_version
+                pywebview_v = pkg_version("pywebview")
+            except Exception:
+                pywebview_v = "?"
+            lines = ["PoB Trade Finder v%s (%s)" % (VERSION, "exe" if getattr(sys, "frozen", False) else "source"),
+                     "OS: %s" % platform.platform(),
+                     "Python %s · pywebview %s" % (platform.python_version(), pywebview_v),
+                     "App folder writable: %s" % os.access(APP_DIR, os.W_OK),
+                     "POESESSID saved: %s" % ("yes" if self._poesessid else "no"),
+                     "Rate-limit cooldown: %ds" % max(0, int(self._blocked_until - time.time()))]
+            for name in ("stats.json", "leagues.json", "currencymap.json"):
+                p = os.path.join(DATA_DIR, name)
+                lines.append("data/%s: %s" % (name, time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p)))
+                                              if os.path.exists(p) else "missing"))
+            try:
+                hk = self.hotkey_status()
+                lines.append("Hotkey: %s%s" % (hk.get("hotkey"), " — " + hk["error"] if hk.get("error") else ""))
+            except Exception as e:
+                lines.append("Hotkey: unavailable (%s)" % e)
+            for title, path, n in (("debug.log", os.path.join(DATA_DIR, "debug.log"), 40),
+                                   ("_update.log", os.path.join(APP_DIR, "_update.log"), 15)):
+                tail = self._tail(path, n)
+                if tail:
+                    lines += ["", "--- %s (last %d lines) ---" % (title, len(tail))] + tail
+            return {"ok": True, "text": self._redact("\n".join(lines))}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     # -- durable storage for the web app -------------------------------------------
     def storage_get(self):

@@ -40,6 +40,7 @@
     <div id="build-bar" class="build-card hidden">
       <div id="build-label"></div>
       <div id="build-sub"></div>
+      <div id="build-cost" class="build-cost hidden"></div>
       <div id="set-picker-slot"></div>
       <div class="build-actions">
         <button id="save-build" class="btn btn-secondary btn-sm" title="Keep this build in the library for one-click reload">☆ Save</button>
@@ -155,6 +156,14 @@
           <button id="check-updates-btn" class="btn btn-secondary">Check for updates</button>
         </div>
         <div id="update-check-status" class="settings-note"></div>
+      </section>
+      <section class="settings-section">
+        <h3>Reporting a problem</h3>
+        <div class="settings-row">
+          <button id="copy-diagnostics" class="btn btn-secondary">Copy diagnostics</button>
+        </div>
+        <div class="settings-note">Copies the app version, recent errors and log lines, ready to paste into a bug report.
+          Your POESESSID and Windows user name are never included.</div>
       </section>
     </aside>
 

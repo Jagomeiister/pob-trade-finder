@@ -26,6 +26,8 @@ body.has-build .sidebar { display: flex; }
 .build-card.hidden { display: none; }
 #build-label { color: var(--accent); font-size: var(--fs-lg); font-weight: 600; line-height: 1.25; }
 #build-sub { color: var(--text-2); font-size: var(--fs-xs); }
+.build-cost { color: var(--text); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.build-cost.hidden { display: none; }
 #set-picker-slot:empty { display: none; }
 #set-picker-slot .field { display: flex; flex-direction: column; align-items: stretch; gap: 2px; font-size: var(--fs-xs); }
 #set-picker-slot select { width: 100%; }
