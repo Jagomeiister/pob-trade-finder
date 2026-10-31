@@ -202,22 +202,23 @@
     if (!openLayer) return;
     var l = openLayer;
     openLayer = null;
-    l.el.remove();
+    if (l.keep) l.el.hidden = true; else l.el.remove();
     if (l.trigger) l.trigger.setAttribute('aria-expanded', 'false');
     if (l.onClose) l.onClose();
   }
   function place(layer, trigger) {
+    layer.hidden = false;
     var r = trigger.getBoundingClientRect();
     layer.style.top = (r.bottom + window.scrollY + 4) + 'px';
     document.body.appendChild(layer);
     var w = layer.offsetWidth;
-    var left = r.right + window.scrollX - w;
+    var left = layer.dataset.align === 'start' ? r.left + window.scrollX : r.right + window.scrollX - w;
     layer.style.left = Math.max(8, Math.min(left, window.scrollX + document.documentElement.clientWidth - w - 8)) + 'px';
   }
-  function openFloating(layer, trigger, onClose) {
+  function openFloating(layer, trigger, onClose, keep) {
     closeLayer();
     place(layer, trigger);
-    openLayer = { el: layer, trigger: trigger, onClose: onClose };
+    openLayer = { el: layer, trigger: trigger, onClose: onClose, keep: keep };
     trigger.setAttribute('aria-expanded', 'true');
   }
   if (typeof document !== 'undefined') {
@@ -276,18 +277,22 @@
     return trigger;
   }
 
-  // Popover: trigger toggles a floating panel holding `content` (kept between opens)
+  // Popover: trigger toggles a floating panel holding `content`. The panel stays in the
+  // document while closed (hidden), so controls inside keep working by id.
   function popover(trigger, content, opts) {
     opts = opts || {};
-    var box = el('div', 'popover');
+    var box = el('div', 'popover' + (opts.cls ? ' ' + opts.cls : ''));
+    box.hidden = true;
+    if (opts.align) box.dataset.align = opts.align; // 'start' = left edges line up (default: right edges)
     box.setAttribute('role', 'dialog');
     if (opts.label) box.setAttribute('aria-label', opts.label);
     box.appendChild(content);
+    document.body.appendChild(box);
     trigger.setAttribute('aria-expanded', 'false');
     trigger.setAttribute('aria-haspopup', 'dialog');
     trigger.addEventListener('click', function () {
       if (openLayer && openLayer.trigger === trigger) { closeLayer(); return; }
-      openFloating(box, trigger, opts.onClose);
+      openFloating(box, trigger, opts.onClose, true);
       var f = box.querySelector('select, input, button, textarea');
       if (f) f.focus();
     });

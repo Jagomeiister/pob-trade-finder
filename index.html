@@ -23,144 +23,207 @@
 </script>
 </head>
 <body>
-<div class="container">
-  <header class="app-head">
-    <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
-      <rect class="logo-bg" x="3" y="3" width="58" height="58" rx="11" stroke-width="2.5"/>
-      <circle class="logo-glass" cx="27" cy="27" r="13" fill="none" stroke-width="4.5"/>
-      <circle class="logo-dot" cx="27" cy="27" r="4.5"/>
-      <line class="logo-glass" x1="36.5" y1="36.5" x2="49" y2="49" stroke-width="6" stroke-linecap="round"/>
-    </svg>
-    <div>
-      <h1>PoB Trade Finder</h1>
-      <div class="subtitle">Paste a Path of Building code — get pre-filled trade searches for the exact gear in the build.</div>
+<div class="app-shell">
+  <!-- sidebar: brand, build, views, market + settings (shown once a build is loaded) -->
+  <aside id="sidebar" class="sidebar" aria-label="Build and views">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
+        <rect class="logo-bg" x="3" y="3" width="58" height="58" rx="11" stroke-width="3"/>
+        <circle class="logo-glass" cx="27" cy="27" r="13" fill="none" stroke-width="5"/>
+        <circle class="logo-dot" cx="27" cy="27" r="4.5"/>
+        <line class="logo-glass" x1="36.5" y1="36.5" x2="49" y2="49" stroke-width="6.5" stroke-linecap="round"/>
+      </svg>
+      <span>PoB Trade Finder</span>
     </div>
-    <span class="ctrl-spacer"></span>
-    <span id="rate-chip" class="hidden" title="GGG API rate-limit cooldown — everything resumes automatically"></span>
-    <button id="settings-btn" class="btn btn-ghost btn-icon" aria-label="Settings" title="Settings — text size, sounds, accessibility">⚙</button>
-  </header>
-
-  <div id="settings-panel" class="hidden" role="dialog" aria-label="Settings">
-    <div class="settings-head">Settings <button id="settings-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close settings">✕</button></div>
-    <div class="settings-grid">
-      <label>Theme
-        <select id="pref-theme">
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-          <option value="system">Match Windows</option>
-        </select>
-      </label>
-      <label>Accent
-        <select id="pref-accent">
-          <option value="gold">Gold</option>
-          <option value="crimson">Crimson</option>
-          <option value="teal">Teal</option>
-          <option value="violet">Violet</option>
-          <option value="green">Green</option>
-        </select>
-      </label>
-      <label>Text size
-        <select id="pref-fontsize">
-          <option value="90">Small</option>
-          <option value="100">Normal</option>
-          <option value="112">Large</option>
-          <option value="125">Extra large</option>
-        </select>
-      </label>
-      <label>Density
-        <select id="pref-density">
-          <option value="comfortable">Comfortable</option>
-          <option value="compact">Compact</option>
-        </select>
-      </label>
-      <label><input type="checkbox" id="pref-sound" checked> Sound alerts (live-search ding)</label>
-      <label class="gui-only"><input type="checkbox" id="pref-notify" checked> Windows notification for live hits while the app is in the background</label>
-      <label>Alert volume <input type="range" id="pref-volume" min="5" max="100" value="25"></label>
-      <label><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
-      <label><input type="checkbox" id="pref-contrast"> High contrast text</label>
-      <label><input type="checkbox" id="pref-cb"> Colourblind-friendly sockets (letter labels)</label>
-      <span class="gui-only">
-        <label>Price-check hotkey
-          <select id="pref-hotkey" title="Hover an item in Path of Exile and press this to price it in a small overlay. Only active while the game window is focused.">
-            <option value="ctrl+d">Ctrl+D</option>
-            <option value="ctrl+shift+d">Ctrl+Shift+D</option>
-            <option value="alt+d">Alt+D</option>
-            <option value="off">Off</option>
-          </select>
-        </label>
-        <span id="hotkey-status" class="hotkey-status"></span>
-      </span>
-      <span class="gui-only">
-        <button id="check-updates-btn" class="btn btn-secondary">Check for updates</button>
-        <span id="update-check-status"></span>
-      </span>
-    </div>
-  </div>
-
-  <div id="update-banner" class="hidden">
-    <span id="update-label"></span>
-    <button id="update-btn" class="btn btn-primary">Install &amp; restart</button>
-  </div>
-
-  <div id="input-panel">
-    <div id="welcome" class="welcome hidden">
-      <div class="welcome-title">👋 Welcome to PoB Trade Finder</div>
-      <ol>
-        <li><b>Paste a build:</b> in Path of Building, use Import/Export Build → Generate → Copy, then paste the code (or a pobb.in link) below.</li>
-        <li><b>Shop it:</b> every slot becomes a card with the build's mods pre-filled. Use <i>Search on trade site</i>, or <i>Check price</i> to see listings here.</li>
-        <li><b>Find upgrades:</b> load your character to see what each slot is missing, then tick <i>⬆ Upgrades only</i>.</li>
-        <li><b>Jewels:</b> the <i>⏳ Timeless jewels</i> tab finds the best seed for your sockets; <i>💎 Jewel finder</i> ranks jewel mods for your build.</li>
-        <li><b>In game:</b> hover an item and press <kbd>Ctrl+D</kbd> to price it (⚙ settings to change the key).</li>
-      </ol>
-      <div class="input-row">
-        <button id="welcome-sample" class="btn btn-secondary">Try a sample build</button>
-        <button id="welcome-close" class="btn btn-secondary">Got it</button>
-      </div>
-    </div>
-    <textarea id="pob-input" placeholder="Paste your PoB export code or a pobb.in / pastebin / poe.ninja link…&#10;(PoB → Import/Export Build → Generate → Copy)"></textarea>
-    <div class="input-row">
-      <button id="decode-btn" class="btn btn-primary btn-lg">Decode build</button>
-      <select id="saved-builds" aria-label="Saved builds"><option value="">Saved builds…</option></select>
-      <button id="delete-build" class="btn btn-secondary btn-icon" title="Remove the selected saved build" aria-label="Delete selected saved build">🗑</button>
-      <span class="input-hint">Pasting decodes automatically · Ctrl+Enter also works</span>
-    </div>
-    <div id="status"></div>
-  </div>
-
-  <div id="build-bar" class="hidden">
-    <div>
+    <div id="build-bar" class="build-card hidden">
       <div id="build-label"></div>
       <div id="build-sub"></div>
+      <div id="set-picker-slot"></div>
+      <div class="build-actions">
+        <button id="save-build" class="btn btn-secondary btn-sm" title="Keep this build in the library for one-click reload">☆ Save</button>
+        <button id="new-build" class="btn btn-ghost btn-sm" title="Paste or pick a different build">Switch build</button>
+      </div>
+      <button id="compare-btn" class="btn btn-ghost btn-sm gui-only" title="Load your character and see what each slot is missing">⚖ Compare with character…</button>
     </div>
-    <button id="save-build" class="btn btn-secondary" style="margin-left:auto" title="Keep this build in the library for one-click reload">☆ Save build</button>
-    <button id="new-build" class="btn btn-secondary">Load another build</button>
+    <nav id="nav" class="nav" aria-label="Views"></nav>
+    <div class="side-foot">
+      <div id="market-tile" class="market-tile hidden" role="button" tabindex="0" title="Market — currency prices">
+        <span class="mt-label">Divine Orb</span>
+        <span class="mt-value">…</span>
+        <span class="mt-delta"></span>
+        <span class="mt-spark"></span>
+      </div>
+      <button id="settings-btn-side" class="btn btn-ghost" aria-label="Settings">⚙ Settings</button>
+    </div>
+  </aside>
+
+  <div class="container main">
+    <!-- top bar: current view + read-only search context; settings in a popover -->
+    <div id="topbar" class="topbar">
+      <h2 id="view-title" class="view-title"></h2>
+      <div id="context-chips" class="context-chips" aria-label="Search settings in use"></div>
+      <span class="ctrl-spacer"></span>
+      <span id="rate-chip" class="hidden" title="GGG API rate-limit cooldown — everything resumes automatically"></span>
+      <button id="search-settings-btn" class="btn btn-ghost">Search settings ▾</button>
+      <button id="open-all" class="btn btn-secondary">Open all searches ↗</button>
+      <button id="check-all" class="btn btn-primary gui-only">Check all prices</button>
+    </div>
+
+    <div id="settings-panel" class="hidden" role="dialog" aria-label="Settings">
+      <div class="settings-head">Settings <button id="settings-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close settings">✕</button></div>
+      <div class="settings-grid">
+        <label>Theme
+          <select id="pref-theme">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">Match Windows</option>
+          </select>
+        </label>
+        <label>Accent
+          <select id="pref-accent">
+            <option value="gold">Gold</option>
+            <option value="crimson">Crimson</option>
+            <option value="teal">Teal</option>
+            <option value="violet">Violet</option>
+            <option value="green">Green</option>
+          </select>
+        </label>
+        <label>Text size
+          <select id="pref-fontsize">
+            <option value="90">Small</option>
+            <option value="100">Normal</option>
+            <option value="112">Large</option>
+            <option value="125">Extra large</option>
+          </select>
+        </label>
+        <label>Density
+          <select id="pref-density">
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="pref-sound" checked> Sound alerts (live-search ding)</label>
+        <label class="gui-only"><input type="checkbox" id="pref-notify" checked> Windows notification for live hits while the app is in the background</label>
+        <label>Alert volume <input type="range" id="pref-volume" min="5" max="100" value="25"></label>
+        <label><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
+        <label><input type="checkbox" id="pref-contrast"> High contrast text</label>
+        <label><input type="checkbox" id="pref-cb"> Colourblind-friendly sockets (letter labels)</label>
+        <span class="gui-only">
+          <label>Price-check hotkey
+            <select id="pref-hotkey" title="Hover an item in Path of Exile and press this to price it in a small overlay. Only active while the game window is focused.">
+              <option value="ctrl+d">Ctrl+D</option>
+              <option value="ctrl+shift+d">Ctrl+Shift+D</option>
+              <option value="alt+d">Alt+D</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <span id="hotkey-status" class="hotkey-status"></span>
+        </span>
+        <span class="gui-only">
+          <button id="refresh-data" class="btn btn-secondary" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
+        </span>
+        <span class="gui-only">
+          <button id="check-updates-btn" class="btn btn-secondary">Check for updates</button>
+          <span id="update-check-status"></span>
+        </span>
+      </div>
+    </div>
+
+    <div id="update-banner" class="hidden">
+      <span id="update-label"></span>
+      <button id="update-btn" class="btn btn-primary">Install &amp; restart</button>
+    </div>
+
+    <!-- landing: shown until a build is loaded (and again via "Switch build") -->
+    <div id="input-panel" class="landing">
+      <header class="app-head">
+        <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
+          <rect class="logo-bg" x="3" y="3" width="58" height="58" rx="11" stroke-width="2.5"/>
+          <circle class="logo-glass" cx="27" cy="27" r="13" fill="none" stroke-width="4.5"/>
+          <circle class="logo-dot" cx="27" cy="27" r="4.5"/>
+          <line class="logo-glass" x1="36.5" y1="36.5" x2="49" y2="49" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <h1>PoB Trade Finder</h1>
+          <div class="subtitle">Paste a Path of Building build — get trade searches for the exact gear in it.</div>
+        </div>
+        <span class="ctrl-spacer"></span>
+        <button id="settings-btn" class="btn btn-ghost btn-icon" aria-label="Settings" title="Settings — theme, text size, sounds, accessibility">⚙</button>
+      </header>
+
+      <div id="welcome" class="welcome hidden">
+        <div class="welcome-title">👋 Welcome to PoB Trade Finder</div>
+        <ol>
+          <li><b>Paste a build:</b> in Path of Building, use Import/Export Build → Generate → Copy, then paste the code (or a pobb.in link) below.</li>
+          <li><b>Shop it:</b> pick a slot on the left to see its mods pre-filled. Use <i>Search on trade site</i>, or <i>Check price</i> to see listings here.</li>
+          <li><b>Find upgrades:</b> <i>Compare with character</i> shows what each slot is missing.</li>
+          <li><b>Jewels:</b> <i>Timeless jewels</i> finds the best seed for your sockets; <i>Jewel finder</i> ranks jewel mods for your build.</li>
+          <li><b>In game:</b> hover an item and press <kbd>Ctrl+D</kbd> to price it (⚙ settings to change the key).</li>
+        </ol>
+        <div class="input-row">
+          <button id="welcome-sample" class="btn btn-secondary">Try a sample build</button>
+          <button id="welcome-close" class="btn btn-ghost">Got it</button>
+        </div>
+      </div>
+
+      <section class="panel landing-paste">
+        <label for="pob-input" class="landing-label">Paste a build</label>
+        <textarea id="pob-input" placeholder="PoB export code, or a pobb.in / pastebin / poe.ninja link…&#10;(PoB → Import/Export Build → Generate → Copy)"></textarea>
+        <div class="input-row">
+          <button id="decode-btn" class="btn btn-primary btn-lg">Load build</button>
+          <button id="back-to-build" class="btn btn-ghost hidden">← Back to current build</button>
+          <span class="input-hint">Pasting loads it automatically · Ctrl+Enter also works</span>
+        </div>
+        <div id="status" role="status"></div>
+      </section>
+
+      <section id="saved-section" class="saved-section hidden" aria-labelledby="saved-title">
+        <h2 id="saved-title" class="landing-h2">Saved builds</h2>
+        <div id="saved-list" class="saved-list"></div>
+      </section>
+
+      <ol class="how-steps" aria-label="How it works">
+        <li><b>1 · Paste</b><span>Any PoB code or build link.</span></li>
+        <li><b>2 · Pick a slot</b><span>Mods are matched to trade stats, min rolls pre-filled.</span></li>
+        <li><b>3 · Shop</b><span>Open the search, or check prices and whisper from here.</span></li>
+      </ol>
+    </div>
+
+    <!-- views (body[data-view]) -->
+    <div id="view-planner" class="view-panel">
+      <div id="planner-empty" class="empty-state">
+        <div class="empty-title">Nothing priced yet</div>
+        <div class="empty-text">Check prices on a few slots and they'll add up here, with the budget solver and your pinned listings.</div>
+      </div>
+      <div id="gear-value" class="hidden"></div>
+      <div id="cost-summary" class="hidden"></div>
+      <div id="basket" class="hidden"></div>
+    </div>
+    <div id="view-market" class="view-panel">
+      <div id="market-empty" class="empty-state">
+        <div class="empty-title">No market data yet</div>
+        <div class="empty-text">Currency history comes from GGG's hourly exchange feed in the desktop app.</div>
+      </div>
+      <div id="market-panel" class="market-panel">
+        <table>
+          <caption class="mp-caption"></caption>
+          <thead><tr><th scope="col">Currency</th><th scope="col" class="num">Now</th><th scope="col" class="num">7 days</th><th scope="col">Trend (chaos)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="results"></div>
+
+    <div class="footer">PoB Trade Finder · data © Grinding Gear Games via the public trade API · not affiliated with GGG</div>
   </div>
+</div>
 
-  <div id="char-bar" class="hidden gui-only-flex">
-    <span class="char-label">Compare with your character:</span>
-    <input type="text" id="acct-input" aria-label="Account name" placeholder="Account (Name#1234)">
-    <button id="acct-load" class="btn btn-secondary">Load characters</button>
-    <select id="char-select" class="hidden"></select>
-    <button id="char-compare" class="btn btn-secondary hidden">Compare gear</button>
-    <label class="toggle hidden" id="hide-matched-wrap"><input type="checkbox" id="hide-matched"> Hide matched slots</label>
-    <button id="value-gear" class="btn btn-secondary hidden" title="Price what your character is wearing — one search per item, rate-limit safe">💰 Value my gear</button>
-    <span id="char-status"></span>
-    <span style="margin-left:auto"></span>
-    <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID (optional)"
-      title="Paste your pathofexile.com POESESSID cookie to unlock instant WebSocket live-search alerts (same as the trade website). Stored only on this machine, sent only to pathofexile.com. Save empty to clear.">
-    <button id="sessid-save" class="btn btn-secondary">Save</button>
-    <span id="sessid-status"></span>
-  </div>
-
-  <div id="gear-value" class="hidden"></div>
-  <div id="cost-summary" class="hidden"></div>
-  <div id="basket" class="hidden"></div>
-
-  <div id="controls" class="hidden">
-    <label>League:
-      <select id="league"></select>
-    </label>
-    <label>Trade:
+<!-- popover contents: kept in the document so every control stays reachable by id -->
+<div id="search-settings" class="search-settings">
+  <div id="controls">
+    <label class="field"><span class="field-label">League</span> <select id="league"></select></label>
+    <label class="field"><span class="field-label">Trade</span>
       <select id="trade-status" title="Instant buyout = buy off the site for a gold fee, no whisper needed. In person = whisper the seller and trade manually.">
         <option value="available">⚡ Instant buyout + in person</option>
         <option value="securable">⚡ Instant buyout only</option>
@@ -169,7 +232,7 @@
         <option value="any">Any (incl. offline)</option>
       </select>
     </label>
-    <label>Sale:
+    <label class="field"><span class="field-label">Sale</span>
       <select id="sale-type">
         <option value="priced">Buyout / fixed price</option>
         <option value="any">Any</option>
@@ -177,44 +240,33 @@
         <option value="unpriced">No listed price</option>
       </select>
     </label>
-    <label><input type="checkbox" id="pseudo" checked title="Fold life/res/attribute rolls into pseudo totals — finds more items"> Pseudo totals</label>
-    <label>≈ in:
+    <label class="field"><span class="field-label">Show prices in</span>
       <select id="eq-currency" title="Show price equivalents and totals in chaos or divine">
         <option value="chaos">chaos</option>
         <option value="divine">divine</option>
       </select>
     </label>
-    <label>Min roll: <input type="range" id="pct" min="50" max="100" value="80" step="5"> <span id="pct-label">80%</span></label>
-    <div id="market-tile" class="market-tile hidden" role="button" tabindex="0" aria-expanded="false" aria-controls="market-panel">
-      <span class="mt-label">Divine Orb</span>
-      <span class="mt-value">…</span>
-      <span class="mt-delta"></span>
-      <span class="mt-spark"></span>
+    <label class="field"><span class="field-label">Min roll</span> <input type="range" id="pct" min="50" max="100" value="80" step="5"> <span id="pct-label">80%</span></label>
+    <label class="field"><input type="checkbox" id="pseudo" checked title="Fold life/res/attribute rolls into pseudo totals — finds more items"> Pseudo totals (finds more items)</label>
+  </div>
+</div>
+<div id="char-pop" class="char-pop">
+  <div id="char-bar" class="hidden gui-only-flex">
+    <span class="char-label">Compare with your character</span>
+    <input type="text" id="acct-input" aria-label="Account name" placeholder="Account (Name#1234)">
+    <button id="acct-load" class="btn btn-secondary">Load characters</button>
+    <select id="char-select" class="hidden" aria-label="Character"></select>
+    <button id="char-compare" class="btn btn-primary hidden">Compare gear</button>
+    <label class="toggle hidden" id="hide-matched-wrap"><input type="checkbox" id="hide-matched"> Hide matched slots</label>
+    <button id="value-gear" class="btn btn-secondary hidden" title="Price what your character is wearing — one search per item, rate-limit safe">💰 Value my gear</button>
+    <span id="char-status"></span>
+    <div class="char-sessid">
+      <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID (optional)"
+        title="Paste your pathofexile.com POESESSID cookie to unlock instant WebSocket live-search alerts (same as the trade website). Stored only on this machine, sent only to pathofexile.com. Save empty to clear.">
+      <button id="sessid-save" class="btn btn-secondary">Save</button>
+      <span id="sessid-status"></span>
     </div>
-    <span class="ctrl-spacer"></span>
-    <button id="open-all" class="btn btn-secondary">Open all searches</button>
-    <button id="check-all" class="btn btn-secondary gui-only">Check all prices</button>
-    <button id="refresh-data" class="btn btn-secondary gui-only" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
   </div>
-  <div id="market-panel" class="market-panel hidden">
-    <table>
-      <caption class="mp-caption"></caption>
-      <thead><tr><th scope="col">Currency</th><th scope="col" class="num">Now</th><th scope="col" class="num">7 days</th><th scope="col">Trend (chaos)</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div id="results"></div>
-
-  <div class="help">
-    <b>How it works:</b> each mod on the build's gear is matched to the official trade-site stat database
-    (bundled from GGG's <code>/api/trade/data/stats</code>). Tick the mods that matter, set minimum
-    rolls (defaults to 80% of the build's roll), and hit <i>Search on trade site</i>.
-    <i>"All but one"</i> match mode finds items missing any single mod — usually where upgrades hide.
-    Bench-crafted mods start unticked (you'll re-craft them). Uniques are searched by name.
-    In the desktop app, <i>Check price</i> shows live listings without leaving the tool.
-  </div>
-  <div class="footer">PoB Trade Finder · data © Grinding Gear Games via the public trade API · not affiliated with GGG</div>
 </div>
 <script>
 // Cache-busted loading: WebView2/browsers cache these files between launches,

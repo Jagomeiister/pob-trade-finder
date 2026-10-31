@@ -7,7 +7,7 @@ html { scrollbar-color: var(--border-strong) var(--bg); }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
 body {
-  margin: 0; padding: 20px 24px 40px;
+  margin: 0;
   background: var(--bg);
   color: var(--text);
   font: var(--fs-md)/1.5 var(--font);
@@ -45,18 +45,12 @@ input[type=range] { accent-color: var(--accent); vertical-align: middle; }
 /* one focus ring for everything keyboard-reachable */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
 
-/* ---- help + footer ---- */
-.help {
-  color: var(--text-2); font-size: var(--fs-xs); margin-top: 34px;
-  border-top: 1px solid var(--border); padding-top: 12px; line-height: 1.7;
-}
-.help code { background: var(--s2); padding: 1px 5px; border-radius: var(--r-sm); }
+/* ---- footer ---- */
 .footer { color: var(--text-3); font-size: var(--fs-xs); margin-top: 8px; }
 
 /* ---- desktop-app-only controls ---- */
-.gui-only { display: none; }
-body.gui .gui-only { display: inline-block; }
-body.gui .btn.gui-only { display: inline-flex; }
+body:not(.gui) .gui-only { display: none !important; }
+body.gui .gui-only:not(.btn) { display: inline-block; }
 
 /* ---- preference classes ---- */
 body.reduce-motion .live-new { animation: none; }
@@ -64,5 +58,5 @@ body.reduce-motion .btn:active { transform: none; }
 body.reduce-motion * { scroll-behavior: auto !important; }
 
 @media (max-width: 640px) {
-  body { padding: 12px; }
+  .main { padding-left: 12px; padding-right: 12px; }
 }

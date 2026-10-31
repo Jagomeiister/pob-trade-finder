@@ -189,11 +189,23 @@
       setTimeout(onDecode, 50);
     });
     document.getElementById('new-build').addEventListener('click', function () {
-      document.getElementById('input-panel').classList.remove('hidden');
-      document.getElementById('build-bar').classList.add('hidden');
+      showLanding();
       var ta = document.getElementById('pob-input');
       ta.focus();
       ta.select();
+    });
+    document.getElementById('back-to-build').addEventListener('click', showBuild);
+    UI.popover(document.getElementById('search-settings-btn'), document.getElementById('search-settings'),
+      { label: 'Search settings', cls: 'popover-search' });
+    UI.popover(document.getElementById('compare-btn'), document.getElementById('char-pop'),
+      { label: 'Compare with your character', align: 'start' });
+    ['league', 'trade-status', 'sale-type', 'pseudo', 'eq-currency'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', updateContextChips);
+    });
+    document.getElementById('pct').addEventListener('input', updateContextChips);
+    document.getElementById('settings-btn-side').addEventListener('click', function () {
+      document.getElementById('settings-panel').classList.toggle('hidden');
+      window.scrollTo(0, 0);
     });
     // character import
     if (saved.account) document.getElementById('acct-input').value = saved.account;
@@ -287,31 +299,8 @@
       refreshBuildSelect();
       this.textContent = '★ Saved';
       var btn = this;
-      setTimeout(function () { btn.textContent = '☆ Save build'; }, 1200);
-    });
-    document.getElementById('saved-builds').addEventListener('change', function () {
-      var lib = loadBuildLib();
-      var b = lib[parseInt(this.value, 10)];
-      if (b) {
-        document.getElementById('pob-input').value = b.code;
-        onDecode();
-      }
-    });
-    document.getElementById('delete-build').addEventListener('click', function () {
-      var sel = document.getElementById('saved-builds');
-      var idx = parseInt(sel.value, 10);
-      if (isNaN(idx)) { UI.toast('Pick a saved build to delete first.', 'warn'); return; }
-      var lib = loadBuildLib();
-      var name = (lib[idx] && lib[idx].name) || 'this build';
-      UI.confirmDanger('Delete saved build?', '"' + name + '" will be removed from your library.', 'Delete build')
-        .then(function (ok) {
-          if (!ok) return;
-          var cur = loadBuildLib();
-          cur.splice(idx, 1);
-          saveBuildLib(cur);
-          refreshBuildSelect();
-          UI.toast('Saved build deleted.', 'success');
-        });
+      setTimeout(function () { btn.textContent = '☆ Save'; }, 1200);
+      UI.toast('Build saved — it\'s on the start screen for one-click reload.', 'success');
     });
     document.getElementById('pct').addEventListener('input', function () {
       document.getElementById('pct-label').textContent = this.value + '%';
@@ -379,10 +368,9 @@
       document.getElementById('league').addEventListener('change', loadMarket);
       var tile = document.getElementById('market-tile');
       tile.addEventListener('click', function (e) {
-        if (e.target.closest('.spark')) return; // hovering/focusing the chart isn't a toggle
-        var panel = document.getElementById('market-panel');
-        var open = panel.classList.toggle('hidden') === false;
-        tile.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (e.target.closest('.spark')) return; // hovering/focusing the chart isn't navigation
+        setView('market');
+        window.scrollTo(0, 0);
       });
       tile.addEventListener('keydown', function (e) {
         if (e.target === tile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tile.click(); }
@@ -440,6 +428,7 @@
         loadPrefs();
         applyPrefs();
         syncWelcome();
+        updateContextChips();
       } catch (e) { /* browser mode / bridge unavailable */ }
     }
     if (isGui()) markGui();
@@ -504,14 +493,13 @@
       build = PoB.parseBuild(xml);
       status.textContent = '';
       saveSettings();
-      document.getElementById('input-panel').classList.add('hidden');
-      document.getElementById('build-bar').classList.remove('hidden');
       document.getElementById('build-label').textContent =
         build.ascendClass || build.className || 'Unknown class';
       var nSets = (build.itemSets || []).length;
       document.getElementById('build-sub').textContent =
         Object.keys(build.items).length + ' items' + (nSets > 1 ? ' · ' + nSets + ' gear sets' : '');
       renderBuild();
+      showBuild();
     } catch (err) {
       status.textContent = '❌ ' + err.message +
         (/^https?:\/\//i.test(input) && !isGui()
@@ -558,22 +546,35 @@
     var set = sets[setIndex] || { slots: build.slots, flasks: build.flasks };
 
     // Gear-set picker — guide PoBs ship several (Leveling / Budget / Endgame…)
+    var pickSlot = document.getElementById('set-picker-slot');
+    pickSlot.textContent = '';
     if (sets.length > 1) {
       var pick = UI.select(sets.map(function (s, i) {
         return [String(i), s.title + (i === build.activeSetIndex ? ' (active in PoB)' : '')];
       }), String(setIndex), { onChange: function () { renderBuild(parseInt(this.value, 10)); } });
-      root.appendChild(UI.field('Gear set', pick, { cls: 'set-picker' }));
+      pickSlot.appendChild(UI.field('Gear set', pick));
     }
 
-    // tabbed sections: gear / jewels & clusters / flasks / gems
+    // one section per view; item views are a slot list + one item at a time
     var sections = {};
     function section(key) {
       if (!sections[key]) {
-        sections[key] = document.createElement('div');
-        sections[key].className = 'tab-section';
-        sections[key].dataset.tab = key;
+        var sec = document.createElement('div');
+        sec.className = 'tab-section';
+        sec.dataset.tab = key;
+        if (MASTER_DETAIL[key]) {
+          sec.classList.add('master-detail');
+          var list = document.createElement('div');
+          list.className = 'slot-list';
+          sec.appendChild(list);
+          var detail = document.createElement('div');
+          detail.className = 'slot-detail';
+          sec.appendChild(detail);
+          sec.detail = detail;
+        }
+        sections[key] = sec;
       }
-      return sections[key];
+      return sections[key].detail || sections[key];
     }
 
     set.slots.forEach(function (s) {
@@ -598,32 +599,180 @@
       section('finder').appendChild(makeJewelFinder(build));
     }
 
-    var TAB_LABELS = { gear: 'Gear', jewels: 'Jewels & Clusters', flasks: 'Flasks', gems: 'Gems',
-                       timeless: '⏳ Timeless jewels', finder: '💎 Jewel finder' };
-    var present = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder'].filter(function (k) { return sections[k]; });
-    if (present.length > 1) {
-      var bar = document.createElement('div');
-      bar.className = 'tab-bar';
-      ['all'].concat(present).forEach(function (k) {
-        var btn = document.createElement('button');
-        btn.className = 'tab-btn' + (k === 'all' ? ' active' : '');
-        var count = (k === 'all' || k === 'finder' || k === 'timeless') ? null : sections[k].children.length;
-        btn.textContent = (k === 'all' ? 'All' : TAB_LABELS[k]) + (count ? ' (' + count + ')' : '');
-        btn.addEventListener('click', function () {
-          root.dataset.tab = k;
-          bar.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-        });
-        bar.appendChild(btn);
-      });
-      root.appendChild(bar);
-    }
-    root.dataset.tab = 'all';
+    var present = VIEW_ORDER.filter(function (k) { return sections[k]; });
     present.forEach(function (k) { root.appendChild(sections[k]); });
-    document.getElementById('controls').classList.remove('hidden');
+    Object.keys(MASTER_DETAIL).forEach(function (k) {
+      var first = sections[k] && sections[k].detail.querySelector('.card');
+      if (first) first.classList.add('is-active');
+    });
     document.getElementById('char-bar').classList.remove('hidden');
+    updateContextChips();
+    renderNav();
+    var keep = document.body.dataset.view;
+    setView(present.indexOf(keep) !== -1 || keep === 'planner' || keep === 'market' ? keep : present[0] || 'planner');
     renderCostSummary(); // clears stale summary — fresh cards have no prices yet
     applyCharDiff();     // re-annotate fresh cards if a character is loaded
+  }
+
+  // ---- app shell: views, sidebar nav, slot lists, search context ---------------
+  var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'pasted'];
+  var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
+  var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
+                      timeless: 'Timeless jewels', finder: 'Jewel finder', pasted: 'Pasted item',
+                      planner: 'Upgrade planner', market: 'Market' };
+
+  function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
+
+  function setView(k) {
+    document.body.dataset.view = k;
+    document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
+    document.querySelectorAll('#nav .nav-item').forEach(function (b) {
+      if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+  }
+
+  function navCount(k) {
+    if (k === 'planner') {
+      var n = loadBasket().length;
+      return n ? String(n) : '';
+    }
+    var sec = viewSection(k);
+    if (!sec || !MASTER_DETAIL[k] && k !== 'gems') return '';
+    if (k === 'gems') return String(build && build.gemGroups ? build.gemGroups.length : '');
+    return String(sec.querySelectorAll('.slot-detail > .card').length);
+  }
+
+  function renderNav() {
+    var nav = document.getElementById('nav');
+    nav.textContent = '';
+    function item(k) {
+      var b = UI.el('button', 'nav-item');
+      b.type = 'button';
+      b.dataset.view = k;
+      b.appendChild(UI.el('span', null, VIEW_LABELS[k]));
+      b.appendChild(UI.el('span', 'nav-count', navCount(k)));
+      b.addEventListener('click', function () { setView(k); window.scrollTo(0, 0); });
+      nav.appendChild(b);
+    }
+    var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
+    if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
+    nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
+    ['planner', 'timeless', 'finder', 'market'].filter(function (k) {
+      return k === 'planner' || k === 'market' || viewSection(k);
+    }).forEach(item);
+    setView(document.body.dataset.view || 'gear');
+  }
+
+  function updateNavCounts() {
+    document.querySelectorAll('#nav .nav-item').forEach(function (b) {
+      b.querySelector('.nav-count').textContent = navCount(b.dataset.view);
+    });
+  }
+
+  // slot list rows mirror the cards in each item view: name, then price / status
+  function slotStatus(state) {
+    var c = state.card.classList;
+    if (state.bought) return UI.chip('Bought', 'success');
+    var league = document.getElementById('league').value;
+    if (state.cheapestChaos !== undefined) return document.createTextNode(fmtEq(state.cheapestChaos, league));
+    if (state.priceState && state.priceState.total === 0) return UI.chip('None listed', 'danger');
+    if (c.contains('diff-matched')) return UI.chip('Equipped', 'success');
+    if (c.contains('diff-close')) return UI.chip('Close', 'warn');
+    if (c.contains('diff-missing')) return UI.chip('Missing', 'danger');
+    return null;
+  }
+
+  function selectSlot(sec, card, focus) {
+    sec.querySelectorAll('.slot-detail > .card').forEach(function (c) { c.classList.toggle('is-active', c === card); });
+    sec.querySelectorAll('.slot-row').forEach(function (r) {
+      if (r.slotCard === card) { r.setAttribute('aria-current', 'true'); if (focus) r.focus(); }
+      else r.removeAttribute('aria-current');
+    });
+  }
+
+  function refreshSlotLists() {
+    Object.keys(MASTER_DETAIL).forEach(function (k) {
+      var sec = viewSection(k);
+      if (!sec) return;
+      var list = sec.querySelector('.slot-list');
+      var focusedIdx = Array.prototype.indexOf.call(list.querySelectorAll('.slot-row'), document.activeElement);
+      list.textContent = '';
+      var head = UI.el('div', 'slot-list-head');
+      var cardEls = Array.prototype.slice.call(sec.querySelectorAll('.slot-detail > .card'));
+      head.appendChild(UI.el('b', null, VIEW_LABELS[k]));
+      var priced = cards.filter(function (s) { return cardEls.indexOf(s.card) !== -1 && s.cheapestChaos !== undefined; }).length;
+      head.appendChild(UI.el('span', 'slot-label', priced ? priced + ' of ' + cardEls.length + ' priced' : cardEls.length + ' slots'));
+      list.appendChild(head);
+      var rows = [];
+      cardEls.forEach(function (cardEl) {
+        var state = cards.find(function (s) { return s.card === cardEl; });
+        if (!state) return;
+        var row = UI.el('button', 'slot-row');
+        row.type = 'button';
+        row.slotCard = cardEl;
+        ['diff-matched', 'diff-close', 'diff-missing'].forEach(function (d) { if (cardEl.classList.contains(d)) row.classList.add(d); });
+        if (state.bought) row.classList.add('bought');
+        var src = cardEl.querySelector('.card-icon');
+        var ic = UI.el('img', 'slot-ic' + (src && src.classList.contains('atlas2') ? ' atlas2' : ''));
+        ic.alt = '';
+        ic.src = src && src.src ? src.src : BLANK_PX;
+        row.appendChild(ic);
+        var txt = UI.el('span', 'slot-txt');
+        txt.appendChild(UI.el('span', 'slot-label', state.slot));
+        var rarity = (state.item.rarity || 'normal').toLowerCase();
+        txt.appendChild(UI.el('span', 'slot-name ' + (rarity === 'relic' ? 'unique' : rarity),
+          state.resolvedName || state.item.name || state.item.base || state.slot));
+        row.appendChild(txt);
+        var st = UI.el('span', 'slot-status');
+        var status = slotStatus(state);
+        if (status) st.appendChild(status);
+        row.appendChild(st);
+        if (cardEl.classList.contains('is-active')) row.setAttribute('aria-current', 'true');
+        row.addEventListener('click', function () { selectSlot(sec, cardEl); });
+        row.addEventListener('keydown', function (e) {
+          var i = rows.indexOf(row);
+          var j = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : -1;
+          if (j < 0 || j >= rows.length) return;
+          e.preventDefault();
+          selectSlot(sec, rows[j].slotCard, true);
+        });
+        rows.push(row);
+        list.appendChild(row);
+      });
+      if (focusedIdx !== -1 && rows[focusedIdx]) rows[focusedIdx].focus();
+    });
+    updateNavCounts();
+  }
+
+  // read-only summary of the search settings, shown in the top bar
+  function updateContextChips() {
+    var box = document.getElementById('context-chips');
+    if (!box) return;
+    box.textContent = '';
+    function optText(id) {
+      var s = document.getElementById(id);
+      var o = s && s.options[s.selectedIndex];
+      return o ? o.textContent : '';
+    }
+    box.appendChild(UI.chip(optText('league') || document.getElementById('league').value));
+    box.appendChild(UI.chip(optText('trade-status')));
+    if (document.getElementById('sale-type').value !== 'priced') box.appendChild(UI.chip('Sale: ' + optText('sale-type')));
+    box.appendChild(UI.chip('Min roll ' + document.getElementById('pct').value + '%'));
+    if (!document.getElementById('pseudo').checked) box.appendChild(UI.chip('No pseudo totals', 'warn'));
+  }
+
+  // landing ⇄ build
+  function showBuild() {
+    document.body.classList.add('has-build');
+    document.getElementById('input-panel').classList.add('hidden');
+    document.getElementById('build-bar').classList.remove('hidden');
+    window.scrollTo(0, 0);
+  }
+  function showLanding() {
+    document.body.classList.remove('has-build');
+    document.getElementById('input-panel').classList.remove('hidden');
+    document.getElementById('back-to-build').classList.toggle('hidden', !build);
+    window.scrollTo(0, 0);
   }
 
   // ---- saved builds library --------------------------------------------------
@@ -635,14 +784,36 @@
     try { persist('pobtf-builds', JSON.stringify(lib.slice(0, 20))); }
     catch (e) { /* storage full/unavailable */ }
   }
+  // saved builds as one-click cards on the start screen
   function refreshBuildSelect() {
-    var sel = document.getElementById('saved-builds');
-    sel.innerHTML = '<option value="">Saved builds…</option>';
-    loadBuildLib().forEach(function (b, i) {
-      var o = document.createElement('option');
-      o.value = String(i);
-      o.textContent = b.name;
-      sel.appendChild(o);
+    var list = document.getElementById('saved-list');
+    var lib = loadBuildLib();
+    list.textContent = '';
+    document.getElementById('saved-section').classList.toggle('hidden', !lib.length);
+    lib.forEach(function (b, i) {
+      var parts = String(b.name || 'Build').split(' · ');
+      var row = UI.el('div', 'saved-build');
+      var open = UI.el('button', 'saved-open');
+      open.type = 'button';
+      open.appendChild(UI.el('span', 'saved-name', parts[0]));
+      open.appendChild(UI.el('span', 'saved-meta', parts.slice(1).join(' · ')));
+      open.addEventListener('click', function () {
+        document.getElementById('pob-input').value = b.code;
+        onDecode();
+      });
+      row.appendChild(open);
+      row.appendChild(UI.iconButton('🗑', 'Delete saved build ' + parts[0], { size: 'sm', onClick: function () {
+        UI.confirmDanger('Delete saved build?', '"' + b.name + '" will be removed from your library.', 'Delete build')
+          .then(function (ok) {
+            if (!ok) return;
+            var cur = loadBuildLib();
+            cur.splice(i, 1);
+            saveBuildLib(cur);
+            refreshBuildSelect();
+            UI.toast('Saved build deleted.', 'success');
+          });
+      } }));
+      list.appendChild(row);
     });
   }
 
@@ -1788,8 +1959,7 @@
     var seedRow = state.rows.find(function (r) { return r.match && /^explicit\.pseudo_timeless_jewel_/.test(r.match.entry.id); });
     var seed = seedRow ? Math.round(parseFloat(seedRow.minInput.value)) : null;
     var preset = { jewel: state.resolvedName, socket: sock ? sock.nodeId : null, seed: seed && !isNaN(seed) ? seed : null };
-    var tab = Array.prototype.find.call(document.querySelectorAll('.tab-btn'), function (t) { return /Timeless/.test(t.textContent); });
-    if (tab) tab.click();
+    setView('timeless');
     if (timelessApplyPreset) timelessApplyPreset(preset);
     else timelessPending = preset;
     window.scrollTo(0, 0);
@@ -2406,12 +2576,20 @@
       pastedState = null;
     }
     var root = document.getElementById('results');
+    var sec = viewSection('pasted');
+    if (!sec) {
+      sec = document.createElement('div');
+      sec.className = 'tab-section';
+      sec.dataset.tab = 'pasted';
+      root.insertBefore(sec, root.firstChild);
+    }
     var card = makeCard(item.slotGuess || 'Pasted item', item);
     pastedState = cards[cards.length - 1];
     card.classList.add('pasted');
-    root.insertBefore(card, root.firstChild);
+    sec.appendChild(card);
     renderCharDiff(pastedState);
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (build) { renderNav(); setView('pasted'); window.scrollTo(0, 0); }
+    else card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function sectionHeader(text) {
@@ -2443,6 +2621,7 @@
     var newState = cards.pop(); // makeCard pushed it to the end
     if (pos !== -1) { cards.splice(pos, 1); cards.splice(pos, 0, newState); }
     else cards.push(newState);
+    if (oldState.card.classList.contains('is-active')) newCard.classList.add('is-active');
     oldState.card.replaceWith(newCard);
     renderCostSummary();
     renderCharDiff(newState);
@@ -3540,6 +3719,7 @@
 
   function applyCharDiff() {
     cards.forEach(renderCharDiff);
+    refreshSlotLists();
   }
 
   // ---- chaos-equivalent prices + build cost summary ------------------------------
@@ -3686,6 +3866,7 @@
 
   function renderMarket() {
     if (!market) return;
+    document.getElementById('view-market').classList.add('has-data');
     var league = market.league;
     var tile = document.getElementById('market-tile');
     var div = marketPoints('divine');
@@ -3895,6 +4076,7 @@
   }
 
   function renderCostSummary() {
+    refreshSlotLists(); // prices + bought state in the slot lists follow the summary
     var box = document.getElementById('cost-summary');
     if (!box) return;
     var league = document.getElementById('league').value;
@@ -4066,8 +4248,11 @@
              account: li.account, whisper: li.whisper, tradeUrl: tradeUrl, ts: Date.now() });
     saveBasket(b);
     renderBasket();
+    UI.toast('Pinned to your basket in the Upgrade planner.', 'success',
+      { action: { label: 'View', onClick: function () { setView('planner'); window.scrollTo(0, 0); } } });
   }
   function renderBasket() {
+    updateNavCounts();
     var box = document.getElementById('basket');
     var b = loadBasket();
     if (!b.length) { box.classList.add('hidden'); return; }
