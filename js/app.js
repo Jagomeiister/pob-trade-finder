@@ -1335,9 +1335,13 @@
       body.textContent = 'No jewel sockets are allocated in this tree — allocate one in PoB first.';
       return;
     }
-    sockets.sort(function (x, y) { return y.notables.length - x.notables.length; });
-    // timeless jewels the build already has socketed: {socket, jewel, seed}
+    // timeless jewels the build already has socketed: {socket, jewel, seed} — their
+    // sockets come first (the default), then the ones covering most of your notables
     var owned = ownedTimeless(b);
+    function ownedAt(sock) { return owned.find(function (o) { return o.socket === sock; }); }
+    sockets.sort(function (x, y) {
+      return (ownedAt(y.socket) ? 1 : 0) - (ownedAt(x.socket) ? 1 : 0) || y.notables.length - x.notables.length;
+    });
     var ctr = document.createElement('div');
     ctr.className = 'card-opts finder-opts';
     var jewelSel = makeMiniSelect(ctr, 'Jewel', TIMELESS_TYPES.map(function (t) { return t[1]; }), 'Brutal Restraint');
@@ -1346,10 +1350,12 @@
       var o = document.createElement('option');
       o.value = String(s.socket);
       var names = s.notables.map(function (n) { return nodeName(J, n); });
-      o.textContent = names.length
-        ? 'Socket near ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' +' + (names.length - 3) : '') +
+      var mineHere = ownedAt(s.socket);
+      o.textContent = (mineHere ? '★ Your ' + mineHere.jewel + ' ' + mineHere.seed + ' — ' : '') + (names.length
+        ? 'socket near ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' +' + (names.length - 3) : '') +
           ' (' + names.length + ' of your notables)'
-        : 'Socket ' + s.socket + ' (none of your notables in radius)';
+        : 'socket ' + s.socket + ' (none of your notables in radius)');
+      o.textContent = o.textContent.charAt(0).toUpperCase() + o.textContent.slice(1);
       sockSel.appendChild(o);
     });
     var sockLab = document.createElement('label');
