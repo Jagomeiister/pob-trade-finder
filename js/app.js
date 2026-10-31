@@ -52,26 +52,40 @@
 
   // ---- user preferences (text size, density, sound, accessibility) ---------
   var PREFS = { fontsize: '100', density: 'comfortable', sound: true, notify: true,
-                volume: 25, motion: false, contrast: false, cb: false, theme: 'classic' };
+                volume: 25, motion: false, contrast: false, cb: false, theme: 'dark', accent: 'gold' };
+  // pre-2.0 colour schemes → base theme + accent (docs/UI-PLAN.md §3)
+  var LEGACY_THEMES = { classic: ['dark', 'gold'], obsidian: ['dark', 'teal'], midnight: ['dark', 'violet'],
+                        blood: ['dark', 'crimson'], forest: ['dark', 'green'] };
+
+  function migratePrefs() {
+    var old = LEGACY_THEMES[PREFS.theme];
+    if (old) { PREFS.theme = old[0]; PREFS.accent = old[1]; }
+    if (['dark', 'light', 'system'].indexOf(PREFS.theme) < 0) PREFS.theme = 'dark';
+  }
 
   function loadPrefs() {
     try {
       var p = JSON.parse(localStorage.getItem('pobtf-prefs'));
       if (p) Object.keys(PREFS).forEach(function (k) { if (k in p) PREFS[k] = p[k]; });
     } catch (e) { /* defaults */ }
+    migratePrefs();
   }
 
+  var LIGHT_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+
   function applyPrefs() {
-    if (PREFS.theme && PREFS.theme !== 'classic') document.body.dataset.theme = PREFS.theme;
-    else delete document.body.dataset.theme;
-    var themeSel = document.getElementById('pref-theme');
-    if (themeSel) themeSel.value = PREFS.theme || 'classic';
+    migratePrefs(); // prefs hydrated from the desktop store can still carry old names
+    var root = document.documentElement;
+    var light = PREFS.theme === 'light' || (PREFS.theme === 'system' && LIGHT_QUERY && LIGHT_QUERY.matches);
+    if (light) root.dataset.theme = 'light'; else delete root.dataset.theme;
+    if (PREFS.accent && PREFS.accent !== 'gold') root.dataset.accent = PREFS.accent; else delete root.dataset.accent;
+    if (PREFS.contrast) root.dataset.contrast = 'high'; else delete root.dataset.contrast;
     document.body.style.zoom = (parseInt(PREFS.fontsize, 10) || 100) / 100;
     document.body.classList.toggle('compact', PREFS.density === 'compact');
     document.body.classList.toggle('reduce-motion', !!PREFS.motion);
-    document.body.classList.toggle('high-contrast', !!PREFS.contrast);
     document.body.classList.toggle('cb-sockets', !!PREFS.cb);
-    var ids = { 'pref-fontsize': PREFS.fontsize, 'pref-density': PREFS.density };
+    var ids = { 'pref-theme': PREFS.theme, 'pref-accent': PREFS.accent,
+                'pref-fontsize': PREFS.fontsize, 'pref-density': PREFS.density };
     Object.keys(ids).forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.value = ids[id];
@@ -330,7 +344,10 @@
     document.getElementById('check-updates-btn').addEventListener('click', function () {
       checkForUpdates(true);
     });
-    [['pref-theme', 'theme', 'value'],
+    if (LIGHT_QUERY && LIGHT_QUERY.addEventListener) {
+      LIGHT_QUERY.addEventListener('change', function () { if (PREFS.theme === 'system') applyPrefs(); });
+    }
+    [['pref-theme', 'theme', 'value'], ['pref-accent', 'accent', 'value'],
      ['pref-fontsize', 'fontsize', 'value'], ['pref-density', 'density', 'value'],
      ['pref-sound', 'sound', 'checked'], ['pref-notify', 'notify', 'checked'], ['pref-volume', 'volume', 'value'],
      ['pref-motion', 'motion', 'checked'], ['pref-contrast', 'contrast', 'checked'],
@@ -1307,7 +1324,7 @@
     intro.className = 'finder-sub';
     intro.textContent = 'Pick a socket from your tree: every seed is checked against the notables in its radius, ' +
       'ranked by the outcomes your build wants, and the best seeds can be priced in one click. ' +
-      'Covers Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy — Glorious Vanity isn\'t supported yet.';
+      'Covers all six: Glorious Vanity, Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy.';
     wrap.appendChild(intro);
     var body = document.createElement('div');
     wrap.appendChild(body);

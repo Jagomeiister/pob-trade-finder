@@ -28,6 +28,7 @@ STEPS = [
     [sys.executable, "test/test_currency_feed.py"],
     ["node", "test/test_craft.js"],
     ["node", "test/test_jewels.js"],
+    ["node", "test/test_contrast.js"],
     [sys.executable, "test/test_price_hotkey.py"],
     [sys.executable, "test/test_timeless.py"],
 ]

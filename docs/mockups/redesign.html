@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoB Trade Finder — redesign mockup</title>
+<style>
+/* ---- tokens (docs/UI-PLAN.md §3) ---------------------------------------- */
+:root, [data-theme="dark"] {
+  --bg:#0f0e0c; --s1:#171512; --s2:#201d19; --s3:#2a2620;
+  --border:#332e26; --border-strong:#4a4236;
+  --text:#ece6da; --text-2:#b9af9d; --text-3:#9a907d;
+  --accent:#d9ad4f; --accent-hover:#e6bf66; --on-accent:#1a1408; --accent-soft:rgba(217,173,79,.14);
+  --unique:#e0894a; --rare:#f0e070; --magic:#9a9aff; --crafted:#b8b8ff; --fractured:#c4b37e;
+  --success:#6cc07a; --warn:#e0b050; --danger:#ec7b7b; --info:#7fb2ec;
+  --success-soft:rgba(108,192,122,.14); --warn-soft:rgba(224,176,80,.14); --danger-soft:rgba(236,123,123,.14); --info-soft:rgba(127,178,236,.14);
+  --focus:0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+[data-theme="light"] {
+  --bg:#f5f2ec; --s1:#ffffff; --s2:#efeae1; --s3:#e6dfd3;
+  --border:#ddd5c8; --border-strong:#c4b9a6;
+  --text:#1d1a15; --text-2:#4a4338; --text-3:#635a4b;
+  --accent:#7e5a0c; --accent-hover:#6a4b08; --on-accent:#ffffff; --accent-soft:rgba(126,90,12,.10);
+  --unique:#a04f12; --rare:#7a6200; --magic:#4646b0; --crafted:#4b4bb8; --fractured:#7a6630;
+  --success:#28702f; --warn:#8a5d00; --danger:#b3261e; --info:#1f5fa8;
+  --success-soft:rgba(40,112,47,.10); --warn-soft:rgba(138,93,0,.10); --danger-soft:rgba(179,38,30,.10); --info-soft:rgba(31,95,168,.10);
+}
+:root { --fs-xs:12px; --fs-sm:13px; --fs-md:14px; --fs-lg:16px; --fs-xl:20px;
+        --r-sm:4px; --r-md:6px; --r-lg:10px; --sp:8px; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:var(--fs-md)/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; }
+button, input, select { font:inherit; color:inherit; }
+:focus-visible { outline:none; box-shadow:var(--focus); }
+.num { font-variant-numeric:tabular-nums; }
+
+/* ---- components ------------------------------------------------------- */
+.btn { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 12px; border-radius:var(--r-md);
+       border:1px solid var(--border-strong); background:var(--s2); font-size:var(--fs-sm); font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn:hover { background:var(--s3); }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.btn.primary:hover { background:var(--accent-hover); }
+.btn.ghost { background:transparent; border-color:transparent; color:var(--text-2); }
+.btn.sm { height:26px; padding:0 8px; font-size:var(--fs-xs); }
+.chip { display:inline-flex; align-items:center; gap:4px; height:20px; padding:0 8px; border-radius:999px;
+        font-size:var(--fs-xs); font-weight:600; background:var(--s3); color:var(--text-2); white-space:nowrap; }
+.chip.success { background:var(--success-soft); color:var(--success); }
+.chip.warn { background:var(--warn-soft); color:var(--warn); }
+.chip.danger { background:var(--danger-soft); color:var(--danger); }
+.chip.info { background:var(--info-soft); color:var(--info); }
+.field { display:flex; flex-direction:column; gap:4px; font-size:var(--fs-xs); color:var(--text-2); font-weight:600; }
+.input, select { height:32px; padding:0 10px; border-radius:var(--r-md); border:1px solid var(--border-strong); background:var(--s2); font-size:var(--fs-sm); }
+.label { font-size:var(--fs-xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+.panel { background:var(--s1); border:1px solid var(--border); border-radius:var(--r-lg); }
+
+/* ---- shell ------------------------------------------------------------ */
+.app { display:grid; grid-template-columns:232px 280px 1fr; height:100vh; }
+.side { background:var(--s1); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:12px; gap:12px; overflow:auto; }
+.brand { display:flex; align-items:center; gap:8px; font-weight:700; font-size:var(--fs-lg); }
+.brand i { width:24px; height:24px; border-radius:6px; background:var(--accent); display:inline-block; }
+.build { padding:10px; border-radius:var(--r-lg); background:var(--s2); }
+.build b { display:block; }
+.build small { color:var(--text-2); font-size:var(--fs-xs); }
+.nav { display:flex; flex-direction:column; gap:2px; }
+.nav a { display:flex; align-items:center; justify-content:space-between; height:34px; padding:0 10px; border-radius:var(--r-md);
+         color:var(--text-2); text-decoration:none; font-weight:600; font-size:var(--fs-sm); }
+.nav a:hover { background:var(--s2); color:var(--text); }
+.nav a[aria-current="page"] { background:var(--accent-soft); color:var(--text); box-shadow:inset 3px 0 0 var(--accent); }
+.nav a .count { color:var(--text-3); font-weight:500; }
+.side-foot { margin-top:auto; display:flex; flex-direction:column; gap:8px; }
+.rate { display:flex; justify-content:space-between; font-size:var(--fs-xs); color:var(--text-2); padding:8px 10px; background:var(--s2); border-radius:var(--r-md); }
+
+.slots { border-right:1px solid var(--border); overflow:auto; background:var(--bg); }
+.slots-head { position:sticky; top:0; background:var(--bg); padding:12px; display:flex; flex-direction:column; gap:8px; border-bottom:1px solid var(--border); }
+.slot { display:grid; grid-template-columns:36px 1fr auto; gap:10px; align-items:center; padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); }
+.slot:hover { background:var(--s1); }
+.slot[aria-selected="true"] { background:var(--s1); box-shadow:inset 3px 0 0 var(--accent); }
+.slot .ic { width:36px; height:36px; border-radius:var(--r-md); background:var(--s2); }
+.slot .nm { font-weight:600; font-size:var(--fs-sm); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.slot .sl { font-size:var(--fs-xs); color:var(--text-3); }
+.slot .pr { text-align:right; font-size:var(--fs-sm); font-weight:700; }
+.unique { color:var(--unique); } .rare { color:var(--rare); } .magic { color:var(--magic); }
+
+.main { overflow:auto; }
+.topbar { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:8px; padding:10px 20px; background:var(--bg); border-bottom:1px solid var(--border); }
+.topbar .ctx { display:flex; gap:6px; flex-wrap:wrap; }
+.topbar .sp { flex:1; }
+.content { padding:20px; display:flex; flex-direction:column; gap:16px; max-width:980px; }
+
+.item-head { display:flex; gap:14px; align-items:center; padding:16px; }
+.item-head .ic { width:56px; height:56px; border-radius:var(--r-lg); background:var(--s2); flex:none; }
+.item-head h1 { margin:0; font-size:var(--fs-xl); line-height:1.2; }
+.item-head .base { color:var(--text-2); font-size:var(--fs-sm); }
+.item-head .acts { margin-left:auto; display:flex; gap:8px; }
+.mods { width:100%; border-collapse:collapse; }
+.mods th { text-align:left; padding:6px 16px; border-top:1px solid var(--border); }
+.mods td { padding:7px 16px; border-top:1px solid var(--border); vertical-align:middle; }
+.mods td:first-child { width:36px; padding-right:0; }
+.mods .mod { color:var(--magic); }
+.mods .mod.cr { color:var(--crafted); }
+.mods .min { width:72px; text-align:right; }
+.mods .stat { color:var(--text-3); font-size:var(--fs-xs); }
+.mods tr.off .mod { color:var(--text-3); }
+details.more { border-top:1px solid var(--border); }
+details.more summary { padding:10px 16px; cursor:pointer; color:var(--text-2); font-weight:600; font-size:var(--fs-sm); list-style:none; display:flex; gap:8px; align-items:center; }
+details.more summary::before { content:"▸"; }
+details.more[open] summary::before { content:"▾"; }
+.filters { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; padding:4px 16px 16px; }
+.card-foot { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--border); align-items:center; }
+.card-foot .sp { flex:1; }
+
+.listing { display:grid; grid-template-columns:44px 1fr 140px; gap:14px; padding:12px 16px; border-top:1px solid var(--border); align-items:start; }
+.listing .ic { width:44px; height:44px; border-radius:var(--r-md); background:var(--s2); }
+.listing .nm { font-weight:700; }
+.listing .lm { font-size:var(--fs-sm); color:var(--magic); }
+.listing .price { text-align:right; }
+.listing .price b { display:block; font-size:var(--fs-lg); }
+.listing .price small { color:var(--text-3); font-size:var(--fs-xs); }
+.listing .price .btn { margin-top:6px; }
+.res-head { display:flex; align-items:center; gap:10px; padding:12px 16px; }
+.res-head b { font-size:var(--fs-lg); }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- sidebar: build, navigation, market -->
+  <aside class="side">
+    <div class="brand"><i></i>PoB Trade Finder</div>
+    <div class="build">
+      <b>Elementalist</b><small>Vaal Ice Nova · 24 items · Allflame</small>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn sm">☆ Save</button><button class="btn sm ghost">Switch build ▾</button>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Views">
+      <a href="#" aria-current="page">Gear <span class="count">9</span></a>
+      <a href="#">Jewels &amp; clusters <span class="count">7</span></a>
+      <a href="#">Flasks <span class="count">5</span></a>
+      <a href="#">Gems <span class="count">12</span></a>
+      <div class="label" style="padding:12px 10px 4px">Tools</div>
+      <a href="#">Upgrade planner</a>
+      <a href="#">Timeless jewels</a>
+      <a href="#">Jewel finder</a>
+      <a href="#">Market</a>
+    </nav>
+    <div class="side-foot">
+      <div class="rate"><span>1 divine</span><b class="num">333c</b></div>
+      <button class="btn ghost">⚙ Settings</button>
+    </div>
+  </aside>
+
+  <!-- slot list: master -->
+  <section class="slots" aria-label="Gear slots">
+    <div class="slots-head">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b>Gear</b><span class="chip">Total 412c</span></div>
+      <button class="btn primary">Check all prices</button>
+    </div>
+    <div role="listbox" aria-label="Slots">
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Weapon</div><div class="nm rare">Corpse Song</div></span><span class="pr num">85c</span></div>
+      <div class="slot" role="option" aria-selected="true"><span class="ic"></span><span><div class="sl">Helmet</div><div class="nm rare">Rift Corona</div></span><span class="pr num">2c</span></div>
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Body armour</div><div class="nm unique">Cloak of Defiance</div></span><span class="chip success">Owned</span></div>
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Gloves</div><div class="nm rare">Dusk Grip</div></span><span class="chip">—</span></div>
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Boots</div><div class="nm rare">Gale Stride</div></span><span class="chip warn">Upgrade</span></div>
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Amulet</div><div class="nm rare">Rune Beads</div></span><span class="pr num">1.2d</span></div>
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Ring 1</div><div class="nm rare">Cataclysm Loop</div></span><span class="pr num">40c</span></div>
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Ring 2</div><div class="nm rare">Storm Band</div></span><span class="chip danger">No match</span></div>
+      <div class="slot" role="option"><span class="ic"></span><span><div class="sl">Belt</div><div class="nm unique">Mageblood</div></span><span class="pr num">210d</span></div>
+    </div>
+  </section>
+
+  <!-- detail -->
+  <main class="main">
+    <div class="topbar">
+      <div class="ctx">
+        <span class="chip">Allflame</span><span class="chip">⚡ Instant + in person</span><span class="chip">Buyout</span><span class="chip">Min roll 80%</span>
+      </div>
+      <span class="sp"></span>
+      <button class="btn ghost">Edit search settings</button>
+      <button class="btn">Open all searches ↗</button>
+    </div>
+    <div class="content">
+      <div class="panel">
+        <div class="item-head">
+          <span class="ic"></span>
+          <div>
+            <div class="label">Helmet</div>
+            <h1 class="rare">Rift Corona</h1>
+            <div class="base">Sunfire Circlet · ilvl 85 · <span class="chip warn">Searing Exarch</span> <span class="chip info">Eater of Worlds</span></div>
+          </div>
+          <div class="acts">
+            <button class="btn primary">Check price</button>
+            <button class="btn">Search on trade ↗</button>
+            <button class="btn" aria-label="More actions">⋯</button>
+          </div>
+        </div>
+        <table class="mods">
+          <thead><tr><th></th><th class="label">Mod</th><th class="label" style="text-align:right">Min</th><th class="label">Trade stat</th></tr></thead>
+          <tbody>
+            <tr><td><input type="checkbox" checked aria-label="Use: 6% of Physical Damage from Hits taken as Lightning"></td><td class="mod">6% of Physical Damage from Hits taken as Lightning <span class="chip info">Eater</span></td><td><input class="input min num" value="4.8"></td><td class="stat">#% phys taken as lightning</td></tr>
+            <tr><td><input type="checkbox" checked aria-label="Use"></td><td class="mod">28% increased Mana Cost Efficiency <span class="chip warn">Exarch</span></td><td><input class="input min num" value="22"></td><td class="stat">#% mana cost efficiency</td></tr>
+            <tr><td><input type="checkbox" checked aria-label="Use"></td><td class="mod">+59 to maximum Energy Shield</td><td><input class="input min num" value="47"></td><td class="stat">pseudo total max ES</td></tr>
+            <tr><td><input type="checkbox" checked aria-label="Use"></td><td class="mod">+32 to maximum Life</td><td><input class="input min num" value="26"></td><td class="stat">pseudo total max life</td></tr>
+            <tr><td><input type="checkbox" checked aria-label="Use"></td><td class="mod">+47% to Cold Resistance</td><td><input class="input min num" value="38"></td><td class="stat">pseudo total cold res</td></tr>
+            <tr class="off"><td><input type="checkbox" aria-label="Use"></td><td class="mod cr">+29% to Chaos Resistance <span class="chip">Crafted</span></td><td><input class="input min num" value="23"></td><td class="stat">pseudo total chaos res</td></tr>
+          </tbody>
+        </table>
+        <details class="more">
+          <summary>More filters <span class="chip">2 changed</span></summary>
+          <div class="filters">
+            <label class="field">Search by<select><option>Any base</option></select></label>
+            <label class="field">Match<select><option>All but one</option></select></label>
+            <label class="field">Min item level<input class="input num" value="85"></label>
+            <label class="field">Max price<input class="input num" placeholder="chaos"></label>
+          </div>
+        </details>
+        <div class="card-foot">
+          <span class="chip success">143 listed</span><span style="color:var(--text-2);font-size:var(--fs-sm)">cheapest 2c · checked 1 min ago</span>
+          <span class="sp"></span>
+          <button class="btn sm ghost">History ▾</button>
+        </div>
+        <div class="listing">
+          <span class="ic"></span>
+          <div>
+            <div class="nm rare">Beast Brow Dire Pelt <span class="chip success">Deal</span></div>
+            <div class="lm">+125 to maximum Life · +45% to Fire Resistance · +35% to Lightning Resistance</div>
+          </div>
+          <div class="price"><b class="num">2 chaos</b><small>karyung0813 · fixed</small><br><button class="btn sm primary">Whisper</button></div>
+        </div>
+        <div class="listing">
+          <span class="ic"></span>
+          <div>
+            <div class="nm rare">Corpse Crown Paladin Crown <span class="chip warn">Exarch</span></div>
+            <div class="lm">8% increased Cast Speed · +84 to maximum Life · +45% to Fire Resistance</div>
+          </div>
+          <div class="price"><b class="num">3 chaos</b><small>vanessa#9854 · fixed</small><br><button class="btn sm primary">Whisper</button></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
