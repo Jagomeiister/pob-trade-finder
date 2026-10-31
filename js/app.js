@@ -550,19 +550,20 @@
     }
 
     if (build.tree && build.tree.nodes && build.tree.nodes.length) {
+      section('timeless').appendChild(makeTimelessFinder(build));
       section('finder').appendChild(makeJewelFinder(build));
     }
 
     var TAB_LABELS = { gear: 'Gear', jewels: 'Jewels & Clusters', flasks: 'Flasks', gems: 'Gems',
-                       finder: '💎 Jewel finder' };
-    var present = ['gear', 'jewels', 'flasks', 'gems', 'finder'].filter(function (k) { return sections[k]; });
+                       timeless: '⏳ Timeless jewels', finder: '💎 Jewel finder' };
+    var present = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder'].filter(function (k) { return sections[k]; });
     if (present.length > 1) {
       var bar = document.createElement('div');
       bar.className = 'tab-bar';
       ['all'].concat(present).forEach(function (k) {
         var btn = document.createElement('button');
         btn.className = 'tab-btn' + (k === 'all' ? ' active' : '');
-        var count = (k === 'all' || k === 'finder') ? null : sections[k].children.length;
+        var count = (k === 'all' || k === 'finder' || k === 'timeless') ? null : sections[k].children.length;
         btn.textContent = (k === 'all' ? 'All' : TAB_LABELS[k]) + (count ? ' (' + count + ')' : '');
         btn.addEventListener('click', function () {
           root.dataset.tab = k;
@@ -1057,7 +1058,11 @@
     ctr.className = 'card-opts finder-opts';
     var kindSel = makeMiniSelect(ctr, 'Jewel', JEWEL_KINDS.map(function (k) { return k[1]; }), JEWEL_KINDS[0][1]);
     var hasAbyss = Object.keys(b.items).some(function (id) { return /Eye Jewel$/.test(b.items[id].base || ''); });
-    var modeSel = makeMiniSelect(ctr, 'Find', ['best for my build', 'at least N of these'], 'best for my build');
+    // weighted searches exceed the anonymous query budget even with 2 mods (measured) —
+    // without a saved POESESSID default to the any-N-of search, which fits
+    var modeSel = makeMiniSelect(ctr, 'Find', ['best for my build', 'at least N of these'],
+                                 HAS_SESSION ? 'best for my build' : 'at least N of these');
+    if (!HAS_SESSION) modeSel.options[0].textContent = 'best for my build (needs POESESSID in-app)';
     var nSel = makeMiniSelect(ctr, 'N', ['2', '3', '4'], '2');
     var rollSel = makeMiniSelect(ctr, 'Min roll', ['any', '50%', '70%', '90%'], '50%');
     var sortSel = makeMiniSelect(ctr, 'Sort', ['best score', 'cheapest'], 'best score');
@@ -1204,14 +1209,260 @@
     wrap.appendChild(hint);
     makeFinderState('Jewel finder', wrap, payload);
 
-    wrap.appendChild(makeTimelessPanel());
+  }
+
+  // ---- timeless jewel finder ---------------------------------------------------------
+  // Python bridge (timeless.py) reads Path of Building's timeless lookup tables:
+  // for a chosen jewel + socket it lists every outcome the seed can give the
+  // notables in radius, then ranks all seeds by the outcomes you value.
+  var TIMELESS_TYPES = [[2, 'Lethal Pride'], [3, 'Brutal Restraint'], [4, 'Militant Faith'],
+                        [5, 'Elegant Hubris'], [6, 'Heroic Tragedy']];
+  // seeds per price check: x4 conquerors must fit the trade site's filter budget
+  function timelessPriceSeeds() { return HAS_SESSION ? 10 : 5; }
+
+  function makeTimelessFinder(b) {
+    var wrap = document.createElement('div');
+    wrap.className = 'card finder timeless-finder';
+    var h = document.createElement('h3');
+    h.textContent = '⏳ Timeless jewel finder';
+    wrap.appendChild(h);
+    var intro = document.createElement('div');
+    intro.className = 'finder-sub';
+    intro.textContent = 'Pick a socket from your tree: every seed is checked against the notables in its radius, ' +
+      'ranked by the outcomes your build wants, and the best seeds can be priced in one click. ' +
+      'Covers Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy — Glorious Vanity isn\'t supported yet.';
+    wrap.appendChild(intro);
+    var body = document.createElement('div');
+    wrap.appendChild(body);
+    if (!isGui() || !window.pywebview.api.timeless_info) {
+      body.className = 'finder-sub';
+      body.textContent = 'Seed ranking needs the desktop app. You can still price seeds you already know below.';
+      wrap.appendChild(makeTimelessPanel());
+      return wrap;
+    }
+    body.textContent = 'Reading your tree…';
+    ensureJewelData().then(function (J) {
+      return window.pywebview.api.timeless_sockets(JSON.stringify(b.tree.nodes)).then(function (r) {
+        if (!r || !r.ok) throw new Error((r && r.error) || 'socket lookup failed');
+        renderTimelessFinder(body, b, J, r.sockets);
+        wrap.appendChild(makeTimelessPanel());
+      });
+    }).catch(function (e) { body.textContent = '❌ ' + (e.message || e); });
+    return wrap;
+  }
+
+  function nodeName(J, id) { var n = J.tree[id]; return n ? n[1] : 'node ' + id; }
+
+  function renderTimelessFinder(body, b, J, sockets) {
+    body.textContent = '';
+    var P = Jewels.profile(b, J);
+    if (!sockets.length) {
+      body.className = 'finder-sub';
+      body.textContent = 'No jewel sockets are allocated in this tree — allocate one in PoB first.';
+      return;
+    }
+    sockets.sort(function (x, y) { return y.notables.length - x.notables.length; });
+    var ctr = document.createElement('div');
+    ctr.className = 'card-opts finder-opts';
+    var jewelSel = makeMiniSelect(ctr, 'Jewel', TIMELESS_TYPES.map(function (t) { return t[1]; }), 'Brutal Restraint');
+    var sockSel = document.createElement('select');
+    sockets.forEach(function (s) {
+      var o = document.createElement('option');
+      o.value = String(s.socket);
+      var names = s.notables.map(function (n) { return nodeName(J, n); });
+      o.textContent = names.length
+        ? 'Socket near ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' +' + (names.length - 3) : '') +
+          ' (' + names.length + ' of your notables)'
+        : 'Socket ' + s.socket + ' (none of your notables in radius)';
+      sockSel.appendChild(o);
+    });
+    var sockLab = document.createElement('label');
+    sockLab.className = 'toggle';
+    sockLab.appendChild(document.createTextNode('Socket '));
+    sockLab.appendChild(sockSel);
+    ctr.appendChild(sockLab);
+    var unalloc = makeToggle(ctr, 'Also count unallocated notables', false);
+    unalloc.checkbox.parentElement.title = 'Include notables in radius you have not taken — a good seed can make pathing to them worth it';
+    body.appendChild(ctr);
+
+    var summary = document.createElement('div');
+    summary.className = 'finder-sub';
+    body.appendChild(summary);
+    var outcomesBox = document.createElement('div');
+    body.appendChild(outcomesBox);
+    var findBtn = document.createElement('button');
+    findBtn.className = 'trade-btn';
+    findBtn.textContent = '🔎 Find best seeds';
+    var resultsBox = document.createElement('div');
+    resultsBox.className = 'timeless-results';
+
+    var info = null, values = {}, seq = 0;
+    var priced = { name: '', seeds: [] };
+
+    function jtype() { return TIMELESS_TYPES.find(function (t) { return t[1] === jewelSel.value; })[0]; }
+
+    function load() {
+      var my = ++seq;
+      summary.textContent = 'Loading ' + jewelSel.value + ' data (the first time downloads ~2 MB from Path of Building)…';
+      outcomesBox.textContent = '';
+      resultsBox.textContent = '';
+      window.pywebview.api.timeless_info(jtype(), parseInt(sockSel.value, 10), JSON.stringify(b.tree.nodes)).then(function (r) {
+        if (my !== seq) return;
+        if (!r || !r.ok) { summary.textContent = '❌ ' + ((r && r.error) || 'failed'); return; }
+        info = r;
+        values = {};
+        r.outcomes.forEach(function (o) {
+          var v = Math.round(Jewels.scoreText(P, o.sd.join('\n')) * 100);
+          values[o.key] = { use: v >= 45, value: v };
+        });
+        var allocN = r.notables.filter(function (n) { return n.allocated; }).length;
+        var allocS = r.smalls.filter(function (n) { return n.allocated; }).length;
+        summary.textContent = r.notables.length + ' notables in radius (' + allocN + ' yours) · ' +
+          r.smalls.length + ' small passives (' + allocS + ' yours): ' + r.small +
+          (r.keystones.length ? ' · keystones in radius: ' + r.keystones.map(function (k) { return nodeName(J, k); }).join(', ') +
+            ' (changed by the conqueror, not the seed)' : '');
+        renderOutcomes();
+      }, function (e) { if (my === seq) summary.textContent = '❌ ' + e; });
+    }
+
+    function renderOutcomes() {
+      outcomesBox.textContent = '';
+      var table = document.createElement('table');
+      table.className = 'finder-table';
+      table.innerHTML = '<thead><tr><th scope="col">Want</th><th scope="col">Outcome on a notable</th>' +
+        '<th scope="col" class="num">Chance</th><th scope="col">Value to your build</th></tr></thead>';
+      var tbody = document.createElement('tbody');
+      info.outcomes.forEach(function (o) {
+        var st = values[o.key];
+        var tr = document.createElement('tr');
+        if (st.use) tr.className = 'on';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = st.use;
+        cb.setAttribute('aria-label', 'Want ' + o.dn);
+        cb.addEventListener('change', function () { st.use = cb.checked; tr.classList.toggle('on', cb.checked); });
+        var td1 = document.createElement('td'); td1.appendChild(cb);
+        var td2 = document.createElement('td');
+        var name = document.createElement('b');
+        name.textContent = (o.replace ? 'Becomes ' : '') + o.dn;
+        td2.appendChild(name);
+        td2.appendChild(document.createTextNode(' — ' + o.sd.join(' · ')));
+        var td3 = document.createElement('td'); td3.className = 'num';
+        td3.textContent = (o.share * 100).toFixed(1) + '%';
+        var td4 = document.createElement('td');
+        var val = document.createElement('input');
+        val.type = 'range'; val.min = '0'; val.max = '100'; val.step = '5'; val.value = String(st.value);
+        val.className = 'finder-val';
+        val.setAttribute('aria-label', 'Value of ' + o.dn);
+        var pct = document.createElement('span');
+        pct.className = 'finder-pct';
+        pct.textContent = st.value + '%';
+        val.addEventListener('input', function () { st.value = parseInt(val.value, 10); pct.textContent = val.value + '%'; });
+        td4.appendChild(val); td4.appendChild(pct);
+        [td1, td2, td3, td4].forEach(function (td) { tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      outcomesBox.appendChild(table);
+      outcomesBox.appendChild(findBtn);
+      outcomesBox.appendChild(resultsBox);
+    }
+
+    findBtn.addEventListener('click', function () {
+      if (!info) return;
+      var weights = {};
+      Object.keys(values).forEach(function (k) { if (values[k].use && values[k].value > 0) weights[k] = values[k].value / 100; });
+      if (!Object.keys(weights).length) { resultsBox.textContent = 'Tick at least one outcome you want.'; return; }
+      var my = ++seq;
+      resultsBox.textContent = 'Checking every ' + jewelSel.value + ' seed…';
+      window.pywebview.api.timeless_search(jtype(), parseInt(sockSel.value, 10), JSON.stringify(b.tree.nodes),
+                                           JSON.stringify(weights), unalloc.checkbox.checked).then(function (r) {
+        if (my !== seq) return;
+        if (!r || !r.ok) { resultsBox.textContent = '❌ ' + ((r && r.error) || 'failed'); return; }
+        renderSeeds(r);
+      }, function (e) { if (my === seq) resultsBox.textContent = '❌ ' + e; });
+    });
+
+    function outcomeLabel(key) {
+      var o = info.outcomes.find(function (x) { return x.key === key; });
+      return o ? o.dn : key;
+    }
+
+    function renderSeeds(r) {
+      resultsBox.textContent = '';
+      if (!r.results.length) {
+        resultsBox.textContent = 'No seed gives any of the ticked outcomes on ' +
+          (unalloc.checkbox.checked ? 'these notables' : 'your allocated notables') + ' here.';
+        return;
+      }
+      var head = document.createElement('div');
+      head.className = 'finder-sub';
+      head.textContent = r.matches + ' seeds give at least one wanted outcome on the ' + r.considered.length +
+        ' notable' + (r.considered.length === 1 ? '' : 's') + ' counted. Best ' + r.results.length + ':';
+      resultsBox.appendChild(head);
+      var priceTop = document.createElement('button');
+      priceTop.className = 'copy-btn';
+      priceTop.textContent = '💰 Price the top ' + Math.min(timelessPriceSeeds(), r.results.length) + ' seeds';
+      if (!HAS_SESSION) priceTop.title = 'Saving a POESESSID raises the trade site query budget to 10 seeds per check';
+      priceTop.addEventListener('click', function () {
+        priced.name = jewelSel.value;
+        priced.seeds = r.results.slice(0, timelessPriceSeeds()).map(function (x) { return x.seed; });
+        checkPrice(priceState);
+      });
+      resultsBox.appendChild(priceTop);
+      var table = document.createElement('table');
+      table.className = 'finder-table timeless-seeds';
+      table.innerHTML = '<thead><tr><th scope="col" class="num">Seed</th><th scope="col" class="num">Score</th>' +
+        '<th scope="col">What your notables become</th><th scope="col"></th></tr></thead>';
+      var tbody = document.createElement('tbody');
+      r.results.forEach(function (x) {
+        var tr = document.createElement('tr');
+        var td1 = document.createElement('td'); td1.className = 'num'; td1.textContent = x.seed;
+        var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = x.score.toFixed(2);
+        var td3 = document.createElement('td');
+        x.notables.forEach(function (p, i) {
+          var span = document.createElement('span');
+          span.className = p.weight > 0 ? 'ts-hit' : 'ts-miss';
+          span.textContent = nodeName(J, p.node) + ' → ' + outcomeLabel(p.key);
+          if (i) td3.appendChild(document.createTextNode(' · '));
+          td3.appendChild(span);
+        });
+        var td4 = document.createElement('td');
+        var pb = document.createElement('button');
+        pb.className = 'copy-btn';
+        pb.textContent = 'Price';
+        pb.title = 'Find listings of this ' + jewelSel.value + ' seed (any conqueror)';
+        pb.addEventListener('click', function () {
+          priced.name = jewelSel.value;
+          priced.seeds = [x.seed];
+          checkPrice(priceState);
+        });
+        td4.appendChild(pb);
+        [td1, td2, td3, td4].forEach(function (td) { tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      resultsBox.appendChild(table);
+      resultsBox.appendChild(priceBlock);
+    }
+
+    // price box for the chosen seeds — the normal listing view, live search, pins
+    var priceBlock = document.createElement('div');
+    var priceState = makeFinderState('Timeless jewel', priceBlock, function (quiet) {
+      if (!priced.seeds.length) { if (!quiet) alert('Find seeds first, then price them.'); return null; }
+      var o = finderOpts(); o.anonymous = !HAS_SESSION;
+      var q = Jewels.timelessQuery(priced.name, priced.seeds, '', o);
+      return { query: q.query, sort: q.sort };
+    });
+
+    [jewelSel, sockSel].forEach(function (el) { el.addEventListener('change', load); });
+    load();
   }
 
   function makeTimelessPanel() {
     var box = document.createElement('details');
     box.className = 'finder-timeless';
     var sum = document.createElement('summary');
-    sum.textContent = '⏳ Timeless jewel seed search';
+    sum.textContent = 'Price seeds you already have';
     box.appendChild(sum);
     var p = document.createElement('div');
     p.className = 'finder-sub';
@@ -3112,6 +3363,13 @@
     if (!rows.length) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
     box.innerHTML = '<div class="cost-head">Build cost — cheapest listing per checked slot</div>';
+    box.firstChild.appendChild(copyButton('📋 Copy', function () {
+      var lines = ['Build cost (' + league + ') — cheapest listing per slot'];
+      var t = 0;
+      rows.forEach(function (s) { t += s.cheapestChaos; lines.push(s.slot + ': ' + (s.item.name || s.item.base || '') + ' — ' + fmtEq(s.cheapestChaos, league)); });
+      lines.push('TOTAL: ' + fmtEq(t, league) + ' for ' + rows.length + ' slot(s)');
+      return lines.join('\n');
+    }));
     var total = 0;
     rows.forEach(function (s) {
       total += s.cheapestChaos;
@@ -3226,6 +3484,30 @@
   }
 
   // ---- shopping basket ------------------------------------------------------------
+  // button that copies text built at click time, with a brief confirmation
+  function copyButton(label, textFn) {
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = label;
+    btn.title = 'Copy as text — paste into Discord, notes, or a message to a friend';
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var text = textFn();
+      var done = function () { btn.textContent = '✔ Copied'; setTimeout(function () { btn.textContent = label; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      } else { fallbackCopy(text); done(); }
+    });
+    return btn;
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* nothing else to try */ }
+    ta.remove();
+  }
+
   function loadBasket() {
     try { return JSON.parse(localStorage.getItem('pobtf-basket')) || []; }
     catch (e) { return []; }
@@ -3266,6 +3548,16 @@
     });
     head.textContent = 'Shopping basket — ' + b.length + ' item(s)' +
       (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : '');
+    head.appendChild(copyButton('📋 Copy list', function () {
+      var lines = ['Shopping list (' + league + ')' + (total ? ' — ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : '')];
+      b.forEach(function (it) {
+        lines.push('- ' + ((it.name ? it.name + ' ' : '') + it.base) + ' — ' + it.account + ' — ' +
+          ((it.amount !== null && it.amount !== undefined) ? it.amount + ' ' + it.currency : 'no price'));
+        if (it.whisper) lines.push('  ' + it.whisper);
+        if (it.tradeUrl) lines.push('  ' + it.tradeUrl);
+      });
+      return lines.join('\n');
+    }));
     var clear = document.createElement('button');
     clear.className = 'copy-btn';
     clear.textContent = 'Clear';

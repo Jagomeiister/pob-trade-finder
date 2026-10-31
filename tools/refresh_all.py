@@ -23,10 +23,13 @@ STEPS = [
     [sys.executable, "tools/make_currencymap.py"],  # after make_baseicons (needs base_items)
     [sys.executable, "tools/make_craftdata.py", "--fetch"],  # after currencymap + ranges
     [sys.executable, "tools/make_jeweldata.py", "--fetch"],  # tree export + gems
+    [sys.executable, "tools/make_timeless.py", "--update"],  # re-pin PoB timeless data (after jeweldata: needs tree)
     ["node", "test/test.js"],
     [sys.executable, "test/test_currency_feed.py"],
     ["node", "test/test_craft.js"],
     ["node", "test/test_jewels.js"],
+    [sys.executable, "test/test_price_hotkey.py"],
+    [sys.executable, "test/test_timeless.py"],
 ]
 
 

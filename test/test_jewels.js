@@ -88,6 +88,8 @@ function score(P, text) { return Jw.scoreText(P, text); }
         one.query.stats[0].filters[0].id === 'explicit.pseudo_timeless_jewel_xibaqua');
   const many = Jw.timelessQuery('Militant Faith', Array.from({ length: 20 }, (_, i) => 2000 + i * 20), '', {});
   check('timeless: caps the filter count', many.truncated && many.query.stats[0].filters.length === 40);
+  const anon = Jw.timelessQuery('Militant Faith', Array.from({ length: 20 }, (_, i) => 2000 + i * 20), '', { anonymous: true });
+  check('timeless: anonymous cap fits the trade budget (20)', anon.truncated && anon.query.stats[0].filters.length === 20);
 }
 
 // 7) every timeless stat id exists in the bundled trade stats

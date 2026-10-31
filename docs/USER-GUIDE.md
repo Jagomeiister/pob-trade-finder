@@ -161,6 +161,56 @@ Details:
 - PoE 1 items only. Currency stacks, maps and other non-gear items open a card but may
   not produce a useful search
 
+## 5d. ⏳ Timeless jewels
+
+Finds the timeless jewel seed that does the most for the notables around one of
+your sockets, then prices it.
+
+1. Load your build and open the **⏳ Timeless jewels** tab.
+2. Pick a **jewel**: Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris or
+   Heroic Tragedy. Glorious Vanity isn't supported yet.
+3. Pick a **socket**. Your allocated sockets are listed, with the ones covering most of
+   your notables first. The summary shows how many notables, small passives and
+   keystones sit in the jewel's radius, and what the jewel does to small passives.
+4. The outcome table lists everything the seed can do to a notable on this jewel, for
+   example *Add Global Crit Chance* or *Becomes Supreme Ego*, with how often each one
+   comes up. Outcomes that suit your build are pre-ticked with a value. Untick or
+   adjust anything.
+5. **Find best seeds** checks every seed and ranks them by the total value of what they
+   do to your notables. Each result shows what each of your notables becomes; the
+   outcomes you wanted are highlighted.
+6. **Price** a single seed, or **Price the top seeds**. This searches every conqueror,
+   because the conqueror only changes the keystone. Without a saved POESESSID the trade
+   site allows 5 seeds per check; with one, 10.
+
+Tick **Also count unallocated notables** to see seeds that would make pathing to an
+untaken notable worthwhile.
+
+The outcome data comes from Path of Building's timeless jewel tables. The first use of
+each jewel downloads them (about 2 MB) from PoB's repository and checks them against a
+stored checksum. To cross-check a seed, socket that jewel and seed into the same
+socket in PoB and compare the notables.
+
+Already know your seeds? Expand **Price seeds you already have** at the bottom of the
+tab and paste them.
+
+## 5e. 💎 Jewel finder (rare and abyss jewels)
+
+Reads your passive tree and main skill to work out what your build scales: for
+example spells, cold, area, crit, staff, and life vs energy shield. It then ranks every
+mod that can roll on rare jewels by how much your build wants it.
+
+- **Jewel** picks the base: any of Crimson / Viridian / Cobalt, or a single one, or an
+  abyss Eye jewel type.
+- Each mod has **Use** and **Must** checkboxes and a **value** slider. The best matches
+  are pre-ticked.
+- **At least N of these** finds jewels with any N of your ticked mods at your minimum
+  roll. This is the default, and it works without logging in.
+- **Best for my build** scores every jewel by your values (a max roll is worth its
+  value % × 100) and sorts by that score. The trade site only allows these weighted
+  searches when logged in, so in-app checks need a saved POESESSID; the trade-site
+  link works while you're logged in there.
+
 ## 6b. Compare with your character
 
 Enter your account name (**Name#1234**) in the bar above the cards, load your characters,

@@ -23,8 +23,9 @@ import webview
 
 import price_hotkey
 from currency_feed import CurrencyFeed
+from timeless import TimelessData
 
-VERSION = "1.10.0"
+VERSION = "1.11.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -69,6 +70,8 @@ class Api:
         except Exception:
             self._currency_map = {}
         threading.Thread(target=self._feed.prune, daemon=True).start()
+        self._timeless = TimelessData(DATA_DIR, "PoBTradeFinder/%s (+https://github.com/%s/%s)"
+                                      % (VERSION, GITHUB_OWNER, GITHUB_REPO))
         self._unique_icons_path = os.path.join(DATA_DIR, "unique_icons.json")
         try:
             with open(self._unique_icons_path, "r", encoding="utf-8") as f:
@@ -454,6 +457,35 @@ class Api:
             return {"ok": False, "error": str(e)}
 
     # -- currency -> chaos rates via GGG's own bulk exchange ---------------------
+    # -- timeless jewel finder (lookup tables from Path of Building, see timeless.py) --
+    def timeless_sockets(self, nodes_json):
+        """Allocated jewel sockets with the allocated notables in timeless radius."""
+        try:
+            alloc = set(int(n) for n in json.loads(nodes_json))
+            out = []
+            for s in self._timeless.sockets():
+                if s not in alloc:
+                    continue
+                near = [n for n, k in self._timeless.in_radius(s) if k == 1 and n in alloc]
+                out.append({"socket": s, "notables": near})
+            return {"ok": True, "sockets": out}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def timeless_info(self, jewel_type, socket_id, nodes_json):
+        try:
+            return dict(ok=True, **self._timeless.info(int(jewel_type), int(socket_id), json.loads(nodes_json)))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def timeless_search(self, jewel_type, socket_id, nodes_json, weights_json, include_unallocated=False):
+        try:
+            r = self._timeless.search(int(jewel_type), int(socket_id), json.loads(nodes_json),
+                                      json.loads(weights_json), bool(include_unallocated))
+            return dict(ok=True, **r)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     def exchange_rates(self, league, currencies_json):
         """Chaos rate for each currency. Primary source: GGG's public hourly
         currency-exchange feed (no trade-API quota). Fallback for anything the

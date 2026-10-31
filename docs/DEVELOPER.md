@@ -207,6 +207,24 @@ RePoE lives at `https://repoe-fork.github.io/<file>` (root path — not `/RePoE/
   1-vs-2 affix split) and a Craft of Exile export (its share link is an undocumented
   querystring of CoE-internal ids — `b`, `bi`, `m`, `e`, `f`, `i`, `lv`, `req`=JSON, `l`
   fossil stacking mode, …; the only public import is pasting Ctrl+Alt+C item text)
+- Timeless jewels (`timeless.py`, data `data/timeless.json` from `tools/make_timeless.py`):
+  Path of Building's lookup tables (MIT, see THIRD_PARTY_NOTICES.md), pinned to one PoB
+  commit with sha256 per table; the ~2 MB zlib tables download on first use into
+  `data/timeless_cache/` (URL allowlisted to PoB's repo, checksum enforced). Layout:
+  `byte = lut[row * seedCount + seedOffset]` (rows = notables in `nodeIndex`, 454 of them),
+  map through `localToGlobal[type]`, then ≥337 → replaced by `nodes[byte-337]`, else
+  gains `additions[byte]`. Elegant Hubris stores seed/20. Small passives and keystones
+  don't depend on the seed. Radius: Large = 1800 on 3.16+ trees; node positions use
+  PoB's orbit maths (16- and 40-node orbits have fixed angle tables). Sockets inside
+  cluster jewels are excluded (they can't hold timeless jewels). Glorious Vanity uses a
+  separate 22 MB variable-length table — not implemented
+- Trade query budget (measured anonymously): count groups up to 20 filters pass, 40 fail;
+  ANY weight group fails even with 2 filters ("Query is too complex … Logging in will
+  increase this limit"). With POESESSID, 40-filter timeless checks and weight groups work
+- Jewel finder (`js/jewels.js`, `data/jeweldata.js` from `tools/make_jeweldata.py`):
+  regular jewel mods are RePoE domain `misc`, abyss mods `abyss_jewel` — the domain decides
+  the base family (abyss bases also carry `default`). Scoring = effect weight × weakest
+  qualifier; main-skill qualifiers count in full; a minion gem only contributes "minion"
 - Thin markets: low-value orbs often see under 5k chaos traded per hour, so hourly
   samples swing ±30%. The market panel flags those rows "thin" rather than hiding it
 

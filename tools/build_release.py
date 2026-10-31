@@ -21,6 +21,7 @@ SHIP = [
     "index.html",
     "README.md",
     "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     "icon.ico",
     "js/pob.js",
     "js/matcher.js",
@@ -39,6 +40,7 @@ SHIP = [
     "data/currencymap.json",
     "data/craftdata.js",
     "data/jeweldata.js",
+    "data/timeless.json",
     "data/stats.json",
     "data/leagues.json",
 ]

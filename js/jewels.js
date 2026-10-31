@@ -224,7 +224,8 @@
     'Elegant Hubris': ['cadiro', 'victario', 'caspiro', 'chitus'],
     'Heroic Tragedy': ['vorana', 'uhtred', 'medved']
   };
-  var MAX_TIMELESS_FILTERS = 40;
+  // trade 'query too complex' budget: 20 filters anonymously, 40 logged in (measured)
+  var MAX_TIMELESS_FILTERS = 40, MAX_TIMELESS_FILTERS_ANON = 20;
 
   function parseSeeds(text) {
     var out = [];
@@ -237,6 +238,7 @@
 
   /* conqueror: one of TIMELESS[jewel] or '' for any */
   function timelessQuery(jewel, seeds, conqueror, opts) {
+    var cap = opts && opts.anonymous ? MAX_TIMELESS_FILTERS_ANON : MAX_TIMELESS_FILTERS;
     var conq = conqueror ? [conqueror] : TIMELESS[jewel] || [];
     var filters = [];
     seeds.forEach(function (s) {
@@ -245,8 +247,8 @@
       });
     });
     var q = { status: { option: (opts && opts.status) || 'available' }, name: jewel, type: 'Timeless Jewel',
-              stats: [{ type: 'count', value: { min: 1 }, filters: filters.slice(0, MAX_TIMELESS_FILTERS) }] };
-    return { query: q, sort: { price: 'asc' }, truncated: filters.length > MAX_TIMELESS_FILTERS };
+              stats: [{ type: 'count', value: { min: 1 }, filters: filters.slice(0, cap) }] };
+    return { query: q, sort: { price: 'asc' }, truncated: filters.length > cap };
   }
 
   /* sockets in the tree: allocated jewel-socket nodes, which hold a jewel */
@@ -264,5 +266,6 @@
   return { features: features, profile: profile, scoreText: scoreText, rankMods: rankMods,
            weightedQuery: weightedQuery, countQuery: countQuery, weightFor: weightFor, maxScore: maxScore,
            timelessQuery: timelessQuery, parseSeeds: parseSeeds, socketReport: socketReport,
-           TIMELESS: TIMELESS, QUALIFIERS: QUALIFIERS, EFFECTS: EFFECTS };
+           TIMELESS: TIMELESS, MAX_TIMELESS_FILTERS: MAX_TIMELESS_FILTERS,
+           MAX_TIMELESS_FILTERS_ANON: MAX_TIMELESS_FILTERS_ANON, QUALIFIERS: QUALIFIERS, EFFECTS: EFFECTS };
 });
