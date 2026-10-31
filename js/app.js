@@ -362,20 +362,27 @@
       tile.addEventListener('keydown', function (e) {
         if (e.target === tile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tile.click(); }
       });
-      // surface rate-limit cooldowns so the app never feels silently stuck
+      // surface rate-limit cooldowns so the app never feels silently stuck: poll the
+      // bridge every 10s, count down locally every second in between
+      var chipUntil = 0;
       setInterval(async function () {
         try {
           var r = await window.pywebview.api.rate_status();
-          var chip = document.getElementById('rate-chip');
-          if (r && r.ok && r.cooldownSeconds > 5) {
-            chip.textContent = '⏳ API cooldown ' + Math.floor(r.cooldownSeconds / 60) + 'm ' +
-              (r.cooldownSeconds % 60) + 's';
-            chip.classList.remove('hidden');
-          } else {
-            chip.classList.add('hidden');
-          }
+          chipUntil = (r && r.ok && r.cooldownSeconds > 5) ? Date.now() + r.cooldownSeconds * 1000 : 0;
+          tickChip();
         } catch (e) { /* bridge missing */ }
       }, 10000);
+      function tickChip() {
+        var chip = document.getElementById('rate-chip');
+        var left = chipUntil - Date.now();
+        if (left > 0) {
+          chip.textContent = '⏳ API cooldown ' + fmtCountdown(left);
+          chip.classList.remove('hidden');
+        } else {
+          chip.classList.add('hidden');
+        }
+      }
+      setInterval(tickChip, 1000);
     }
 
     // pull durable state from the bridge and re-apply it to the UI
@@ -841,8 +848,14 @@
     });
     Object.keys(bestBySize).sort().forEach(function (n) {
       var cb = bestBySize[n];
+      var rcode = C.resonators[cb.fossils.length - 1];
+      var parts = [[rcode, rcode.replace(/-/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); })]]
+        .concat(cb.fossils.map(function (fi) { return [C.fossils[fi][1], C.fossils[fi][0]]; }));
+      var breakdown = parts.map(function (p) {
+        return p[1] + ' ' + (rates[p[0]] !== undefined ? fmtEq(rates[p[0]], league) : 'no price');
+      }).join(' + ');
       methods.push({ label: 'Fossils: ' + cb.names.map(function (s) { return s.replace(/ Fossil$/, ''); }).join(' + '),
-                     perTry: cb.perTry, forced: null, P: cb.Q });
+                     perTry: cb.perTry, forced: null, P: cb.Q, breakdown: breakdown });
     });
     var baseCost = parseFloat(state.craftBase.value);
     if (isNaN(baseCost)) baseCost = 0;
@@ -860,6 +873,7 @@
       }
       var sum = Craft.summarize(st, m.perTry === undefined ? 0 : m.perTry, bench, baseCost);
       sum.label = m.label;
+      sum.breakdown = m.breakdown || '';
       sum.priced = m.perTry !== undefined;
       results.push(sum);
     }
@@ -931,8 +945,15 @@
         var td = document.createElement('td');
         td.textContent = c;
         if (i) td.className = 'num';
+        if (i === 2 && r.breakdown) { td.title = 'Per try: ' + r.breakdown; td.classList.add('has-tip'); }
         tr.appendChild(td);
       });
+      if (r.breakdown) {
+        var sub = document.createElement('div');
+        sub.className = 'craft-breakdown';
+        sub.textContent = r.breakdown;
+        tr.firstChild.appendChild(sub);
+      }
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -2932,6 +2953,56 @@
            '?q=' + encodeURIComponent(JSON.stringify(payload));
   }
 
+  // ---- live countdown for GGG rate-limit cooldown messages ---------------------
+  // The bridge reports "…cooldown — 3m 20s remaining" / "…cooling down 60s…" once;
+  // this turns it into a ticking countdown and offers a retry when it reaches zero.
+  var COOLDOWN_RE = /cooldown — (\d+)m (\d+)s remaining|cooling down (\d+)s/;
+  var cooldownTicker = null;
+
+  function showCooldown(box, msg, retry) {
+    var m = COOLDOWN_RE.exec(msg || '');
+    if (!m) return false;
+    var secs = m[3] !== undefined ? parseInt(m[3], 10) : parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    box.classList.remove('hidden');
+    box.textContent = '';
+    var line = document.createElement('span');
+    line.className = 'cooldown-line';
+    line.dataset.until = String(Date.now() + secs * 1000);
+    box.appendChild(line);
+    box._cooldownRetry = retry || null;
+    tickCooldowns();
+    if (!cooldownTicker) cooldownTicker = setInterval(tickCooldowns, 1000);
+    return true;
+  }
+
+  function fmtCountdown(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    return (s >= 60 ? Math.floor(s / 60) + 'm ' : '') + (s % 60) + 's';
+  }
+
+  function tickCooldowns() {
+    var lines = document.querySelectorAll('.cooldown-line[data-until]');
+    if (!lines.length) { clearInterval(cooldownTicker); cooldownTicker = null; return; }
+    lines.forEach(function (line) {
+      var left = parseInt(line.dataset.until, 10) - Date.now();
+      if (left > 0) {
+        line.textContent = '⏳ GGG rate-limit cooldown — ' + fmtCountdown(left) + ' remaining';
+        return;
+      }
+      delete line.dataset.until;
+      line.textContent = '✔ Cooldown over — safe to search again. ';
+      var box = line.parentElement;
+      if (box && box._cooldownRetry) {
+        var b = document.createElement('button');
+        b.className = 'copy-btn';
+        b.textContent = '↻ Retry';
+        var fn = box._cooldownRetry;
+        b.addEventListener('click', function () { fn(); });
+        line.appendChild(b);
+      }
+    });
+  }
+
   function openUrl(url) {
     if (isGui() && window.pywebview.api.open_url) window.pywebview.api.open_url(url);
     else window.open(url, '_blank');
@@ -4054,6 +4125,7 @@
       var res = await window.pywebview.api.trade_search(league, payloadStr);
       if (seq !== state.priceSeq) return; // superseded by a newer search
       if (!res.ok) {
+        if (showCooldown(box, res.error, function () { checkPrice(state, quiet); })) { state.priceState = null; return; }
         box.textContent = '❌ ' + res.error +
           (/complex/i.test(res.error || '') && !HAS_SESSION
             ? ' — flexible-resistance checks need a saved POESESSID (higher query budget); the trade-site link works while logged in there.'
@@ -4099,7 +4171,12 @@
       try {
         var ids = ps.ids.slice(page * ps.pageSize, (page + 1) * ps.pageSize);
         var r = await window.pywebview.api.trade_fetch(ps.searchId, JSON.stringify(ids));
-        if (!r.ok) { state.priceBox.textContent = '❌ ' + r.error; return; }
+        if (!r.ok) {
+          if (!showCooldown(state.priceBox, r.error, function () { gotoPage(state, page); })) {
+            state.priceBox.textContent = '❌ ' + r.error;
+          }
+          return;
+        }
         ps.cache[page] = r.listings;
       } catch (e) {
         state.priceBox.textContent = '❌ ' + e.message;

@@ -25,7 +25,7 @@ import price_hotkey
 from currency_feed import CurrencyFeed
 from timeless import TimelessData
 
-VERSION = "1.12.0"
+VERSION = "1.12.1"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -486,6 +486,13 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    def _divine_rate(self, league):
+        try:
+            meta = self._currency_map["divine"]["id"]
+            return self._feed.rates(league, [meta])[0].get(meta)
+        except Exception:
+            return None
+
     def exchange_rates(self, league, currencies_json):
         """Chaos rate for each currency. Primary source: GGG's public hourly
         currency-exchange feed (no trade-API quota). Fallback for anything the
@@ -514,10 +521,13 @@ class Api:
                     rates[cur] = hit[0]
                     continue
                 try:
+                    # many items (fossils, essences) are sold mostly for divines —
+                    # accept both, converting divine offers at the feed's rate
+                    div = rates.get("divine") or self._divine_rate(league)
                     res = self._http(
                         "%s/exchange/%s" % (TRADE_BASE, urllib.request.quote(league)),
                         {"query": {"status": {"option": "online"},
-                                   "want": [cur], "have": ["chaos"]},
+                                   "want": [cur], "have": ["chaos", "divine"] if div else ["chaos"]},
                          "sort": {"have": "asc"}})
                     result = res.get("result") or {}
                     entries = list(result.values()) if isinstance(result, dict) else []
@@ -526,8 +536,11 @@ class Api:
                         for off in (entry.get("listing") or {}).get("offers", [])[:1]:
                             ex = off.get("exchange") or {}
                             it = off.get("item") or {}
-                            if ex.get("currency") == "chaos" and it.get("amount"):
-                                ratios.append(float(ex["amount"]) / float(it["amount"]))
+                            if not it.get("amount"):
+                                continue
+                            per = {"chaos": 1.0, "divine": div}.get(ex.get("currency"))
+                            if per:
+                                ratios.append(float(ex["amount"]) * per / float(it["amount"]))
                     if ratios:
                         ratios.sort()
                         rate = ratios[len(ratios) // 2]  # median beats troll offers

@@ -376,7 +376,8 @@
     out.tries = 1 / p;
     out.expected = out.baseCost + perTry / p + benchPer;
     // unlucky case: tries needed for a 90% chance of having succeeded
-    out.tries90 = p >= 1 ? 1 : Math.log(0.1) / Math.log(1 - p);
+    // whole tries: ln(0.1)/ln(1-p) drops below 1 for high odds, but every craft costs ≥ 1 try
+    out.tries90 = p >= 1 ? 1 : Math.max(1, Math.ceil(Math.log(0.1) / Math.log(1 - p)));
     out.cost90 = out.baseCost + perTry * out.tries90 + benchPer;
     return out;
   }

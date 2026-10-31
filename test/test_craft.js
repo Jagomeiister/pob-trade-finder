@@ -126,6 +126,10 @@ function within(pHat, p, n) { // 4 standard errors
   const sum = Craft.summarize(st, 1, [{ costChaos: 4 }], 10);
   check('summary adds bench + base cost', Math.abs(sum.expected - (10 + 1 / sum.p + 4)) < 1e-6,
         'expected ' + sum.expected.toFixed(2));
+  const easy = Craft.summarize({ n: 1000, s: 990, benchUses: {} }, 12, [], 0);
+  check('unlucky cost is never below one try (99% odds)', easy.tries90 === 1 && easy.cost90 >= 12, easy.cost90);
+  const hard = Craft.summarize({ n: 1000, s: 10, benchUses: {} }, 1, [], 0);
+  check('unlucky cost is at least the average', hard.cost90 >= hard.expected, hard.cost90 + ' vs ' + hard.expected);
 }
 
 // 6) allow-missing mirrors the card's "all but one" mode

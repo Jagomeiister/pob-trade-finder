@@ -167,12 +167,33 @@ class CurrencyFeed:
         raise RuntimeError("currency feed has no snapshot in the last 6 hours")
 
     # -- queries --------------------------------------------------------------------
+    LOOKBACK_HOURS = 48      # thin markets (some fossils, essences) skip hours
+    LOOKBACK_DOWNLOADS = 6   # hours we'll fetch for that; older ones only if cached
+
     def rates(self, league, ids):
-        """{metadata id: chaos value} for the latest hour; ids absent from the
-        league's markets are omitted. Returns (rates, hour)."""
+        """{metadata id: chaos value} from the latest hour; anything that didn't
+        trade that hour takes its most recent price from earlier hours. Ids with
+        no price in the lookback window are omitted. Returns (rates, hour)."""
         hour = self.latest_hour()
         snap = (self.snapshot(hour) or {}).get(league) or {}
-        return {i: snap[i][0] for i in ids if i in snap}, hour
+        out = {i: snap[i][0] for i in ids if i in snap}
+        missing = [i for i in ids if i not in out]
+        downloads = 0
+        for back in range(1, self.LOOKBACK_HOURS + 1):
+            if not missing:
+                break
+            h = hour - back * HOUR
+            cached = h in self._mem or os.path.exists(self._path(h))
+            if not cached:
+                if downloads >= self.LOOKBACK_DOWNLOADS:
+                    continue
+                downloads += 1
+            older = (self.snapshot(h) or {}).get(league) or {}
+            for i in list(missing):
+                if i in older:
+                    out[i] = older[i][0]
+                    missing.remove(i)
+        return out, hour
 
     def history(self, league, ids, days=7, step_hours=12):
         """{metadata id: [[hour, chaos value, volume], ...]} oldest first, on an
