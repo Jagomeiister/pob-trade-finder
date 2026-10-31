@@ -1,5 +1,24 @@
 # UI redesign plan (v2.0.0, ships before 3.30 / 13 Nov 2026)
 
+## Status (31 Oct 2026)
+
+All seven steps are on branch `redesign-v2`: tokens and contrast guard (step 1),
+`js/ui.js` components (2), the app shell (3), the item card and listings (4), the tool
+pages and settings drawer (5), accessibility and responsive (6), and the docs refresh
+with the 2.0.0 build (7). It has not been merged or released yet.
+
+Changes from the plan below:
+
+- **Go live** stays a visible card button rather than going into ⋯, because it shows its
+  running state (⏹ Stop live).
+- **Trade stat** sits under the mod text unless the card is at least 760px wide (a
+  container query). A fixed column squeezed the mod text at common window widths.
+- **Gems** keeps its existing layout. The slot-list version (§5.2) is deferred until after
+  league start.
+- The desktop window now opens at **1280×900** (it was 1060 wide). Between 1001 and 1180px
+  the sidebar becomes a 64px icon rail, and **☰** opens the build card as a flyout.
+- **POESESSID** moved from the compare pop-up to Settings → Account.
+
 Decisions (user, 31 Oct 2026):
 - **Primary use:** all tools are equally important, so each one gets its own page.
 - **Cards:** advanced filters move behind a "More filters" disclosure.
