@@ -251,6 +251,65 @@
     return { query: q, sort: { price: 'asc' }, truncated: filters.length > cap };
   }
 
+  /* Fuzzy filter for the mod/outcome lists. Every query word must match one word of
+     the text: as a prefix/substring (best), as a subsequence ("critcal" in
+     "critical", "mlti" in "multiplier"), or within a small edit distance
+     ("multipiler"). Returns a score (higher = better) or -1 for no match. */
+  // optimal-string-alignment distance (adjacent swaps count as one edit), capped
+  function editDistance(a, b, cap) {
+    if (Math.abs(a.length - b.length) > cap) return cap + 1;
+    var older = null, prev = [], cur, i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      cur = [i];
+      var rowMin = i;
+      for (j = 1; j <= b.length; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        if (older && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) cur[j] = Math.min(cur[j], older[j - 2] + 1);
+        if (cur[j] < rowMin) rowMin = cur[j];
+      }
+      if (rowMin > cap) return cap + 1;
+      older = prev; prev = cur;
+    }
+    return prev[b.length];
+  }
+  // shorthand players type -> the words the mods use
+  var ALIASES = { es: 'energy shield', ms: 'movement speed', aoe: 'area', res: 'resistance',
+                  ele: 'elemental', dot: 'over time', cdr: 'cooldown recovery', dmg: 'damage',
+                  crit: 'critical', multi: 'multiplier', phys: 'physical', regen: 'regeneration',
+                  hp: 'life', attr: 'attributes', ias: 'attack speed', cs: 'cast speed' };
+  function isSubsequence(q, w) {
+    var k = 0;
+    for (var i = 0; i < w.length && k < q.length; i++) if (w[i] === q[k]) k++;
+    return k === q.length;
+  }
+  function fuzzyScore(query, text) {
+    var words = [];
+    String(query || '').toLowerCase().split(/[^a-z0-9%+]+/).filter(Boolean).forEach(function (w) {
+      (ALIASES[w] || w).split(' ').forEach(function (x) { words.push(x); });
+    });
+    if (!words.length) return 0;
+    var tw = String(text || '').toLowerCase().split(/[^a-z0-9%+]+/).filter(Boolean);
+    var total = 0;
+    for (var i = 0; i < words.length; i++) {
+      var q = words[i], best = -1;
+      for (var j = 0; j < tw.length; j++) {
+        var w = tw[j], s = -1;
+        if (w.indexOf(q) === 0) s = 10;
+        else if (w.indexOf(q) > 0) s = 7;
+        else if (q.length >= 3 && isSubsequence(q, w) && q[0] === w[0]) s = 5;
+        else if (q.length >= 4) {
+          var cap = q.length >= 7 ? 2 : 1;
+          if (editDistance(q, w.slice(0, q.length + cap), cap) <= cap) s = 4;
+        }
+        if (s > best) best = s;
+      }
+      if (best < 0) return -1;
+      total += best;
+    }
+    return total;
+  }
+
   /* sockets in the tree: allocated jewel-socket nodes, which hold a jewel */
   function socketReport(build, J) {
     var filled = {};
@@ -265,7 +324,7 @@
 
   return { features: features, profile: profile, scoreText: scoreText, rankMods: rankMods,
            weightedQuery: weightedQuery, countQuery: countQuery, weightFor: weightFor, maxScore: maxScore,
-           timelessQuery: timelessQuery, parseSeeds: parseSeeds, socketReport: socketReport,
+           timelessQuery: timelessQuery, parseSeeds: parseSeeds, socketReport: socketReport, fuzzyScore: fuzzyScore,
            TIMELESS: TIMELESS, MAX_TIMELESS_FILTERS: MAX_TIMELESS_FILTERS,
            MAX_TIMELESS_FILTERS_ANON: MAX_TIMELESS_FILTERS_ANON, QUALIFIERS: QUALIFIERS, EFFECTS: EFFECTS };
 });

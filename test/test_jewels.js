@@ -77,6 +77,19 @@ function score(P, text) { return Jw.scoreText(P, text); }
   check('count: abyss category', c.query.filters.type_filters.filters.category.option === 'jewel.abyss');
 }
 
+// 5b) fuzzy mod search
+{
+  const crit = '+#% to Critical Strike Multiplier for Spell Damage';
+  check('fuzzy: partial words', Jw.fuzzyScore('crit multi spel', crit) > 0);
+  check('fuzzy: dropped letter (critcal)', Jw.fuzzyScore('critcal', crit) > 0);
+  check('fuzzy: swapped letters (multipiler)', Jw.fuzzyScore('multipiler', crit) > 0);
+  check('fuzzy: shorthand es -> energy shield', Jw.fuzzyScore('es recharge', '#% faster start of Energy Shield Recharge') > 0);
+  check('fuzzy: every word must match', Jw.fuzzyScore('crit minion', crit) < 0);
+  check('fuzzy: junk matches nothing', Jw.fuzzyScore('zzz', crit) < 0);
+  check('fuzzy: exact prefix outranks a typo',
+        Jw.fuzzyScore('cold', '#% increased Cold Damage') > Jw.fuzzyScore('cold', '#% increased Could Damage'));
+}
+
 // 6) timeless seeds
 {
   check('seed parser dedupes and ignores junk', JSON.stringify(Jw.parseSeeds('123, 456 abc 123;789')) === '[123,456,789]');

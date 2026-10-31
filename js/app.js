@@ -1009,6 +1009,32 @@
   ];
   var FINDER_DEFAULT_PICKS = 8, FINDER_SHOW = 24;
 
+  // search-as-you-type box for the finder lists (fuzzy: typos, partial words, shorthand)
+  function makeFinderSearch(parent, placeholder, onChange) {
+    var row = document.createElement('div');
+    row.className = 'finder-search';
+    var inp = document.createElement('input');
+    inp.type = 'search';
+    inp.placeholder = placeholder;
+    inp.setAttribute('aria-label', 'Search');
+    var count = document.createElement('span');
+    count.className = 'finder-sub';
+    inp.addEventListener('input', onChange);
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Escape') { inp.value = ''; onChange(); } });
+    row.appendChild(inp);
+    row.appendChild(count);
+    parent.appendChild(row);
+    inp.setCount = function (t) { count.textContent = t; };
+    return inp;
+  }
+  // best matches first; ties keep the list's own order (relevance)
+  function fuzzyFilter(items, q, textOf) {
+    return items.map(function (it, i) { return { it: it, i: i, s: Jewels.fuzzyScore(q, textOf(it)) }; })
+      .filter(function (x) { return x.s >= 0; })
+      .sort(function (a, b) { return b.s - a.s || a.i - b.i; })
+      .map(function (x) { return x.it; });
+  }
+
   // a card-like state so price checks, paging, live search and pins all work
   function makeFinderState(label, container, payloadFn) {
     var st = { slot: label, item: { name: '', base: '', mods: [] }, rows: [], unique: false, card: null,
@@ -1122,6 +1148,7 @@
     }
 
     // ---- ranked mod list
+    var modSearch = makeFinderSearch(wrap, 'Search mods — e.g. "crit multi", "es recharge", "minion dmg"', function () { renderList(); });
     var list = document.createElement('div');
     list.className = 'finder-mods';
     wrap.appendChild(list);
@@ -1151,7 +1178,10 @@
         '<th scope="col" class="num">Best roll</th><th scope="col">Value to your build</th></tr>';
       table.appendChild(thead);
       var tbody = document.createElement('tbody');
-      (showAll ? ranked : ranked.slice(0, FINDER_SHOW)).forEach(function (m) {
+      var q = modSearch.value.trim();
+      var shown = q ? fuzzyFilter(ranked, q, function (m) { return m.text; }) : (showAll ? ranked : ranked.slice(0, FINDER_SHOW));
+      modSearch.setCount(q ? shown.length + ' of ' + ranked.length + ' mods' : '');
+      shown.forEach(function (m) {
         var p = picks[m.tail];
         var tr = document.createElement('tr');
         if (p && p.use) tr.className = 'on';
@@ -1196,7 +1226,7 @@
       });
       table.appendChild(tbody);
       list.appendChild(table);
-      if (ranked.length > FINDER_SHOW) {
+      if (!q && ranked.length > FINDER_SHOW) {
         var more = document.createElement('button');
         more.className = 'copy-btn';
         more.textContent = showAll ? 'Show top ' + FINDER_SHOW : 'Show all ' + ranked.length + ' mods';
@@ -1334,6 +1364,7 @@
     var summary = document.createElement('div');
     summary.className = 'finder-sub';
     body.appendChild(summary);
+    var outcomeSearch = makeFinderSearch(body, 'Search outcomes — e.g. "minion", "crit", "flask"', function () { if (info) renderOutcomes(); });
     var outcomesBox = document.createElement('div');
     body.appendChild(outcomesBox);
     var findBtn = document.createElement('button');
@@ -1433,7 +1464,10 @@
         '<th scope="col">Value to your build (left = avoid)</th></tr></thead>';
       var tbody = document.createElement('tbody');
       var maxNeed = Math.max(1, info.notables.filter(function (n) { return n.allocated || unalloc.checkbox.checked; }).length);
-      info.outcomes.forEach(function (o) {
+      var oq = outcomeSearch.value.trim();
+      var shownOutcomes = oq ? fuzzyFilter(info.outcomes, oq, function (o) { return o.dn + ' ' + o.sd.join(' '); }) : info.outcomes;
+      outcomeSearch.setCount(oq ? shownOutcomes.length + ' of ' + info.outcomes.length + ' outcomes' : '');
+      shownOutcomes.forEach(function (o) {
         var st = values[o.key];
         var tr = document.createElement('tr');
         if (st.use) tr.className = 'on';
