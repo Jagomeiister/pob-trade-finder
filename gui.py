@@ -26,7 +26,7 @@ from currency_feed import CurrencyFeed
 from timeless import TimelessData
 from art_cache import ArtCache
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
