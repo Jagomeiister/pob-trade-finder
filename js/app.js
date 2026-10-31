@@ -52,26 +52,40 @@
 
   // ---- user preferences (text size, density, sound, accessibility) ---------
   var PREFS = { fontsize: '100', density: 'comfortable', sound: true, notify: true,
-                volume: 25, motion: false, contrast: false, cb: false, theme: 'classic' };
+                volume: 25, motion: false, contrast: false, cb: false, theme: 'dark', accent: 'gold' };
+  // pre-2.0 colour schemes → base theme + accent (docs/UI-PLAN.md §3)
+  var LEGACY_THEMES = { classic: ['dark', 'gold'], obsidian: ['dark', 'teal'], midnight: ['dark', 'violet'],
+                        blood: ['dark', 'crimson'], forest: ['dark', 'green'] };
+
+  function migratePrefs() {
+    var old = LEGACY_THEMES[PREFS.theme];
+    if (old) { PREFS.theme = old[0]; PREFS.accent = old[1]; }
+    if (['dark', 'light', 'system'].indexOf(PREFS.theme) < 0) PREFS.theme = 'dark';
+  }
 
   function loadPrefs() {
     try {
       var p = JSON.parse(localStorage.getItem('pobtf-prefs'));
       if (p) Object.keys(PREFS).forEach(function (k) { if (k in p) PREFS[k] = p[k]; });
     } catch (e) { /* defaults */ }
+    migratePrefs();
   }
 
+  var LIGHT_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+
   function applyPrefs() {
-    if (PREFS.theme && PREFS.theme !== 'classic') document.body.dataset.theme = PREFS.theme;
-    else delete document.body.dataset.theme;
-    var themeSel = document.getElementById('pref-theme');
-    if (themeSel) themeSel.value = PREFS.theme || 'classic';
+    migratePrefs(); // prefs hydrated from the desktop store can still carry old names
+    var root = document.documentElement;
+    var light = PREFS.theme === 'light' || (PREFS.theme === 'system' && LIGHT_QUERY && LIGHT_QUERY.matches);
+    if (light) root.dataset.theme = 'light'; else delete root.dataset.theme;
+    if (PREFS.accent && PREFS.accent !== 'gold') root.dataset.accent = PREFS.accent; else delete root.dataset.accent;
+    if (PREFS.contrast) root.dataset.contrast = 'high'; else delete root.dataset.contrast;
     document.body.style.zoom = (parseInt(PREFS.fontsize, 10) || 100) / 100;
     document.body.classList.toggle('compact', PREFS.density === 'compact');
     document.body.classList.toggle('reduce-motion', !!PREFS.motion);
-    document.body.classList.toggle('high-contrast', !!PREFS.contrast);
     document.body.classList.toggle('cb-sockets', !!PREFS.cb);
-    var ids = { 'pref-fontsize': PREFS.fontsize, 'pref-density': PREFS.density };
+    var ids = { 'pref-theme': PREFS.theme, 'pref-accent': PREFS.accent,
+                'pref-fontsize': PREFS.fontsize, 'pref-density': PREFS.density };
     Object.keys(ids).forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.value = ids[id];
@@ -175,12 +189,35 @@
       setTimeout(onDecode, 50);
     });
     document.getElementById('new-build').addEventListener('click', function () {
-      document.getElementById('input-panel').classList.remove('hidden');
-      document.getElementById('build-bar').classList.add('hidden');
+      showLanding();
       var ta = document.getElementById('pob-input');
       ta.focus();
       ta.select();
     });
+    document.getElementById('back-to-build').addEventListener('click', showBuild);
+    // narrow windows: the sidebar is an icon rail and the build card opens as a flyout
+    var sidebar = document.getElementById('sidebar');
+    var railBtn = document.getElementById('rail-build-btn');
+    function setFlyout(on) {
+      sidebar.classList.toggle('show-build', on);
+      railBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    }
+    railBtn.addEventListener('click', function () { setFlyout(!sidebar.classList.contains('show-build')); });
+    document.addEventListener('mousedown', function (e) {
+      if (sidebar.classList.contains('show-build') && !e.target.closest('#build-bar, #rail-build-btn, .popover')) setFlyout(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && sidebar.classList.contains('show-build')) { setFlyout(false); railBtn.focus(); }
+    });
+    UI.popover(document.getElementById('search-settings-btn'), document.getElementById('search-settings'),
+      { label: 'Search settings', cls: 'popover-search' });
+    UI.popover(document.getElementById('compare-btn'), document.getElementById('char-pop'),
+      { label: 'Compare with your character', align: 'start' });
+    ['league', 'trade-status', 'sale-type', 'pseudo', 'eq-currency'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', updateContextChips);
+    });
+    document.getElementById('pct').addEventListener('input', updateContextChips);
+    document.getElementById('settings-btn-side').addEventListener('click', function () { openSettings(this); });
     // character import
     if (saved.account) document.getElementById('acct-input').value = saved.account;
     document.getElementById('acct-load').addEventListener('click', async function () {
@@ -273,24 +310,8 @@
       refreshBuildSelect();
       this.textContent = '★ Saved';
       var btn = this;
-      setTimeout(function () { btn.textContent = '☆ Save build'; }, 1200);
-    });
-    document.getElementById('saved-builds').addEventListener('change', function () {
-      var lib = loadBuildLib();
-      var b = lib[parseInt(this.value, 10)];
-      if (b) {
-        document.getElementById('pob-input').value = b.code;
-        onDecode();
-      }
-    });
-    document.getElementById('delete-build').addEventListener('click', function () {
-      var sel = document.getElementById('saved-builds');
-      var idx = parseInt(sel.value, 10);
-      if (isNaN(idx)) return;
-      var lib = loadBuildLib();
-      lib.splice(idx, 1);
-      saveBuildLib(lib);
-      refreshBuildSelect();
+      setTimeout(function () { btn.textContent = '☆ Save'; }, 1200);
+      UI.toast('Build saved — it\'s on the start screen for one-click reload.', 'success');
     });
     document.getElementById('pct').addEventListener('input', function () {
       document.getElementById('pct-label').textContent = this.value + '%';
@@ -321,16 +342,27 @@
       document.getElementById('pob-input').value = window.POE_SAMPLE_BUILD;
       document.getElementById('decode-btn').click();
     });
-    document.getElementById('settings-btn').addEventListener('click', function () {
-      document.getElementById('settings-panel').classList.toggle('hidden');
-    });
-    document.getElementById('settings-close').addEventListener('click', function () {
-      document.getElementById('settings-panel').classList.add('hidden');
+    document.getElementById('settings-btn').addEventListener('click', function () { openSettings(this); });
+    document.getElementById('settings-close').addEventListener('click', closeSettings);
+    document.getElementById('settings-backdrop').addEventListener('click', closeSettings);
+    document.getElementById('settings-panel').addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); closeSettings(); return; }
+      if (e.key !== 'Tab') return;
+      // modal drawer: Tab wraps around inside it
+      var f = Array.prototype.filter.call(this.querySelectorAll('button, select, input'), function (el) {
+        return !el.disabled && el.offsetParent !== null;
+      });
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     });
     document.getElementById('check-updates-btn').addEventListener('click', function () {
       checkForUpdates(true);
     });
-    [['pref-theme', 'theme', 'value'],
+    if (LIGHT_QUERY && LIGHT_QUERY.addEventListener) {
+      LIGHT_QUERY.addEventListener('change', function () { if (PREFS.theme === 'system') applyPrefs(); });
+    }
+    [['pref-theme', 'theme', 'value'], ['pref-accent', 'accent', 'value'],
      ['pref-fontsize', 'fontsize', 'value'], ['pref-density', 'density', 'value'],
      ['pref-sound', 'sound', 'checked'], ['pref-notify', 'notify', 'checked'], ['pref-volume', 'volume', 'value'],
      ['pref-motion', 'motion', 'checked'], ['pref-contrast', 'contrast', 'checked'],
@@ -355,10 +387,9 @@
       document.getElementById('league').addEventListener('change', loadMarket);
       var tile = document.getElementById('market-tile');
       tile.addEventListener('click', function (e) {
-        if (e.target.closest('.spark')) return; // hovering/focusing the chart isn't a toggle
-        var panel = document.getElementById('market-panel');
-        var open = panel.classList.toggle('hidden') === false;
-        tile.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (e.target.closest('.spark')) return; // hovering/focusing the chart isn't navigation
+        setView('market');
+        window.scrollTo(0, 0);
       });
       tile.addEventListener('keydown', function (e) {
         if (e.target === tile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tile.click(); }
@@ -416,6 +447,7 @@
         loadPrefs();
         applyPrefs();
         syncWelcome();
+        updateContextChips();
       } catch (e) { /* browser mode / bridge unavailable */ }
     }
     if (isGui()) markGui();
@@ -480,15 +512,15 @@
       build = PoB.parseBuild(xml);
       status.textContent = '';
       saveSettings();
-      document.getElementById('input-panel').classList.add('hidden');
-      document.getElementById('build-bar').classList.remove('hidden');
       document.getElementById('build-label').textContent =
         build.ascendClass || build.className || 'Unknown class';
       var nSets = (build.itemSets || []).length;
       document.getElementById('build-sub').textContent =
         Object.keys(build.items).length + ' items' + (nSets > 1 ? ' · ' + nSets + ' gear sets' : '');
       renderBuild();
+      showBuild();
     } catch (err) {
+      UI.toast('Could not load that build — see the message under the paste box.', 'danger');
       status.textContent = '❌ ' + err.message +
         (/^https?:\/\//i.test(input) && !isGui()
           ? ' — link fetching can be blocked by the site (CORS). Open the link, copy the PoB export code, and paste the code itself.'
@@ -534,32 +566,35 @@
     var set = sets[setIndex] || { slots: build.slots, flasks: build.flasks };
 
     // Gear-set picker — guide PoBs ship several (Leveling / Budget / Endgame…)
+    var pickSlot = document.getElementById('set-picker-slot');
+    pickSlot.textContent = '';
     if (sets.length > 1) {
-      var pickWrap = document.createElement('div');
-      pickWrap.className = 'set-picker';
-      pickWrap.appendChild(document.createTextNode('Gear set: '));
-      var pick = document.createElement('select');
-      sets.forEach(function (s, i) {
-        var o = document.createElement('option');
-        o.value = String(i);
-        o.textContent = s.title + (i === build.activeSetIndex ? ' (active in PoB)' : '');
-        pick.appendChild(o);
-      });
-      pick.value = String(setIndex);
-      pick.addEventListener('change', function () { renderBuild(parseInt(this.value, 10)); });
-      pickWrap.appendChild(pick);
-      root.appendChild(pickWrap);
+      var pick = UI.select(sets.map(function (s, i) {
+        return [String(i), s.title + (i === build.activeSetIndex ? ' (active in PoB)' : '')];
+      }), String(setIndex), { onChange: function () { renderBuild(parseInt(this.value, 10)); } });
+      pickSlot.appendChild(UI.field('Gear set', pick));
     }
 
-    // tabbed sections: gear / jewels & clusters / flasks / gems
+    // one section per view; item views are a slot list + one item at a time
     var sections = {};
     function section(key) {
       if (!sections[key]) {
-        sections[key] = document.createElement('div');
-        sections[key].className = 'tab-section';
-        sections[key].dataset.tab = key;
+        var sec = document.createElement('div');
+        sec.className = 'tab-section';
+        sec.dataset.tab = key;
+        if (MASTER_DETAIL[key]) {
+          sec.classList.add('master-detail');
+          var list = document.createElement('div');
+          list.className = 'slot-list';
+          sec.appendChild(list);
+          var detail = document.createElement('div');
+          detail.className = 'slot-detail';
+          sec.appendChild(detail);
+          sec.detail = detail;
+        }
+        sections[key] = sec;
       }
-      return sections[key];
+      return sections[key].detail || sections[key];
     }
 
     set.slots.forEach(function (s) {
@@ -584,32 +619,202 @@
       section('finder').appendChild(makeJewelFinder(build));
     }
 
-    var TAB_LABELS = { gear: 'Gear', jewels: 'Jewels & Clusters', flasks: 'Flasks', gems: 'Gems',
-                       timeless: '⏳ Timeless jewels', finder: '💎 Jewel finder' };
-    var present = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder'].filter(function (k) { return sections[k]; });
-    if (present.length > 1) {
-      var bar = document.createElement('div');
-      bar.className = 'tab-bar';
-      ['all'].concat(present).forEach(function (k) {
-        var btn = document.createElement('button');
-        btn.className = 'tab-btn' + (k === 'all' ? ' active' : '');
-        var count = (k === 'all' || k === 'finder' || k === 'timeless') ? null : sections[k].children.length;
-        btn.textContent = (k === 'all' ? 'All' : TAB_LABELS[k]) + (count ? ' (' + count + ')' : '');
-        btn.addEventListener('click', function () {
-          root.dataset.tab = k;
-          bar.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-        });
-        bar.appendChild(btn);
-      });
-      root.appendChild(bar);
-    }
-    root.dataset.tab = 'all';
+    var present = VIEW_ORDER.filter(function (k) { return sections[k]; });
     present.forEach(function (k) { root.appendChild(sections[k]); });
-    document.getElementById('controls').classList.remove('hidden');
+    Object.keys(MASTER_DETAIL).forEach(function (k) {
+      var first = sections[k] && sections[k].detail.querySelector('.card');
+      if (first) first.classList.add('is-active');
+    });
     document.getElementById('char-bar').classList.remove('hidden');
+    updateContextChips();
+    renderNav();
+    var keep = document.body.dataset.view;
+    setView(present.indexOf(keep) !== -1 || keep === 'planner' || keep === 'market' ? keep : present[0] || 'planner');
     renderCostSummary(); // clears stale summary — fresh cards have no prices yet
     applyCharDiff();     // re-annotate fresh cards if a character is loaded
+  }
+
+  // ---- settings drawer: slides in from the right, focus stays inside until closed ----
+  var settingsOpener = null;
+  function openSettings(opener) {
+    settingsOpener = opener || null;
+    document.getElementById('settings-backdrop').classList.remove('hidden');
+    var panel = document.getElementById('settings-panel');
+    panel.classList.remove('hidden');
+    document.getElementById('settings-close').focus();
+  }
+  function closeSettings() {
+    document.getElementById('settings-backdrop').classList.add('hidden');
+    document.getElementById('settings-panel').classList.add('hidden');
+    if (settingsOpener) settingsOpener.focus();
+  }
+
+  // ---- app shell: views, sidebar nav, slot lists, search context ---------------
+  var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'pasted'];
+  var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
+  var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
+                      timeless: 'Timeless jewels', finder: 'Jewel finder', pasted: 'Pasted item',
+                      planner: 'Upgrade planner', market: 'Market' };
+  // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
+  var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
+                     timeless: '⏳', finder: '🔍', market: '📈' };
+
+  function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
+
+  function setView(k) {
+    document.body.dataset.view = k;
+    document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
+    document.querySelectorAll('#nav .nav-item').forEach(function (b) {
+      if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+  }
+
+  function navCount(k) {
+    if (k === 'planner') {
+      var n = loadBasket().length;
+      return n ? String(n) : '';
+    }
+    var sec = viewSection(k);
+    if (!sec || !MASTER_DETAIL[k] && k !== 'gems') return '';
+    if (k === 'gems') return String(build && build.gemGroups ? build.gemGroups.length : '');
+    return String(sec.querySelectorAll('.slot-detail > .card').length);
+  }
+
+  function renderNav() {
+    var nav = document.getElementById('nav');
+    nav.textContent = '';
+    function item(k) {
+      var b = UI.el('button', 'nav-item');
+      b.type = 'button';
+      b.dataset.view = k;
+      b.title = VIEW_LABELS[k];
+      var ic = UI.el('span', 'nav-icon', VIEW_ICONS[k] || '•');
+      ic.setAttribute('aria-hidden', 'true');
+      b.appendChild(ic);
+      b.appendChild(UI.el('span', 'nav-label', VIEW_LABELS[k]));
+      b.appendChild(UI.el('span', 'nav-count', navCount(k)));
+      b.addEventListener('click', function () { setView(k); window.scrollTo(0, 0); });
+      nav.appendChild(b);
+    }
+    var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
+    if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
+    nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
+    ['planner', 'timeless', 'finder', 'market'].filter(function (k) {
+      return k === 'planner' || k === 'market' || viewSection(k);
+    }).forEach(item);
+    setView(document.body.dataset.view || 'gear');
+  }
+
+  function updateNavCounts() {
+    document.querySelectorAll('#nav .nav-item').forEach(function (b) {
+      b.querySelector('.nav-count').textContent = navCount(b.dataset.view);
+    });
+  }
+
+  // slot list rows mirror the cards in each item view: name, then price / status
+  function slotStatus(state) {
+    var c = state.card.classList;
+    if (state.bought) return UI.chip('Bought', 'success');
+    var league = document.getElementById('league').value;
+    if (state.cheapestChaos !== undefined) return document.createTextNode(fmtEq(state.cheapestChaos, league));
+    if (state.priceState && state.priceState.total === 0) return UI.chip('None listed', 'danger');
+    if (c.contains('diff-matched')) return UI.chip('Equipped', 'success');
+    if (c.contains('diff-close')) return UI.chip('Close', 'warn');
+    if (c.contains('diff-missing')) return UI.chip('Missing', 'danger');
+    return null;
+  }
+
+  function selectSlot(sec, card, focus) {
+    sec.querySelectorAll('.slot-detail > .card').forEach(function (c) { c.classList.toggle('is-active', c === card); });
+    sec.querySelectorAll('.slot-row').forEach(function (r) {
+      if (r.slotCard === card) { r.setAttribute('aria-current', 'true'); if (focus) r.focus(); }
+      else r.removeAttribute('aria-current');
+    });
+  }
+
+  function refreshSlotLists() {
+    Object.keys(MASTER_DETAIL).forEach(function (k) {
+      var sec = viewSection(k);
+      if (!sec) return;
+      var list = sec.querySelector('.slot-list');
+      var focusedIdx = Array.prototype.indexOf.call(list.querySelectorAll('.slot-row'), document.activeElement);
+      list.textContent = '';
+      var head = UI.el('div', 'slot-list-head');
+      var cardEls = Array.prototype.slice.call(sec.querySelectorAll('.slot-detail > .card'));
+      head.appendChild(UI.el('b', null, VIEW_LABELS[k]));
+      var priced = cards.filter(function (s) { return cardEls.indexOf(s.card) !== -1 && s.cheapestChaos !== undefined; }).length;
+      head.appendChild(UI.el('span', 'slot-label', priced ? priced + ' of ' + cardEls.length + ' priced' : cardEls.length + ' slots'));
+      list.appendChild(head);
+      var rows = [];
+      cardEls.forEach(function (cardEl) {
+        var state = cards.find(function (s) { return s.card === cardEl; });
+        if (!state) return;
+        var row = UI.el('button', 'slot-row');
+        row.type = 'button';
+        row.slotCard = cardEl;
+        ['diff-matched', 'diff-close', 'diff-missing'].forEach(function (d) { if (cardEl.classList.contains(d)) row.classList.add(d); });
+        if (state.bought) row.classList.add('bought');
+        var src = cardEl.querySelector('.card-icon');
+        var ic = UI.el('img', 'slot-ic' + (src && src.classList.contains('atlas2') ? ' atlas2' : ''));
+        ic.alt = '';
+        ic.src = src && src.src ? src.src : BLANK_PX;
+        row.appendChild(ic);
+        var txt = UI.el('span', 'slot-txt');
+        txt.appendChild(UI.el('span', 'slot-label', state.slot));
+        var rarity = (state.item.rarity || 'normal').toLowerCase();
+        txt.appendChild(UI.el('span', 'slot-name ' + (rarity === 'relic' ? 'unique' : rarity),
+          state.resolvedName || state.item.name || state.item.base || state.slot));
+        row.appendChild(txt);
+        var st = UI.el('span', 'slot-status');
+        var status = slotStatus(state);
+        if (status) st.appendChild(status);
+        row.appendChild(st);
+        if (cardEl.classList.contains('is-active')) row.setAttribute('aria-current', 'true');
+        row.addEventListener('click', function () { selectSlot(sec, cardEl); });
+        row.addEventListener('keydown', function (e) {
+          var i = rows.indexOf(row);
+          var j = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : -1;
+          if (j < 0 || j >= rows.length) return;
+          e.preventDefault();
+          selectSlot(sec, rows[j].slotCard, true);
+        });
+        rows.push(row);
+        list.appendChild(row);
+      });
+      if (focusedIdx !== -1 && rows[focusedIdx]) rows[focusedIdx].focus();
+    });
+    updateNavCounts();
+  }
+
+  // read-only summary of the search settings, shown in the top bar
+  function updateContextChips() {
+    var box = document.getElementById('context-chips');
+    if (!box) return;
+    box.textContent = '';
+    function optText(id) {
+      var s = document.getElementById(id);
+      var o = s && s.options[s.selectedIndex];
+      return o ? o.textContent : '';
+    }
+    box.appendChild(UI.chip(optText('league') || document.getElementById('league').value));
+    box.appendChild(UI.chip(optText('trade-status')));
+    if (document.getElementById('sale-type').value !== 'priced') box.appendChild(UI.chip('Sale: ' + optText('sale-type')));
+    box.appendChild(UI.chip('Min roll ' + document.getElementById('pct').value + '%'));
+    if (!document.getElementById('pseudo').checked) box.appendChild(UI.chip('No pseudo totals', 'warn'));
+  }
+
+  // landing ⇄ build
+  function showBuild() {
+    document.body.classList.add('has-build');
+    document.getElementById('input-panel').classList.add('hidden');
+    document.getElementById('build-bar').classList.remove('hidden');
+    window.scrollTo(0, 0);
+  }
+  function showLanding() {
+    document.body.classList.remove('has-build');
+    document.getElementById('input-panel').classList.remove('hidden');
+    document.getElementById('back-to-build').classList.toggle('hidden', !build);
+    window.scrollTo(0, 0);
   }
 
   // ---- saved builds library --------------------------------------------------
@@ -621,14 +826,36 @@
     try { persist('pobtf-builds', JSON.stringify(lib.slice(0, 20))); }
     catch (e) { /* storage full/unavailable */ }
   }
+  // saved builds as one-click cards on the start screen
   function refreshBuildSelect() {
-    var sel = document.getElementById('saved-builds');
-    sel.innerHTML = '<option value="">Saved builds…</option>';
-    loadBuildLib().forEach(function (b, i) {
-      var o = document.createElement('option');
-      o.value = String(i);
-      o.textContent = b.name;
-      sel.appendChild(o);
+    var list = document.getElementById('saved-list');
+    var lib = loadBuildLib();
+    list.textContent = '';
+    document.getElementById('saved-section').classList.toggle('hidden', !lib.length);
+    lib.forEach(function (b, i) {
+      var parts = String(b.name || 'Build').split(' · ');
+      var row = UI.el('div', 'saved-build');
+      var open = UI.el('button', 'saved-open');
+      open.type = 'button';
+      open.appendChild(UI.el('span', 'saved-name', parts[0]));
+      open.appendChild(UI.el('span', 'saved-meta', parts.slice(1).join(' · ')));
+      open.addEventListener('click', function () {
+        document.getElementById('pob-input').value = b.code;
+        onDecode();
+      });
+      row.appendChild(open);
+      row.appendChild(UI.iconButton('🗑', 'Delete saved build ' + parts[0], { size: 'sm', onClick: function () {
+        UI.confirmDanger('Delete saved build?', '"' + b.name + '" will be removed from your library.', 'Delete build')
+          .then(function (ok) {
+            if (!ok) return;
+            var cur = loadBuildLib();
+            cur.splice(i, 1);
+            saveBuildLib(cur);
+            refreshBuildSelect();
+            UI.toast('Saved build deleted.', 'success');
+          });
+      } }));
+      list.appendChild(row);
     });
   }
 
@@ -700,15 +927,13 @@
     state.craftBase = makeMiniInput(head, 'Base price', 'c');
     state.craftBase.title = 'What the blank base costs you (chaos). Leave blank to ignore';
     if (isGui()) {
-      var pb = document.createElement('button');
-      pb.className = 'copy-btn';
+      var pb = UI.button('secondary');
       pb.textContent = 'Price base';
       pb.title = 'Look up the cheapest ' + (state.item.base || 'base') + ' at this item level on the trade site (one search)';
       pb.addEventListener('click', function () { priceCraftBase(state, pb); });
       head.appendChild(pb);
     }
-    var run = document.createElement('button');
-    run.className = 'copy-btn';
+    var run = UI.button('secondary');
     run.textContent = '↻ Re-run';
     run.addEventListener('click', function () { runCraft(state); });
     head.appendChild(run);
@@ -900,8 +1125,7 @@
     } else if (best) {
       verdict.textContent = 'Best craft: ' + best.label + ', ' + fmtEq(best.expected, league) + ' on average. Check price to compare with buying.';
       if (state.priceBtn) {
-        var cb = document.createElement('button');
-        cb.className = 'copy-btn';
+        var cb = UI.button('secondary');
         cb.textContent = 'Check buy price';
         cb.addEventListener('click', async function () {
           cb.disabled = true;
@@ -1041,19 +1265,11 @@
                customPayload: payloadFn };
     cards.push(st);
     var btns = document.createElement('div');
-    btns.className = 'btns';
-    var pBtn = document.createElement('button');
-    pBtn.className = 'copy-btn gui-only';
-    pBtn.textContent = 'Check price';
-    pBtn.addEventListener('click', function () { checkPrice(st); });
-    var lBtn = document.createElement('button');
-    lBtn.className = 'copy-btn gui-only';
-    lBtn.textContent = '🔴 Go live';
-    lBtn.addEventListener('click', function () { toggleLive(st); });
-    var oBtn = document.createElement('button');
-    oBtn.className = 'trade-btn';
-    oBtn.textContent = 'Search on trade site ↗';
-    oBtn.addEventListener('click', function () { var u = buildTradeUrl(st); if (u) openUrl(u); });
+    btns.className = 'btns finder-actions';
+    var pBtn = UI.button('primary', { cls: 'gui-only', label: 'Check price', onClick: function () { checkPrice(st); } });
+    var lBtn = UI.button('secondary', { cls: 'gui-only', label: '🔴 Go live', onClick: function () { toggleLive(st); } });
+    var oBtn = UI.button('secondary', { cls: 'act-search', label: 'Search on trade ↗',
+      onClick: function () { var u = buildTradeUrl(st); if (u) openUrl(u); } });
     btns.appendChild(pBtn); btns.appendChild(lBtn); btns.appendChild(oBtn);
     container.appendChild(btns);
     st.priceBtn = pBtn; st.liveBtn = lBtn;
@@ -1068,6 +1284,18 @@
     return st;
   }
 
+  // numbered step panel: the jewel tools read top to bottom as 1 → 2 → 3 → 4
+  function finderStep(parent, n, title, hint) {
+    var sec = UI.el('section', 'finder-step');
+    var h = UI.el('h3', 'step-title');
+    h.appendChild(UI.el('span', 'step-num', String(n)));
+    h.appendChild(document.createTextNode(title));
+    sec.appendChild(h);
+    if (hint) sec.appendChild(UI.el('div', 'finder-sub step-hint', hint));
+    parent.appendChild(sec);
+    return sec;
+  }
+
   function finderOpts() {
     return { status: document.getElementById('trade-status').value,
              saleType: document.getElementById('sale-type').value };
@@ -1075,7 +1303,7 @@
 
   function makeJewelFinder(b) {
     var wrap = document.createElement('div');
-    wrap.className = 'card finder';
+    wrap.className = 'finder';
     wrap.innerHTML = '<div class="finder-loading">Reading your passive tree…</div>';
     ensureJewelData().then(function (J) { renderJewelFinder(wrap, b, J); }, function (e) {
       wrap.textContent = '❌ ' + e.message;
@@ -1087,12 +1315,8 @@
     wrap.textContent = '';
     var P = Jewels.profile(b, J);
 
-    // ---- header: what the build is about, and its sockets
-    var head = document.createElement('div');
-    head.className = 'finder-head';
-    var h = document.createElement('h3');
-    h.textContent = '💎 Jewel finder';
-    head.appendChild(h);
+    // ---- 1: what the build is about, and its sockets
+    var head = finderStep(wrap, 1, 'Your build', 'What your tree and main skill scale — mods are ranked by this.');
     var focus = document.createElement('div');
     focus.className = 'finder-focus';
     focus.appendChild(document.createTextNode('Build focus: '));
@@ -1121,9 +1345,9 @@
         (P.gems.length ? ' · main skill: ' + P.gems[0] : '')
       : 'No jewel sockets allocated' + (P.gems.length ? ' · main skill: ' + P.gems[0] : '');
     head.appendChild(sline);
-    wrap.appendChild(head);
 
-    // ---- controls
+    // ---- 2: what kind of jewel, and how to search
+    var step2 = finderStep(wrap, 2, 'Jewel and search type');
     var ctr = document.createElement('div');
     ctr.className = 'card-opts finder-opts';
     var kindSel = makeMiniSelect(ctr, 'Jewel', JEWEL_KINDS.map(function (k) { return k[1]; }), JEWEL_KINDS[0][1]);
@@ -1139,19 +1363,21 @@
     var minQ = makeMiniSelect(ctr, 'Min quality', ['any', '30%', '45%', '60%'], '30%');
     minQ.title = 'Weighted search: minimum share of the best possible score (all your picked mods max-rolled)';
     var maxPrice = makeMiniInput(ctr, 'Max price', 'c');
-    wrap.appendChild(ctr);
+    step2.appendChild(ctr);
     if (hasAbyss) {
       var note = document.createElement('div');
       note.className = 'finder-sub';
       note.textContent = 'Your gear has abyssal sockets — pick an Eye jewel type above for abyss jewels.';
-      wrap.appendChild(note);
+      step2.appendChild(note);
     }
 
-    // ---- ranked mod list
-    var modSearch = makeFinderSearch(wrap, 'Search mods — e.g. "crit multi", "es recharge", "minion dmg"', function () { renderList(); });
+    // ---- 3: ranked mod list
+    var step3 = finderStep(wrap, 3, 'Pick mods',
+      'Want = counts toward the search · Must = every result has it. Best for your build is at the top.');
+    var modSearch = makeFinderSearch(step3, 'Search mods — e.g. "crit multi", "es recharge", "minion dmg"', function () { renderList(); });
     var list = document.createElement('div');
     list.className = 'finder-mods';
-    wrap.appendChild(list);
+    step3.appendChild(list);
     var picks = {}; // tail -> {use, required, score}
     var ranked = [];
     var showAll = false;
@@ -1174,7 +1400,7 @@
       var table = document.createElement('table');
       table.className = 'finder-table';
       var thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th scope="col">Use</th><th scope="col">Must</th><th scope="col">Mod</th>' +
+      thead.innerHTML = '<tr><th scope="col">Pick</th><th scope="col">Mod</th>' +
         '<th scope="col" class="num">Best roll</th><th scope="col">Value to your build</th></tr>';
       table.appendChild(thead);
       var tbody = document.createElement('tbody');
@@ -1185,25 +1411,17 @@
         var p = picks[m.tail];
         var tr = document.createElement('tr');
         if (p && p.use) tr.className = 'on';
-        var use = document.createElement('input');
-        use.type = 'checkbox'; use.checked = !!(p && p.use);
-        use.setAttribute('aria-label', 'Use ' + m.text);
-        var must = document.createElement('input');
-        must.type = 'checkbox'; must.checked = !!(p && p.required);
-        must.setAttribute('aria-label', 'Require ' + m.text);
-        use.addEventListener('change', function () {
-          picks[m.tail] = picks[m.tail] || { score: m.score };
-          picks[m.tail].use = use.checked;
-          if (!use.checked) { picks[m.tail].required = false; must.checked = false; }
-          tr.classList.toggle('on', use.checked);
-        });
-        must.addEventListener('change', function () {
-          picks[m.tail] = picks[m.tail] || { score: m.score };
-          picks[m.tail].required = must.checked;
-          if (must.checked) { picks[m.tail].use = true; use.checked = true; tr.classList.add('on'); }
-        });
-        var td1 = document.createElement('td'); td1.appendChild(use);
-        var td2 = document.createElement('td'); td2.appendChild(must);
+        var pick = UI.segmented([['off', 'Off'], ['want', 'Want'], ['must', 'Must']],
+          p && p.required ? 'must' : p && p.use ? 'want' : 'off', {
+            ariaLabel: m.text,
+            titles: { want: 'Counts toward the search', must: 'Every result must have this mod' },
+            onChange: function (v) {
+              picks[m.tail] = picks[m.tail] || { score: m.score };
+              picks[m.tail].use = v !== 'off';
+              picks[m.tail].required = v === 'must';
+              tr.classList.toggle('on', v !== 'off');
+            } });
+        var td1 = document.createElement('td'); td1.appendChild(pick);
         var td3 = document.createElement('td'); td3.textContent = m.text;
         var td4 = document.createElement('td'); td4.className = 'num'; td4.textContent = fmtCompact(m.max);
         var td5 = document.createElement('td');
@@ -1221,14 +1439,13 @@
           picks[m.tail].score = parseInt(val.value, 10) / 100;
         });
         td5.appendChild(val); td5.appendChild(pct);
-        [td1, td2, td3, td4, td5].forEach(function (td) { tr.appendChild(td); });
+        [td1, td3, td4, td5].forEach(function (td) { tr.appendChild(td); });
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
       list.appendChild(table);
       if (!q && ranked.length > FINDER_SHOW) {
-        var more = document.createElement('button');
-        more.className = 'copy-btn';
+        var more = UI.button('secondary');
         more.textContent = showAll ? 'Show top ' + FINDER_SHOW : 'Show all ' + ranked.length + ' mods';
         more.addEventListener('click', function () { showAll = !showAll; renderList(); });
         list.appendChild(more);
@@ -1244,7 +1461,7 @@
     function payload(quiet) {
       var sel = selected();
       if (!sel.length) {
-        if (!quiet) alert('Tick at least one mod in the jewel finder first.');
+        if (!quiet) UI.toast('Set at least one mod to Want or Must first.', 'warn');
         return null;
       }
       var k = kind();
@@ -1275,13 +1492,12 @@
     syncModeControls();
     rerank(true);
 
-    var hint = document.createElement('div');
-    hint.className = 'finder-sub';
-    hint.textContent = '"Best for my build" scores every listed jewel by your picks (a max roll is worth its value % × 100) ' +
+    // ---- 4: search
+    var step4 = finderStep(wrap, 4, 'Find jewels',
+      '"Best for my build" scores every listed jewel by your picks (a max roll is worth its value % × 100) ' +
       'and sorts by score — in-app checks of weighted searches need a saved POESESSID (higher query budget); ' +
-      'the trade-site link works while you are logged in there.';
-    wrap.appendChild(hint);
-    makeFinderState('Jewel finder', wrap, payload);
+      'the trade-site link works while you are logged in there.');
+    makeFinderState('Jewel finder', step4, payload);
 
   }
 
@@ -1299,15 +1515,12 @@
 
   function makeTimelessFinder(b) {
     var wrap = document.createElement('div');
-    wrap.className = 'card finder timeless-finder';
-    var h = document.createElement('h3');
-    h.textContent = '⏳ Timeless jewel finder';
-    wrap.appendChild(h);
+    wrap.className = 'finder timeless-finder';
     var intro = document.createElement('div');
-    intro.className = 'finder-sub';
+    intro.className = 'finder-sub finder-intro';
     intro.textContent = 'Pick a socket from your tree: every seed is checked against the notables in its radius, ' +
       'ranked by the outcomes your build wants, and the best seeds can be priced in one click. ' +
-      'Covers Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy — Glorious Vanity isn\'t supported yet.';
+      'Covers all six: Glorious Vanity, Lethal Pride, Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy.';
     wrap.appendChild(intro);
     var body = document.createElement('div');
     wrap.appendChild(body);
@@ -1349,13 +1562,9 @@
     ctr.className = 'card-opts finder-opts';
     var jewelSel = makeMiniSelect(ctr, 'Jewel', TIMELESS_TYPES.map(function (t) { return t[1]; }), 'Brutal Restraint');
     // conqueror decides the keystone; the seed decides the notables
-    var conqSel = document.createElement('select');
-    var conqLab = document.createElement('label');
-    conqLab.className = 'toggle';
-    conqLab.title = 'The conqueror only changes the keystone. Pricing searches this conqueror, or all of them with "any".';
-    conqLab.appendChild(document.createTextNode('Conqueror '));
-    conqLab.appendChild(conqSel);
-    ctr.appendChild(conqLab);
+    var conqSel = UI.select([]);
+    UI.field('Conqueror', conqSel, { parent: ctr,
+      title: 'The conqueror only changes the keystone. Pricing searches this conqueror, or all of them with "any".' });
     function fillConquerors(prefer) {
       var keep = prefer !== undefined ? prefer : conqSel.value;
       conqSel.textContent = '';
@@ -1376,37 +1585,32 @@
       if (ts && ts.jewelTypeId === jtype()) return Jewels.pobConqueror(ts.jewelTypeId, ts.conquerorTypeId) || 'any';
       return 'any';
     }
-    var sockSel = document.createElement('select');
-    sockets.forEach(function (s) {
-      var o = document.createElement('option');
-      o.value = String(s.socket);
+    var sockSel = UI.select(sockets.map(function (s) {
       var names = s.notables.map(function (n) { return nodeName(J, n); });
       var mineHere = ownedAt(s.socket);
-      o.textContent = (mineHere ? '★ Your ' + mineHere.jewel + ' ' + mineHere.seed + ' — ' : '') + (names.length
+      var text = (mineHere ? '★ Your ' + mineHere.jewel + ' ' + mineHere.seed + ' — ' : '') + (names.length
         ? 'socket near ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' +' + (names.length - 3) : '') +
           ' (' + names.length + ' of your notables)'
         : 'socket ' + s.socket + ' (none of your notables in radius)');
-      o.textContent = o.textContent.charAt(0).toUpperCase() + o.textContent.slice(1);
-      sockSel.appendChild(o);
-    });
-    var sockLab = document.createElement('label');
-    sockLab.className = 'toggle';
-    sockLab.appendChild(document.createTextNode('Socket '));
-    sockLab.appendChild(sockSel);
-    ctr.appendChild(sockLab);
+      return [String(s.socket), text.charAt(0).toUpperCase() + text.slice(1)];
+    }));
+    UI.field('Socket', sockSel, { parent: ctr });
     var unalloc = makeToggle(ctr, 'Also count unallocated notables', false);
     unalloc.checkbox.parentElement.title = 'Include notables in radius you have not taken — a good seed can make pathing to them worth it';
-    body.appendChild(ctr);
+    var step1 = finderStep(body, 1, 'Jewel and socket',
+      'The seed decides what each notable in the radius becomes; the conqueror only changes the keystone.');
+    step1.appendChild(ctr);
 
     var summary = document.createElement('div');
     summary.className = 'finder-sub';
-    body.appendChild(summary);
+    step1.appendChild(summary);
+    var step2 = finderStep(body, 2, 'What you want',
+      'Tick the outcomes you want. Need × drops seeds with fewer; drag a value left of zero to avoid an outcome.');
     var importedNote = document.createElement('div');
     importedNote.className = 'finder-sub';
-    body.appendChild(importedNote);
-    var outcomeSearch = makeFinderSearch(body, 'Search outcomes — e.g. "minion", "crit", "flask"', function () { if (info) renderOutcomes(); });
-    var suggestBtn = document.createElement('button');
-    suggestBtn.className = 'copy-btn';
+    step2.appendChild(importedNote);
+    var outcomeSearch = makeFinderSearch(step2, 'Search outcomes — e.g. "minion", "crit", "flask"', function () { if (info) renderOutcomes(); });
+    var suggestBtn = UI.button('secondary');
     suggestBtn.textContent = '✨ Suggest for my build';
     suggestBtn.title = 'Tick the outcomes that match what your tree and main skill scale (value 50% or more)';
     suggestBtn.addEventListener('click', function () {
@@ -1414,8 +1618,7 @@
       Object.keys(values).forEach(function (k) { if (values[k].value >= 50) values[k].use = true; });
       renderOutcomes();
     });
-    var clearBtn = document.createElement('button');
-    clearBtn.className = 'copy-btn';
+    var clearBtn = UI.button('secondary');
     clearBtn.textContent = 'Clear';
     clearBtn.addEventListener('click', function () {
       if (!info) return;
@@ -1425,12 +1628,14 @@
     outcomeSearch.parentElement.appendChild(suggestBtn);
     outcomeSearch.parentElement.appendChild(clearBtn);
     var outcomesBox = document.createElement('div');
-    body.appendChild(outcomesBox);
-    var findBtn = document.createElement('button');
-    findBtn.className = 'trade-btn';
+    step2.appendChild(outcomesBox);
+    var findBtn = UI.button('primary');
     findBtn.textContent = '🔎 Find best seeds';
     var resultsBox = document.createElement('div');
     resultsBox.className = 'timeless-results';
+    var step3 = finderStep(body, 3, 'Best seeds', 'Every seed is scored against your picks; price the top ones in one click.');
+    step3.appendChild(findBtn);
+    step3.appendChild(resultsBox);
 
     var info = null, values = {}, seq = 0;
     var priced = { name: '', seeds: [] };
@@ -1513,7 +1718,7 @@
           ' with your current picks. Find best seeds to compare.'));
       });
     }
-    outcomesBox.parentNode.insertBefore(currentBox, outcomesBox);
+    step1.appendChild(currentBox);
 
     // open on a given jewel/socket (from a timeless jewel card in the build)
     timelessApplyPreset = function (p) {
@@ -1597,8 +1802,6 @@
       });
       table.appendChild(tbody);
       outcomesBox.appendChild(table);
-      outcomesBox.appendChild(findBtn);
-      outcomesBox.appendChild(resultsBox);
     }
 
     findBtn.addEventListener('click', function () {
@@ -1674,8 +1877,7 @@
       head.textContent = r.matches + ' seeds ' + (needTxt.length ? 'meet ' + needTxt.join(' and ') : 'give at least one wanted outcome') +
         ' on the ' + r.considered.length + ' notable' + (r.considered.length === 1 ? '' : 's') + ' counted. Best ' + r.results.length + ':';
       resultsBox.appendChild(head);
-      var priceTop = document.createElement('button');
-      priceTop.className = 'copy-btn';
+      var priceTop = UI.button('secondary');
       var oneConq = conqSel.value !== 'any';
       priceTop.textContent = '💰 Price the top ' + Math.min(timelessPriceSeeds(oneConq), r.results.length) + ' seeds' +
         (oneConq ? ' (' + conqSel.value.charAt(0).toUpperCase() + conqSel.value.slice(1) + ')' : ' (any conqueror)');
@@ -1724,8 +1926,7 @@
         });
         td3.appendChild(det);
         var td4 = document.createElement('td');
-        var pb = document.createElement('button');
-        pb.className = 'copy-btn';
+        var pb = UI.button('secondary');
         pb.textContent = 'Price';
         pb.title = 'Find listings of this ' + jewelSel.value + ' seed (' +
           (conqSel.value === 'any' ? 'any conqueror' : conqSel.value) + ')';
@@ -1747,7 +1948,7 @@
     // price box for the chosen seeds — the normal listing view, live search, pins
     var priceBlock = document.createElement('div');
     var priceState = makeFinderState('Timeless jewel', priceBlock, function (quiet) {
-      if (!priced.seeds.length) { if (!quiet) alert('Find seeds first, then price them.'); return null; }
+      if (!priced.seeds.length) { if (!quiet) UI.toast('Find seeds first, then price them.', 'warn'); return null; }
       var o = finderOpts(); o.anonymous = !HAS_SESSION;
       var q = Jewels.timelessQuery(priced.name, priced.seeds, priced.conqueror || '', o);
       return { query: q.query, sort: q.sort };
@@ -1798,8 +1999,7 @@
     var seedRow = state.rows.find(function (r) { return r.match && /^explicit\.pseudo_timeless_jewel_/.test(r.match.entry.id); });
     var seed = seedRow ? Math.round(parseFloat(seedRow.minInput.value)) : null;
     var preset = { jewel: state.resolvedName, socket: sock ? sock.nodeId : null, seed: seed && !isNaN(seed) ? seed : null };
-    var tab = Array.prototype.find.call(document.querySelectorAll('.tab-btn'), function (t) { return /Timeless/.test(t.textContent); });
-    if (tab) tab.click();
+    setView('timeless');
     if (timelessApplyPreset) timelessApplyPreset(preset);
     else timelessPending = preset;
     window.scrollTo(0, 0);
@@ -1836,23 +2036,15 @@
     }
     jewelSel.addEventListener('change', fillConq);
     fillConq();
-    var seeds = document.createElement('input');
-    seeds.type = 'text';
-    seeds.className = 'finder-seeds';
-    seeds.placeholder = 'Seeds, e.g. 4521, 7790, 12003';
-    seeds.setAttribute('aria-label', 'Timeless jewel seeds');
-    var lab = document.createElement('label');
-    lab.className = 'toggle';
-    lab.appendChild(document.createTextNode('Seeds '));
-    lab.appendChild(seeds);
-    ctr.appendChild(lab);
+    var seeds = UI.input({ cls: 'finder-seeds', placeholder: 'Seeds, e.g. 4521, 7790, 12003' });
+    UI.field('Seeds', seeds, { parent: ctr });
     box.appendChild(ctr);
     var warn = document.createElement('div');
     warn.className = 'finder-sub';
     box.appendChild(warn);
     makeFinderState('Timeless jewel', box, function (quiet) {
       var s = Jewels.parseSeeds(seeds.value);
-      if (!s.length) { if (!quiet) alert('Enter at least one seed number.'); return null; }
+      if (!s.length) { if (!quiet) UI.toast('Enter at least one seed number.', 'warn'); return null; }
       var q = Jewels.timelessQuery(jewelSel.value, s, conqSel.value === 'any' ? '' : conqSel.value, finderOpts());
       warn.textContent = q.truncated ? 'Too many seed × conqueror combinations — searching the first 40. Pick a conqueror or fewer seeds.' : '';
       return { query: q.query, sort: q.sort };
@@ -2193,8 +2385,7 @@
 
         var priceSpan = document.createElement('span');
         priceSpan.className = 'gem-price';
-        var openBtn = document.createElement('button');
-        openBtn.className = 'copy-btn';
+        var openBtn = UI.button('secondary');
         openBtn.textContent = '↗';
         openBtn.title = 'Open this gem search on the trade site';
         openBtn.setAttribute('aria-label', 'Open ' + gem.name + ' search on the trade site');
@@ -2275,18 +2466,15 @@
 
           var btns = document.createElement('div');
           btns.className = 'btns gem-panel-btns';
-          var pBtn = document.createElement('button');
-          pBtn.className = 'copy-btn gui-only';
+          var pBtn = UI.button('secondary', { cls: 'gui-only' });
           pBtn.textContent = 'Check price';
           pBtn.addEventListener('click', function () { checkPrice(gemState); });
           gemState.priceBtn = pBtn;
-          var lBtn = document.createElement('button');
-          lBtn.className = 'copy-btn gui-only';
+          var lBtn = UI.button('secondary', { cls: 'gui-only' });
           lBtn.textContent = '🔴 Go live';
           lBtn.addEventListener('click', function () { toggleLive(gemState); });
           gemState.liveBtn = lBtn;
-          var oBtn = document.createElement('button');
-          oBtn.className = 'trade-btn';
+          var oBtn = UI.button('primary');
           oBtn.textContent = 'Search on trade site ↗';
           oBtn.addEventListener('click', function () {
             var url = buildTradeUrl(gemState);
@@ -2305,8 +2493,7 @@
           gemState.priceBox = prBox;
           return gemState;
         }
-        var expandBtn = document.createElement('button');
-        expandBtn.className = 'copy-btn gem-expand';
+        var expandBtn = UI.button('secondary', { size: 'sm' });
         expandBtn.textContent = '▾';
         expandBtn.title = 'Expand: full listings, live search, pinning — like a gear card';
         expandBtn.setAttribute('aria-label', 'Expand ' + gem.name + ' listings');
@@ -2319,7 +2506,9 @@
             panel.classList.add('hidden');
             expandBtn.textContent = '▾';
           }
+          expandBtn.setAttribute('aria-expanded', panel.classList.contains('hidden') ? 'false' : 'true');
         }
+        expandBtn.setAttribute('aria-expanded', 'false');
         expandBtn.addEventListener('click', togglePanel);
         label.style.cursor = 'pointer';
         label.addEventListener('click', togglePanel);
@@ -2348,8 +2537,7 @@
     opts.className = 'card-opts';
     var btns = document.createElement('div');
     btns.className = 'btns';
-    var priceAll = document.createElement('button');
-    priceAll.className = 'copy-btn gui-only';
+    var priceAll = UI.button('secondary', { cls: 'gui-only' });
     priceAll.textContent = 'Price all gems';
     priceAll.addEventListener('click', async function () {
       if (!isGui()) return;
@@ -2401,8 +2589,7 @@
         : 'Price all gems';
       priceAll.disabled = false;
     });
-    var openAllG = document.createElement('button');
-    openAllG.className = 'copy-btn';
+    var openAllG = UI.button('secondary');
     openAllG.textContent = 'Open all gem searches';
     openAllG.addEventListener('click', function () {
       rows.forEach(function (r, i) {
@@ -2431,12 +2618,20 @@
       pastedState = null;
     }
     var root = document.getElementById('results');
+    var sec = viewSection('pasted');
+    if (!sec) {
+      sec = document.createElement('div');
+      sec.className = 'tab-section';
+      sec.dataset.tab = 'pasted';
+      root.insertBefore(sec, root.firstChild);
+    }
     var card = makeCard(item.slotGuess || 'Pasted item', item);
     pastedState = cards[cards.length - 1];
     card.classList.add('pasted');
-    root.insertBefore(card, root.firstChild);
+    sec.appendChild(card);
     renderCharDiff(pastedState);
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (build) { renderNav(); setView('pasted'); window.scrollTo(0, 0); }
+    else card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function sectionHeader(text) {
@@ -2468,9 +2663,22 @@
     var newState = cards.pop(); // makeCard pushed it to the end
     if (pos !== -1) { cards.splice(pos, 1); cards.splice(pos, 0, newState); }
     else cards.push(newState);
+    if (oldState.card.classList.contains('is-active')) newCard.classList.add('is-active');
     oldState.card.replaceWith(newCard);
     renderCostSummary();
     renderCharDiff(newState);
+  }
+
+  var INFLUENCE_TONE = { 'Searing Exarch': 'tone-exarch', 'Eater of Worlds': 'tone-eater' };
+
+  // bought slots: dimmed, labelled, and out of the build cost total
+  function setBought(state, on) {
+    state.bought = on;
+    state.card.classList.toggle('bought', on);
+    var chip = state.metaEl && state.metaEl.querySelector('.bought-chip');
+    if (on && !chip && state.metaEl) state.metaEl.appendChild(UI.chip('✔ Bought', 'success', 'bought-chip'));
+    if (!on && chip) chip.remove();
+    renderCostSummary();
   }
 
   function makeCard(slot, item, setIndex) {
@@ -2500,28 +2708,25 @@
         'alt="" loading="lazy">'
       : '';
     head.innerHTML =
-      '<div>' + iconHtml + '<span class="slot-tag">' + esc(slot) + '</span>' +
+      '<div class="card-title">' + iconHtml + '<div class="card-id">' +
+      '<span class="slot-tag">' + esc(slot) + '</span>' +
       '<span class="item-name ' + rarityClass(item.rarity) + '">' + esc(item.name) + '</span>' +
+      '<span class="item-meta">' +
       (item.base && item.base !== item.name ? '<span class="item-base">' + esc(item.base) + '</span>' : '') +
-      (item.influences.length ? '<span class="infl-tag">' + esc(item.influences.join(' + ')) + '</span>' : '') +
-      '</div>';
+      (item.itemLevel ? '<span>ilvl ' + item.itemLevel + '</span>' : '') +
+      item.influences.map(function (inf) {
+        return '<span class="badge infl-tag ' + (INFLUENCE_TONE[inf] || 'tone-info') + '">' + esc(inf) + '</span>';
+      }).join('') +
+      '</span></div></div>';
+    var meta = head.querySelector('.item-meta');
+    state.metaEl = meta;
     // per-slot gear-set dropdown — only when other sets hold a different item here
     var slotSets = (setIndex !== undefined) ? setsForSlot(slot) : [];
     if (slotSets.length) {
-      var setSel = document.createElement('select');
-      setSel.className = 'set-mini';
-      slotSets.forEach(function (o) {
-        var opt = document.createElement('option');
-        opt.value = String(o.setIndex);
-        opt.textContent = o.title;
-        setSel.appendChild(opt);
-      });
-      setSel.value = String(setIndex);
-      setSel.title = 'Show this slot from a different gear set';
-      setSel.addEventListener('change', function () {
-        swapCardSet(state, slot, parseInt(this.value, 10));
-      });
-      head.firstChild.appendChild(setSel);
+      var setSel = UI.select(slotSets.map(function (o) { return [String(o.setIndex), o.title]; }), String(setIndex), {
+        cls: 'set-mini', title: 'Show this slot from a different gear set', ariaLabel: 'Gear set for this slot',
+        onChange: function () { swapCardSet(state, slot, parseInt(this.value, 10)); } });
+      meta.appendChild(setSel);
     }
     card.appendChild(head);
 
@@ -2543,11 +2748,19 @@
     body.className = 'card-body';
     card.appendChild(body);
 
+    if (item.mods.length) {
+      var modHead = document.createElement('div');
+      modHead.className = 'mod-head';
+      modHead.setAttribute('aria-hidden', 'true'); // each control carries its own label
+      modHead.innerHTML = '<span class="mh-use">Use</span><span class="mh-mod">Mod</span>' +
+        '<span class="mh-min">Min</span><span class="mh-stat">Trade stat</span>';
+      body.appendChild(modHead);
+    }
     if (state.unique) {
       var note = document.createElement('div');
       note.className = 'unique-note';
-      note.textContent = 'Unique — searched by name. Tick mods below to also require minimum rolls (rolls matter on this one? tick them).';
-      body.appendChild(note);
+      note.textContent = 'Unique — searched by name. Tick a mod to also require a minimum roll.';
+      body.insertBefore(note, body.firstChild);
       addModRows(state, body, item, slot, true); // unticked by default
     } else {
       addModRows(state, body, item, slot, false);
@@ -2612,75 +2825,43 @@
     // budget cap: chaos-equivalent max price (applies to links, price checks, live)
     state.maxPriceInput = makeMiniInput(opts, 'Max price', 'c');
     state.maxPriceInput.title = 'Maximum price in chaos-equivalent — searches, price checks, and live alerts all respect it';
-    // bought tracking: dims the card and drops it from the cost summary
-    var boughtBtn = document.createElement('button');
-    boughtBtn.className = 'copy-btn';
-    boughtBtn.textContent = '✔ Bought';
-    boughtBtn.title = 'Mark this slot as purchased — removed from the build cost total';
-    boughtBtn.addEventListener('click', function () {
-      state.bought = !state.bought;
-      card.classList.toggle('bought', state.bought);
-      renderCostSummary();
-    });
-    opts.appendChild(boughtBtn);
+
+    // header actions: the main action, live watch, the trade site, everything else in ⋯
+    var actions = document.createElement('div');
+    actions.className = 'card-actions';
+    var priceBtn = UI.button('primary', { cls: 'gui-only', label: 'Check price',
+      onClick: function () { checkPrice(state); } });
+    state.priceBtn = priceBtn;
+    var liveBtn = UI.button('secondary', { cls: 'gui-only', label: '🔴 Go live',
+      title: 'Watch this search — new listings appear here with a sound (checks ~20s)',
+      onClick: function () { toggleLive(state); } });
+    state.liveBtn = liveBtn;
+    // in the browser (no Check price) this is the main action — CSS promotes it
+    var openBtn = UI.button('secondary', { cls: 'act-search', label: 'Search on trade ↗',
+      title: 'Open this search on pathofexile.com/trade',
+      onClick: function () { var url = buildTradeUrl(state); if (url) openUrl(url); } });
+    var isTimeless = state.unique && TIMELESS_TYPES.some(function (t) { return t[1] === state.resolvedName; }) &&
+      build && build.tree && build.tree.nodes.length;
+    var canCraft = item.rarity === 'RARE' && !/^(Jewel|Flask|Abyssal)/.test(slot);
+    var more = UI.menu(function () {
+      return [
+        { label: 'Copy search URL', onClick: function () {
+          var url = buildTradeUrl(state);
+          if (url) navigator.clipboard.writeText(url).then(function () { UI.toast('Search URL copied.', 'success'); });
+        } },
+        { label: '⚒ Craft vs buy', hidden: !canCraft, onClick: function () { openCraft(state); },
+          title: 'Estimate what crafting this item would cost (chaos / essence spam + a bench craft) and compare it with buying' },
+        { label: '⏳ Find seeds for this socket', hidden: !isTimeless || !isGui(), onClick: function () { openTimelessFor(state); },
+          title: 'Open the timeless jewel finder on the socket this jewel sits in' },
+        { label: state.bought ? 'Unmark bought' : '✔ Mark bought', onClick: function () { setBought(state, !state.bought); },
+          title: 'Bought slots drop out of the build cost total' }
+      ];
+    }, { ariaLabel: 'More actions for ' + slot });
+    [priceBtn, liveBtn, openBtn, more].forEach(function (b) { actions.appendChild(b); });
+    head.appendChild(actions);
 
     var btnWrap = document.createElement('div');
-    btnWrap.className = 'btns';
-
-    var priceBtn = document.createElement('button');
-    priceBtn.className = 'copy-btn gui-only';
-    priceBtn.textContent = 'Check price';
-    priceBtn.addEventListener('click', function () { checkPrice(state); });
-    state.priceBtn = priceBtn;
-    btnWrap.appendChild(priceBtn);
-
-    var liveBtn = document.createElement('button');
-    liveBtn.className = 'copy-btn gui-only';
-    liveBtn.textContent = '🔴 Go live';
-    liveBtn.title = 'Watch this search — new listings appear here with a sound (checks ~20s)';
-    liveBtn.addEventListener('click', function () { toggleLive(state); });
-    state.liveBtn = liveBtn;
-    btnWrap.appendChild(liveBtn);
-
-    if (state.unique && TIMELESS_TYPES.some(function (t) { return t[1] === state.resolvedName; }) &&
-        build && build.tree && build.tree.nodes.length) {
-      var tsBtn = document.createElement('button');
-      tsBtn.className = 'copy-btn gui-only';
-      tsBtn.textContent = '⏳ Find seeds for this socket';
-      tsBtn.title = 'Open the timeless jewel finder on the socket this jewel sits in — see what your seed does and find better ones';
-      tsBtn.addEventListener('click', function () { openTimelessFor(state); });
-      btnWrap.appendChild(tsBtn);
-    }
-
-    if (item.rarity === 'RARE' && !/^(Jewel|Flask|Abyssal)/.test(slot)) {
-      var craftBtn = document.createElement('button');
-      craftBtn.className = 'copy-btn';
-      craftBtn.textContent = '⚒ Craft vs buy';
-      craftBtn.title = 'Estimate what crafting this item would cost (chaos / essence spam + a bench craft) and compare it with buying';
-      craftBtn.addEventListener('click', function () { openCraft(state); });
-      state.craftBtn = craftBtn;
-      btnWrap.appendChild(craftBtn);
-    }
-
-    var openBtn = document.createElement('button');
-    openBtn.className = 'trade-btn';
-    openBtn.textContent = 'Search on trade site ↗';
-    openBtn.addEventListener('click', function () {
-      var url = buildTradeUrl(state);
-      if (url) openUrl(url);
-    });
-    var copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-btn';
-    copyBtn.textContent = 'Copy URL';
-    copyBtn.addEventListener('click', function () {
-      var url = buildTradeUrl(state);
-      if (url) navigator.clipboard.writeText(url).then(function () {
-        copyBtn.textContent = 'Copied!';
-        setTimeout(function () { copyBtn.textContent = 'Copy URL'; }, 1200);
-      });
-    });
-    btnWrap.appendChild(openBtn);
-    btnWrap.appendChild(copyBtn);
+    btnWrap.className = 'card-meta';
     var histSel = document.createElement('select');
     histSel.className = 'hist-sel hidden';
     histSel.title = 'Earlier price checks for this slot in this build — pick one to reopen it on the trade site';
@@ -2697,8 +2878,21 @@
     state.trendBox = trendBox;
     btnWrap.appendChild(trendBox);
     renderHistorySelect(state);
-    opts.appendChild(btnWrap);
-    card.appendChild(opts);
+    card.appendChild(btnWrap);
+
+    // advanced filters fold away; the summary counts what differs from the defaults
+    var moreFilters = UI.disclosure('More filters', opts);
+    moreFilters.classList.add('card-more');
+    var fields = Array.prototype.slice.call(opts.querySelectorAll('select, input'));
+    var defaults = fields.map(function (f) { return f.type === 'checkbox' ? f.checked : f.value; });
+    function countChanged() {
+      moreFilters.setCount(fields.filter(function (f, i) {
+        return (f.type === 'checkbox' ? f.checked : f.value) !== defaults[i];
+      }).length);
+    }
+    opts.addEventListener('change', countChanged);
+    opts.addEventListener('input', countChanged);
+    card.appendChild(moreFilters);
 
     var liveBox = document.createElement('div');
     liveBox.className = 'price-box live-box hidden';
@@ -2826,6 +3020,7 @@
     // timeless jewel's conqueror + seed).
     cb.checked = !!match && (!defaultOff || !!mod.variant) && !(mod.crafted && mod.kind === 'explicit');
     cb.disabled = !match;
+    cb.setAttribute('aria-label', 'Use: ' + mod.line);
 
     // trade-site convention: colour identifies the mod source, no text labels
     var label = document.createElement('span');
@@ -2847,8 +3042,9 @@
         label.appendChild(eldBadge);
       }
     }
-    if (mod.crafted) label.title = 'Crafted mod';
-    if (mod.fractured) label.title = 'Fractured mod';
+    // mod source is spelled out too, not colour alone
+    if (mod.crafted) label.appendChild(UI.chip('crafted', 'crafted'));
+    if (mod.fractured) label.appendChild(UI.chip('fractured', 'fractured'));
     if (mod.kind === 'implicit' && !mod.crafted) label.title = 'Implicit';
 
     // clicking anywhere on the row toggles the mod — not just the tiny checkbox
@@ -2862,6 +3058,7 @@
     minInput.type = 'number';
     minInput.className = 'min-input';
     minInput.step = 'any';
+    minInput.setAttribute('aria-label', 'Minimum for: ' + mod.line);
 
     var tag = document.createElement('span');
     tag.className = 'match-tag';
@@ -3011,32 +3208,15 @@
   }
 
   function makeModeSelect(parent, state) {
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.appendChild(document.createTextNode('Match: '));
-    var sel = document.createElement('select');
-    ['all mods', 'all but one', 'all but two'].forEach(function (t, i) {
-      var o = document.createElement('option');
-      o.value = String(i); o.textContent = t;
-      sel.appendChild(o);
-    });
-    sel.value = '1'; // "all but one" is the sweet spot for upgrade hunting
-    wrap.appendChild(sel);
-    parent.appendChild(wrap);
+    // "all but one" is the sweet spot for upgrade hunting
+    var sel = UI.select([['0', 'all mods'], ['1', 'all but one'], ['2', 'all but two']], '1');
+    UI.field('Match', sel, { parent: parent });
     return sel;
   }
 
   function makeMiniInput(parent, label, placeholder) {
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.appendChild(document.createTextNode(label + ' '));
-    var inp = document.createElement('input');
-    inp.type = 'number';
-    inp.className = 'min-input';
-    inp.placeholder = placeholder || '';
-    inp.style.width = '70px';
-    wrap.appendChild(inp);
-    parent.appendChild(wrap);
+    var inp = UI.input({ type: 'number', cls: 'min-input', placeholder: placeholder || '', width: '70px' });
+    UI.field(label, inp, { parent: parent });
     return inp;
   }
 
@@ -3064,36 +3244,16 @@
   function makeSearchBySelect(parent, slot, item, preferExact) {
     var options = searchByOptions(slot, item);
     if (!options.length) return null;
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.title = 'How strictly to match the item base — broader searches find more (and cheaper) listings';
-    wrap.appendChild(document.createTextNode('Search by '));
-    var sel = document.createElement('select');
-    options.forEach(function (o) {
-      var opt = document.createElement('option');
-      opt.value = o[0]; opt.textContent = o[1];
-      sel.appendChild(opt);
-    });
     var values = options.map(function (o) { return o[0]; });
-    sel.value = (preferExact && values.indexOf('exact') !== -1) ? 'exact' : values[values.length - 1];
-    wrap.appendChild(sel);
-    parent.appendChild(wrap);
+    var sel = UI.select(options, (preferExact && values.indexOf('exact') !== -1) ? 'exact' : values[values.length - 1]);
+    UI.field('Search by', sel, { parent: parent,
+      title: 'How strictly to match the item base — broader searches find more (and cheaper) listings' });
     return sel;
   }
 
   function makeMiniSelect(parent, label, options, value) {
-    var wrap = document.createElement('label');
-    wrap.className = 'toggle';
-    wrap.appendChild(document.createTextNode(label + ' '));
-    var sel = document.createElement('select');
-    options.forEach(function (o) {
-      var opt = document.createElement('option');
-      opt.value = o; opt.textContent = o;
-      sel.appendChild(opt);
-    });
-    sel.value = value;
-    wrap.appendChild(sel);
-    parent.appendChild(wrap);
+    var sel = UI.select(options, value);
+    UI.field(label, sel, { parent: parent });
     return sel;
   }
 
@@ -3235,7 +3395,7 @@
         filters.push({ id: lone.id, value: { min: lone.min } });
       }
       if (!filters.length && !flexDiverted.length) {
-        if (!quiet) alert('No mods selected for this search.');
+        if (!quiet) UI.toast('No mods selected for this search.', 'warn');
         return null;
       }
 
@@ -3390,8 +3550,7 @@
       line.textContent = '✔ Cooldown over — safe to search again. ';
       var box = line.parentElement;
       if (box && box._cooldownRetry) {
-        var b = document.createElement('button');
-        b.className = 'copy-btn';
+        var b = UI.button('secondary');
         b.textContent = '↻ Retry';
         var fn = box._cooldownRetry;
         b.addEventListener('click', function () { fn(); });
@@ -3618,6 +3777,7 @@
 
   function applyCharDiff() {
     cards.forEach(renderCharDiff);
+    refreshSlotLists();
   }
 
   // ---- chaos-equivalent prices + build cost summary ------------------------------
@@ -3764,6 +3924,7 @@
 
   function renderMarket() {
     if (!market) return;
+    document.getElementById('view-market').classList.add('has-data');
     var league = market.league;
     var tile = document.getElementById('market-tile');
     var div = marketPoints('divine');
@@ -3776,6 +3937,16 @@
     var updated = new Date(market.hour * 1000);
     tile.title = 'Divine Orb price, 7 days — GGG currency exchange (' + league + '), hour of ' +
       updated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + '. Click for more currencies.';
+
+    // Market page headline: the Divine Orb, large
+    var chart = document.getElementById('market-chart');
+    chart.textContent = '';
+    chart.appendChild(UI.el('div', 'mc-label', 'Divine Orb · 7 days · ' + league));
+    var big = UI.el('div', 'mc-value', lastDiv ? fmtCompact(lastDiv) + 'c' : '—');
+    if (div.length > 1) big.appendChild(UI.el('span', 'mc-delta', fmtDelta(div[0].v, lastDiv)));
+    chart.appendChild(big);
+    chart.appendChild(sparkline(div, { w: 720, h: 140, label: 'Divine Orb in chaos, 7 days',
+      fmt: function (v) { return fmtCompact(v) + 'c'; } }));
 
     var panel = document.getElementById('market-panel');
     var body = panel.querySelector('tbody');
@@ -3973,40 +4144,54 @@
   }
 
   function renderCostSummary() {
+    refreshSlotLists(); // prices + bought state in the slot lists follow the summary
     var box = document.getElementById('cost-summary');
     if (!box) return;
     var league = document.getElementById('league').value;
     var rows = cards.filter(function (s) { return s.cheapestChaos !== undefined && !s.bought; });
     if (!rows.length) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
-    box.innerHTML = '<div class="cost-head">Build cost — cheapest listing per checked slot</div>';
-    box.firstChild.appendChild(copyButton('📋 Copy', function () {
+    box.innerHTML = '';
+    box.appendChild(UI.sectionHeader('Build cost — cheapest listing per checked slot', [copyButton('📋 Copy', function () {
       var lines = ['Build cost (' + league + ') — cheapest listing per slot'];
       var t = 0;
       rows.forEach(function (s) { t += s.cheapestChaos; lines.push(s.slot + ': ' + (s.item.name || s.item.base || '') + ' — ' + fmtEq(s.cheapestChaos, league)); });
       lines.push('TOTAL: ' + fmtEq(t, league) + ' for ' + rows.length + ' slot(s)');
       return lines.join('\n');
-    }));
+    })]));
     var total = 0;
-    rows.forEach(function (s) {
-      total += s.cheapestChaos;
-      var row = document.createElement('div');
-      row.className = 'cost-row';
-      row.innerHTML = '<span class="cost-slot">' + esc(s.slot) + '</span>' +
-        '<span class="cost-item">' + esc(s.item.name) + '</span>' +
-        '<span class="cost-amt">' + fmtEq(s.cheapestChaos, league) + '</span>';
-      box.appendChild(row);
-    });
+    rows.forEach(function (s) { total += s.cheapestChaos; });
+    box.appendChild(UI.table([
+      { key: 'slot', label: 'Slot', render: function (s) { return s.slot; }, sort: function (s) { return s.slot; } },
+      { key: 'item', label: 'Item', render: function (s) { return slotLink(s); }, sort: function (s) { return s.item.name || ''; } },
+      { key: 'price', label: 'Cheapest', num: true, render: function (s) { return fmtEq(s.cheapestChaos, league); },
+        sort: function (s) { return s.cheapestChaos; } }
+    ], rows, { sortable: true }));
     var dr = divRate(league);
     var secondary = eqMode() === 'divine'
       ? '  (' + fmtChaos(total) + ')'
       : (dr ? '  (' + (Math.round(total / dr * 10) / 10) + ' div)' : '');
     var totalRow = document.createElement('div');
-    totalRow.className = 'cost-row cost-total';
-    totalRow.innerHTML = '<span class="cost-slot">TOTAL</span><span class="cost-item">' +
-      rows.length + ' slot(s) priced</span><span class="cost-amt">' + fmtEq(total, league) + secondary + '</span>';
+    totalRow.className = 'cost-total';
+    totalRow.innerHTML = '<span>Total · ' + rows.length + ' slot(s) priced</span><span class="cost-amt">' +
+      fmtEq(total, league) + esc(secondary) + '</span>';
     box.appendChild(totalRow);
     renderSolver(box, league);
+  }
+
+  // item name that jumps to its slot (planner tables)
+  function slotLink(state) {
+    var b = UI.el('button', 'link-btn', state.resolvedName || state.item.name || state.item.base || state.slot);
+    b.type = 'button';
+    b.title = 'Show this slot';
+    b.addEventListener('click', function () {
+      var sec = state.card && state.card.closest('.tab-section');
+      if (!sec) return;
+      setView(sec.dataset.tab);
+      if (sec.classList.contains('master-detail')) selectSlot(sec, state.card);
+      window.scrollTo(0, 0);
+    });
+    return b;
   }
 
   var solverResTarget = 300, solverLifeTarget = 0, solverResult = null;
@@ -4025,8 +4210,7 @@
     var lifeIn = makeMiniInput(bar, 'Total life ≥', '0');
     lifeIn.value = solverLifeTarget || '';
     lifeIn.addEventListener('change', function () { solverLifeTarget = parseFloat(this.value) || 0; });
-    var solveBtn = document.createElement('button');
-    solveBtn.className = 'copy-btn';
+    var solveBtn = UI.button('secondary', { size: 'sm' });
     solveBtn.textContent = 'Solve cheapest combo';
     solveBtn.addEventListener('click', function () {
       solverResult = solveBudget(solverResTarget || 0, solverLifeTarget || 0);
@@ -4060,8 +4244,7 @@
       (solverResult.met ? '' : ' — targets not reachable with the priced listings (price more pages/slots)') + '</span>' +
       '<span class="cost-amt">' + fmtEq(t.chaos, league) + '</span>';
     box.appendChild(sumRow);
-    var pinAll = document.createElement('button');
-    pinAll.className = 'copy-btn';
+    var pinAll = UI.button('secondary');
     pinAll.textContent = '☆ Pin combo to basket';
     pinAll.addEventListener('click', function () {
       solverResult.picks.forEach(function (p) { pinToBasket(p.cand.li, p.state); });
@@ -4103,8 +4286,7 @@
   // ---- shopping basket ------------------------------------------------------------
   // button that copies text built at click time, with a brief confirmation
   function copyButton(label, textFn) {
-    var btn = document.createElement('button');
-    btn.className = 'copy-btn';
+    var btn = UI.button('secondary');
     btn.textContent = label;
     btn.title = 'Copy as text — paste into Discord, notes, or a message to a friend';
     btn.addEventListener('click', function (e) {
@@ -4147,25 +4329,24 @@
              account: li.account, whisper: li.whisper, tradeUrl: tradeUrl, ts: Date.now() });
     saveBasket(b);
     renderBasket();
+    UI.toast('Pinned to your basket in the Upgrade planner.', 'success',
+      { action: { label: 'View', onClick: function () { setView('planner'); window.scrollTo(0, 0); } } });
   }
   function renderBasket() {
+    updateNavCounts();
     var box = document.getElementById('basket');
     var b = loadBasket();
     if (!b.length) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
     box.innerHTML = '';
     var league = document.getElementById('league').value;
-    var head = document.createElement('div');
-    head.className = 'basket-head';
     var total = 0, totalKnown = true;
     b.forEach(function (it) {
       var rate = RATES[league] && RATES[league][it.currency];
       if (it.amount !== null && it.amount !== undefined && rate !== undefined) total += it.amount * rate;
       else totalKnown = false;
     });
-    head.textContent = 'Shopping basket — ' + b.length + ' item(s)' +
-      (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : '');
-    head.appendChild(copyButton('📋 Copy list', function () {
+    var copyList = copyButton('📋 Copy list', function () {
       var lines = ['Shopping list (' + league + ')' + (total ? ' — ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : '')];
       b.forEach(function (it) {
         lines.push('- ' + ((it.name ? it.name + ' ' : '') + it.base) + ' — ' + it.account + ' — ' +
@@ -4174,54 +4355,50 @@
         if (it.tradeUrl) lines.push('  ' + it.tradeUrl);
       });
       return lines.join('\n');
-    }));
-    var clear = document.createElement('button');
-    clear.className = 'copy-btn';
-    clear.textContent = 'Clear';
-    clear.addEventListener('click', function () { saveBasket([]); renderBasket(); });
-    head.appendChild(clear);
-    box.appendChild(head);
+    });
+    var clear = UI.button('secondary', { label: 'Clear', onClick: function () {
+      UI.confirmDanger('Clear the basket?', 'All ' + b.length + ' pinned item(s) will be removed.', 'Clear basket')
+        .then(function (ok) { if (ok) { saveBasket([]); renderBasket(); } });
+    } });
+    box.appendChild(UI.sectionHeader('Shopping basket — ' + b.length + ' item(s)' +
+      (total ? ' · ' + (totalKnown ? '' : '≥ ') + fmtEq(total, league) : ''), [copyList, clear]));
 
-    b.forEach(function (it, idx) {
-      var row = document.createElement('div');
-      row.className = 'basket-row';
-      var label = document.createElement('span');
-      label.className = 'basket-item';
-      label.textContent = ((it.name ? it.name + ' ' : '') + it.base) + '  —  ' + it.account;
-      var price = document.createElement('span');
-      price.className = 'basket-price';
-      price.textContent = (it.amount !== null && it.amount !== undefined)
-        ? it.amount + ' ' + it.currency : 'no price';
-      row.appendChild(label);
-      row.appendChild(price);
+    function basketActions(it, idx) {
+      var row = UI.el('span', 'row-acts');
       if (it.tradeUrl) {
-        var tl = document.createElement('button');
-        tl.className = 'copy-btn';
+        var tl = UI.button('secondary', { size: 'sm' });
         tl.textContent = '↗ Trade';
         tl.title = 'Open the search that found this item on the trade site';
         tl.addEventListener('click', function () { openUrl(it.tradeUrl); });
         row.appendChild(tl);
       }
       if (it.whisper && isGui()) {
-        var w = document.createElement('button');
-        w.className = 'copy-btn';
+        var w = UI.button('secondary', { size: 'sm' });
         w.textContent = '⚡ Whisper';
         w.addEventListener('click', function () { sendPoeChat(w, it.whisper, '⚡ Whisper'); });
         row.appendChild(w);
       }
-      var del = document.createElement('button');
-      del.className = 'copy-btn';
-      del.textContent = '✕';
-      del.setAttribute('aria-label', 'Remove from basket');
-      del.addEventListener('click', function () {
-        var cur = loadBasket();
-        cur.splice(idx, 1);
-        saveBasket(cur);
-        renderBasket();
-      });
-      row.appendChild(del);
-      box.appendChild(row);
-    });
+      row.appendChild(UI.iconButton('✕', 'Remove from basket', { variant: 'secondary', size: 'sm', onClick: function () {
+        UI.confirmDanger('Remove from basket?', ((it.name ? it.name + ' ' : '') + it.base) + ' — ' + it.account, 'Remove')
+          .then(function (ok) {
+            if (!ok) return;
+            var cur = loadBasket();
+            cur.splice(idx, 1);
+            saveBasket(cur);
+            renderBasket();
+          });
+      } }));
+      return row;
+    }
+    var indexed = b.map(function (it, idx) { return { it: it, idx: idx }; });
+    box.appendChild(UI.table([
+      { key: 'item', label: 'Item', render: function (r) { return (r.it.name ? r.it.name + ' ' : '') + r.it.base; } },
+      { key: 'seller', label: 'Seller', render: function (r) { return r.it.account; } },
+      { key: 'price', label: 'Price', num: true, render: function (r) {
+        return (r.it.amount !== null && r.it.amount !== undefined) ? r.it.amount + ' ' + r.it.currency : 'no price';
+      } },
+      { key: 'acts', label: '', render: function (r) { return basketActions(r.it, r.idx); } }
+    ], indexed));
   }
 
   // ---- sold watcher: periodically re-check open results, grey out listings ------
@@ -4338,9 +4515,9 @@
   }
 
   async function toggleLive(state) {
-    if (!isGui()) { alert('Live search needs the desktop app (run PoB Trade Finder.bat).'); return; }
+    if (!isGui()) { UI.toast('Live search needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
     if (state.live) { stopLive(state); return; }
-    if (liveCount >= 2) { alert('Max 2 live searches at once — GGG rate limits.'); return; }
+    if (liveCount >= 2) { UI.toast('Max 2 live searches at once — GGG rate limits.', 'warn'); return; }
     var payload = buildTradePayload(state);
     if (!payload) return;
     initAudio();
@@ -4506,7 +4683,7 @@
 
   // ---- live price checking (desktop app only) -----------------------------------
   async function checkPrice(state, quiet) {
-    if (!isGui()) { alert('Live price checking needs the desktop app (run PoB Trade Finder.bat).'); return; }
+    if (!isGui()) { UI.toast('Live price checking needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
     var payload = null;
     try { payload = buildTradePayload(state, quiet); } catch (e) { /* stale card after re-render */ }
     if (!payload) return;
@@ -4597,8 +4774,7 @@
       if (pageCount <= 1) return null;
       var nav = document.createElement('span');
       nav.className = 'price-nav';
-      var prev = document.createElement('button');
-      prev.className = 'copy-btn';
+      var prev = UI.button('secondary', { size: 'sm' });
       prev.textContent = '‹ Prev';
       prev.disabled = ps.page === 0 || !!ps.loading;
       prev.addEventListener('click', function () { gotoPage(state, ps.page - 1); });
@@ -4606,8 +4782,7 @@
       pageLbl.className = 'page-label';
       pageLbl.textContent = 'page ' + (ps.page + 1) + ' / ' + pageCount +
         (ps.total > ps.ids.length ? ' (first ' + ps.ids.length + ')' : '');
-      var next = document.createElement('button');
-      next.className = 'copy-btn';
+      var next = UI.button('secondary', { size: 'sm' });
       next.textContent = 'Next ›';
       next.disabled = ps.page >= pageCount - 1 || !!ps.loading;
       next.addEventListener('click', function () { gotoPage(state, ps.page + 1); });
@@ -4950,7 +5125,12 @@
           // click any listing mod to sort all results by it
           line.classList.add('sortable');
           line.title = 'Click to sort results by this mod (again for lowest, again to clear)';
+          line.tabIndex = 0;
+          line.setAttribute('role', 'button');
           line.addEventListener('click', function () { cycleSort(state, m.hash, m.text); });
+          line.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleSort(state, m.hash, m.text); }
+          });
         }
         modsEl.appendChild(line);
       });
@@ -4971,16 +5151,6 @@
 
     var side = document.createElement('div');
     side.className = 'listing-side';
-    var pinBtn = document.createElement('button');
-    pinBtn.className = 'copy-btn whisper-btn';
-    pinBtn.textContent = '☆ Pin';
-    pinBtn.title = 'Add to the shopping basket';
-    pinBtn.addEventListener('click', function () {
-      pinToBasket(li, state);
-      pinBtn.textContent = '★ Pinned';
-      setTimeout(function () { pinBtn.textContent = '☆ Pin'; }, 1200);
-    });
-    side.appendChild(pinBtn);
     var priced = (li.amount !== null && li.amount !== undefined);
     var amt = document.createElement('div');
     amt.className = 'price-amt' + (/divine/i.test(li.currency) ? ' divine' : '');
@@ -5007,56 +5177,61 @@
     acct.className = 'price-acct';
     acct.textContent = li.account;
     side.appendChild(acct);
-    if (li.whisper) {
-      // "@CharName Hi, I would like to buy your…" -> character name for /hideout
-      var charMatch = li.whisper.match(/^@(\S+)/);
 
-      var wBtn = document.createElement('button');
-      wBtn.className = 'copy-btn whisper-btn gui-only';
-      wBtn.textContent = '⚡ Whisper in game';
-      wBtn.title = 'Pastes the whisper into the PoE chat and sends it';
-      wBtn.addEventListener('click', function () { sendPoeChat(wBtn, li.whisper, '⚡ Whisper in game'); });
-      side.appendChild(wBtn);
-
-      // Hideout travel only makes sense for priced listings (set price, go get it);
-      // unpriced listings are a negotiation — whisper only.
-      if (charMatch && priced) {
-        var hBtn = document.createElement('button');
-        hBtn.className = 'copy-btn hideout-btn gui-only';
-        hBtn.textContent = '⌂ Hideout';
-        hBtn.title = 'Sends /hideout ' + charMatch[1] + ' in game — works once the seller has partied you';
-        hBtn.addEventListener('click', function () { sendPoeChat(hBtn, '/hideout ' + charMatch[1], '⌂ Hideout'); });
-        side.appendChild(hBtn);
-      }
-
-      var cBtn = document.createElement('button');
-      cBtn.className = 'copy-btn whisper-btn';
-      cBtn.textContent = 'Copy whisper';
-      cBtn.dataset.role = 'copy-whisper';
-      cBtn.addEventListener('click', function () {
-        navigator.clipboard.writeText(li.whisper).then(function () {
-          cBtn.textContent = 'Copied!';
-          setTimeout(function () { cBtn.textContent = 'Copy whisper'; }, 1200);
-        });
-      });
-      side.appendChild(cBtn);
+    // one main action per listing — the way this listing is bought — the rest in ⋯
+    // "@CharName Hi, I would like to buy your…" -> character name for /hideout
+    var charMatch = li.whisper && li.whisper.match(/^@(\S+)/);
+    var gui = isGui();
+    function openSearch() { var url = buildTradeUrl(state); if (url) openUrl(url); }
+    function copyWhisper() {
+      navigator.clipboard.writeText(li.whisper).then(function () { UI.toast('Whisper copied — paste it in game.', 'success'); });
     }
+    var main = null, mainKind = null;
     if (instant && state) {
-      // Instant buyout flow: travel to the seller's hideout via the trade
-      // site's "Travel to Hideout" (gold fee, seller can be offline).
-      var bBtn = document.createElement('button');
-      bBtn.className = 'copy-btn whisper-btn';
-      bBtn.textContent = '⌂ Go to hideout ↗';
-      bBtn.title = 'Opens this search on the trade site — use its "Travel to Hideout" button there (fee ' +
-                   (li.fee ? li.fee.toLocaleString() + ' gold' : 'applies') + '). Travel needs your logged-in session, so it happens on the site.';
-      bBtn.addEventListener('click', function () {
-        var url = buildTradeUrl(state);
-        if (url) openUrl(url);
-      });
-      side.appendChild(bBtn);
+      // Instant buyout: travel to the seller's hideout via the trade site's
+      // "Travel to Hideout" (gold fee, seller can be offline).
+      main = UI.button('primary', { size: 'sm', label: '⌂ Go to hideout ↗', onClick: openSearch,
+        title: 'Opens this search on the trade site — use its "Travel to Hideout" button there (fee ' +
+               (li.fee ? li.fee.toLocaleString() + ' gold' : 'applies') + '). Travel needs your logged-in session, so it happens on the site.' });
+      mainKind = 'travel';
+    } else if (li.whisper && gui) {
+      main = UI.button('primary', { size: 'sm', label: '⚡ Whisper', title: 'Pastes the whisper into the PoE chat and sends it',
+        onClick: function () { sendPoeChat(main, li.whisper, '⚡ Whisper'); } });
+      mainKind = 'whisper';
+    } else if (li.whisper) {
+      main = UI.button('primary', { size: 'sm', label: 'Copy whisper', onClick: copyWhisper });
+      mainKind = 'copy';
     }
+    var acts = document.createElement('div');
+    acts.className = 'listing-acts';
+    if (main) acts.appendChild(main);
+    acts.appendChild(UI.menu([
+      { label: '☆ Pin to basket', onClick: function () { pinToBasket(li, state); } },
+      { label: '⚡ Whisper in game', hidden: !li.whisper || !gui || mainKind === 'whisper',
+        onClick: function () { sendPoeChatToast(li.whisper, 'Whisper sent.'); } },
+      { label: 'Copy whisper', hidden: !li.whisper || mainKind === 'copy', onClick: copyWhisper },
+      // hideout travel only makes sense for priced listings (set price, go get it);
+      // unpriced listings are a negotiation — whisper only
+      { label: '⌂ /hideout ' + (charMatch ? charMatch[1] : ''), hidden: !gui || !charMatch || !priced,
+        title: 'Works once the seller has partied you',
+        onClick: function () { sendPoeChatToast('/hideout ' + charMatch[1], 'Sent /hideout.'); } },
+      { label: '⌂ Go to hideout ↗', hidden: !instant || !state || mainKind === 'travel', onClick: openSearch }
+    ], { size: 'sm', ariaLabel: 'More actions for this listing' }));
+    side.appendChild(acts);
     card.appendChild(side);
     return card;
+  }
+
+  // chat commands fired from a menu: no button to relabel, so report with a toast
+  async function sendPoeChatToast(text, okMsg) {
+    if (!isGui()) return;
+    try {
+      var res = await window.pywebview.api.poe_chat(text);
+      if (res && res.ok) UI.toast(okMsg, 'success');
+      else UI.toast('Could not send: ' + ((res && res.error) || 'failed'), 'danger');
+    } catch (e) {
+      UI.toast('Could not send: ' + e.message, 'danger');
+    }
   }
 
   async function sendPoeChat(btn, text, restoreLabel) {
@@ -5074,7 +5249,7 @@
   }
 
   async function checkAllPrices() {
-    if (!isGui()) { alert('Live price checking needs the desktop app (run PoB Trade Finder.bat).'); return; }
+    if (!isGui()) { UI.toast('Live price checking needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
     var btn = document.getElementById('check-all');
     btn.disabled = true;
     var snapshot = cards; // renderBuild() replaces `cards` if the user switches gear set mid-scan
@@ -5092,7 +5267,7 @@
 
   // ---- refresh bundled trade data (desktop app only) -----------------------------
   async function refreshData() {
-    if (!isGui()) { alert('Data refresh needs the desktop app — or run: node tools/make-data-js.js --fetch'); return; }
+    if (!isGui()) { UI.toast('Data refresh needs the desktop app — or run: node tools/make-data-js.js --fetch', 'warn'); return; }
     var btn = document.getElementById('refresh-data');
     btn.disabled = true;
     btn.textContent = 'Refreshing…';
@@ -5196,8 +5371,8 @@
           refreshHotkeyStatus(window.pywebview.api.set_price_hotkey(this.value));
         }
       });
-      document.getElementById('settings-btn').addEventListener('click', function () {
-        refreshHotkeyStatus();
+      ['settings-btn', 'settings-btn-side'].forEach(function (id) {
+        document.getElementById(id).addEventListener('click', function () { refreshHotkeyStatus(); });
       });
     }
     if (!OVERLAY) return;
@@ -5205,7 +5380,7 @@
     bar.id = 'overlay-bar';
     bar.innerHTML = '<span class="ov-title">Price check</span>' +
       '<span id="overlay-meta" class="ov-meta">Hover an item in Path of Exile and press the hotkey</span>' +
-      '<button id="overlay-close" class="copy-btn" aria-label="Close price check" title="Close (Esc)">✕</button>';
+      '<button id="overlay-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close price check" title="Close (Esc)">✕</button>';
     var container = document.querySelector('.container');
     container.insertBefore(bar, container.firstChild);
     document.getElementById('overlay-close').addEventListener('click', overlayClose);

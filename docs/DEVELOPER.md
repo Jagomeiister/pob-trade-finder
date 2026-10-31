@@ -263,3 +263,17 @@ fallbacks). UI and bridge behaviour are exercised via stubbed `window.pywebview`
 browser; `gui.py` quota/updater logic has offline unit checks (see git history for
 examples). `python test/test_price_hotkey.py` and `python test/test_currency_feed.py`
 cover the Python side. Run tests before every release.
+
+`node test/test_contrast.js` guards the design tokens: every text colour in
+`css/tokens.css` must reach WCAG AA (4.5:1) on `--bg`/`--s1`/`--s2` and as a tinted chip,
+in every theme × accent × high-contrast combination. It also fails if a colour literal
+appears outside `tokens.css`, if any rule sets `outline: none`, or if a font size drops
+below 12px (mark a deliberate exception with `/* allow-small */`).
+
+## Styling
+
+CSS lives in `css/` (loaded cache-busted from `index.html`): `tokens.css` (all colours,
+type scale, radii; themes are `data-theme` / `data-accent` / `data-contrast` attributes on
+`<html>`), `base.css`, `components.css`, `layout.css`. Add new colours as tokens, never
+inline. Legacy variable names (`--panel`, `--gold`, `--dim`…) alias the new tokens until
+the v2.0 redesign finishes migrating components — see `docs/UI-PLAN.md`.

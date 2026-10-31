@@ -26,7 +26,7 @@ from currency_feed import CurrencyFeed
 from timeless import TimelessData
 from art_cache import ArtCache
 
-VERSION = "1.14.0"
+VERSION = "2.0.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -1116,9 +1116,10 @@ def main():
         "PoB Trade Finder",
         index,
         js_api=api,
-        width=1060,
-        height=880,
-        background_color="#0c0b09",
+        width=1280,  # sidebar + slot list + item card side by side (narrower windows stack)
+        height=900,
+        min_size=(760, 560),
+        background_color="#0f0e0c",  # css/tokens.css --bg (dark)
     )
     # in-game price-check overlay: same page in overlay mode, same Api instance
     # (one rate limiter for both windows), created hidden and reused per press
@@ -1131,7 +1132,7 @@ def main():
         min_size=(380, 300),
         hidden=True,
         on_top=True,
-        background_color="#0c0b09",
+        background_color="#0f0e0c",
     )
     api._attach_windows(main_window, overlay)
     api._start_hotkey()

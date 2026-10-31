@@ -1,0 +1,143 @@
+/* Design tokens — the ONLY file allowed to hold colour literals (test/test_contrast.js enforces it).
+   Themes and accents are attributes on <html>: data-theme="light", data-accent="teal",
+   data-contrast="high". Every text token is checked for WCAG AA on --bg/--s1/--s2 in every
+   theme × accent × contrast combination. See docs/UI-PLAN.md §3. */
+
+:root {
+  /* surfaces */
+  --bg: #0f0e0c;
+  --s1: #171512;
+  --s2: #201d19;
+  --s3: #2a2620;
+  --border: #332e26;
+  --border-strong: #4a4236;
+  --shadow: rgba(0, 0, 0, .5);
+
+  /* text */
+  --text: #ece6da;
+  --text-2: #b9af9d;
+  --text-3: #9a907d;
+
+  /* accent (gold by default; data-accent swaps it) */
+  --accent: #d9ad4f;
+  --accent-hover: #e6bf66;
+  --on-accent: #1a1408;
+
+  /* item rarity + mod source (official trade-site hues, brightened for AA) */
+  --unique: #e0894a;
+  --rare: #f0e070;
+  --magic: #9a9aff;
+  --normal: #d0ccc4;
+  --crafted: #b8b8ff;
+  --fractured: #c4b37e;
+  --veiled: #a99cc8;
+  --exarch: #ff9a76;
+  --eater: #b8a6ff;
+  --gem: #3cc4b8;
+  --divine: #8fdcec;
+  --price: #e0b850;
+
+  /* status */
+  --success: #6cc07a;
+  --warn: #e0b050;
+  --danger: #ec7b7b;
+  --info: #7fb2ec;
+
+  /* sockets (graphics, not text) */
+  --sock-r-hi: #e05050; --sock-r-lo: #a01515;
+  --sock-g-hi: #6cc45f; --sock-g-lo: #2e7d28;
+  --sock-b-hi: #6f8fe0; --sock-b-lo: #2c4ba8;
+  --sock-w-hi: #ffffff; --sock-w-lo: #b8b4a4;
+  --sock-a-hi: #2c4a4a; --sock-a-lo: #101820;
+  --sock-dv-hi: #b08a4c; --sock-dv-lo: #6b4a1c;
+  --on-sock: #ffffff;
+  --on-sock-light: #333333;
+  --sock-shadow: #000000;
+
+  /* type, shape, motion */
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: Consolas, "Cascadia Mono", monospace;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-pill: 999px;
+
+  --chip-tint: 14%;
+
+  /* derived — resolved on <html>, so they follow theme/accent overrides */
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --row-hover: color-mix(in srgb, var(--accent) 6%, transparent);
+
+  /* legacy names used by pre-2.0 rules; removed as components migrate (UI-PLAN §7) */
+  --panel: var(--s1);
+  --panel2: var(--s2);
+  --panel-deep: var(--bg);
+  --border-hi: var(--border-strong);
+  --border-soft: var(--border);
+  --gold: var(--accent);
+  --gold-hi: var(--accent);
+  --dim: var(--text-3);
+
+  color-scheme: dark;
+}
+
+/* ---- accents (dark) ---- */
+:root[data-accent="crimson"] { --accent: #f07a6e; --accent-hover: #f59388; --on-accent: #1a0a08; }
+:root[data-accent="teal"]    { --accent: #4cc9bd; --accent-hover: #6fd8cd; --on-accent: #06201d; }
+:root[data-accent="violet"]  { --accent: #b59cf5; --accent-hover: #c8b4f8; --on-accent: #150d26; }
+:root[data-accent="green"]   { --accent: #74c784; --accent-hover: #8fd59c; --on-accent: #0a1a0d; }
+
+/* ---- high contrast (dark) ---- */
+:root[data-contrast="high"] {
+  --text: #fffaf0; --text-2: #e6dfd2; --text-3: #d0c8b8;
+  --border: #5a5040; --border-strong: #7a6d56;
+}
+
+/* ---- light theme ---- */
+:root[data-theme="light"] {
+  --bg: #f5f2ec;
+  --s1: #ffffff;
+  --s2: #efeae1;
+  --s3: #e6dfd3;
+  --border: #ddd5c8;
+  --border-strong: #c4b9a6;
+  --shadow: rgba(60, 40, 10, .12);
+  --text: #1d1a15;
+  --text-2: #4a4338;
+  --text-3: #635a4b;
+  --accent: #7e5a0c;
+  --accent-hover: #6a4b08;
+  --on-accent: #ffffff;
+  --unique: #924810;
+  --rare: #7a6200;
+  --magic: #4646b0;
+  --normal: #4a4338;
+  --crafted: #4b4bb8;
+  --fractured: #6b5928;
+  --veiled: #5e4f8a;
+  --exarch: #a8401c;
+  --eater: #5b3fb0;
+  --gem: #0b6e66;
+  --divine: #186272;
+  --price: #7a5800;
+  --success: #28702f;
+  --warn: #7c5300;
+  --danger: #b3261e;
+  --info: #1f5fa8;
+  --chip-tint: 9%;
+  color-scheme: light;
+}
+:root[data-theme="light"][data-accent="crimson"] { --accent: #a3271c; --accent-hover: #8a1f16; --on-accent: #ffffff; }
+:root[data-theme="light"][data-accent="teal"]    { --accent: #0b6a62; --accent-hover: #08574f; --on-accent: #ffffff; }
+:root[data-theme="light"][data-accent="violet"]  { --accent: #5b3fb0; --accent-hover: #4b3394; --on-accent: #ffffff; }
+:root[data-theme="light"][data-accent="green"]   { --accent: #2a6b30; --accent-hover: #215626; --on-accent: #ffffff; }
+:root[data-theme="light"][data-contrast="high"] {
+  --text: #000000; --text-2: #2a251d; --text-3: #3a342a;
+  --border: #a89c86; --border-strong: #8a7d66;
+}

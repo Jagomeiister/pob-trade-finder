@@ -19,44 +19,85 @@ in-game whisper/hideout actions, all without touching the trade website's filter
 
 ## 2. Loading a build
 
-- **Paste a PoB export code** (PoB → Import/Export Build → Generate → Copy) — decoding
-  happens automatically on paste
+The start screen has one big paste box.
+
+- **Paste a PoB export code** (PoB → Import/Export Build → Generate → Copy) — it loads
+  as soon as you paste (or press **Load build** / Ctrl+Enter)
 - **Or paste a link** — pobb.in, pastebin, and poe.ninja/pob links are fetched for you
+- **Saved builds** appear as cards under the paste box: click one to load it, 🗑 to
+  delete it (it asks first). Save the current build with **☆ Save** in the sidebar
 - **Gear sets:** guide builds usually contain several (Leveling / Budget / Endgame…) —
-  pick which one to shop for with the **Gear set** dropdown; it defaults to whatever
-  the build creator had active
-- **☆ Save build** keeps the current build in a library (the **Saved builds…** dropdown)
-  for one-click reload later; 🗑 removes the selected entry
+  pick which one to shop for with the **Gear set** dropdown in the sidebar; it defaults to
+  whatever the build creator had active
+- **Switch build** (sidebar) goes back to the start screen; **← Back to current build**
+  returns without loading anything
 - Your league, filters, and last build are remembered between launches
 
-## 3. Global controls (top bar)
+## 3. Finding your way around
 
-| Control | What it does |
+Once a build loads, the window has three parts:
+
+- **Sidebar (left)** — the build (name, gear set, ☆ Save, Switch build, ⚖ Compare with
+  character…), then the pages: **Items** — Gear, Jewels & clusters, Flasks, Gems — and
+  **Tools** — Upgrade planner, Timeless jewels, Jewel finder, Market. Numbers show how
+  many slots each page has (and how many items are in your basket). At the bottom: the
+  **Divine Orb** price tile and **⚙ Settings**. In a window narrower than about 1180px the
+  sidebar shrinks to icons; **☰** opens the build card
+- **Top bar** — the page name, small chips showing the search settings in use (league,
+  trade type, min roll), **Search settings ▾**, **Open all searches ↗** and
+  **Check all prices**
+- **The page** — on Gear, Jewels and Flasks: a **slot list** on the left (each slot's art,
+  name, and its price once checked, or a status such as *Bought*, *None listed*,
+  *Equipped*, *Missing*) and the selected item on the right. Click a slot, or use ↑/↓
+
+**Search settings ▾** (top bar) holds the settings every search shares:
+
+| Setting | What it does |
 |---|---|
-| **League** | Which league to search. **Refresh trade data** updates the list at league start |
-| **Trade** | ⚡ *Instant buyout + in person* (default) / ⚡ *instant only* / 💬 *in person* / any — see §7 |
+| **League** | Which league to search. **Refresh trade data** (⚙ Settings) updates the list at league start |
+| **Trade** | ⚡ *Instant buyout + in person* (default) / ⚡ *instant only* / 💬 *in person* / any — see §6 |
 | **Sale** | Buyout/fixed price (default) / any / price with note / unpriced |
-| **Pseudo totals** | Folds life/resist/attribute rolls into pseudo stats so hybrid-rolled items still match — finds strictly more items, recommended on |
+| **Show prices in** | chaos or divine for the ≈ equivalents and totals |
 | **Min roll** | Sets every mod's minimum to this % of the build's roll (default 80%) |
-| **Open all searches** | Opens every slot's search in browser tabs |
-| **Check all prices** | Live-prices every slot in sequence (rate-limit safe) |
-| **Divine Orb tile** | Current divine price in chaos, its 7-day change and trend line (hover or arrow-key through the points). Click it for a table of 14 common currencies with the same 7-day history. Data is GGG's official hourly currency-exchange feed, so it doesn't use any trade-site rate limit. Rows marked *thin* trade so little per hour that their trend is mostly noise |
+| **Pseudo totals** | Folds life/resist/attribute rolls into pseudo stats so hybrid-rolled items still match — finds strictly more items, recommended on |
 
-## 4. Item cards
+**Open all searches** opens every slot's search in browser tabs; **Check all prices**
+live-prices every slot in sequence (rate-limit safe).
 
-Every equipped item — gear, jewels (tree, cluster, abyssal-socket), flasks — gets a card
-showing its art and mods. Per mod:
+**Market** (sidebar, or click the Divine Orb tile) shows the Divine Orb's 7-day chart and
+a table of 14 common currencies with their 7-day change and trend line (hover or
+arrow-key through the points). Data is GGG's official hourly currency-exchange feed, so
+it doesn't use any trade-site rate limit. Rows marked *thin* trade so little per hour
+that their trend is mostly noise.
 
-- **Checkbox** (or click the row) — include this mod in the search. Bench crafts start
+## 4. The item card
+
+The selected item shows its art, slot, name, base, item level and influences. The
+buttons on the right:
+
+- **Check price** (desktop) — listings right in the app (§5)
+- **🔴 Go live** (desktop) — watch the search for new listings (§7)
+- **Search on trade ↗** — open the search on pathofexile.com
+- **⋯** — Copy search URL, ⚒ Craft vs buy (rares), ⏳ Find seeds for this socket (timeless
+  jewels), ✔ Mark bought
+
+The mods table has one row per mod:
+
+- **Use** checkbox (or click the row) — include this mod in the search. Bench crafts start
   unticked (you'll re-craft them); everything else starts on
-- **Min value** — pre-filled from the build's actual roll × the min-roll %. Inputs are
+- **Min** — pre-filled from the build's actual roll × the min-roll %. Inputs are
   **clamped to what the mod can genuinely roll** (lowest tier min → highest tier max),
   so impossible searches can't happen. Pseudo totals are never clamped
-- **⇅** — sort results by this mod: once = highest roll first, again = lowest, again = off
+- **Trade stat** — the trade-site stat the mod matched (under the mod text in a narrow
+  window)
+- **⇅** (shows when you hover a row) — sort results by this mod: once = highest roll
+  first, again = lowest, again = off
 - Colours follow the trade site: explicit/implicit blue, **crafted/enchant light blue**,
-  **fractured dirty-gold**, implicits above a separator line
+  **fractured dirty-gold**, implicits above a separator line. Crafted and fractured mods
+  also carry a *crafted* / *fractured* label
 
-Per-card options:
+**More filters** (fold-out under the mods) holds the per-item options. Its heading counts
+how many you've changed from the defaults, e.g. *More filters · 2 changed*:
 
 - **Search by** — how strictly to match the base: *this base* (default for weapons),
   *any base with the same defences* (e.g. any pure-ES helmet), *any weapon of that class*
@@ -67,15 +108,18 @@ Per-card options:
   *combined* total instead of each roll separately (a 75% total split 20/55 matches a
   build asking 35/40). Site links work while logged in there; in-app checks need a
   saved POESESSID (weight searches use the logged-in query budget)
-- **🕘 History** — appears after your first price check: the last 8 searches for that slot
-  in this build (time, league, listing count, cheapest price); pick one to reopen it on the
-  trade site. Re-run the same search later and the card shows a **Cheapest** trend line
-  (e.g. 20c → 12c over 3 checks) so you can see whether waiting is paying off
 - **Min ilvl** — type a minimum item level (the greyed number is the build item's ilvl)
 - **Base %ile ≥ / Sockets ≥ / Links ≥** — caps are slot-aware
   (helm/gloves/boots max 4, shields 3, body 6); links default to the build item's 5/6-link
 - **Require fractured mod(s)** — the fractured mod must actually be fractured (crafting-base shopping)
 - **Min roll** — per-card override of the global percentage
+- **Max price** — see §6c
+
+**🕘 History** appears under the mods after your first price check: the last 8 searches
+for that slot in this build (time, league, listing count, cheapest price); pick one to
+reopen it on the trade site. Re-run the same search later and a **Cheapest** trend line
+appears beside it (e.g. 20c → 12c over 3 checks) so you can see whether waiting is
+paying off.
 
 **Uniques** are searched by name. Their mods are listed unticked — tick one to demand a
 minimum roll (only mods that actually roll are editable). Sockets/links/base-percentile
@@ -99,10 +143,19 @@ filters still apply.
 While a results panel is open, the app **re-checks it every 60s** and greys out anything
 **sold / delisted** until you press Check price again.
 
-The **Build cost panel** (appears above the results) totals the cheapest listing per
-priced slot in chaos, with a divine conversion — run **Check all prices** to fill it.
+Prices also appear next to each slot in the slot list ("2 of 9 priced").
 
-**The solver** (bottom of the cost panel): set build-wide targets — *Total ele res ≥*
+### Upgrade planner
+
+The **Upgrade planner** page (sidebar) collects the shopping side:
+
+- **Build cost** — a table of the cheapest listing per priced slot, with a total in chaos
+  and divines. Click a column heading to sort; click an item name to jump to its slot.
+  Run **Check all prices** to fill it
+- **Shopping basket** — everything you've pinned (§6c)
+- **Value my gear** results (§6b)
+
+**The solver** (under the build cost table): set build-wide targets — *Total ele res ≥*
 and *Total life ≥* — and **Solve cheapest combo**. It scores every priced listing's
 resistances and life, then finds the cheapest one-listing-per-slot combination that
 meets the targets, letting slots trade off against each other (overshooting res on a
@@ -112,26 +165,31 @@ pins the whole combination to the basket.
 
 ## 6. Buying
 
+Each listing shows its price (with *b/o* / *fixed* / *negotiable*), the seller, and one
+main button for the way that listing is bought. Everything else is under **⋯**.
+
 **⚡ Instant buyout listings** (fee shown, e.g. `⚡ instant · fee 4,368 gold`):
-- **⌂ Go to hideout** opens the search on the trade site — use its *Travel to Hideout*
+- **⌂ Go to hideout ↗** opens the search on the trade site — use its *Travel to Hideout*
   button there (travel needs your logged-in session; the gold fee applies; the seller
   can be offline)
 
 **💬 In-person listings:**
-- **⚡ Whisper in game** — pastes and sends the buy whisper directly in the PoE client
-- **⌂ Hideout** — sends `/hideout <seller>` — works **after** the seller parties you
-- **Copy whisper** — for pasting manually
+- **⚡ Whisper** (desktop) — pastes and sends the buy whisper directly in the PoE client.
+  In the browser version the main button is **Copy whisper** instead
+- **⋯ → ⌂ /hideout <seller>** — works **after** the seller parties you
+- **⋯ → Copy whisper** — for pasting manually
+- **⋯ → ☆ Pin to basket** — see §6c
 
-## 5b. Tabs, gems, and pasted items
+## 5b. Gems and pasted items
 
-- **Tabs** above the cards — All / Gear / Jewels & Clusters / Flasks / Gems — with counts;
-  abyssal-socket jewels live under Jewels
-- **Gems tab** — every skill gem in the build (active skill set, deduped with ×N counts).
+- Abyssal-socket jewels live under **Jewels & clusters**
+- **Gems** — every skill gem in the build (active skill set, deduped with ×N counts).
   Each row has editable min level/quality, a search link, and a price; **Price all gems**
   totals the whole setup ("Gems ≈ 3.2 div")
-- **Paste an in-game item** — Ctrl+C any item in the client, paste into the build box:
-  it becomes a purple-edged card at the top with all its mods matched, ready to
-  price-check, sell-price, or compare against your character. The loaded build stays put
+- **Paste an in-game item** — Ctrl+C any item in the client and paste it into the build
+  box (Switch build → paste): it opens on a **Pasted item** page with all its mods
+  matched, ready to price-check, sell-price, or compare against your character. The
+  loaded build stays put
 
 ## 5c. In-game price check (hotkey)
 
@@ -167,8 +225,11 @@ Finds the timeless jewel seed that does the most for the notables around one of
 your sockets, then prices it. All six are supported: Glorious Vanity, Lethal Pride,
 Brutal Restraint, Militant Faith, Elegant Hubris and Heroic Tragedy.
 
+The page runs top to bottom in numbered steps: **1 Jewel and socket**, **2 What you
+want**, **3 Best seeds**.
+
 **It starts from your build.** If your build link has a timeless jewel socketed, the
-tab opens on that jewel, its socket (marked ★ and listed first), its **conqueror** and
+page opens on that jewel, its socket (marked ★ and listed first), its **conqueror** and
 its seed. A line at the top shows what your current seed does to each notable, e.g.
 *Mystic Bulwark → Add Flask Charges*. Builds whose author filled in Path of Building's
 own *Find Timeless Jewel* search are imported too: their outcome weights are ticked for
@@ -211,19 +272,22 @@ and checks them against a stored checksum. Checked against PoB itself: Brutal Re
 2582 gives Mystic Bulwark *10% increased Flask Charges gained*, exactly as PoB shows.
 
 Already know your seeds? Expand **Price seeds you already have** at the bottom of the
-tab and paste them. A timeless jewel's card in the build also has **⏳ Find seeds for
-this socket**, which opens this finder on that jewel's socket.
+page and paste them. A timeless jewel's card in the build also has **⋯ → ⏳ Find seeds
+for this socket**, which opens this finder on that jewel's socket.
 
 ## 5e. 💎 Jewel finder (rare and abyss jewels)
 
 Reads your passive tree and main skill to work out what your build scales: for
 example spells, cold, area, crit, staff, and life vs energy shield. It then ranks every
-mod that can roll on rare jewels by how much your build wants it.
+mod that can roll on rare jewels by how much your build wants it. The page runs in
+numbered steps: **1 Your build**, **2 Jewel and search type**, **3 Pick mods**,
+**4 Find jewels**.
 
 - **Jewel** picks the base: any of Crimson / Viridian / Cobalt, or a single one, or an
   abyss Eye jewel type.
-- Each mod has **Use** and **Must** checkboxes and a **value** slider. The best matches
-  are pre-ticked.
+- Each mod has an **Off / Want / Must** switch and a **value** slider. *Want* counts the
+  mod toward the search; *Must* means every result has it. The best matches start on
+  *Want*.
 - **At least N of these** finds jewels with any N of your ticked mods at your minimum
   roll. This is the default, and it works without logging in.
 - **Best for my build** scores every jewel by your values (a max roll is worth its
@@ -233,13 +297,15 @@ mod that can roll on rare jewels by how much your build wants it.
 
 ## 6b. Compare with your character
 
-Enter your account name (**Name#1234**) in the bar above the cards, load your characters,
-pick one, and **Compare gear** (public profiles, no login). Every card gains a strip:
+Click **⚖ Compare with character…** in the sidebar, enter your account name
+(**Name#1234**), load your characters, pick one, and **Compare gear** (public profiles, no
+login). With a POESESSID saved (§7b) your characters load automatically. Every card gains
+a strip:
 
 > **You:** My Old Dome — 2/4 target mods · missing: +58 to maximum Life · +35% to Cold Resistance
 
-Cards get a coloured edge — green (matched, rolls included), gold (close), red (missing) —
-and **Hide matched slots** collapses what you already own so you only shop the gaps.
+The slot list labels each slot **Equipped** (matched, rolls included), **Close** or
+**Missing**, and **Hide matched slots** hides what you already own so you only shop the gaps.
 Works with the per-slot gear-set dropdowns, so you can compare against any mix.
 
 **⬆ Upgrades only** (on each rare card's strip) raises every ticked mod's minimum to
@@ -261,11 +327,13 @@ automatically, so treat it as a guide.
   alerts — no more 50-div listings while shopping on 2 div
 - Listings priced well under the going rate get a **🔥 deal** badge (verify before you
   buy — sometimes it's a snipe, sometimes it's a scam listing)
-- **☆ Pin** any listing into the **shopping basket** — a persistent panel with every
-  pending purchase, running total, and one-click whispers
-- **✔ Bought** marks a slot as purchased: the card dims and drops out of the build cost total
+- **⋯ → ☆ Pin to basket** on any listing adds it to the **shopping basket** on the Upgrade
+  planner page — every pending purchase, running total, and one-click whispers. Clearing
+  the basket or removing an item asks first
+- **⋯ → ✔ Mark bought** on a card marks the slot as purchased: its mods dim, it shows
+  *Bought* in the slot list, and it drops out of the build cost total
 
-### ⚒ Craft vs buy (rare gear cards)
+### ⚒ Craft vs buy (rare gear cards, under ⋯)
 
 Estimates what it would cost to roll the ticked explicit mods yourself, then compares that
 with the cheapest listing from **Check price**.
@@ -316,7 +384,7 @@ friend.
 
 ### 7b. Instant alerts (POESESSID)
 
-Paste your **POESESSID** cookie into the field in the character bar and Save — live
+Paste your **POESESSID** cookie into **⚙ Settings → Account** and Save — live
 searches then use the trade site's real **WebSocket**: new listings alert **the moment
 they're listed** (🟢 INSTANT), not on a 30-second poll. To find the cookie: on
 pathofexile.com while logged in, press F12 → Application → Cookies → `POESESSID`.
@@ -324,15 +392,23 @@ It's stored only on this machine (`data/session.json`), sent only to pathofexile
 and you can clear it by saving an empty field. If the session expires, live searches
 say so and fall back to polling.
 
-## 7c. Settings & accessibility (⚙, top right)
+## 7c. Settings & accessibility (⚙ Settings, bottom of the sidebar)
 
-- **Theme** — six colour schemes: Classic (PoE gold), Obsidian, Midnight, Blood, Forest, Light
-- **Text size** (90–125%) and **density** (comfortable/compact)
-- **Sound alerts** on/off and **volume** for the live-search ding
-- **Reduce motion** — disables flashes and animations
-- **High contrast** — brighter text and borders
-- **Colourblind-friendly sockets** — socket colours get letter labels (R/G/B/W/A)
-- **Price-check hotkey** — the in-game price-check key (§5c): Ctrl+D, Ctrl+Shift+D, Alt+D or Off
+Settings opens as a panel on the right; Esc or a click outside closes it.
+
+- **Appearance** — **Theme**: Dark, Light, or Match Windows; **Accent**: gold, crimson,
+  teal, violet or green. Every combination is checked for readable contrast. (Older colour
+  schemes carry over: Blood → Dark + crimson, etc.) **Text size** (90–125%) and
+  **density** (comfortable/compact)
+- **Accessibility** — **High contrast** (brighter text and borders), **Reduce motion**
+  (no flashes or animations), **Colourblind-friendly sockets** (letter labels R/G/B/W/A)
+- **Alerts** — live-search **sound** and **volume**, Windows notifications in the background
+- **In game** — the **price-check hotkey** (§5c): Ctrl+D, Ctrl+Shift+D, Alt+D or Off
+- **Account** — your POESESSID (§7b)
+- **Data and updates** — **Refresh trade data** and **Check for updates**
+
+Everything works from the keyboard: Tab moves between controls, arrows move through the
+slot list, menus and Off / Want / Must switches, and Esc closes menus, pop-ups and panels.
 
 All preferences persist across launches and updates.
 
@@ -345,7 +421,7 @@ resume automatically. The app never retries into a penalty (that's what extends 
 
 ## 9. League start / data refresh
 
-Press **Refresh trade data** (desktop) after a new league launches — it re-downloads the
+Press **⚙ Settings → Refresh trade data** (desktop) after a new league launches — it re-downloads the
 league list and stat database and reloads. From source:
 `node tools/make-data-js.js --fetch`, plus `python tools/make_ranges.py --fetch` and
 `python tools/make_baseicons.py --fetch` when patches add new mods/bases.

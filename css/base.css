@@ -1,0 +1,62 @@
+/* Base: reset, page, form controls, focus, utilities. Colours come from tokens.css only. */
+* { box-sizing: border-box; }
+html { scrollbar-color: var(--border-strong) var(--bg); }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--r-md); border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: var(--fs-md)/1.5 var(--font);
+  min-height: 100vh;
+}
+button { font-family: inherit; }
+.hidden, #input-panel.hidden { display: none !important; }
+.num { font-variant-numeric: tabular-nums; }
+
+h1 {
+  color: var(--accent); font-weight: 600; letter-spacing: 1px;
+  font-size: var(--fs-2xl); margin: 0;
+}
+
+/* ---- form controls ---- */
+textarea {
+  width: 100%; height: 104px; resize: vertical;
+  background: var(--s1); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg);
+  padding: 12px; font: var(--fs-xs)/1.4 var(--font-mono);
+}
+textarea::placeholder, input::placeholder { color: var(--text-3); }
+textarea:focus { border-color: var(--accent); }
+select, .min-input {
+  background: var(--s1); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 5px 8px;
+  font: inherit; font-size: var(--fs-sm);
+}
+select:hover, .min-input:hover { border-color: var(--text-3); }
+select:focus, .min-input:focus { border-color: var(--accent); }
+input[type=checkbox] { accent-color: var(--accent); }
+input[type=range] { accent-color: var(--accent); vertical-align: middle; }
+.min-input { width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* one focus ring for everything keyboard-reachable */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+
+/* ---- footer ---- */
+.footer { color: var(--text-3); font-size: var(--fs-xs); margin-top: 8px; }
+
+/* ---- desktop-app-only controls ---- */
+body:not(.gui) .gui-only { display: none !important; }
+body.gui .gui-only:not(.btn) { display: inline-block; }
+
+/* ---- preference classes ---- */
+body.reduce-motion .live-new { animation: none; }
+body.reduce-motion .btn:active { transform: none; }
+body.reduce-motion * { scroll-behavior: auto !important; }
+
+@media (max-width: 640px) {
+  .app-main { padding-left: 12px; padding-right: 12px; }
+}
