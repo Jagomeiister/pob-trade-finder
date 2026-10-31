@@ -41,7 +41,7 @@ From source: `pip install pywebview`, then `python gui.py`.
 - **Jewel tools** — a timeless jewel seed finder for all six timeless jewels (from Path of
   Building's tables), and a rare/abyss jewel finder that ranks mods by what your tree scales
 - **Craft vs buy**, an **in-game price-check hotkey** (Ctrl+D), and a **currency market**
-  page from GGG's hourly exchange feed
+  page from GGG's hourly exchange feed, with price alerts
 - **Dark and light themes** with five accents, all checked for readable contrast;
   full keyboard use
 - **Self-updating**, rate-limit safe (reads GGG's quota headers), league-start data

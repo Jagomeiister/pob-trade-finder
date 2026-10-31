@@ -66,7 +66,7 @@ Mockup: [docs/mockups/redesign.html](mockups/redesign.html). Open it via the dev
 - Several states are shown by colour alone: crafted/fractured mod source, diff borders, roll hi/lo, timeless hit/miss, and sockets when colourblind mode is off.
 
 **Bugs found during the review**
-- The Timeless page still says "Glorious Vanity isn't supported yet". It has been supported since v1.14.0.
+- ~~The Timeless page still says "Glorious Vanity isn't supported yet".~~ Fixed in the v2.0.0 rewrite (the page lists all six jewels).
 - The basket Whisper button lacks `.whisper-btn`, so it is sized differently from listing whispers.
 - The staff weapon icon is missing in the sample build.
 

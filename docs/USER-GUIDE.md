@@ -76,7 +76,13 @@ scarabs, catalysts, divination cards and more.
   exact price, time and traded volume. Below it: the change, low, high and typical
   volume.
 - **Watchlist**: ☆ any item to keep it at the top right. Your list is remembered.
-- **Converter**: any amount of any item in chaos and divines.
+- **Price alerts**: press **🔔 Alert** above the chart and set any of *rises above*,
+  *falls below* (in chaos or divines) or *moves more than X% in 24 hours*. Prices are
+  checked each hour while the app is open. Each alert fires once when the price crosses
+  the level and re-arms when it crosses back. You get an in-app message with a **View**
+  button, plus a Windows notification when the app is in the background. Items with an
+  alert are added to your watchlist and show 🔔 there.
+- **Converter**: what any amount of any item is worth in chaos and divines.
 - **Table**: every item, busiest first, with price (and divines when it's worth more than
   one), 24h and 7-day change, 7-day range, volume and a trend line. Search by name (fuzzy:
   "prismatic", "div", "scarab"), filter by category or your watchlist, hide thin markets,
@@ -442,8 +448,12 @@ resume automatically. The app never retries into a penalty (that's what extends 
 
 ## 9. League start / data refresh
 
-Press **⚙ Settings → Refresh trade data** (desktop) after a new league launches — it re-downloads the
-league list and stat database and reloads. From source:
+The desktop app checks GGG's league list at launch and every 6 hours. When a new challenge
+league goes live, a banner offers **Switch to <league>**. It re-downloads the league list and
+stat database, switches every search and price to the new league, and reloads. **Not now**
+hides it for that league; you can still switch from the League menu any time.
+
+To refresh by hand, press **⚙ Settings → Refresh trade data**. From source:
 `node tools/make-data-js.js --fetch`, plus `python tools/make_ranges.py --fetch` and
 `python tools/make_baseicons.py --fetch` when patches add new mods/bases.
 

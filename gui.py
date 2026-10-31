@@ -26,7 +26,7 @@ from currency_feed import CurrencyFeed
 from timeless import TimelessData
 from art_cache import ArtCache
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 
@@ -679,6 +679,32 @@ class Api:
                 f.write("window.POE_LEAGUES = " + json.dumps(leagues) + ";\n")
             n = len([l for l in leagues["result"] if l.get("realm") == "pc"])
             return {"ok": True, "leagues": n}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @staticmethod
+    def _pc_leagues(data):
+        seen, out = set(), []
+        for l in (data or {}).get("result", []):
+            if l.get("realm", "pc") == "pc" and l.get("id") and l["id"] not in seen:
+                seen.add(l["id"])
+                out.append({"id": l["id"], "text": l.get("text") or l["id"]})
+        return out
+
+    def league_check(self):
+        """Live PC trade leagues vs the bundled list, so the app can offer the new league
+        on launch day: {'ok', 'leagues': [{id, text}], 'new': [ids missing from bundled data]}.
+        One background call — skipped during any rate-limit cooldown."""
+        try:
+            live = self._pc_leagues(self._http(TRADE_BASE + "/data/leagues", background=True))
+            if not live:
+                return {"ok": False, "error": "unexpected API response"}
+            try:
+                with open(os.path.join(DATA_DIR, "leagues.json"), encoding="utf-8") as f:
+                    bundled = {l["id"] for l in self._pc_leagues(json.load(f))}
+            except Exception:
+                bundled = set()
+            return {"ok": True, "leagues": live, "new": [l["id"] for l in live if l["id"] not in bundled]}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

@@ -145,7 +145,7 @@
       o.value = l.id; o.textContent = l.text;
       sel.appendChild(o);
     });
-    var def = leagues.find(function (l) { return !/Standard|Hardcore|Ruthless/i.test(l.id); });
+    var def = leagues.find(function (l) { return isChallengeLeague(l.id); });
     if (def) sel.value = def.id;
     if (saved.league && leagues.some(function (l) { return l.id === saved.league; })) sel.value = saved.league;
     if (saved.status) document.getElementById('trade-status').value = saved.status;
@@ -384,7 +384,8 @@
       refreshSessionStatus(true);
       setInterval(function () { refreshSessionStatus(true); }, 30 * 60 * 1000);
       // market history loads after the saved league is restored; the feed is hourly
-      hydrateFromBridge().then(function () { setTimeout(loadMarket, 1500); });
+      hydrateFromBridge().then(function () { setTimeout(loadMarket, 1500); setTimeout(checkNewLeague, 4000); });
+      setInterval(checkNewLeague, 6 * 3600 * 1000);
       setInterval(loadMarket, 60 * 60 * 1000);
       document.getElementById('league').addEventListener('change', loadMarket);
       var tile = document.getElementById('market-tile');
@@ -485,6 +486,73 @@
         window.pywebview.api.apply_update(res.url);
       };
     }).catch(function () { /* offline — skip */ });
+  }
+
+  // ---- new league autopilot ------------------------------------------------------
+  // On launch and every 6h the live trade-league list (one background call) is compared
+  // with the bundled one. A challenge league the user hasn't been offered yet gets a
+  // banner; switching refreshes the bundled stats + leagues first when they lack it.
+  function isChallengeLeague(id) { return !/Standard|Hardcore|Ruthless/i.test(id); }
+  var LEAGUE_SEEN_KEY = 'pobtf-league-seen';
+  function leaguesSeen() {
+    try { var s = JSON.parse(localStorage.getItem(LEAGUE_SEEN_KEY)); if (Array.isArray(s)) return s; }
+    catch (e) { /* none yet */ }
+    return [];
+  }
+  // awaited: a reload right after must not race the bridge write
+  async function persistNow(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { /* fine */ }
+    if (isGui() && window.pywebview.api.storage_set) {
+      try { await window.pywebview.api.storage_set(key, value); } catch (e) { /* fine */ }
+    }
+  }
+
+  async function checkNewLeague() {
+    if (!isGui() || !window.pywebview.api.league_check) return;
+    var r;
+    try { r = await window.pywebview.api.league_check(); } catch (e) { return; }
+    if (!r || !r.ok) return;
+    var challenge = r.leagues.filter(function (l) { return isChallengeLeague(l.id); });
+    var target = challenge.filter(function (l) { return r.new.indexOf(l.id) !== -1; })[0] || challenge[0];
+    var sel = document.getElementById('league');
+    if (!target || sel.value === target.id || leaguesSeen().indexOf(target.id) !== -1) return;
+    var known = Array.prototype.some.call(sel.options, function (o) { return o.value === target.id; });
+    var needsRefresh = r.new.length > 0 || !known;
+    var bar = document.getElementById('league-banner');
+    var go = document.getElementById('league-switch');
+    var later = document.getElementById('league-dismiss');
+    document.getElementById('league-label').textContent = target.text + ' is live' +
+      (needsRefresh ? '. Switch to it and refresh trade data for the new league?' : '. Switch searches and prices to it?');
+    go.textContent = 'Switch to ' + target.text;
+    go.disabled = false;
+    bar.classList.remove('hidden');
+    function seen() { return persistNow(LEAGUE_SEEN_KEY, JSON.stringify(leaguesSeen().concat([target.id]))); }
+    later.onclick = function () { seen(); bar.classList.add('hidden'); };
+    go.onclick = async function () {
+      go.disabled = true;
+      if (needsRefresh) {
+        go.textContent = 'Refreshing trade data…';
+        var res;
+        try { res = await window.pywebview.api.refresh_data(); } catch (e) { res = { ok: false, error: e.message }; }
+        if (!res || !res.ok) {
+          UI.toast('Couldn\'t refresh trade data: ' + ((res && res.error) || 'unknown error') + '. Try again later.', 'danger');
+          go.textContent = 'Switch to ' + target.text;
+          go.disabled = false;
+          return;
+        }
+        var s = loadSettings();
+        s.league = target.id;
+        await persistNow(SETTINGS_KEY, JSON.stringify(s));
+        await seen();
+        location.reload(); // picks up the regenerated data/leagues.js + stats.js
+        return;
+      }
+      await seen();
+      bar.classList.add('hidden');
+      sel.value = target.id;
+      sel.dispatchEvent(new Event('change')); // saves settings, updates chips, reloads the market
+      UI.toast('Switched to ' + target.text, 'success');
+    };
   }
 
   // ---- decode flow -----------------------------------------------------------
@@ -3919,7 +3987,7 @@
   var marketSeq = 0;
   var marketDirty = false;
   var MK = { sel: 'divine', range: 7, cat: 'All', q: '', hideThin: false, movers: 24, showAll: false,
-             convAmt: '1', convCode: 'divine', els: null };
+             convAmt: '1', convCode: 'divine', alertOpen: false, els: null };
   var CDN_ROOT = 'https://web.poecdn.com';
   var MARKET_ROWS = 80;
 
@@ -3937,6 +4005,143 @@
     renderWatch();
     renderMarketTable();
     renderChartCard();
+  }
+
+  // ---- price alerts ------------------------------------------------------------------
+  // pobtf-alerts: {code: {above, below, unit: 'c'|'div', move (24h %), fired: {rule: bool}}}.
+  // Checked on every market load (the feed is hourly). A rule fires when it becomes true
+  // and re-arms once it is false again, so a price sitting past a level alerts once.
+  function loadAlerts() {
+    try {
+      var a = JSON.parse(localStorage.getItem('pobtf-alerts'));
+      if (a && typeof a === 'object' && !Array.isArray(a)) return a;
+    } catch (e) { /* none yet */ }
+    return {};
+  }
+  function saveAlerts(a) { persist('pobtf-alerts', JSON.stringify(a)); }
+
+  // which rules hold right now, plus the readable price they were judged on
+  function alertState(al, it) {
+    var dr = RATES[market.league] && RATES[market.league].divine;
+    var div = al.unit === 'div';
+    var now = div ? (dr ? it.st.now / dr : null) : it.st.now;
+    var ch = it.st.ch24;
+    return {
+      price: now === null ? '' : fmtCompact(now) + (div ? ' div' : 'c'),
+      above: al.above != null && now !== null && now >= al.above,
+      below: al.below != null && now !== null && now <= al.below,
+      move: al.move != null && ch !== null && isFinite(ch) && Math.abs(ch) * 100 >= al.move
+    };
+  }
+
+  function alertMessage(rule, al, it, s) {
+    var u = al.unit === 'div' ? ' div' : 'c';
+    if (rule === 'above') return it.name + ' rose to ' + s.price + ' (alert: above ' + al.above + u + ')';
+    if (rule === 'below') return it.name + ' fell to ' + s.price + ' (alert: below ' + al.below + u + ')';
+    var p = it.st.ch24 * 100;
+    return it.name + (p > 0 ? ' up ' : ' down ') + Math.abs(p).toFixed(1) + '% in 24h (now ' + s.price + ')';
+  }
+
+  function checkAlerts() {
+    if (!market) return;
+    var alerts = loadAlerts(), hits = [], changed = false;
+    Object.keys(alerts).forEach(function (code) {
+      var al = alerts[code], it = market.items[code];
+      if (!it) return;
+      al.fired = al.fired || {};
+      var s = alertState(al, it);
+      ['above', 'below', 'move'].forEach(function (rule) {
+        if (s[rule] && !al.fired[rule]) {
+          hits.push({ code: code, text: alertMessage(rule, al, it, s) });
+          al.fired[rule] = true;
+          changed = true;
+        } else if (!s[rule] && al.fired[rule]) {
+          al.fired[rule] = false;
+          changed = true;
+        }
+      });
+    });
+    if (changed) saveAlerts(alerts);
+    if (!hits.length) return;
+    hits.forEach(function (h) {
+      UI.toast('🔔 ' + h.text, 'info', { timeout: 0, action: { label: 'View', onClick: function () {
+        setView('market');
+        selectMarketItem(h.code, true);
+      } } });
+    });
+    if (PREFS.notify !== false && isGui() && window.pywebview.api.notify && !document.hasFocus()) {
+      window.pywebview.api.notify(hits.length === 1 ? 'Price alert' : hits.length + ' price alerts',
+        hits.map(function (h) { return h.text; }).join(' · ')).then(function () {}, function () {});
+    }
+  }
+
+  // inline form under the chart header: rise above / fall below / 24h move
+  function alertForm(code, it) {
+    var alerts = loadAlerts(), al = alerts[code] || {};
+    var form = UI.el('div', 'mk-alert');
+    form.appendChild(UI.el('div', 'mk-alert-title', 'Notify me when ' + it.name + '…'));
+    var row = UI.el('div', 'mk-alert-row');
+    function num(v, label) {
+      return UI.input({ type: 'number', cls: 'min-input', min: 0, step: 'any', ariaLabel: label,
+                        value: v == null ? '' : v, placeholder: '—' });
+    }
+    var above = num(al.above, 'Rises above'), below = num(al.below, 'Falls below');
+    var dr = RATES[market.league] && RATES[market.league].divine;
+    var unit = UI.select([['c', 'chaos'], ['div', 'divine']], al.unit || (dr && it.st.now >= 2 * dr ? 'div' : 'c'),
+      { ariaLabel: 'Price unit' });
+    var move = num(al.move, 'Moves more than, percent');
+    UI.field('Rises above', above, { parent: row });
+    UI.field('Falls below', below, { parent: row });
+    UI.field('Unit', unit, { parent: row });
+    UI.field('Moves more than (% in 24h)', move, { parent: row });
+    form.appendChild(row);
+    var note = UI.el('div', 'finder-sub');
+    note.setAttribute('aria-live', 'polite');
+    form.appendChild(note);
+    function val(i) { var v = parseFloat(i.value); return isFinite(v) && v > 0 ? v : null; }
+    var acts = UI.el('div', 'mk-alert-acts');
+    acts.appendChild(UI.button('primary', { label: 'Save alert', size: 'sm', onClick: function () {
+      var next = { above: val(above), below: val(below), unit: unit.value, move: val(move) };
+      var all = loadAlerts();
+      if (next.above === null && next.below === null && next.move === null) {
+        delete all[code];
+      } else {
+        // start from what is true now: only a fresh crossing notifies
+        var s = alertState(next, it);
+        next.fired = { above: s.above, below: s.below, move: s.move };
+        all[code] = next;
+        var w = loadWatch();
+        if (w.indexOf(code) === -1) { w.push(code); saveWatch(w); }
+      }
+      saveAlerts(all);
+      MK.alertOpen = false;
+      renderChartCard();
+      renderWatch();
+      renderMarketTable();
+      var held = all[code] && ['above', 'below', 'move'].filter(function (r) { return all[code].fired[r]; });
+      UI.toast(!all[code] ? 'Alert removed for ' + it.name
+        : held.length ? 'Alert saved. That\'s already true now, so it will notify the next time it happens.'
+        : 'Alert saved for ' + it.name + '. Checked each hour while the app is open.', 'success');
+    } }));
+    if (alerts[code]) {
+      acts.appendChild(UI.button('ghost', { label: 'Remove alert', size: 'sm', onClick: function () {
+        var all = loadAlerts();
+        delete all[code];
+        saveAlerts(all);
+        MK.alertOpen = false;
+        renderChartCard();
+        renderWatch();
+        UI.toast('Alert removed for ' + it.name, 'success');
+      } }));
+    }
+    form.appendChild(acts);
+    function showNow() {
+      note.textContent = 'Now ' + (unit.value === 'div' && dr ? fmtCompact(it.st.now / dr) + ' div' : fmtCompact(it.st.now) + 'c') +
+        '. Checked each hour while the app is open. Windows notification when it\'s in the background.';
+    }
+    unit.addEventListener('change', showNow);
+    showNow();
+    return form;
   }
 
   async function loadMarket() {
@@ -3962,6 +4167,7 @@
       Object.keys(r.items).forEach(function (c) { RATES[league][c] = r.items[c].st.now; });
       marketDirty = true;
       refreshEqDisplays(); // re-annotates listings and renders the market tile/page
+      checkAlerts();
     } catch (e) {
       if (seq !== marketSeq) return;
       tile.querySelector('.mt-value').textContent = '—';
@@ -4231,11 +4437,24 @@
       onClick: function () { toggleWatch(code); } });
     star.setAttribute('aria-pressed', watching ? 'true' : 'false');
     acts.appendChild(star);
+    var hasAlert = !!loadAlerts()[code];
+    var form = alertForm(code, it);
+    form.hidden = !MK.alertOpen;
+    var bell = UI.button(hasAlert ? 'secondary' : 'ghost', { label: hasAlert ? '🔔 Alert on' : '🔔 Alert',
+      title: 'Notify me when this price crosses a level or moves sharply', onClick: function () {
+        MK.alertOpen = form.hidden;
+        form.hidden = !MK.alertOpen;
+        bell.setAttribute('aria-expanded', MK.alertOpen ? 'true' : 'false');
+        if (MK.alertOpen) form.querySelector('input').focus();
+      } });
+    bell.setAttribute('aria-expanded', MK.alertOpen ? 'true' : 'false');
+    acts.appendChild(bell);
     var range = UI.segmented([['1', '1 day'], ['7', '7 days'], ['30', '30 days']], String(MK.range), {
       ariaLabel: 'Chart range', onChange: function (v) { MK.range = parseInt(v, 10); renderChartCard(); } });
     acts.appendChild(range);
     head.appendChild(acts);
     box.appendChild(head);
+    box.appendChild(form);
 
     var body = UI.el('div', 'mk-chart-body');
     box.appendChild(body);
@@ -4289,6 +4508,7 @@
     box.appendChild(UI.sectionHeader('Watchlist'));
     var list = UI.el('div', 'mk-watch-list');
     var codes = loadWatch().filter(function (c) { return market.items[c]; });
+    var alerts = loadAlerts();
     if (!codes.length) list.appendChild(UI.el('div', 'finder-sub', 'Star items (☆) to keep them here.'));
     codes.forEach(function (c) {
       var it = market.items[c];
@@ -4296,9 +4516,12 @@
       b.type = 'button';
       b.appendChild(itemImg(it));
       b.appendChild(UI.el('span', 'mk-name', it.name));
+      var bell = UI.el('span', 'mk-bell', alerts[c] ? '🔔' : ''); // empty cell keeps the columns aligned
+      if (alerts[c]) bell.title = 'Price alert set';
+      b.appendChild(bell);
       b.appendChild(UI.el('span', 'mk-num', mPrice(it.st.now)));
       b.appendChild(pctChip(it.st.ch24));
-      b.title = it.name + ' — 24h change';
+      b.title = it.name + ' — 24h change' + (alerts[c] ? ' · price alert set' : '');
       b.addEventListener('click', function () { selectMarketItem(c); renderWatch(); });
       list.appendChild(b);
     });
@@ -4322,9 +4545,13 @@
       var n = parseFloat(amt.value) || 0;
       var each = sel.value === 'chaos' ? 1 : market.items[sel.value].st.now;
       var chaos = n * each, dr = RATES[market.league] && RATES[market.league].divine;
-      out.textContent = '';
-      out.appendChild(UI.el('b', null, '= ' + fmtCompact(chaos) + ' chaos'));
-      if (dr) out.appendChild(UI.el('span', null, ' = ' + fmtCompact(chaos / dr) + ' divine'));
+      out.textContent = 'Worth ';
+      // the amount's own currency is already in the row above — show the other one(s)
+      if (sel.value !== 'chaos') out.appendChild(UI.el('b', null, fmtCompact(chaos) + ' chaos'));
+      if (dr && sel.value !== 'divine' && (sel.value === 'chaos' || chaos >= dr / 10)) {
+        out.appendChild(sel.value === 'chaos' ? UI.el('b', null, fmtCompact(chaos / dr) + ' divine')
+          : UI.el('span', null, ' · ' + fmtCompact(chaos / dr) + ' divine'));
+      }
     }
     amt.addEventListener('input', calc);
     sel.addEventListener('change', calc);

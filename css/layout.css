@@ -299,7 +299,7 @@ body:not(.gui) #char-bar { display: none !important; }
 #overlay-bar { display: none; }
 body.overlay { min-height: 0; }
 body.overlay .app-main { padding: 8px 10px 12px; max-width: none; }
-body.overlay .sidebar, body.overlay .topbar, body.overlay #settings-panel, body.overlay #update-banner,
+body.overlay .sidebar, body.overlay .topbar, body.overlay #settings-panel, body.overlay #update-banner, body.overlay #league-banner,
 body.overlay #input-panel, body.overlay .view-panel, body.overlay .footer,
 body.overlay #results > :not(.tab-section[data-tab="pasted"]) { display: none !important; }
 body.overlay #results > .tab-section[data-tab="pasted"] { display: block !important; margin: 0; }
