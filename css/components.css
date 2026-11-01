@@ -101,6 +101,26 @@ body:not(.gui) .btn.act-search { background: var(--accent); border-color: var(--
 .hotkey-status { color: var(--text-2); font-size: var(--fs-xs); white-space: normal; }
 
 /* ---- cost summary + basket ---- */
+.quick-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.qp-label { color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
+.qp-value { color: var(--price); font-variant-numeric: tabular-nums; }
+.qp-src { color: var(--text-3); font-size: var(--fs-sm); }
+.qp-offers { display: flex; flex-direction: column; gap: 2px; padding: 6px 16px 8px;
+  border-bottom: 1px solid var(--border); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.qp-offer { display: flex; gap: 10px; align-items: baseline; }
+.qp-offer-who { min-width: 9em; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qp-offers > .btn { align-self: flex-start; margin-top: 4px; }
+.upgrade-check { display: flex; flex-direction: column; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--s2); }
+.upgrade-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.upgrade-who { color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; min-width: 120px; }
+.upgrade-name { color: var(--text); font-weight: 600; }
+.upgrade-deltas { flex: 1 1 100%; color: var(--text-2); font-size: var(--fs-sm); padding-left: 130px; }
+.seller-dot { margin-right: 4px; }
+.seller-dot.on { color: var(--success); }
+.seller-dot.away { color: var(--warn); }
+.seller-dot.off { color: var(--text-3); }
+.listed-age { color: var(--text-3); }
+.price-acct .badge { margin-left: 6px; }
 .listing-score { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
 .listing-value { color: var(--text-3); }
 .value-sort { margin-left: 4px; }

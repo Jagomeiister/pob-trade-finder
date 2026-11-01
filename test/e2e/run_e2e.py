@@ -26,6 +26,7 @@ Scenarios (each on a fresh page load with empty localStorage):
   14 stash     — official login off by default; signed in: nav entry, Stash value page, one run per click
   15 zoom      — menus line up at every Text size; 'query too complex' explained with ways forward
   16 sessid    — POESESSID: one-time disclaimer, Cancel saves nothing, never asks again or on clear
+  17 v21       — seller dots/age/You/×N, 5-min cache + Refresh, Listed within, quick price, upgrade check, tiers, wiki
 
 Run a subset by number or name: python test/e2e/run_e2e.py 3 diff
 
@@ -220,6 +221,9 @@ STUB_JS = r"""
     // official login: GGG hasn't issued a client id, so the real bridge reports it switched off
     oauth_status: function () { return { ok: true, enabled: false, signedIn: false, username: null }; },
     stash_value: function () { return { ok: false, error: 'not signed in' }; },
+    // quick price: the backend (poe.ninja proxy) has no data in tests unless a scenario overrides it
+    quick_price: function () { return { ok: false, error: 'no quick price for this item' }; },
+    bulk_exchange: function () { return { ok: true, total: 0, offers: [] }; },
     session_status: function () { return { ok: true, set: false }; },
     timeless_sockets: function () { return { ok: true, sockets: [] }; },
     hotkey_status: function () { return { ok: true, hotkey: 'ctrl+d', label: 'Ctrl+D', running: false, active: false, error: null }; },
@@ -1269,6 +1273,175 @@ def scenario_sessid(s, tag):
     check(tag + " clearing never asks", r["clear"] == {"dialog": False, "saves": 3}, r["clear"])
 
 
+S17_V21 = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+// listings: seller online/away dot, listed age, "You" badge, same-seller merging
+const card = H.gearCards()[2];
+[...document.querySelectorAll('.tab-section[data-tab="gear"] .slot-row')].find(r => r.slotCard === card).click();
+document.getElementById('acct-input').value = 'MeMyself#0001';
+window.__stubOverrides.trade_search = (function () {
+  const now = Date.now();
+  const mk = (i, acct, amt, extra) => Object.assign({ id: 'v21_' + i, name: '', base: 'Two-Stone Ring', frameType: 2,
+    amount: amt, currency: 'chaos', priceType: '~price', account: acct, whisper: '@x hi', explicitMods: ['+70 to maximum Life'],
+    indexed: new Date(now - (i + 1) * 3600e3).toISOString(), online: true, afk: false }, extra || {});
+  const ls = [mk(0, 'Seller#1', 10), mk(1, 'Seller#1', 10), mk(2, 'Seller#1', 10), mk(3, 'Away#2', 12, { afk: true }),
+              mk(4, 'Gone#3', 15, { online: false }), mk(5, 'MeMyself#0001', 20)];
+  return { ok: true, total: ls.length, searchId: 'v21', ids: ls.map(l => l.id), pageSize: 10, listings: ls };
+})();
+document.getElementById('listed-within').value = '3days';
+document.getElementById('listed-within').dispatchEvent(new Event('change'));
+const before = H.calls('trade_search').length;
+H.button(card, 'Check price').click();
+await H.waitFor(() => card.querySelectorAll('.card-side .listing').length, 5000, 'listings');
+out.firstPayload = JSON.parse(H.calls('trade_search')[before].args[1]);
+const rows = [...card.querySelectorAll('.card-side .listing')];
+out.rowCount = rows.length;
+out.accts = rows.map(r => (r.querySelector('.price-acct') || {}).textContent);
+out.dots = rows.map(r => { const d = r.querySelector('.seller-dot'); return d ? d.className.replace('seller-dot ', '') : null; });
+// cache: the same search within 5 minutes doesn't call the trade site again
+const n1 = H.calls('trade_search').length;
+H.button(card, 'Check price').click();
+await H.sleep(300);
+out.cacheCalls = H.calls('trade_search').length - n1;
+out.cachedChip = H.text('.cached-chip', card);
+H.button(card, '↻ Refresh').click();
+await H.sleep(300);
+out.refreshCalls = H.calls('trade_search').length - n1;
+delete window.__stubOverrides.trade_search;
+// pasted ring (advanced copy): tiers, low tiers off, quick price, upgrade vs the build's rings
+window.__stubOverrides.quick_price = { ok: true, source: 'poe.ninja', chaos: 42, divine: 0.2, listings: 7 };
+document.getElementById('pob-input').value = [
+  'Item Class: Rings', 'Rarity: Rare', 'Doom Loop', 'Two-Stone Ring', '--------', 'Item Level: 84', '--------',
+  '{ Implicit Modifier — Elemental, Fire, Cold, Resistance }', '+12(12-16)% to Fire and Cold Resistances (implicit)', '--------',
+  '{ Prefix Modifier "Prime" (Tier: 1) — Life }', '+90(90-99) to maximum Life',
+  '{ Suffix Modifier "of the Volcano" (Tier: 5) — Elemental, Fire, Resistance }', '+20(18-23)% to Fire Resistance'].join('\n');
+document.getElementById('decode-btn').click();
+await H.waitFor(() => document.querySelector('.card.pasted .quick-price'), 5000, 'quick price');
+const p = document.querySelector('.card.pasted');
+out.quick = H.text('.quick-price', p);
+out.upgradeRows = [...p.querySelectorAll('.upgrade-row')].map(r => r.textContent);
+const st = cards.find(s => s.card === p);
+out.tiers = st.rows.map(r => ({ line: r.mod.line, tier: r.mod.tier || null, on: r.cb.checked, min: r.minInput.value }));
+out.tierChips = [...p.querySelectorAll('.mod-text .badge')].map(b => b.textContent).filter(t => /^T\d/.test(t));
+// wiki link goes through the allow-listed bridge
+const before2 = H.calls('open_url').length;
+p.querySelector('.menu-trigger').click();
+await H.sleep(50);
+[...document.querySelectorAll('.menu .menu-item')].find(b => /PoE Wiki/.test(b.textContent)).click();
+await H.sleep(50);
+out.wiki = (H.calls('open_url')[before2] || { args: [] }).args[0];
+return out;
+"""
+
+
+def scenario_v21(s, tag):
+    s.fresh()
+    r = s.run(S17_V21, timeout=60)
+    tf = ((r["firstPayload"].get("query") or {}).get("filters") or {}).get("trade_filters") or {}
+    check(tag + " Listed within reaches the search", ((tf.get("filters") or {}).get("indexed") or {}).get("option") == "3days", tf)
+    check(tag + " same seller + same price shown once with ×3", r["rowCount"] == 4 and "×3" in r["accts"][0], r["accts"])
+    check(tag + " online / away / offline dots", r["dots"] == ["on", "away", "off", "on"], r["dots"])
+    check(tag + " listed age shown", "h ago" in r["accts"][0], r["accts"][0])
+    check(tag + " your own listing gets a You badge", "You" in r["accts"][3], r["accts"][3])
+    check(tag + " same search within 5 min: no trade call, says how old", r["cacheCalls"] == 0 and
+          "ago" in (r["cachedChip"] or ""), (r["cacheCalls"], r["cachedChip"]))
+    check(tag + " Refresh searches again", r["refreshCalls"] == 1, r["refreshCalls"])
+    check(tag + " quick price shown on a pasted item", "42" in (r["quick"] or "") and "poe.ninja" in r["quick"], r["quick"])
+    check(tag + " upgrade check vs both build rings", len(r["upgradeRows"]) == 2 and all(
+        ("Upgrade" in x or "Sidegrade" in x or "Downgrade" in x) for x in r["upgradeRows"]), r["upgradeRows"])
+    t = {x["line"]: x for x in r["tiers"]}
+    check(tag + " advanced copy: ranges stripped, tiers read", "+90 to maximum Life" in t and
+          t["+90 to maximum Life"]["tier"] == 1 and t["+20% to Fire Resistance"]["tier"] == 5, r["tiers"])
+    check(tag + " tier 1 on, tier 5 off by default", t["+90 to maximum Life"]["on"] and not t["+20% to Fire Resistance"]["on"],
+          r["tiers"])
+    check(tag + " pasted items use 90% of the roll", t["+90 to maximum Life"]["min"] == "81", t["+90 to maximum Life"])
+    check(tag + " tier badges", r["tierChips"] == ["T1", "T5"], r["tierChips"])
+    check(tag + " wiki link via the bridge", (r["wiki"] or "").startswith("https://www.poewiki.net/wiki/Two-Stone_Ring"),
+          r["wiki"])
+
+
+S18_V21B = r"""
+const H = window.__e2e;
+const out = {};
+const league = document.getElementById('league').value;
+RATES[league] = Object.assign(RATES[league] || {}, { divine: 200 });
+document.getElementById('priced-in').value = 'divine';
+document.getElementById('priced-in').dispatchEvent(new Event('change'));
+out.chips = H.text('#context-chips') || [...document.querySelectorAll('.chip, .badge')].map(c => c.textContent).join('|');
+// presets on a pasted rare
+document.getElementById('pob-input').value = [
+  'Item Class: Rings', 'Rarity: Rare', 'Doom Loop', 'Two-Stone Ring', '--------', 'Item Level: 84', '--------',
+  '{ Prefix Modifier "Prime" (Tier: 1) — Life }', '+90(90-99) to maximum Life',
+  '{ Suffix Modifier "of the Volcano" (Tier: 5) — Elemental, Fire, Resistance }', '+20(18-23)% to Fire Resistance'].join('\n');
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 1, divine: 0.005, code: 'chaos' };
+document.getElementById('decode-btn').click();
+await H.waitFor(() => document.querySelector('.card.pasted .quick-price'), 5000, 'quick price');
+const p = document.querySelector('.card.pasted');
+const st = cards.find(s => s.card === p);
+const snap = () => ({ rows: st.rows.map(r => [r.cb.checked, r.minInput.value]), mode: st.modeSel.value,
+  by: st.searchBySel && st.searchBySel.value, ilvl: st.ilvlInput.value });
+out.similar = snap();
+out.maxSet = (st.maxPriceInput.value = '400');
+out.payloadSimilar = JSON.parse(JSON.stringify(buildTradePayload(st, true)));
+const seg = p.querySelector('.segmented');
+out.hasSeg = !!seg;
+seg.querySelector('[data-value="exact"]').click();
+out.exact = snap();
+seg.querySelector('[data-value="base"]').click();
+out.base = snap();
+out.payloadBase = JSON.parse(JSON.stringify(buildTradePayload(st, true)));
+seg.querySelector('[data-value="similar"]').click();
+out.back = snap();
+// live bulk-exchange offers: one request per press
+window.__stubOverrides.bulk_exchange = { ok: true, total: 2, offers: [
+  { seller: 'Bulk#1', online: true, afk: false, pay: 1, payCurrency: 'divine', get: 210, stock: 5000, chaosEach: 0.95 },
+  { seller: 'Bulk#2', online: true, afk: true, pay: 10, payCurrency: 'chaos', get: 10, stock: 80, chaosEach: 1 }] };
+const nb = H.calls('bulk_exchange').length;
+H.button(p, 'Live offers').click();
+await H.waitFor(() => p.querySelectorAll('.qp-offer').length, 5000, 'offers');
+out.bulkCalls = H.calls('bulk_exchange').length - nb;
+out.bulkArgs = H.calls('bulk_exchange')[nb].args;
+out.offers = [...p.querySelectorAll('.qp-offer')].map(r => r.textContent);
+await H.sleep(200);
+out.bulkCallsLater = H.calls('bulk_exchange').length - nb;
+const no = H.calls('open_url').length;
+H.button(p, 'Open on trade site ↗').click();
+await H.sleep(50);
+out.exUrl = (H.calls('open_url')[no] || { args: [] }).args[0];
+document.getElementById('priced-in').value = '';
+document.getElementById('priced-in').dispatchEvent(new Event('change'));
+return out;
+"""
+
+
+def scenario_v21b(s, tag):
+    s.fresh()
+    r = s.run(S18_V21B, timeout=60)
+    sim, ex, base = r["similar"], r["exact"], r["base"]
+    check(tag + " preset control on pasted rare", r["hasSeg"], r)
+    check(tag + " Similar = defaults (T1 on at 90%, T5 off)", sim["rows"] == [[True, "81"], [False, "18"]], sim)
+    check(tag + " Exact: all mods, full roll, all must match, exact base",
+          ex["rows"] == [[True, "90"], [True, "20"]] and ex["mode"] == "0" and ex["by"] == "exact", ex)
+    check(tag + " Base: no mods, exact base, item level", not any(c for c, _ in base["rows"]) and
+          base["by"] == "exact" and base["ilvl"] == "84", base)
+    q = (r["payloadBase"] or {}).get("query") or {}
+    check(tag + " Base search has no stats, just the base", q.get("type") == "Two-Stone Ring" and
+          not any(g.get("filters") for g in q.get("stats", [])), q)
+    check(tag + " back to Similar restores the defaults", r["back"]["rows"] == sim["rows"] and
+          r["back"]["mode"] == sim["mode"], r["back"])
+    price = ((((r["payloadSimilar"] or {}).get("query") or {}).get("filters") or {}).get("trade_filters") or {}) \
+        .get("filters", {}).get("price")
+    check(tag + " Priced in divine: option set, chaos max converted", price == {"option": "divine", "max": 2}, price)
+    check(tag + " Priced in shows as a context chip", "Priced in divine only" in (r["chips"] or ""), r["chips"])
+    check(tag + " Live offers: one request per press", r["bulkCalls"] == 1 and r["bulkCallsLater"] == 1, r)
+    check(tag + " offers listed with chaos each", len(r["offers"]) == 2 and "Bulk#1" in r["offers"][0] and
+          "0.95c each" in r["offers"][0], r["offers"])
+    check(tag + " exchange link opens via the bridge", (r["exUrl"] or "").startswith(
+        "https://www.pathofexile.com/trade/exchange/") and "%22want%22%3A%5B%22chaos%22%5D" in r["exUrl"], r["exUrl"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -1286,6 +1459,8 @@ SCENARIOS = [
     ("14 stash", scenario_stash),
     ("15 zoom", scenario_zoom_complex),
     ("16 sessid", scenario_sessid),
+    ("17 v21", scenario_v21),
+    ("18 v21b", scenario_v21b),
 ]
 
 

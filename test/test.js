@@ -295,6 +295,26 @@ async function main() {
   assert(!!gMatch, 'pasted item mods flow through the matcher');
   assert(!PoB.looksLikeGameItem('just some text'), 'plain text not misdetected');
 
+  // advanced copy (default since 3.29): { headers }, roll ranges, reminder text
+  const advText = ['Item Class: Rings', 'Rarity: Rare', 'Doom Loop', 'Two-Stone Ring', '--------', 'Item Level: 84', '--------',
+    '{ Implicit Modifier — Elemental, Fire, Cold, Resistance }', '+12(12-16)% to Fire and Cold Resistances (implicit)', '--------',
+    '{ Prefix Modifier "Prime" (Tier: 2) — Life }', '+70(70-79) to maximum Life',
+    '{ Master Crafted Suffix Modifier "of Craft" (Rank: 1) — Attribute }', '+30(26-30) to Intelligence (crafted)',
+    '{ Fractured Suffix Modifier "of the Volcano" (Tier: 1) — Elemental, Fire, Resistance }', '+46(46-48)% to Fire Resistance',
+    '(Fire Resistance reduces Fire Damage taken)'].join('\n');
+  const adv = PoB.parseGameItem(advText);
+  assert(adv.mods.length === 4, 'advanced: headers and reminder text are not mods: ' + adv.mods.map(m => m.line).join(' | '));
+  assert(adv.mods[0].kind === 'implicit' && adv.mods[0].line === '+12% to Fire and Cold Resistances', 'advanced: implicit, range stripped');
+  assert(adv.mods[1].line === '+70 to maximum Life' && adv.mods[1].tier === 2, 'advanced: tier kept, range stripped');
+  assert(adv.mods[2].crafted === true && adv.mods[3].fractured === true, 'advanced: crafted/fractured from headers');
+  assert(!!Matcher.matchMod(index, adv.mods[1], 'Ring 1'), 'advanced mods flow through the matcher');
+  const cur = PoB.parseGameItem(['Item Class: Stackable Currency', 'Rarity: Currency', 'Chaos Orb', '--------',
+    'Stack Size: 1,234/5000', '--------', 'Reforges a rare item with new random modifiers'].join('\n'));
+  assert(cur.stackSize === 1234 && cur.itemClass === 'Stackable Currency' && cur.name === 'Chaos Orb', 'currency stack size + class');
+  const gem = PoB.parseGameItem(['Item Class: Skill Gems', 'Rarity: Gem', 'Vaal Grace', '--------', 'Vaal, Aura, Spell',
+    'Level: 21 (Max)', 'Quality: +23% (augmented)', '--------', 'Requirements:', 'Level: 72'].join('\n'));
+  assert(gem.gemLevel === 21 && gem.quality === 23, 'gem level + quality: ' + gem.gemLevel + '/' + gem.quality);
+
   console.log('== multi-line stats, anoints, cluster singular ==');
   const mFlask = Matcher.matchMod(index, { line: 'Removes all Burning when used', kind: 'explicit', crafted: false, fractured: false }, 'Flask 2');
   assert(!!mFlask && mFlask.entry.text.includes('\n'), 'multi-line stat matched via a single line: ' + (mFlask ? JSON.stringify(mFlask.entry.text.slice(0, 40)) : 'NO MATCH'));

@@ -49,6 +49,7 @@ SHIP = [
     "js/app/15-price-check.js",
     "js/app/16-overlay.js",
     "js/app/17-stash.js",
+    "js/app/18-upgrade.js",
     "data/stats.js",
     "data/leagues.js",
     "data/ranges.js",

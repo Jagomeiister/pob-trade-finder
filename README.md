@@ -40,7 +40,10 @@ From source: `pip install pywebview`, then `python gui.py`.
   meeting your res/life targets, a shopping basket, and compare-with-your-character
 - **Jewel tools** — a timeless jewel seed finder for all six timeless jewels (from Path of
   Building's tables), and a rare/abyss jewel finder that ranks mods by what your tree scales
-- **Craft vs buy**, an **in-game price-check hotkey** (Ctrl+D), and a **currency market**
+- **In-game price check (Ctrl+D) that knows your build**: *is this an upgrade?* against your PoB
+  item and what you wear, instant prices (exchange feed, poe.ninja), a suggested list price,
+  mod tiers, and sellers' online/AFK status
+- **Craft vs buy**, and a **currency market**
   page from GGG's hourly exchange feed, with price alerts
 - **Five themes** (Dark, Dim, Slate, Light, Parchment) with five accents, all checked for readable contrast;
   full keyboard use

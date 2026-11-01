@@ -72,6 +72,8 @@ Once a build loads, the window has three parts:
 | **League** | Which league to search. **Refresh trade data** (⚙ Settings) updates the list at league start |
 | **Trade** | ⚡ *Instant buyout + in person* (default) / ⚡ *instant only* / 💬 *in person* / any — see §6 |
 | **Sale** | Buyout/fixed price (default) / any / price with note / unpriced |
+| **Listed within** | Any time (default) / 1 day … 1 month: skip old listings, which are often abandoned or price-fixed |
+| **Priced in** | Any currency (default) / Chaos or divine / Chaos only / Divine only. Max price stays in chaos; for Divine only it's converted at the current rate |
 | **Show prices in** | chaos or divine for the ≈ equivalents and totals |
 | **Min roll** | Sets every mod's minimum to this % of the build's roll (default 80%) |
 | **Pseudo totals** | Folds life/resist/attribute rolls into pseudo stats so hybrid-rolled items still match — finds strictly more items, recommended on |
@@ -194,6 +196,12 @@ filters still apply.
 - **Click any mod line to re-sort all results by it** (server-side — ranks every listing,
   not just the visible page); the active sort shows as a chip with ✕ to clear
 - **10 listings per page**, Prev/Next above *and* below (up to the first 100)
+- **Seller and age**: a dot shows whether the seller is online (●), away (◐) or offline (○), next to
+  how long ago the item was listed. Your own listings get a **You** badge (from the account in
+  *Compare with character*), and the same seller listing the same thing at the same price shows
+  once with **×N**
+- **Re-checking the same search within 5 minutes** reuses its results without a trade-site
+  call; the panel says how old they are, with **↻ Refresh** to search again
 - **"% of your item"** under each price: how the listing compares with your build item
   on the stats you searched (each worth 100% at your item's roll), then **price per %**.
   **Best value first** (above the listings) re-sorts the page so the most stats per chaos
@@ -274,7 +282,25 @@ Price an item without leaving the game:
    page are bait or price fixers and are ignored. **Open full search ↗** opens the same
    search on the trade site. The suggestion also shows for items you paste (Ctrl+C) into
    the main window
-5. **Esc** or **✕** hides it and puts you back in the game
+5. **Is it an upgrade?** The card compares the item with your build's item for that slot (both
+   rings for a ring) and, if you imported your character, with what you wear: **Upgrade /
+   Sidegrade / Downgrade** with a %, and the stat differences (e.g. *+18 maximum Life · −20% Cold
+   Resistance · missing Cast Speed*). Each of that item's stats counts 100% at its roll; it's a
+   stat comparison, not a DPS calculation. The overlay uses the build you loaded last
+6. **Quick price**: currency, fragments, scarabs, essences and cards are priced instantly from
+   GGG's exchange feed (with your stack's value); uniques and gems from poe.ninja through the
+   app's own server. It shows before the trade search finishes
+   For exchange items, **Live offers** asks the trade site's bulk exchange who sells it right
+   now (one request per press): seller, online/away, what they want, chaos each and stock, plus
+   **Open on trade site ↗**
+7. **Sensible filters for one item**: the game's Ctrl+C copy now includes mod tiers, shown as
+   **T1, T2…**. Mods worse than tier 2 start unticked (they rarely set the price), crafted mods
+   start off, and minimums are 90% of each roll, so you compare like with like. ⋯ also has
+   **Open on PoE Wiki / PoEDB**
+   **Preset** switches in one click: **Similar** (those defaults), **Exact** (every mod at its
+   full roll, all must match, this exact base) or **Base** (no mods: the base, item level and
+   influence alone). If you already checked the price it checks again
+8. **Esc** or **✕** hides it and puts you back in the game
 
 Details:
 

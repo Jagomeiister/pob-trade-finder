@@ -450,7 +450,8 @@
     var sections = text.replace(/\r/g, '').split(/\n--------\n/);
     var headLines = sections[0].split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
     var item = { rarity: 'RARE', name: '', base: '', sockets: '', maxLinks: 0,
-                 corrupted: false, itemLevel: 0, influences: [], mods: [], slotGuess: null };
+                 corrupted: false, itemLevel: 0, influences: [], mods: [], slotGuess: null,
+                 itemClass: '', stackSize: 0, gemLevel: 0, quality: 0 };
     var itemClass = '';
     var nameLines = [];
     headLines.forEach(function (l) {
@@ -462,12 +463,29 @@
     if (nameLines.length >= 2) { item.name = nameLines[0]; item.base = nameLines[1]; }
     else if (nameLines.length === 1) { item.name = nameLines[0]; item.base = nameLines[0]; }
     item.slotGuess = GAME_ITEM_CLASS_SLOT[itemClass] || null;
+    item.itemClass = itemClass;
+    var isGem = /Gems?$/.test(itemClass);
 
     for (var s = 1; s < sections.length; s++) {
       var lines = sections[s].split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      // advanced copy (the default since 3.29): a "{ … Modifier … }" header precedes each
+      // mod and says what kind it is; rolls carry their range, "+42(38-45) to …"
+      var header = null;
       lines.forEach(function (line) {
         var m;
+        if (/^\{.*\}$/.test(line)) {
+          header = { implicit: /Implicit Modifier/i.test(line), crafted: /Crafted/i.test(line),
+                     fractured: /Fractured/i.test(line), enchant: /Enchant/i.test(line),
+                     tier: (line.match(/\(Tier: (\d+)\)/) || [])[1] };
+          return;
+        }
+        if (/^\(.*\)$/.test(line)) return; // reminder text
+        line = line.replace(/(\d+(?:\.\d+)?)\((-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\)/g, '$1');
         if ((m = line.match(/^Item Level:\s*(\d+)/))) { item.itemLevel = parseInt(m[1], 10); return; }
+        if ((m = line.match(/^Stack Size:\s*([\d,.]+)/))) { item.stackSize = parseInt(m[1].replace(/[,.]/g, ''), 10); return; }
+        // the gem's own level comes first; "Requirements: Level: 72" later is the character's
+        if (isGem && (m = line.match(/^Level:\s*(\d+)/))) { if (!item.gemLevel) item.gemLevel = parseInt(m[1], 10); return; }
+        if ((m = line.match(/^Quality(?: \([^)]*\))?:\s*\+?(\d+)%/))) { item.quality = parseInt(m[1], 10); return; }
         if ((m = line.match(/^Sockets:\s*(.+)$/))) {
           item.sockets = m[1].trim();
           m[1].trim().split(/\s+/).forEach(function (g) {
@@ -494,8 +512,14 @@
           if (suffix[1] === 'crafted') crafted = true;
           if (suffix[1] === 'fractured') fractured = true;
         }
-        item.mods.push({ line: line, raw: line, kind: kind, crafted: crafted,
-                         fractured: fractured, ranged: false });
+        if (header) {
+          if (header.implicit || header.enchant) kind = 'implicit';
+          if (header.crafted || header.enchant) crafted = true;
+          if (header.fractured) fractured = true;
+        }
+        var mod = { line: line, raw: line, kind: kind, crafted: crafted, fractured: fractured, ranged: false };
+        if (header && header.tier) mod.tier = parseInt(header.tier, 10);
+        item.mods.push(mod);
       });
     }
     return item;

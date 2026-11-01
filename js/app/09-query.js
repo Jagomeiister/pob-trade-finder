@@ -19,8 +19,12 @@ function buildTradePayload(state, quiet) {
   var saleType = document.getElementById('sale-type').value;
   var tf = {};
   if (saleType !== 'any') tf.sale_type = { option: saleType };
+  var listedWithin = document.getElementById('listed-within').value;
+  if (listedWithin) tf.indexed = { option: listedWithin };
   var maxP = state.maxPriceInput ? parseFloat(state.maxPriceInput.value) : NaN;
   if (!isNaN(maxP) && maxP > 0) tf.price = { max: maxP }; // chaos-equivalent by default
+  var pricedIn = pricedInFilter(tf.price);
+  if (pricedIn) tf.price = pricedIn;
   var tradeFilters = Object.keys(tf).length ? { trade_filters: { filters: tf } } : null;
 
   var requireFrac = state.fracToggle && state.fracToggle.checkbox.checked;
@@ -123,7 +127,8 @@ function buildTradePayload(state, quiet) {
       var lone = flexDiverted.pop();
       filters.push({ id: lone.id, value: { min: lone.min } });
     }
-    if (!filters.length && !flexDiverted.length) {
+    var baseOnly = state.presetSeg && state.presetSeg.value === 'base'; // the base alone: no mods by design
+    if (!filters.length && !flexDiverted.length && !baseOnly) {
       if (!quiet) UI.toast('No mods selected for this search.', 'warn');
       return null;
     }
@@ -345,6 +350,26 @@ function tickCooldowns() {
       line.appendChild(b);
     }
   });
+}
+
+// "Priced in" setting → trade price filter. The trade site reads max in the chosen currency
+// for single-currency options, so a chaos max becomes divines at the current rate (and the
+// currency option is dropped when there's no rate to convert with).
+function pricedInFilter(price) {
+  var el = document.getElementById('priced-in');
+  var opt = el ? el.value : '';
+  if (!opt) return null;
+  var out = { option: opt };
+  if (price && price.max) {
+    if (opt === 'divine') {
+      var dr = divRate(document.getElementById('league').value);
+      if (!dr) return null;
+      out.max = Math.round(price.max / dr * 100) / 100;
+    } else {
+      out.max = price.max;
+    }
+  }
+  return out;
 }
 
 function openUrl(url) {

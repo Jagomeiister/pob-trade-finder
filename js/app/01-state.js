@@ -146,6 +146,8 @@ function saveSettings() {
       league: document.getElementById('league').value,
       status: document.getElementById('trade-status').value,
       saleType: document.getElementById('sale-type').value,
+      listedWithin: document.getElementById('listed-within').value,
+      pricedIn: document.getElementById('priced-in').value,
       eqCurrency: document.getElementById('eq-currency').value,
       pseudo: document.getElementById('pseudo').checked,
       pct: document.getElementById('pct').value,

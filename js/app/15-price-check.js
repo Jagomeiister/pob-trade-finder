@@ -4,7 +4,23 @@
 'use strict';
 
 // ---- live price checking (desktop app only) -----------------------------------
-async function checkPrice(state, quiet) {
+// The same search again within 5 minutes reuses its results instead of spending a trade
+// call (Awakened PoE Trade does the same); the panel says how old they are, with Refresh.
+var PRICE_CACHE = {}, PRICE_CACHE_MS = 5 * 60 * 1000, PRICE_CACHE_MAX = 60;
+function cachedSearch(key) {
+  var hit = PRICE_CACHE[key];
+  return hit && Date.now() - hit.at < PRICE_CACHE_MS ? hit : null;
+}
+function rememberSearch(key, res) {
+  PRICE_CACHE[key] = { at: Date.now(), res: res };
+  var keys = Object.keys(PRICE_CACHE);
+  if (keys.length > PRICE_CACHE_MAX) {
+    keys.sort(function (a, b) { return PRICE_CACHE[a].at - PRICE_CACHE[b].at; })
+      .slice(0, keys.length - PRICE_CACHE_MAX).forEach(function (k) { delete PRICE_CACHE[k]; });
+  }
+}
+
+async function checkPrice(state, quiet, fresh) {
   if (!isGui()) { UI.toast('Live price checking needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
   var payload = null;
   try { payload = buildTradePayload(state, quiet); } catch (e) { /* stale card after re-render */ }
@@ -19,8 +35,11 @@ async function checkPrice(state, quiet) {
   box.textContent = 'Checking prices… (rate-limited, be patient)';
   state.priceBtn.disabled = true;
   try {
-    var res = await window.pywebview.api.trade_search(league, payloadStr);
+    var cacheKey = league + '\n' + payloadStr;
+    var hit = fresh ? null : cachedSearch(cacheKey);
+    var res = hit ? hit.res : await window.pywebview.api.trade_search(league, payloadStr);
     if (seq !== state.priceSeq) return; // superseded by a newer search
+    if (!hit && res && res.ok) rememberSearch(cacheKey, res);
     if (!res.ok) {
       if (showCooldown(box, res.error, function () { checkPrice(state, quiet); })) { state.priceState = null; return; }
       state.priceState = null; // stop the sold watcher polling a dead panel
@@ -39,7 +58,8 @@ async function checkPrice(state, quiet) {
       // validate against THIS, not whatever the controls say later
       payloadStr: payloadStr,
       league: league,
-      weights: weights
+      weights: weights,
+      cachedAt: hit ? hit.at : null
     };
     renderListings(state);
     ensureSoldWatcher();
@@ -156,6 +176,14 @@ function renderListings(state) {
   var label = document.createElement('span');
   label.textContent = ps.total + ' listed';
   head.appendChild(label);
+  if (ps.cachedAt) {
+    var mins = Math.max(0, Math.round((Date.now() - ps.cachedAt) / 60000));
+    var cachedChip = UI.chip(mins ? 'from ' + mins + ' min ago' : 'from moments ago', 'neutral', 'cached-chip');
+    cachedChip.title = 'The same search ran less than 5 minutes ago, so its results were reused (no trade call)';
+    head.appendChild(cachedChip);
+    head.appendChild(UI.button('ghost', { size: 'sm', label: '↻ Refresh', title: 'Search again now',
+      onClick: function () { checkPrice(state, false, true); } }));
+  }
   if (ps.weights && ps.weights.length) {
     // client-side: this page by price per % of your item (lower = more stats per chaos)
     var vbtn = UI.button(state.valueSort ? 'secondary' : 'ghost', { size: 'sm', cls: 'value-sort',
@@ -215,7 +243,7 @@ function renderListings(state) {
     return;
   }
   var tails = tailsFor(state);
-  listings.forEach(function (li) {
+  mergeSameSeller(listings).forEach(function (li) {
     box.appendChild(listingCard(li, tails, state));
   });
   // bottom nav so you don't scroll back up after reading the last item
@@ -241,6 +269,35 @@ function sortListingsByValue(box) {
       return av ? -1 : bv ? 1 : a.i - b.i;
     })
     .forEach(function (x) { box.insertBefore(x.el, anchor); });
+}
+
+// the same seller listing the same thing at the same price shows once, with ×N
+// (copies are only skipped on screen; the cached page keeps every listing)
+function mergeSameSeller(listings) {
+  var out = [], seen = {};
+  listings.forEach(function (li) {
+    var key = li.account && li.amount != null ? li.account + '|' + li.amount + '|' + li.currency + '|' +
+      (li.name || '') + '|' + li.base : null;
+    if (key && seen[key]) { seen[key]._dupes = (seen[key]._dupes || 0) + 1; return; }
+    var copy = Object.assign({}, li);
+    delete copy._dupes;
+    if (key) seen[key] = copy;
+    out.push(copy);
+  });
+  return out;
+}
+
+function listedAgo(iso) {
+  var t = iso ? Date.parse(iso) : NaN;
+  if (!isFinite(t)) return '';
+  var m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  return m < 60 ? m + 'm ago' : m < 2880 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago';
+}
+
+// your own listings get a "You" badge: the account from Compare with character / POESESSID
+function isMyAccount(name) {
+  var mine = (document.getElementById('acct-input') || {}).value || '';
+  return !!(name && mine.trim()) && name.toLowerCase() === mine.trim().toLowerCase();
 }
 
 // stat-id tails of the mods a search filtered on — used to highlight them on listings
@@ -574,7 +631,27 @@ function listingCard(li, tails, state) {
   }
   var acct = document.createElement('div');
   acct.className = 'price-acct';
-  acct.textContent = li.account;
+  // seller: online / away / offline dot (with words in the tooltip), name, listed age
+  if (li.online !== undefined) {
+    var dot = UI.el('span', 'seller-dot ' + (li.afk ? 'away' : li.online ? 'on' : 'off'),
+      li.afk ? '◐' : li.online ? '●' : '○');
+    dot.title = li.afk ? 'Seller is away (AFK)' : li.online ? 'Seller is online' : 'Seller is offline';
+    dot.setAttribute('aria-label', dot.title);
+    acct.appendChild(dot);
+  }
+  acct.appendChild(document.createTextNode(li.account));
+  if (isMyAccount(li.account)) acct.appendChild(UI.chip('You', 'info'));
+  var age = listedAgo(li.indexed);
+  if (age) {
+    var ageEl = UI.el('span', 'listed-age', ' · ' + age);
+    ageEl.title = 'Listed ' + new Date(li.indexed).toLocaleString();
+    acct.appendChild(ageEl);
+  }
+  if (li._dupes) {
+    var dupe = UI.chip('×' + (li._dupes + 1), 'neutral', 'dupe-count');
+    dupe.title = 'This seller has ' + (li._dupes + 1) + ' listings like this at the same price on this page';
+    acct.appendChild(dupe);
+  }
   side.appendChild(acct);
 
   // one main action per listing — the way this listing is bought — the rest in ⋯

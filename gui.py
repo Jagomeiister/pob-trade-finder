@@ -27,7 +27,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.0.6"
+VERSION = "2.1.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -46,6 +46,9 @@ DATA_DIR = os.path.join(APP_DIR, "data")
 # Not "OAuth {clientId}/…": this app has no registered OAuth client, so it doesn't claim one.
 UA = "PoBTradeFinder/%s (contact: %s)" % (VERSION, CONTACT)
 TRADE_BASE = "https://www.pathofexile.com/api/trade"
+# the app's backend (server/): poe.ninja prices proxied and cached, as poe.ninja asks of desktop apps
+PRICES_API = "https://pob-trade-finder.vercel.app/api/prices"
+PRICES_TTL = 1800
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
 MIN_INTERVAL = 2.5
@@ -291,6 +294,10 @@ class Api:
             "fee": li.get("fee"),  # instant-buyout gold fee (None for in-person)
             "account": (li.get("account") or {}).get("name", ""),
             "whisper": li.get("whisper", ""),
+            "indexed": li.get("indexed", ""),  # when listed (ISO time)
+            # account.online is an object while the seller is online ({"status": "afk"} when away)
+            "online": bool((li.get("account") or {}).get("online")),
+            "afk": ((li.get("account") or {}).get("online") or {}).get("status") == "afk",
         }
 
     @staticmethod
@@ -706,6 +713,112 @@ class Api:
                 items[code] = {"name": m["name"], "cat": m.get("cat", ""), "img": m.get("img", ""),
                                "s": [[h, float("%.4g" % v), int(vol)] for h, v, vol in pts]}
             return {"ok": True, "hour": hour, "items": items}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # -- quick prices: no trade-site call ------------------------------------------------
+    def _ninja_prices(self, league):
+        """The backend's poe.ninja snapshot for a league, kept for PRICES_TTL in memory."""
+        cache = getattr(self, "_ninja_cache", None)
+        if cache is None:
+            cache = self._ninja_cache = {}
+        hit = cache.get(league)
+        if hit and time.time() - hit[0] < PRICES_TTL:
+            return hit[1]
+        req = urllib.request.Request(PRICES_API + "?" + urllib.parse.urlencode({"league": league}),
+                                     headers={"User-Agent": UA, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        cache[league] = (time.time(), data)
+        return data
+
+    @staticmethod
+    def _ninja_match(data, item):
+        """Best poe.ninja line for a pasted item: uniques by name (+ links), gems by name,
+        level, quality and corruption. None when there's no confident match."""
+        name, rarity = item.get("name") or "", (item.get("rarity") or "").upper()
+        types = (data or {}).get("types") or {}
+        if rarity == "GEM":
+            lines = [l for l in (types.get("SkillGem") or {}).get("lines", []) if l.get("n") == name]
+            lvl, q, cr = item.get("gemLevel") or 1, item.get("quality") or 0, 1 if item.get("corrupted") else 0
+            lines = [l for l in lines if l.get("gl", 1) == lvl and l.get("cr", 0) == cr and l.get("gq", 0) <= q]
+            return max(lines, key=lambda l: l.get("gq", 0), default=None)
+        if rarity in ("UNIQUE", "RELIC"):
+            links = item.get("links") or 0
+            cands = [l for k, t in types.items() if k.startswith("Unique") or k == "ForbiddenJewel"
+                     for l in t.get("lines", []) if l.get("n") == name]
+            wanted = links if links >= 5 else 0
+            exact = [l for l in cands if (l.get("l") or 0) == wanted]
+            pool = exact or cands
+            # several variants: the cheapest is the honest floor
+            return min(pool, key=lambda l: l.get("c", 0), default=None)
+        return None
+
+    def quick_price(self, league, item_json):
+        """Instant price for a pasted / Ctrl+D item without a trade search: exchange items
+        (currency, fragments, scarabs, cards…) from GGG's hourly feed, uniques and gems from
+        poe.ninja via the app's backend. {'ok', 'source', 'chaos', 'divine', 'listings',
+        'stack', 'stackChaos'}; ok False when nothing matches."""
+        try:
+            item = json.loads(item_json)
+            name = (item.get("name") or "").strip()
+            by_name, code_by_name = {}, {}
+            for code, m in self._currency_map.items():
+                key = m["name"].lower()
+                by_name.setdefault(key, m["id"])
+                if key not in code_by_name or len(code) < len(code_by_name[key]):
+                    code_by_name[key] = code  # duplicate rows: shortest trade code
+            div_id = (self._currency_map.get("divine") or {}).get("id")
+            key = name.lower() if name.lower() in by_name else (item.get("base") or "").lower()
+            mid = by_name.get(key)
+            if mid:
+                rates, hour = self._feed.rates(league, [mid, div_id] if div_id else [mid])
+                if rates.get(mid) is not None:
+                    each = rates[mid]
+                    out = {"ok": True, "source": "GGG currency exchange", "chaos": each, "code": code_by_name.get(key),
+                           "divine": each / rates[div_id] if rates.get(div_id) else None}
+                    stack = int(item.get("stackSize") or 0)
+                    if stack > 1:
+                        out["stack"], out["stackChaos"] = stack, stack * each
+                    return out
+            line = self._ninja_match(self._ninja_prices(league), item)
+            if line:
+                return {"ok": True, "source": "poe.ninja", "chaos": line.get("c"), "divine": line.get("d"),
+                        "listings": line.get("lc")}
+            return {"ok": False, "error": "no quick price for this item"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def bulk_exchange(self, league, code):
+        """Live bulk-exchange offers for one exchange item (one trade request, made when the
+        user presses the button): who sells it for chaos or divines right now, cheapest first.
+        {'ok', 'offers': [{seller, online, afk, pay, payCurrency, get, stock, chaosEach}], 'total'}"""
+        try:
+            if code not in self._currency_map:
+                return {"ok": False, "error": "not an exchange item"}
+            div = self._divine_rate(league)
+            res = self._http("%s/exchange/%s" % (TRADE_BASE, urllib.request.quote(league)),
+                             {"query": {"status": {"option": "online"}, "want": [code],
+                                        "have": ["chaos", "divine"] if div else ["chaos"]},
+                              "sort": {"have": "asc"}})
+            result = res.get("result") or {}
+            offers = []
+            for entry in (result.values() if isinstance(result, dict) else []):
+                li = entry.get("listing") or {}
+                acct = li.get("account") or {}
+                online = acct.get("online")
+                for off in (li.get("offers") or [])[:1]:
+                    ex, it = off.get("exchange") or {}, off.get("item") or {}
+                    if not it.get("amount") or not ex.get("amount"):
+                        continue
+                    per = {"chaos": 1.0, "divine": div}.get(ex.get("currency"))
+                    offers.append({"seller": acct.get("name", ""), "online": bool(online),
+                                   "afk": isinstance(online, dict) and online.get("status") == "afk",
+                                   "pay": ex["amount"], "payCurrency": ex.get("currency"), "get": it["amount"],
+                                   "stock": it.get("stock"),
+                                   "chaosEach": float(ex["amount"]) * per / float(it["amount"]) if per else None})
+            offers.sort(key=lambda o: o["chaosEach"] if o["chaosEach"] is not None else float("inf"))
+            return {"ok": True, "offers": offers[:20], "total": res.get("total", len(offers))}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -1373,7 +1486,8 @@ class Api:
 
     # -- open in system browser --------------------------------------------------
     OPEN_URL_PREFIXES = ("https://www.pathofexile.com/",
-                         "https://vilsol.github.io/timeless-jewels/")  # timeless seed calculator
+                         "https://vilsol.github.io/timeless-jewels/",  # timeless seed calculator
+                         "https://www.poewiki.net/wiki/", "https://poedb.tw/us/")  # item reference pages
 
     def open_url(self, url):
         if url.startswith(self.OPEN_URL_PREFIXES):

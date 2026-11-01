@@ -25,10 +25,12 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('pct-label').textContent = saved.pct + '%';
   }
   if (saved.saleType) document.getElementById('sale-type').value = saved.saleType;
+  if (saved.listedWithin) document.getElementById('listed-within').value = saved.listedWithin;
+  if (saved.pricedIn) document.getElementById('priced-in').value = saved.pricedIn;
   if (saved.eqCurrency) document.getElementById('eq-currency').value = saved.eqCurrency;
   if (saved.lastCode) document.getElementById('pob-input').value = saved.lastCode;
 
-  ['league', 'trade-status', 'pseudo', 'sale-type'].forEach(function (id) {
+  ['league', 'trade-status', 'pseudo', 'sale-type', 'listed-within', 'priced-in'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', saveSettings);
   });
   // pseudo totals change the SCALE of dual-res inputs (×2) — rescale live so
@@ -85,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
     { label: 'Search settings', cls: 'popover-search' });
   UI.popover(document.getElementById('compare-btn'), document.getElementById('char-pop'),
     { label: 'Compare with your character', align: 'start' });
-  ['league', 'trade-status', 'sale-type', 'pseudo', 'eq-currency'].forEach(function (id) {
+  ['league', 'trade-status', 'sale-type', 'listed-within', 'priced-in', 'pseudo', 'eq-currency'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', updateContextChips);
   });
   document.getElementById('pct').addEventListener('input', updateContextChips);
@@ -129,6 +131,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (slot) charGear[slot] = it;
       });
       applyCharDiff();
+      // the price-check overlay compares Ctrl+D items with what you wear (18-upgrade.js)
+      try { persist('pobtf-chargear', JSON.stringify({ name: charName, gear: charGear })); } catch (e) { /* storage full */ }
+      if (pastedState) renderUpgradeCheck(pastedState);
       document.getElementById('hide-matched-wrap').classList.remove('hidden');
       document.getElementById('value-gear').classList.remove('hidden');
       charName_ = charName;
@@ -316,6 +321,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       if (saved.status) document.getElementById('trade-status').value = saved.status;
       if (saved.saleType) document.getElementById('sale-type').value = saved.saleType;
+      if (saved.listedWithin) document.getElementById('listed-within').value = saved.listedWithin;
+      if (saved.pricedIn) document.getElementById('priced-in').value = saved.pricedIn;
       if (saved.eqCurrency) document.getElementById('eq-currency').value = saved.eqCurrency;
       if (saved.pseudo !== undefined) document.getElementById('pseudo').checked = saved.pseudo;
       if (saved.pct) {

@@ -56,6 +56,8 @@ index.html + js/*  ──────────────►  any browser   
 | `cx_flips(league)` | Latest hour's chaos-market vs divine-market price per item (`CurrencyFeed.pairs`, `<hour>.pairs.json`) |
 | `oauth_status()` / `oauth_login()` / `oauth_logout()` | Official login (`oauth.py`): GGG's public-client OAuth, PKCE S256, redirect `http://127.0.0.1:8080/callback`, tokens in `data/oauth.json`. Off while `OAUTH_CLIENT_ID` in `gui.py` is empty (GGG isn't accepting new applications) |
 | `stash_value(league)` | Official API (`account:stashes`, `OAuth {clientId}/…` User-Agent): every tab's exchange items valued at the currency feed's prices; other items counted |
+| `quick_price(league, itemJson)` | Pasted/Ctrl+D items without a trade call: exchange items by name from the currency feed (+ stack value); uniques/gems from `PRICES_API` (the app's backend, `server/`, proxying poe.ninja), cached 30 min |
+| `bulk_exchange(league, code)` | One bulk-exchange request (user-pressed **Live offers**): online offers for that trade code in chaos/divine, cheapest chaos-each first, top 20 |
 | `diagnostics()` | Bug-report text: version, OS, data dates, log tails; POESESSID, 32-hex tokens and the Windows user name redacted |
 | `check_update()` / `apply_update(url)` | GitHub Releases auto-update (see below) |
 
@@ -291,6 +293,17 @@ tracking. A scenario fails on any uncaught page exception. Filter by number or n
 in every theme × accent × high-contrast combination. It also fails if a colour literal
 appears outside `tokens.css`, if any rule sets `outline: none`, or if a font size drops
 below 12px (mark a deliberate exception with `/* allow-small */`).
+
+## Backend (server/)
+
+`server/` is a Vercel project (Node.js functions, no secrets): `GET /api/prices?league=<id>`
+proxies poe.ninja's PoE1 item overviews, as poe.ninja asks of desktop apps
+(https://poe.ninja/docs/api): one fetch per category per 30 min (Vercel Runtime Cache + CDN
+headers), identifying User-Agent, shrunk to the fields the app reads. Only known leagues and the
+single `league` parameter are accepted, so nobody can bypass the cache to fan requests out.
+`GET /api/health` for liveness. Vercel project settings: Root Directory `server`, Framework
+Other. Tests: `cd server && npm install && npm test`. It must never proxy trade searches: GGG's
+limits are per IP, so those stay on each user's PC.
 
 ## Styling
 

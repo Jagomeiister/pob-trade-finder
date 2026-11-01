@@ -303,6 +303,24 @@
         <option value="unpriced">No listed price</option>
       </select>
     </label>
+    <label class="field"><span class="field-label">Listed within</span>
+      <select id="listed-within" title="Only listings indexed recently: old listings are often abandoned or price-fixed">
+        <option value="">Any time</option>
+        <option value="1day">1 day</option>
+        <option value="3days">3 days</option>
+        <option value="1week">1 week</option>
+        <option value="2weeks">2 weeks</option>
+        <option value="1month">1 month</option>
+      </select>
+    </label>
+    <label class="field"><span class="field-label">Priced in</span>
+      <select id="priced-in" title="Only listings priced in these currencies. Max price stays in chaos; for Divine only it's converted at the current rate.">
+        <option value="">Any currency</option>
+        <option value="chaos_divine">Chaos or divine</option>
+        <option value="chaos">Chaos only</option>
+        <option value="divine">Divine only</option>
+      </select>
+    </label>
     <label class="field"><span class="field-label">Show prices in</span>
       <select id="eq-currency" title="Show price equivalents and totals in chaos or divine">
         <option value="chaos">chaos</option>
@@ -334,7 +352,7 @@
   // js/app/: one program split by feature — order matters (docs/DEVELOPER.md)
   var APP = ['01-state', '02-init', '03-shell', '04-library', '05-craft', '06-jewels', '07-history-gems',
              '08-cards', '09-query', '10-character', '11-market', '12-cost', '13-builds-tracking',
-             '14-basket-live', '15-price-check', '16-overlay', '17-stash'];
+             '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade'];
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
    'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/sample.js',
    'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js'].concat(APP.map(function (n) {

@@ -120,7 +120,13 @@ function gemPayload(gem, level, quality) {
   var filters = {};
   if (Object.keys(misc).length) filters.misc_filters = { filters: misc };
   var saleType = document.getElementById('sale-type').value;
-  if (saleType !== 'any') filters.trade_filters = { filters: { sale_type: { option: saleType } } };
+  var gtf = {};
+  if (saleType !== 'any') gtf.sale_type = { option: saleType };
+  var listedWithin = document.getElementById('listed-within').value;
+  if (listedWithin) gtf.indexed = { option: listedWithin };
+  var pricedIn = pricedInFilter(null);
+  if (pricedIn) gtf.price = pricedIn;
+  if (Object.keys(gtf).length) filters.trade_filters = { filters: gtf };
   var tf = gemDisc(gem.name);
   var query = {
     status: { option: document.getElementById('trade-status').value },

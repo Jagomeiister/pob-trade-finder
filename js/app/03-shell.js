@@ -337,6 +337,8 @@ function updateContextChips() {
   box.appendChild(UI.chip(optText('league') || document.getElementById('league').value));
   box.appendChild(UI.chip(optText('trade-status')));
   if (document.getElementById('sale-type').value !== 'priced') box.appendChild(UI.chip('Sale: ' + optText('sale-type')));
+  if (document.getElementById('listed-within').value) box.appendChild(UI.chip('Listed within ' + optText('listed-within')));
+  if (document.getElementById('priced-in').value) box.appendChild(UI.chip('Priced in ' + optText('priced-in').toLowerCase()));
   box.appendChild(UI.chip('Min roll ' + document.getElementById('pct').value + '%'));
   if (!document.getElementById('pseudo').checked) box.appendChild(UI.chip('No pseudo totals', 'warn'));
 }

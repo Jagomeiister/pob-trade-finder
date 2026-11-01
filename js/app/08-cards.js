@@ -5,6 +5,19 @@
 
 // ---- pasted in-game item -------------------------------------------------------
 var pastedState = null;
+var PASTED_ROLL_PCT = 0.9; // pasted / Ctrl+D items: 90% of each roll (see makeModRow)
+
+// reference pages: the unique itself, else its base (rares' names are random)
+function refName(state) {
+  var it = state.item;
+  return (state.unique || it.rarity === 'GEM') ? (state.resolvedName || it.name) : (it.base || it.name);
+}
+function wikiUrl(state) {
+  return 'https://www.poewiki.net/wiki/' + encodeURIComponent(refName(state).replace(/ /g, '_'));
+}
+function poedbUrl(state) {
+  return 'https://poedb.tw/us/' + encodeURIComponent(refName(state).replace(/ /g, '_').replace(/'/g, ''));
+}
 
 function renderPastedItem(item) {
   document.getElementById('controls').classList.remove('hidden');
@@ -28,6 +41,8 @@ function renderPastedItem(item) {
   card.classList.add('pasted');
   sec.appendChild(card);
   renderCharDiff(pastedState);
+  renderUpgradeCheck(pastedState);
+  renderQuickPrice(pastedState);
   if (build) { renderNav(); setView('pasted'); window.scrollTo(0, 0); }
   else card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -229,6 +244,7 @@ function makeCard(slot, item, setIndex) {
   // budget cap: chaos-equivalent max price (applies to links, price checks, live)
   state.maxPriceInput = makeMiniInput(opts, 'Max price', 'c');
   state.maxPriceInput.title = 'Maximum price in chaos-equivalent — searches, price checks, and live alerts all respect it';
+  if (!state.unique && item.itemClass !== undefined && item.mods.length) makePresetControl(opts, state);
 
   // header actions: the main action, live watch, the trade site, everything else in ⋯
   var actions = document.createElement('div');
@@ -258,7 +274,11 @@ function makeCard(slot, item, setIndex) {
       { label: '⏳ Find seeds for this socket', hidden: !isTimeless || !isGui(), onClick: function () { openTimelessFor(state); },
         title: 'Open the timeless jewel finder on the socket this jewel sits in' },
       { label: state.bought ? 'Unmark bought' : '✔ Mark bought', onClick: function () { setBought(state, !state.bought); },
-        title: 'Bought slots drop out of the build cost total' }
+        title: 'Bought slots drop out of the build cost total' },
+      { label: 'Open on PoE Wiki ↗', onClick: function () { openUrl(wikiUrl(state)); },
+        title: 'The item (uniques) or its base on poewiki.net' },
+      { label: 'Open on PoEDB ↗', onClick: function () { openUrl(poedbUrl(state)); },
+        title: 'Mod tiers and weights for this base on poedb.tw' }
     ];
   }, { ariaLabel: 'More actions for ' + slot });
   [priceBtn, liveBtn, openBtn, more].forEach(function (b) { actions.appendChild(b); });
@@ -423,7 +443,11 @@ function makeModRow(state, mod, match, defaultOff) {
   // On uniques (defaultOff), lines from the selected variant start ON: they're what
   // makes this copy the one the build wants (Impossible Escape's keystone, a
   // timeless jewel's conqueror + seed).
-  cb.checked = !!match && (!defaultOff || !!mod.variant) && !(mod.crafted && mod.kind === 'explicit');
+  // Pasted / Ctrl+D items (game copy carries tiers since 3.29): mods worse than tier 2 start
+  // off — they rarely set the price — unless fractured (fixed on the item).
+  var pastedItem = !!(state.item && state.item.itemClass !== undefined);
+  cb.checked = !!match && (!defaultOff || !!mod.variant) && !(mod.crafted && mod.kind === 'explicit') &&
+               !(pastedItem && mod.tier > 2 && !mod.fractured);
   cb.disabled = !match;
   cb.setAttribute('aria-label', 'Use: ' + mod.line);
 
@@ -451,6 +475,12 @@ function makeModRow(state, mod, match, defaultOff) {
   // PoB writes enchants (anoints, cluster and lab enchants) as crafted implicit lines
   if (mod.crafted) label.appendChild(UI.chip(mod.kind === 'implicit' ? 'enchant' : 'crafted', 'crafted'));
   if (mod.fractured) label.appendChild(UI.chip('fractured', 'fractured'));
+  if (mod.tier) {
+    var tierChip = UI.chip('T' + mod.tier, mod.tier <= 2 ? 'success' : 'neutral');
+    tierChip.title = 'Tier ' + mod.tier + ' (1 is the best roll band)' +
+      (pastedItem && mod.tier > 2 && !mod.fractured ? ' — off by default: low tiers rarely set the price' : '');
+    label.appendChild(tierChip);
+  }
   if (mod.kind === 'implicit' && !mod.crafted) label.title = 'Implicit';
 
   // clicking anywhere on the row toggles the mod — not just the tiny checkbox
@@ -483,7 +513,9 @@ function makeModRow(state, mod, match, defaultOff) {
                           /^explicit\.pseudo_timeless_jewel_/.test(match.entry.id);
     var pseudoOn = document.getElementById('pseudo').checked;
     var eff = effectiveMatch(rowState, pseudoOn);
-    var pct = parseInt(document.getElementById('pct').value, 10) / 100;
+    // pricing one specific item compares like with like: 90% of each roll (as Awakened PoE
+    // Trade / Scalpel do); build shopping keeps the global Min roll setting
+    var pct = pastedItem && !state.unique ? PASTED_ROLL_PCT : parseInt(document.getElementById('pct').value, 10) / 100;
     if (match.fixedText || eff.avg === null) {
       // stat carries no adjustable value — no min input
     } else if (rowState.exactCount) {
@@ -666,6 +698,56 @@ function makeSearchBySelect(parent, slot, item, preferExact) {
   UI.field('Search by', sel, { parent: parent,
     title: 'How strictly to match the item base — broader searches find more (and cheaper) listings' });
   return sel;
+}
+
+// Pasted / Ctrl+D items: one click between "similar" (the defaults: good tiers at 90%),
+// "exact" (every mod at its full roll, exact base) and "base" (no mods: the base, ilvl and
+// influence alone). Re-checks the price straight away if it was already checked.
+var PRESET_TITLES = {
+  similar: 'Tier 1–2 mods at 90% of the roll, all but one must match (the default)',
+  exact: 'Every mod at its full roll, all must match, this exact base',
+  base: 'No mods: this base at this item level (and influence) — what the base alone sells for'
+};
+function makePresetControl(parent, state) {
+  var start = {
+    rows: state.rows.map(function (r) { return { checked: r.cb.checked, min: r.minInput.value }; }),
+    mode: state.modeSel && state.modeSel.value,
+    searchBy: state.searchBySel && state.searchBySel.value,
+    ilvl: state.ilvlInput ? state.ilvlInput.value : ''
+  };
+  var seg = UI.segmented([['similar', 'Similar'], ['exact', 'Exact'], ['base', 'Base']], 'similar', {
+    ariaLabel: 'Search preset', titles: PRESET_TITLES,
+    onChange: function (v) {
+      applyPreset(state, v, start);
+      if (state.priceState) checkPrice(state);
+    } });
+  UI.field('Preset', seg, { parent: parent, title: 'Similar / Exact / Base' });
+  state.presetSeg = seg;
+  return seg;
+}
+
+function applyPreset(state, preset, start) {
+  var exactBase = state.searchBySel && Array.prototype.some.call(state.searchBySel.options,
+    function (o) { return o.value === 'exact'; });
+  state.rows.forEach(function (r, i) {
+    if (preset === 'similar') {
+      r.cb.checked = start.rows[i].checked;
+      r.minInput.value = start.rows[i].min;
+    } else if (preset === 'exact') {
+      r.cb.checked = !!r.match;
+      if (r.baseAvg !== null && r.match && !r.exactCount) r.minInput.value = roundMin(r.baseAvg);
+    } else {
+      r.cb.checked = false;
+    }
+  });
+  if (state.modeSel) {
+    state.modeSel.value = preset === 'exact' ? '0' : start.mode;
+    state.modeSel.dispatchEvent(new Event('change'));
+  }
+  if (state.searchBySel) state.searchBySel.value = preset !== 'similar' && exactBase ? 'exact' : start.searchBy;
+  if (state.ilvlInput) state.ilvlInput.value = preset === 'base' ? String(state.item.itemLevel || '') : start.ilvl;
+  if (state.inflToggle) state.inflToggle.checkbox.checked = true;
+  if (state.pctSel) state.pctSel.value = 'global';
 }
 
 function makeMiniSelect(parent, label, options, value) {
