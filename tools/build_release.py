@@ -27,6 +27,7 @@ SHIP = [
     "css/base.css",
     "css/components.css",
     "css/layout.css",
+    "css/navicons.css",
     "js/ui.js",
     "js/pob.js",
     "js/matcher.js",

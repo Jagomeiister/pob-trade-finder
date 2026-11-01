@@ -385,11 +385,18 @@ body.trades .trades-root { display: block; }
 .trades-body { display: flex; flex-direction: column; gap: 8px; }
 .trade-card { padding: 8px 10px; background: var(--s1); border: 1px solid var(--border); border-left: 3px solid var(--accent);
   border-radius: var(--r-md); display: flex; flex-direction: column; gap: 4px; }
-.trade-card.out { border-left-color: var(--info); }
-.trade-card.joined { border-left-color: var(--success); }
-.tc-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.tc-dir { color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
-.tc-age { margin-left: auto; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+/* the edge repeats the status pill's colour (tradeCardStatus): never the only signal */
+.trade-card[data-status="neutral"] { border-left-color: var(--text-3); }
+.trade-card[data-status="info"] { border-left-color: var(--info); }
+.trade-card[data-status="warn"] { border-left-color: var(--warn); }
+.trade-card[data-status="success"] { border-left-color: var(--success); }
+/* line 1 never wraps: a long name is cut short instead of pushing ✕ onto its own line */
+.tc-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tc-dir { flex: none; color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.tc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-age { flex: none; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.tc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-complete:not(.btn-primary) { color: var(--success); border-color: color-mix(in srgb, var(--success) 55%, var(--border)); }
 .tc-item { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .tc-item-name { font-weight: 600; }
 .tc-price { color: var(--price); font-variant-numeric: tabular-nums; }
@@ -425,8 +432,8 @@ body.trades .trades-root { display: block; }
 /* in-game overlay (index.html?cards=1): see-through window, sized to this content by gui.py */
 html:has(body.trade-cards), body.trade-cards { background: transparent !important; overflow: hidden; }
 body.trade-cards .app-shell, body.trade-cards .app-main { display: block; padding: 0; margin: 0; max-width: none; min-height: 0; }
-body.trade-cards .trades-root { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 6px;
-  width: max-content; padding: 2px; opacity: var(--ov-opacity, .92); transition: opacity .15s; }
+body.trade-cards .trades-root { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  width: max-content; padding: 2px; opacity: var(--ov-opacity, .95); transition: opacity .15s; }
 body.trade-cards .trades-root:hover { opacity: 1; }
 .trade-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .trade-slider { width: 140px; accent-color: var(--accent); }
@@ -462,8 +469,40 @@ body.trade-cards .trades-root:hover { opacity: 1; }
   border: 1px solid var(--border); border-left: 3px solid var(--info); border-radius: var(--r-md); box-shadow: 0 4px 14px var(--shadow); }
 .ov-zone-area { color: var(--info); white-space: nowrap; }
 .ov-zone-text { flex: 1; min-width: 0; color: var(--text-2); font-size: var(--fs-sm); }
+
+/* ---- one look for every panel drawn over the game (icon bar, cards, zone note, cheat sheet) ----
+   Nearly solid, a lighter rim plus a dark outer ring and shadow so a panel stands apart from
+   bright and dark scenes alike, and a 4px edge for its kind / status. The in-game pages are
+   always dark (IN_GAME_PAGE in 01-state.js), so the black ring is safe. Text runs a step
+   bigger than in the app: it's read at a glance from across a game screen. */
+body.trade-cards { --ov-w: 340px; font-size: var(--fs-md); }
+body.trade-cards .ov-head, body.trade-cards .ov-zone, body.trade-cards .ov-note,
+body.trade-cards .ov-cards .trade-card, body.trade-cards .sheet-panel {
+  background: var(--s1); border: 1px solid var(--border-hi); border-left-width: 4px; border-radius: var(--r-md);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 8px 22px rgba(0, 0, 0, .5); }
+body.trade-cards .ov-head, body.trade-cards .sheet-panel { border-left-color: var(--accent); }
+body.trade-cards .ov-zone { border-left-color: var(--info); }
+body.trade-cards .ov-note { border-left-color: var(--text-3); }
+body.trade-cards .ov-cards, body.trade-cards .ov-head, body.trade-cards .ov-zone { width: var(--ov-w); box-sizing: border-box; }
+body.trade-cards .ov-cards.is-row { width: max-content; }
+body.trade-cards .ov-cards.is-row .trade-card { width: var(--ov-w); }
+body.trade-cards .ov-head { padding: 4px 4px 4px 10px; }
+body.trade-cards .ov-head-title, body.trade-cards .sheet-title { color: var(--text); font-size: var(--fs-md); font-weight: 700; }
+body.trade-cards .trade-card { padding: 8px 10px; gap: 6px; }
+body.trade-cards .tc-name, body.trade-cards .tc-item-name, body.trade-cards .tc-price { font-size: var(--fs-md); }
+body.trade-cards .tc-where, body.trade-cards .tc-last, body.trade-cards .tc-note,
+body.trade-cards .ov-zone-text, body.trade-cards .sheet-li { font-size: var(--fs-sm); }
+body.trade-cards .btn-sm { font-size: var(--fs-sm); }
+body.trade-cards .ov-grip { padding: 4px 6px; font-size: 16px; color: var(--text-2); opacity: 1; }
+/* the icon: a bigger target; its hover buttons match the sidebar's icons */
+body.trade-cards .ov-icon { width: 44px; height: 44px; }
+body.trade-cards .ov-logo { font-size: var(--fs-sm); }
+body.trade-cards .ov-bar { gap: 6px; }
+body.trade-cards .ov-bar .btn-icon { width: 32px; height: 32px; border: 1px solid var(--border-hi);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 4px 12px rgba(0, 0, 0, .45); }
+body.trade-cards .sheet-head .btn-icon { width: 30px; height: 30px; font-size: var(--fs-lg); }
 /* cheat sheets (js/app/24-cheatsheets.js): the overlay (?sheet=1) and the Tools → Cheat sheets page */
-.sheet-root { display: inline-block; padding: 2px; opacity: var(--ov-opacity, .92); transition: opacity .15s; }
+.sheet-root { display: inline-block; padding: 2px; opacity: var(--ov-opacity, .95); transition: opacity .15s; }
 .sheet-root:hover { opacity: 1; }
 .sheet-panel { background: var(--s1); border: 1px solid var(--border); border-left: 3px solid var(--accent);
   border-radius: var(--r-md); box-shadow: 0 4px 14px var(--shadow); overflow: hidden; }
@@ -480,11 +519,15 @@ body.trade-cards .trades-root:hover { opacity: 1; }
 .sheet-li { display: flex; align-items: baseline; gap: 6px; color: var(--text); font-size: var(--fs-sm); line-height: 1.45; }
 .sheet-li.is-here { color: var(--success); font-weight: 600; }
 .sheet-li.sheet-sub { color: var(--text-2); font-style: italic; }
-.sheet-tag { flex: none; min-width: 4.6em; text-align: center; padding: 0 4px; border-radius: var(--r-sm);
-  font-size: var(--fs-xs); font-weight: 600; color: var(--c, var(--text-2)); border: 1px solid var(--c, var(--border)); }
+/* soft filled tags, one colour per kind: points green, trials blue, respecs grey */
+.sheet-tag { flex: none; min-width: 4.8em; text-align: center; padding: 1px 6px; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: 600; color: var(--c, var(--text-2));
+  background: color-mix(in srgb, var(--c, var(--text-2)) 16%, transparent); }
 .sheet-tag.is-point { --c: var(--success); }
-.sheet-tag.is-respec { --c: var(--info); }
-.sheet-tag.is-trial { --c: var(--warn); }
+.sheet-tag.is-respec { --c: var(--text-2); }
+.sheet-tag.is-trial { --c: var(--info); }
+.sheet-li-text { display: flex; flex-direction: column; min-width: 0; }
+.sheet-li-sub { color: var(--text-2); font-size: var(--fs-xs); font-weight: 400; }
 .sheet-user-text { color: var(--text); font-size: var(--fs-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
 .sheet-img { display: block; max-width: 100%; margin-top: 6px; border-radius: var(--r-sm); }
 .sheet-empty { color: var(--text-3); font-style: italic; font-size: var(--fs-sm); }
@@ -528,7 +571,8 @@ body.trade-cards .trades-root:hover { opacity: 1; }
 .sheets-mech { display: flex; flex-direction: column; gap: 6px; }
 .sheet-panel.is-mech { max-width: 760px; }
 .sheet-hint { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 6px; background: var(--s1);
-  border: 1px solid var(--accent); border-radius: 999px; box-shadow: 0 4px 14px var(--shadow); white-space: nowrap; }
+  border: 1px solid var(--accent); border-radius: 999px; white-space: nowrap;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 8px 22px rgba(0, 0, 0, .5); } /* the in-game panel ring (see above) */
 .sheet-hint-text { color: var(--text); font-size: var(--fs-sm); font-weight: 600; padding: 0 4px; }
 .zone-notes { display: flex; flex-direction: column; gap: 4px; }
 .zone-row { display: flex; align-items: center; gap: 8px; }
@@ -539,28 +583,25 @@ body.trade-cards .trades-root:hover { opacity: 1; }
 .trade-h3 { font-size: var(--fs-md); margin: 8px 0 0; }
 .trade-warn { color: var(--warn); }
 
-/* ---- medium windows (the app opens 1280 wide; users shrink it): icon rail ---- */
-.nav-icon { display: none; width: 18px; text-align: center; flex: none; }
-.nav-item .nav-label { flex: 1; }
+/* icon art (css/navicons.css, tools/make_navicons.py): line-art masks painted in the text
+   colour, so they follow the theme and accent; quieter than the label until hovered / current */
+.ni { display: inline-block; flex: none; width: 18px; height: 18px; background-color: currentColor;
+  -webkit-mask: var(--ni) center / contain no-repeat; mask: var(--ni) center / contain no-repeat; }
+.nav-item .ni { color: var(--text-3); }
+.nav-item:hover .ni { color: var(--text-2); }
+.nav-item[aria-current="page"] .ni { color: var(--accent); }
+.btn-icon .ni { width: 18px; height: 18px; }
+body.trade-cards .ov-bar .btn-icon .ni { width: 20px; height: 20px; color: var(--accent); }
+
+/* ---- medium windows (the app opens 1280 wide; users shrink it): a narrower sidebar that
+   keeps every icon's name next to it (an icon-only rail was harder to read) ---- */
+.nav-icon { display: inline-block; width: 18px; text-align: center; flex: none; }
+.nav-item .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #rail-build-btn { display: none; }
 @media (min-width: 1001px) and (max-width: 1180px) {
-  body.has-build .app-shell { grid-template-columns: 64px minmax(0, 1fr); }
-  .sidebar { padding: 12px 8px; align-items: center; }
-  .brand span { display: none; }
-  #rail-build-btn { display: inline-flex; }
-  .sidebar .build-card { display: none; }
-  .sidebar.show-build .build-card:not(.hidden) {
-    display: flex; position: fixed; left: 72px; top: 12px; width: 260px; z-index: 30;
-    border: 1px solid var(--border-strong); box-shadow: 0 8px 24px var(--shadow);
-  }
-  .nav { align-items: center; }
-  .nav-group { display: none; }
-  .nav-item { width: 44px; justify-content: center; padding: 0; }
-  .nav-item .nav-label, .nav-item .nav-count, #settings-btn-side .nav-label { display: none; }
-  .nav-icon { display: inline; font-size: var(--fs-lg); }
-  .side-foot { align-items: center; }
+  body.has-build .app-shell { grid-template-columns: 216px minmax(0, 1fr); }
+  .sidebar { padding-left: 8px; padding-right: 8px; }
   .side-foot .market-tile { display: none !important; }
-  #settings-btn-side { width: 44px; padding: 0; justify-content: center; }
   .master-detail { grid-template-columns: 220px minmax(0, 1fr); }
 }
 

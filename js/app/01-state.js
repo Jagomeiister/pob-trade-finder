@@ -95,12 +95,16 @@ function loadPrefs() {
 }
 
 var LIGHT_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+// the windows drawn over the game (price check, icon, trade cards, cheat sheet) stay dark
+// whatever the app theme: a light panel glares over a dark game, like a torch in the face
+var IN_GAME_PAGE = /[?&](overlay|ovicon|cards|sheet|sheethint)=1(&|$)/.test(location.search);
 
 function applyPrefs() {
   migratePrefs(); // prefs hydrated from the desktop store can still carry old names
   var root = document.documentElement;
   var t = THEMES[PREFS.theme === 'system' ? (LIGHT_QUERY && LIGHT_QUERY.matches ? 'light' : 'dark') : PREFS.theme] ||
           THEMES.dark;
+  if (IN_GAME_PAGE && t[0] === 'light') t = THEMES.dark;
   if (t[0]) root.dataset.theme = t[0]; else delete root.dataset.theme;
   if (t[1]) root.dataset.surface = t[1]; else delete root.dataset.surface;
   if (PREFS.accent && PREFS.accent !== 'gold') root.dataset.accent = PREFS.accent; else delete root.dataset.accent;

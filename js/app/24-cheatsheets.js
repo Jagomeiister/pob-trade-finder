@@ -30,7 +30,7 @@ function sheetPrefs() {
   var p;
   try { p = JSON.parse(localStorage.getItem(SHEET_PREFS_KEY)) || {}; } catch (e) { p = {}; }
   if (!(p.act >= 1 && p.act <= 10)) p.act = 1;
-  if (p.opacity === undefined) p.opacity = 92;
+  if (p.opacity === undefined) p.opacity = 95; // nearly solid: readable over bright scenes
   if (!p.scale) p.scale = 100;
   if (!p.width) p.width = 320;
   if (!p.height) p.height = 520;          // the sheet scrolls past this (mechanic tables are long)
@@ -167,7 +167,10 @@ function sheetContent(act, opts) {
       var here = sheetArea && sheetArea === t.area;
       var li = UI.el('li', 'sheet-li' + (here ? ' is-here' : ''));
       li.appendChild(UI.el('span', 'sheet-tag is-trial', 'trial'));
-      li.appendChild(UI.el('span', null, t.area + ' · ' + t.trap));
+      var txt = UI.el('span', 'sheet-li-text'); // area on top, its traps quieter underneath
+      txt.appendChild(UI.el('span', null, t.area));
+      txt.appendChild(UI.el('span', 'sheet-li-sub', t.trap));
+      li.appendChild(txt);
       if (here) li.appendChild(UI.chip('you\'re here', 'success'));
       tl.appendChild(li);
     });
@@ -222,10 +225,14 @@ function renderSheetOverlay() {
   if (grip) head.appendChild(grip);
   if (mech) {
     head.appendChild(UI.iconButton('‹', 'Back to the act sheet', { size: 'sm', onClick: function () { sheetShow(null); } }));
-    head.appendChild(UI.el('span', 'sheet-title', mech.title));
+    var mt = UI.el('span', 'sheet-title', mech.title);
+    mt.title = 'Game data: ' + (mech.source || 'Path of Exile Wiki') + ' (CC BY-NC-SA 3.0)'; // the full credit line is in Tools → Cheat sheets
+    head.appendChild(mt);
   } else {
     head.appendChild(UI.iconButton('‹', 'Previous act', { size: 'sm', onClick: function () { sheetStep(-1); } }));
     var title = UI.el('span', 'sheet-title', 'Act ' + p.act);
+    var src = sheetData();
+    if (src) title.title = 'Game data: ' + src.source; // the full credit line is in Tools → Cheat sheets
     if (p.follow) {
       var dot = UI.el('span', 'sheet-follow-dot');
       dot.title = 'Follows your act from the game log';
@@ -246,7 +253,7 @@ function renderSheetOverlay() {
   var body = UI.el('div', 'sheet-body');
   body.style.maxHeight = Math.max(200, Math.min(1400, p.height)) + 'px';
   if (sheetPicking) body.appendChild(sheetPicker(function (id) { sheetPicking = false; sheetShow(id); }, p.sheet));
-  else body.appendChild(mech ? mechanicContent(mech) : sheetContent(p.act));
+  else body.appendChild(mech ? mechanicContent(mech, { noSource: true }) : sheetContent(p.act, { noSource: true }));
   panel.appendChild(body);
   root.appendChild(panel);
   fitSheetOverlay();
@@ -600,7 +607,7 @@ function renderSheetGameControls(p) {
   look.appendChild(slider('Width', p.width, 220, 640, 20, 'px', 'width'));
   look.appendChild(slider('Max height', p.height, 200, 1400, 20, 'px', 'height'));
   look.appendChild(slider('Size', p.scale, 70, 150, 5, '%', 'scale'));
-  look.appendChild(slider('Opacity', p.opacity, 30, 100, 2, '%', 'opacity'));
+  look.appendChild(slider('Opacity', p.opacity, 30, 100, 5, '%', 'opacity'));
   box.appendChild(look);
 
   var more = UI.el('div', 'trade-row');
