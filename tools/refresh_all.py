@@ -20,6 +20,9 @@ STEPS = [
     [sys.executable, "tools/make_uniquenames.py"],
     [sys.executable, "tools/make_uniqueranges.py"],
     [sys.executable, "tools/make_gemtypes.py"],
+    [sys.executable, "tools/make_watcherseye.py"],
+    [sys.executable, "tools/make_forbidden.py"],
+    [sys.executable, "tools/make_mapmods.py"],
     [sys.executable, "tools/make_currencymap.py"],  # after make_baseicons (needs base_items)
     [sys.executable, "tools/make_craftdata.py", "--fetch"],  # after currencymap + ranges
     [sys.executable, "tools/make_jeweldata.py", "--fetch"],  # tree export + gems

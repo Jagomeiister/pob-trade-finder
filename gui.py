@@ -1581,6 +1581,15 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    def game_search_paste(self, text):
+        """Search text builder: one press fills the game's open stash / vendor search box."""
+        try:
+            if not self._sender:
+                self._sender = trade_helper.ChatSender(find_game=self._find_poe_window)
+            return self._sender.paste_search(str(text or ""))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     def trade_highlight(self, left, top, tab=""):
         """Outline a stash cell over the game for a few seconds (display only)."""
         try:

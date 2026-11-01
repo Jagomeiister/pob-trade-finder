@@ -239,6 +239,7 @@ STUB_JS = r"""
     trade_status: function () { return { ok: true, watching: true, logName: 'Client.txt' }; },
     trade_prefs_changed: function () { return { ok: true }; },
     open_main: function () { return { ok: true }; },
+    game_search_paste: function () { return { ok: true }; },
     overlay_toggle_cards: function () { return { ok: true }; },
     set_hotkey: function (n, spec) { return { ok: true, hotkeys: {} }; },
     hotkeys_status: function () { return { ok: true, hotkeys: {} }; },
@@ -1734,6 +1735,177 @@ def scenario_overlay_icon(s, tag):
     check(tag + " icon window sized to the button", r["fit"][0] == "icon" and 0 < r["fit"][1] < 200, r["fit"])
 
 
+S21_UNIQUES = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+BATCH_GAP_MS = 5;
+setView('uniques');
+await H.sleep(30);
+const sec = document.querySelector('.tab-section[data-tab="uniques"]');
+out.nav = [...document.querySelectorAll('#nav .nav-item')].some(b => b.dataset.view === 'uniques');
+out.visible = sec.getBoundingClientRect().height > 100;
+out.auras = [...sec.querySelectorAll('.uj-aura')].map(b => [b.textContent, b.classList.contains('is-on')]);
+out.buildAuras = buildAuras(build);
+// make sure Anger + Determination are picked, then tick two mods
+['Anger', 'Determination'].forEach(a => { const c = [...sec.querySelectorAll('.uj-aura')].find(b => b.textContent === a);
+  if (!c.classList.contains('is-on')) c.click(); });
+await H.sleep(20);
+const modRow = t => [...sec.querySelectorAll('.uj-mod')].find(r => r.textContent.includes(t));
+const extra = modRow('Gain #% of Physical Damage as Extra Fire Damage');
+extra.querySelector('input[type=checkbox]').click();
+extra.querySelector('input[type=number]').value = '20';
+modRow('Prevent +#% of Reflected Physical Damage').querySelector('input[type=checkbox]').click();
+await H.sleep(20);
+const n0 = H.calls('open_url').length;
+H.button(sec, 'Search on trade ↗').click();
+await H.sleep(20);
+out.url = (H.calls('open_url')[n0] || { args: [''] }).args[0];
+window.__stubOverrides.trade_search = { ok: true, total: 3, listings: [
+  { id: 'w1', amount: 5, currency: 'divine', account: 'A#1', whisper: '@a hi', online: true,
+    explicitMods: ['Gain 22% of Physical Damage as Extra Fire Damage while affected by Anger', '+1% to all maximum Resistances'] }] };
+window.__stubOverrides.exchange_rates = { ok: true, rates: { divine: 200 } };
+const before = H.calls('trade_search').length;
+H.button(sec, 'Check price').click();
+await H.waitFor(() => sec.querySelector('.uj-listing'), 3000, 'listing');
+out.listing = H.text('.uj-listing', sec);
+out.summary = H.text('.uj-out .finder-sub', sec);
+// a third mod, then price each pair: 3 searches, each an AND of exactly two
+modRow('additional Physical Damage Reduction').querySelector('input[type=checkbox]').click();
+await H.sleep(20);
+const b2 = H.calls('trade_search').length;
+H.button(sec, 'Price each pair').click();
+await H.waitFor(() => H.calls('trade_search').length - b2 >= 3 && H.button(sec, 'Price each pair'), 8000, 'pairs');
+await H.sleep(50);
+out.pairPayloads = H.calls('trade_search').slice(b2).map(c => JSON.parse(c.args[1]).query.stats[0]);
+out.pairRows = sec.querySelectorAll('.uj-pair').length;
+// Forbidden: your ascendancy's notables, a pair = Flame + Flesh with the same node
+sec.querySelector('.segmented [data-value="forbidden"]').click();
+await H.sleep(20);
+out.asc = sec.querySelector('select[aria-label=Ascendancy]').value;
+out.notables = sec.querySelectorAll('.uj-fb').length;
+const b3 = H.calls('trade_search').length;
+H.button(sec.querySelector('.uj-fb'), 'Price pair').click();
+await H.waitFor(() => H.calls('trade_search').length - b3 >= 2, 8000, 'forbidden');
+await H.sleep(50);
+out.fb = H.calls('trade_search').slice(b3).map(c => { const q = JSON.parse(c.args[1]).query; return [q.name, q.type, q.stats[0].filters[0].id]; });
+out.fbPrice = H.text('.uj-fb .uj-price', sec);
+// Thread of Hope: five sizes, each its own stat id
+sec.querySelector('.segmented [data-value="thread"]').click();
+await H.sleep(20);
+out.rings = [...sec.querySelectorAll('.uj-pair-mods')].map(e => e.textContent);
+const n1 = H.calls('open_url').length;
+H.button(sec.querySelectorAll('.uj-pair')[4], 'Search on trade ↗').click();
+await H.sleep(20);
+out.threadUrl = decodeURIComponent((H.calls('open_url')[n1] || { args: [''] }).args[0]);
+delete window.__stubOverrides.trade_search;
+return out;
+"""
+
+
+def scenario_uniques(s, tag):
+    s.fresh()
+    r = s.run(S21_UNIQUES, timeout=60)
+    check(tag + " Watcher's Eye & co. in the sidebar and visible", r["nav"] and r["visible"], (r["nav"], r["visible"]))
+    check(tag + " all 17 auras offered, build's auras pre-picked", len(r["auras"]) == 17 and
+          all(on == (name in r["buildAuras"]) for name, on in r["auras"]), (r["buildAuras"], r["auras"]))
+    u = __import__("urllib.parse").parse.unquote(r["url"] or "")
+    check(tag + " trade link: league in the URL, Watcher's Eye, correct current stat ids", "/trade/search/" in u and
+          "Watcher's Eye" in u and "explicit.stat_4245204226" in u and "explicit.stat_2255585376" in u and
+          '"min":20' in u and '"type":"count"' not in u, u[:300])
+    check(tag + " in-app price check lists the jewel (aura mods only)", "5 divine" in (r["listing"] or "") and
+          "Extra Fire" in r["listing"] and "maximum Resistances" not in r["listing"], r["listing"])
+    check(tag + " cheapest shown in chaos", "1000" in (r["summary"] or "") or "5 div" in (r["summary"] or ""), r["summary"])
+    pp = r["pairPayloads"]
+    check(tag + " price each pair: 3 searches, each AND of two mods", len(pp) == 3 and
+          all(g["type"] == "and" and len(g["filters"]) == 2 for g in pp) and r["pairRows"] == 3, (pp, r["pairRows"]))
+    check(tag + " Forbidden: build's ascendancy and its notables", r["asc"] == "Elementalist" and r["notables"] >= 5,
+          (r["asc"], r["notables"]))
+    fb = r["fb"]
+    check(tag + " Forbidden pair = Flame (Crimson) + Flesh (Cobalt), same node", len(fb) == 2 and
+          fb[0][:2] == ["Forbidden Flame", "Crimson Jewel"] and fb[1][:2] == ["Forbidden Flesh", "Cobalt Jewel"] and
+          fb[0][2].startswith("explicit.stat_2460506030|") and fb[1][2].startswith("explicit.stat_1190333629|") and
+          fb[0][2].split("|")[1] == fb[1][2].split("|")[1], fb)
+    check(tag + " pair price shown", "the pair" in (r["fbPrice"] or ""), r["fbPrice"])
+    check(tag + " Thread of Hope: 5 ring sizes, Massive = |5", r["rings"] == ["Small Ring", "Medium Ring", "Large Ring",
+          "Very Large Ring", "Massive Ring"] and "explicit.stat_3642528642|5" in r["threadUrl"], (r["rings"], r["threadUrl"][:200]))
+
+
+S22_SEARCH = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+setView('search');
+await H.sleep(30);
+const sec = document.querySelector('.tab-section[data-tab="search"]');
+out.visible = sec.getBoundingClientRect().height > 100;
+out.mods = sec.querySelectorAll('.st-mod').length;
+const f = sec.querySelector('input[aria-label="Filter map mods"]');
+const row = t => [...sec.querySelectorAll('.st-mod')].find(r => r.querySelector('.st-mod-text').textContent === t);
+const regen = 'Players cannot Regenerate Life, Mana or Energy Shield';
+row(regen).querySelector('button[title="Avoid"]').click();
+await H.sleep(10);
+row('Players are Cursed with Vulnerability').querySelector('button[title="Avoid"]').click();
+await H.sleep(10);
+row('Monster Damage Penetrates #% Elemental Resistances').querySelector('button[title="Want"]').click();
+await H.sleep(10);
+const q = sec.querySelector('input[aria-label="Minimum item quantity"]');
+q.value = '60'; q.dispatchEvent(new Event('input'));
+await H.sleep(10);
+out.tokens = { regen: row(regen).querySelector('.st-token').textContent,
+  vuln: row('Players are Cursed with Vulnerability').querySelector('.st-token').textContent,
+  pen: row('Monster Damage Penetrates #% Elemental Resistances').querySelector('.st-token').textContent };
+out.text = sec.querySelector('.st-text').value;
+out.count = H.text('.st-result .badge', sec);
+f.value = 'cursed'; f.dispatchEvent(new Event('input'));
+await H.sleep(10);
+out.filtered = sec.querySelectorAll('.st-mod').length;
+H.button(sec, 'Copy').click();
+await H.sleep(30);
+out.clip = window.__clip;
+H.button(sec, 'Paste into game').click();
+await H.sleep(30);
+out.paste = (H.calls('game_search_paste')[0] || { args: [] }).args[0];
+sec.querySelector('input[aria-label="Preset name"]').value = 'my maps';
+H.button(sec, 'Save preset').click();
+await H.sleep(20);
+H.button(sec, 'Clear').click();
+await H.sleep(20);
+out.cleared = sec.querySelector('.st-text').value;
+H.button(sec.querySelector('.st-presets'), 'my maps').click();
+await H.sleep(20);
+out.loaded = sec.querySelector('.st-text').value;
+sec.querySelector('.segmented [data-value="custom"]').click();
+await H.sleep(20);
+const ta = sec.querySelector('.st-words');
+ta.value = 'movement speed\nr-g-b'; ta.dispatchEvent(new Event('input'));
+await H.sleep(10);
+out.anyWords = sec.querySelector('.st-text').value;
+const mode = [...sec.querySelectorAll('select')].find(s => [...s.options].some(o => o.value === 'exclude'));
+mode.value = 'exclude'; mode.dispatchEvent(new Event('change'));
+await H.sleep(10);
+out.noneWords = sec.querySelector('.st-text').value;
+out.long = buildSearchText({ avoid: Array.from({ length: 20 }, (_, i) => 'abc' + i), want: [], quant: 0 }).length;
+return out;
+"""
+
+
+def scenario_search(s, tag):
+    s.fresh()
+    r = s.run(S22_SEARCH, timeout=60)
+    check(tag + " Search text view visible with the map mods", r["visible"] and r["mods"] > 60, (r["visible"], r["mods"]))
+    t = r["tokens"]
+    want = '"!%s|%s" "%s" "m q.*(\d{3}|[6-9]\d)%%"' % (t["regen"], t["vuln"], t["pen"])
+    check(tag + " avoid + want + quantity build one search string", r["text"] == want, (r["text"], want))
+    check(tag + " length shown against the 50 limit", r["count"] == "%d / 50" % len(want), r["count"])
+    check(tag + " filter narrows the list", 0 < r["filtered"] < 15, r["filtered"])
+    check(tag + " Copy puts it on the clipboard", r["clip"] == want, r["clip"])
+    check(tag + " Paste into game sends that text (one press)", r["paste"] == want, r["paste"])
+    check(tag + " presets save and load", r["cleared"] == "" and r["loaded"] == want, (r["cleared"], r["loaded"]))
+    check(tag + " own words: any / none", r["anyWords"] == '"movement speed|r-g-b"' and
+          r["noneWords"] == '"!movement speed|r-g-b"', (r["anyWords"], r["noneWords"]))
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -1755,6 +1927,8 @@ SCENARIOS = [
     ("18 v21b", scenario_v21b),
     ("19 trades", scenario_trades),
     ("20 ovicon", scenario_overlay_icon),
+    ("21 uniques", scenario_uniques),
+    ("22 search", scenario_search),
 ]
 
 

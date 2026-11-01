@@ -1,0 +1,114 @@
+"""Generate data/mapmods.js: map mods with the shortest in-game search token for each (what
+poe.re does), for the Search text builder (js/app/21-search-text.js).
+
+Source: data/mods.min.json (RePoE, already bundled). Map mods = area-domain prefixes/suffixes
+that spawn on tiered maps (low/mid/top/uber tier tags); logbook, corrupted side-area and
+Maven-only mods are left out. Quantity / rarity / pack size lines are dropped (a map shows
+those as its totals, not per mod).
+
+A token is the shortest lower-case piece of the mod's text (no digits, so it matches every
+roll) that appears in no other map mod and in none of the text every map carries (name,
+properties, influence lines). Run:  python tools/make_mapmods.py
+"""
+import json
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MAP_TAGS = {"low_tier_map", "mid_tier_map", "top_tier_map", "uber_tier_map"}
+DROP = re.compile(r"increased (quantity|rarity) of items found in this area|monster pack size|"
+                  r"increased pack size|more maps|more currency|more scarabs|chance for .* to drop", re.I)
+# text on every map item: a token must not match these (it would select every map)
+COMMON = ("map tier: item quantity: item rarity: monster pack size: more currency: more maps: more scarabs: "
+          "quality: corrupted unidentified travel to this map by using it in a personal map device. "
+          "maps can only be used once. rarity: normal magic rare unique map item class: maps area level "
+          "delirium blighted uber elder shaper conqueror influenced originator memory nightmare")
+MAX_TOKEN = 24
+
+
+def mod_lines(text):
+    out = []
+    for line in (text or "").split("\n"):
+        line = line.strip()
+        if line and not DROP.search(line):
+            line = re.sub(r"\[(?:[^|\]]*\|)?([^\]]*)\]", r"\1", line)  # [PhysicalThorns|Physical Thorns]
+            out.append(re.sub(r"\((-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\)|\d+(?:\.\d+)?", "#", line))
+    return out
+
+
+def candidates(line):
+    s = line.lower()
+    seen = set()
+    for n in range(3, min(MAX_TOKEN, len(s)) + 1):
+        for i in range(0, len(s) - n + 1):
+            t = s[i:i + n]
+            if "#" in t or t[0] == " " or t[-1] == " " or t in seen:
+                continue
+            seen.add(t)
+            yield t
+
+
+def main():
+    mods = json.load(open(os.path.join(ROOT, "data", "mods.min.json"), encoding="utf-8"))
+    groups = {}  # template text -> {lines, tiers, kind, ids}
+    for key, m in mods.items():
+        if m.get("domain") != "area" or m.get("generation_type") not in ("prefix", "suffix"):
+            continue
+        tags = {w["tag"] for w in m.get("spawn_weights", []) if w["weight"] > 0}
+        if not tags & MAP_TAGS:
+            continue
+        lines = mod_lines(m.get("text"))
+        if not lines:
+            continue
+        k = " / ".join(lines)
+        g = groups.setdefault(k, {"text": k, "lines": lines, "kind": m["generation_type"],
+                                  "uber": True, "ids": []})
+        g["ids"].append(key)
+        g["uber"] = g["uber"] and tags <= {"uber_tier_map"}  # T17-only
+    pool = list(groups.values())
+    lines_of = [[ln.lower() for ln in g["lines"]] for g in pool]
+    # every map also shows its name: a token must not match any map base either
+    try:
+        bases = json.load(open(os.path.join(ROOT, "data", "base_items.min.json"), encoding="utf-8"))
+        names = [b.get("name", "") for b in bases.values() if b.get("item_class") == "Map"]
+    except Exception:
+        names = []
+    common = (COMMON + " " + " ".join(names)).lower()
+    missing = []
+    for gi, g in enumerate(pool):
+        # a token may also hit another map mod only if that mod has the very same line (the
+        # same effect): "more monster life" also finds "cannot be stunned / more monster life"
+        best = None
+        for line in lines_of[gi]:
+            ok = []
+            for t in candidates(line):
+                if best and len(t) > len(best):
+                    break
+                if ok and len(t) > len(ok[0]):
+                    break
+                if t in common:
+                    continue
+                if all(line in lines_of[oj] for oj in range(len(pool))
+                       if oj != gi and any(t in ln for ln in lines_of[oj])):
+                    ok.append(t)
+            if ok:
+                ok.sort(key=lambda t: (" " in t, t))  # same length: one without spaces reads better
+                if not best or len(ok[0]) < len(best) or (len(ok[0]) == len(best) and " " in best and " " not in ok[0]):
+                    best = ok[0]
+        g["token"] = best
+        if not best:
+            missing.append(g["text"])
+    out = [{"text": g["text"], "token": g["token"], "kind": g["kind"], "t17": g["uber"]}
+           for g in sorted(pool, key=lambda g: g["text"].lower())]
+    with open(os.path.join(ROOT, "data", "mapmods.js"), "w", encoding="utf-8") as f:
+        f.write("// generated by tools/make_mapmods.py from RePoE map mods; token = shortest unique search text\n")
+        f.write("window.POE_MAP_MODS = " + json.dumps(out, ensure_ascii=False, separators=(",", ":")) + ";\n")
+    print("Wrote data/mapmods.js: %d map mods, %d without a unique token" % (len(out), len(missing)))
+    for t in missing[:10]:
+        print("  no token:", t)
+    return 0 if len(out) > 40 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

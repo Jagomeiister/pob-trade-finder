@@ -556,8 +556,9 @@ def command_for(action, name, text=None):
 
 
 # -- sending one chat command ---------------------------------------------------
-VK_RETURN, VK_CONTROL, VK_A, VK_V = 0x0D, 0x11, 0x41, 0x56
+VK_RETURN, VK_CONTROL, VK_A, VK_V, VK_F = 0x0D, 0x11, 0x41, 0x56, 0x46
 MAX_COMMAND = 512
+MAX_SEARCH = 250  # the stash search box takes 50; the builder warns, the game truncates
 STEP_DELAY = 0.04       # between key steps
 FOCUS_WAIT = 0.4        # how long to wait for the game to come to the front
 RESTORE_DELAY = 0.25    # let the game read the clipboard before it is put back
@@ -625,14 +626,28 @@ class ChatSender:
             except Exception as e:
                 return {"ok": False, "error": "Couldn't send to Path of Exile: %s" % e}
 
-    def _send(self, command):
+    def paste_search(self, text):
+        """Search text builder: one press fills the open stash / vendor search box —
+        focus the game, Ctrl+F, Ctrl+A, paste (no Enter: the game searches as you type);
+        the clipboard text is put back afterwards."""
+        if not isinstance(text, str) or not text.strip():
+            return {"ok": False, "error": "Nothing to paste"}
+        if "\n" in text or "\r" in text or len(text) > MAX_SEARCH:
+            return {"ok": False, "error": "Search text must be one line of at most %d characters" % MAX_SEARCH}
+        with self._lock:
+            try:
+                return self._send(text, search=True)
+            except Exception as e:
+                return {"ok": False, "error": "Couldn't paste into Path of Exile: %s" % e}
+
+    def _send(self, command, search=False):
         w, sleep = self._win, self._sleep
         hwnd = self._find_game()
         if not hwnd:
             return {"ok": False, "error": "Path of Exile isn't running"}
         if w.elevation_mismatch(hwnd):
             return {"ok": False, "error": ELEVATION_ERROR}
-        vk = self._chat_vk or read_chat_key()
+        vk = VK_F if search else (self._chat_vk or read_chat_key())
         prev = w.get_clipboard()
         touched = False
         try:
@@ -644,7 +659,7 @@ class ChatSender:
                 sleep(0.05)
                 waited += 0.05
             sleep(STEP_DELAY)
-            self._tap(vk)                    # open chat
+            self._tap(vk, ctrl=search)       # open chat / Ctrl+F: the search box
             sleep(STEP_DELAY)
             self._tap(VK_A, ctrl=True)       # select any draft text
             sleep(STEP_DELAY)
@@ -653,7 +668,8 @@ class ChatSender:
             sleep(STEP_DELAY)
             self._tap(VK_V, ctrl=True)       # paste
             sleep(STEP_DELAY)
-            self._tap(VK_RETURN)             # send
+            if not search:
+                self._tap(VK_RETURN)         # send
             sleep(RESTORE_DELAY)
             return {"ok": True, "error": None}
         finally:

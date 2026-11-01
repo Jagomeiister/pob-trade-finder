@@ -235,6 +235,8 @@ body[data-view="flasks"] .tab-section[data-tab="flasks"],
 body[data-view="gems"] .tab-section[data-tab="gems"],
 body[data-view="timeless"] .tab-section[data-tab="timeless"],
 body[data-view="finder"] .tab-section[data-tab="finder"],
+body[data-view="uniques"] .tab-section[data-tab="uniques"],
+body[data-view="search"] .tab-section[data-tab="search"],
 body[data-view="pasted"] .tab-section[data-tab="pasted"] { display: block; }
 body[data-view="gear"] .tab-section.master-detail[data-tab="gear"],
 body[data-view="jewels"] .tab-section.master-detail[data-tab="jewels"],

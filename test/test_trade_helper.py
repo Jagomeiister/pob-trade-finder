@@ -288,6 +288,16 @@ check("sender: short sleeps between steps", all(x[1] <= 0.3 for x in w.log if x[
       and sum(1 for x in w.log if x[0] == "sleep") >= 5)
 
 w = FakeWin()
+r = sender(w).paste_search('"!ege|abi" "m q.*(\\d{3}|[6-9]\\d)%"')
+want = ([("getclip",), ("focus", 777)] + tap(0x46, True) + tap(A, True) +
+        [("setclip", '"!ege|abi" "m q.*(\\d{3}|[6-9]\\d)%"')] + tap(V, True) + [("setclip", "old clip")])
+check("search paste: Ctrl+F, Ctrl+A, paste, no Enter, clipboard back", r["ok"] and no_sleep(w.log) == want,
+      no_sleep(w.log))
+w = FakeWin()
+check("search paste: refuses two lines / empty", not sender(w).paste_search("a\nb")["ok"] and
+      not sender(w).paste_search("  ")["ok"] and not any(x[0] == "key" for x in w.log), w.log)
+
+w = FakeWin()
 sender(w, vk=84).send("@Bob hi")
 check("sender: custom chat key", no_sleep(w.log)[2:4] == tap(84), no_sleep(w.log))
 

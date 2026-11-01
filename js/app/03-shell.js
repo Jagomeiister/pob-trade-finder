@@ -145,6 +145,8 @@ function renderBuild(setIndex) {
     section('timeless').appendChild(makeTimelessFinder(build));
     section('finder').appendChild(makeJewelFinder(build));
   }
+  section('uniques').appendChild(makeUniqueJewels(build)); // Watcher's Eye, Forbidden pair, Thread of Hope
+  section('search').appendChild(makeSearchText()); // in-game search text builder
 
   var present = VIEW_ORDER.filter(function (k) { return sections[k]; });
   present.forEach(function (k) { root.appendChild(sections[k]); });
@@ -177,14 +179,14 @@ function closeSettings() {
 }
 
 // ---- app shell: views, sidebar nav, slot lists, search context ---------------
-var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'pasted'];
+var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'uniques', 'search', 'pasted'];
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
-                    timeless: 'Timeless jewels', finder: 'Jewel finder', pasted: 'Pasted item',
+                    timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', pasted: 'Pasted item',
                     planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', market: '📈', stash: '💰', trades: '🤝' };
+                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', market: '📈', stash: '💰', trades: '🤝' };
 
 function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
 
@@ -231,7 +233,7 @@ function renderNav() {
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'timeless', 'finder', 'market', 'stash', 'trades'].filter(function (k) {
+  ['planner', 'timeless', 'finder', 'uniques', 'search', 'market', 'stash', 'trades'].filter(function (k) {
     if (k === 'stash') return OAUTH.signedIn; // official login only
     if (k === 'trades') return isGui();
     return k === 'planner' || k === 'market' || viewSection(k);
