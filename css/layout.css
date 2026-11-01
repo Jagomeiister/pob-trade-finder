@@ -354,7 +354,9 @@ body.overlay #overlay-bar {
   position: sticky; top: 0; z-index: 6; margin-bottom: 8px; padding: 6px 10px;
   background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: 0 4px 14px var(--shadow);
+  cursor: move; user-select: none; /* no title bar: the banner moves the window */
 }
+body.overlay #overlay-bar .btn { cursor: pointer; }
 .ov-title { color: var(--accent); font-weight: 600; font-variant: small-caps; letter-spacing: .5px; }
 .ov-meta { flex: 1; min-width: 0; color: var(--text-2); font-size: var(--fs-xs);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

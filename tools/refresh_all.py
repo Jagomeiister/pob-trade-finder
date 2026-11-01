@@ -46,6 +46,8 @@ STEPS = [
     [sys.executable, "test/test_oauth.py"],
     [sys.executable, "test/test_quick_price.py"],
     [sys.executable, "test/test_char_links.py"],
+    [sys.executable, "test/test_search_presets.py"],
+    [sys.executable, "test/test_macros.py"],
     [sys.executable, "test/test_trade_helper.py"],
     [sys.executable, "test/test_tray.py"],
     [sys.executable, "test/test_divcards.py"],

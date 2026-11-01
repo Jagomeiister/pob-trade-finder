@@ -187,6 +187,11 @@ class Api:
                 spec = default
             self._hotkey_specs[name] = spec
         self._hotkey_spec = self._hotkey_specs["price"]
+        self._macro_watchers = []
+        try:
+            self._macros = self._clean_macros(prefs.get("macros") or [])[0]
+        except Exception:
+            self._macros = []
 
     # -- shared HTTP helper: quota-aware throttle, global 429 lockout ------------
     def _read_quota(self, headers):
@@ -1222,16 +1227,26 @@ class Api:
 
     # -- tray icon + main window over the game ----------------------------------------
     def _main_hwnd(self):
-        """The main window's handle, cached: over the game its title is cleared (that's how the
-        title bar goes away), so it can't be found by name then."""
-        h = getattr(self, "_main_hwnd_cache", 0)
+        """The main window's handle, asked from its form: over the game its title is cleared
+        (that's how the title bar goes away) and WinForms re-creates the window for that (new
+        handle), so neither an old handle nor a title search would find it then. Kept while it
+        is still a window (this runs on every overlay tick)."""
+        return self._form_hwnd("_main_hwnd_cache", self._main_form() if self._main else None, MAIN_TITLE)
+
+    def _form_hwnd(self, cache, form, title):
+        h = getattr(self, cache, 0)
         if h and sys.platform == "win32":
             import ctypes
             if ctypes.windll.user32.IsWindow(h):
                 return h
-        h = price_hotkey.find_window(MAIN_TITLE)
-        if h:
-            self._main_hwnd_cache = h
+        h = 0
+        if form is not None:
+            try:
+                h = int(self._on_ui(lambda: form.Handle.ToInt64(), form) or 0)
+            except Exception:
+                h = 0
+        h = h or price_hotkey.find_window(title)
+        setattr(self, cache, h)
         return h
 
     def _main_form(self):
@@ -1242,10 +1257,64 @@ class Api:
         except Exception:
             return None
 
-    def _on_ui(self, fn):
+    def _price_form(self):
+        """pywebview's WinForms form for the price check (None off Windows / before it exists)."""
+        try:
+            from webview.platforms.winforms import BrowserView
+            return BrowserView.instances.get(self._overlay.uid) if self._overlay else None
+        except Exception:
+            return None
+
+    def _price_hwnd(self):
+        """The price-check window's handle. Asked from its form: dropping the title bar makes
+        WinForms re-create the window (new handle) and clears the title, so neither a cached
+        handle nor a title search would find it afterwards."""
+        return self._form_hwnd("_price_hwnd_cache", self._price_form(), OVERLAY_TITLE)
+
+    def _price_frameless(self):
+        """The price check is always an overlay, so it has no title bar: drag its banner to move
+        it, its edges still resize it. Same WinForms change as the app over the game (no title
+        text + no control box), made once on the window's own UI thread."""
+        if sys.platform != "win32" or getattr(self, "_price_frame_done", False):
+            return
+        form = self._price_form()
+        if form is None:
+            return
+
+        def apply():
+            form.ControlBox = False
+            form.Text = ""
+        self._on_ui(apply, form)
+        self._price_frame_done = True
+
+    def price_overlay_move(self, phase, dx=0, dy=0):
+        """Price-check banner drag: start / move by (dx, dy) CSS px / end. The next press
+        places it beside the hovered item again."""
+        try:
+            import ctypes
+            u = ctypes.windll.user32
+            hwnd = self._price_hwnd()
+            r = price_hotkey.window_rect(hwnd)
+            if not r:
+                return {"ok": False}
+            if phase == "start" or not getattr(self, "_price_drag_from", None):
+                self._price_drag_from = (r[0], r[1])
+                if phase == "start":
+                    return {"ok": True}
+            scale = u.GetDpiForWindow(hwnd) / 96.0 if hasattr(u, "GetDpiForWindow") else 1.0
+            x = int(self._price_drag_from[0] + float(dx) * scale)
+            y = int(self._price_drag_from[1] + float(dy) * scale)
+            u.SetWindowPos(hwnd, 0, x, y, 0, 0, 0x0001 | 0x0004 | 0x0010)  # NOSIZE | NOZORDER | NOACTIVATE
+            if phase == "end":
+                self._price_drag_from = None
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def _on_ui(self, fn, form=None):
         """Run fn on the main window's WinForms UI thread and wait for it (WinForms only behaves
         when its forms are changed from their own thread)."""
-        form = self._main_form()
+        form = form or self._main_form()
         if form is None:
             return fn()
         from System import Func, Type
@@ -1520,10 +1589,81 @@ class Api:
             except Exception as e:
                 _debug_log("%s hotkey unavailable: %s" % (name, e))
         self._hotkey = self._hotkeys.get("price")
+        self._start_macro_hotkeys()
 
     def _stop_hotkey(self):
         for w in self._hotkeys.values():
             w.stop()
+        for w in self._macro_watchers:
+            w.stop()
+
+    # -- chat macros: one press (button or hotkey) = one chat command, nothing else --------
+    MACRO_RE = re.compile(r"^/[A-Za-z_]{1,40}( [^\r\n]{1,200})?$")
+    MAX_MACROS = 12
+
+    def _clean_macros(self, macros):
+        """Validated macro list [{label, command, hotkey}] and a list of problems."""
+        out, errors, used = [], [], {s for s in self._hotkey_specs.values() if s not in price_hotkey.OFF}
+        for m in list(macros)[:self.MAX_MACROS]:
+            if not isinstance(m, dict):
+                continue
+            cmd = str(m.get("command") or "").strip()
+            if not self.MACRO_RE.fullmatch(cmd):
+                errors.append("%r isn't a chat command (start with /, one line)" % cmd[:40])
+                continue
+            hk = str(m.get("hotkey") or "off").strip().lower().replace(" ", "")
+            try:
+                price_hotkey.parse_hotkey(hk)
+            except ValueError as e:
+                errors.append(str(e))
+                hk = "off"
+            if hk not in price_hotkey.OFF:
+                if hk in used:
+                    errors.append("%s is already used for another hotkey" % price_hotkey.hotkey_label(hk))
+                    hk = "off"
+                else:
+                    used.add(hk)
+            out.append({"label": str(m.get("label") or cmd)[:40], "command": cmd, "hotkey": hk})
+        return out, errors
+
+    def _start_macro_hotkeys(self):
+        if sys.platform != "win32":
+            return
+        for w in self._macro_watchers:
+            w.stop()
+        self._macro_watchers = []
+        for m in self._macros:
+            if m["hotkey"] in price_hotkey.OFF:
+                continue
+            try:  # default target: only while the game itself is the foreground window
+                w = price_hotkey.HotkeyWatcher(lambda hwnd, cmd=m["command"]: self.chat_macro(cmd), m["hotkey"],
+                                               log=_debug_log)
+                w.start()
+                self._macro_watchers.append(w)
+            except Exception as e:
+                _debug_log("macro hotkey %s unavailable: %s" % (m["hotkey"], e))
+
+    def set_macros(self, macros_json):
+        """Settings → In game → Chat macros saved: re-register their hotkeys."""
+        try:
+            macros, errors = self._clean_macros(json.loads(macros_json or "[]"))
+            self._macros = macros
+            self._start_macro_hotkeys()
+            return {"ok": True, "macros": macros, "errors": errors}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def chat_macro(self, command):
+        """One chat command (/kingsmarch, /delve, /exit, your own) for one press."""
+        cmd = str(command or "").strip()
+        if not self.MACRO_RE.fullmatch(cmd):
+            return {"ok": False, "error": "A macro must be one chat command starting with /"}
+        try:
+            if not self._sender:
+                self._sender = trade_helper.ChatSender(find_game=self._find_poe_window)
+            return self._sender.send(cmd)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def set_hotkey(self, name, spec):
         """Settings → In game: change one hotkey (price | app | trades) at runtime."""
@@ -1533,6 +1673,7 @@ class Api:
             spec = (spec or "off").strip().lower().replace(" ", "")
             price_hotkey.parse_hotkey(spec)
             taken = [n for n, s in self._hotkey_specs.items() if n != name and s == spec and spec not in price_hotkey.OFF]
+            taken += [m["label"] for m in self._macros if m["hotkey"] == spec and spec not in price_hotkey.OFF]
             if taken:
                 return {"ok": False, "error": "%s is already used for another hotkey" % price_hotkey.hotkey_label(spec)}
             self._hotkey_specs[name] = spec
@@ -1565,7 +1706,8 @@ class Api:
         # JSON-encoded: the item text reaches JS as a string literal, never as code
         ov.evaluate_js("window.__overlayItem ? (window.__overlayItem(%s), true) : false"
                        % json.dumps(text))
-        hwnd = price_hotkey.find_window(OVERLAY_TITLE)
+        self._price_frameless()
+        hwnd = self._price_hwnd()
         game = price_hotkey.window_rect(game_hwnd)
         own = price_hotkey.window_rect(hwnd)
         if hwnd and game and own:
@@ -1675,7 +1817,7 @@ class Api:
                         and self._prefs().get("closeOnGameClick", True) is not False):
                     self._set_app_overlay(False, refocus=False)
                 hwnds = {n: price_hotkey.find_window(o["title"]) for n, o in OVERLAYS.items()}
-                ours = set(hwnds.values()) | {price_hotkey.find_window(OVERLAY_TITLE)}
+                ours = set(hwnds.values()) | {self._price_hwnd()}
                 if self._app_overlay:
                     ours.add(self._main_hwnd())
                 game_up = bool(game) and not u.IsIconic(game) and (fg == game or fg in ours)
@@ -2595,7 +2737,8 @@ class Api:
     # -- open in system browser --------------------------------------------------
     OPEN_URL_PREFIXES = ("https://www.pathofexile.com/",
                          "https://vilsol.github.io/timeless-jewels/",  # timeless seed calculator
-                         "https://www.poewiki.net/wiki/", "https://poedb.tw/us/")  # item reference pages
+                         "https://www.poewiki.net/wiki/", "https://poedb.tw/us/",  # item reference pages
+                         "https://poe.ninja/poe1/economy/")  # price history pages
 
     def open_url(self, url):
         if url.startswith(self.OPEN_URL_PREFIXES):

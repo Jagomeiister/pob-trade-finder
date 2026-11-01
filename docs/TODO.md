@@ -131,9 +131,9 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
   Blocked on one decision: which bench colour crafts are live. Allflame has white sockets
   and "2/3/4 non-white" crafts; Standard has the per-colour crafts. Ask which league
   matters, or support both with a toggle.
-- [ ] **Overlay for the price-check pop-up (Ctrl+D)**: it's still a normal window. Consider
+- [x] **Overlay for the price-check pop-up (Ctrl+D)** (done 2026-11-01: no title bar, drag the banner, edges resize): it's still a normal window. Consider
       the same borderless, clipped style as the other overlays.
-- [ ] **Gem setups: compare with your character** (asked 2026-11-01). The Gems view gets the
+- [x] **Gem setups: compare with your character** (released in v2.5.2) (asked 2026-11-01). The Gems view gets the
       same "you have / missing" marks as the gear compare. It reads the socketed gems from the
       imported character (`get-items`, `socketedItems`), already fetched by the gear compare.
   - Match each PoB skill group by its gems, **not by slot**. Players put links in other items
@@ -181,11 +181,11 @@ sources, or ask the author.
 - [ ] **Div card expected value per map**: Scalpel gets drop weights from wraeclast.cards
       (credits Maps of Exile + the Forbidden Library). Check its terms / an API. With weights,
       our Div cards "by area" becomes a real expected value instead of "cards that can drop".
-- [ ] **Chat macros**: buttons or hotkeys for /hideout, /kingsmarch, /menagerie, /delve,
+- [x] **Chat macros** (done 2026-11-01: Settings → In game, ▶ or a hotkey; no /hideout, the game has its own key): buttons or hotkeys for /hideout, /kingsmarch, /menagerie, /delve,
       /exit and your own commands. One press = one command, like the trade buttons.
-- [ ] **View on poe.ninja**: we have PoE Wiki / PoEDB links on items; add poe.ninja (uniques,
+- [x] **View on poe.ninja** (done 2026-11-01: card ⋯ menu, gem panels, Market chart, Ctrl+D quick price): we have PoE Wiki / PoEDB links on items; add poe.ninja (uniques,
       gems, currency).
-- [ ] **More search text presets**: Scalpel / poe.re do flask and vendor regex too. Add a
+- [x] **More search text presets** (done 2026-11-01: Flasks and Vendor tabs, tokens checked by test/test_search_presets.py): Scalpel / poe.re do flask and vendor regex too. Add a
       Flasks tab (useful affixes, e.g. "of the Armadillo") and vendor presets (movement speed
       boots, chromatic r-g-b, links).
 - [ ] **Socket recolour calculator**: already in section 3 (waiting on Allflame vs Standard).

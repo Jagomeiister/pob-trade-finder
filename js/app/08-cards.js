@@ -19,6 +19,35 @@ function poedbUrl(state) {
   return 'https://poedb.tw/us/' + encodeURIComponent(refName(state).replace(/ /g, '_').replace(/'/g, ''));
 }
 
+// poe.ninja economy pages: the league as poe.ninja writes it ("Hardcore Allflame" -> allflamehc;
+// SSF leagues use their trade league's prices), then the category page filtered by name
+function ninjaLeague(league) {
+  var l = String(league || 'Standard').replace(/\bSSF /, '').trim();
+  var hc = /^Hardcore (.+)$/.exec(l);
+  if (hc) return hc[1].toLowerCase().replace(/[^a-z0-9]/g, '') + 'hc';
+  return l.toLowerCase().replace(/[^a-z0-9]/g, '') || 'standard';
+}
+function ninjaUrl(category, name, league) {
+  return 'https://poe.ninja/poe1/economy/' + ninjaLeague(league || document.getElementById('league').value) +
+    '/' + category + '?name=' + encodeURIComponent(name);
+}
+// which poe.ninja page an item is on: uniques by kind, gems, currency, div cards; rares have none
+function ninjaCategory(state) {
+  var it = state.item, cls = it.itemClass || '';
+  if (it.rarity === 'GEM' || /Gem/.test(cls)) return 'skill-gems';
+  if (/Stackable Currency/.test(cls) || it.rarity === 'CURRENCY') return 'currency';
+  if (/Divination/.test(cls) || it.rarity === 'DIVINATION') return 'divination-cards';
+  if (!state.unique) return null;
+  var where = cls + ' ' + (state.slot || '');
+  var bt = (window.POE_BASE_TYPES || {})[it.base];
+  if (/Tincture/.test(where)) return 'unique-tinctures';
+  if (/Flask/.test(where)) return 'unique-flasks';
+  if (/Jewel/.test(where)) return 'unique-jewels';
+  if (/Ring|Amulet|Belt/.test(where)) return 'unique-accessories';
+  if (bt && /^weapon/.test(bt[0])) return 'unique-weapons';
+  return 'unique-armours'; // body / helmet / gloves / boots, shields and quivers
+}
+
 function renderPastedItem(item) {
   document.getElementById('controls').classList.remove('hidden');
   if (pastedState) {
@@ -278,7 +307,10 @@ function makeCard(slot, item, setIndex) {
       { label: 'Open on PoE Wiki ↗', onClick: function () { openUrl(wikiUrl(state)); },
         title: 'The item (uniques) or its base on poewiki.net' },
       { label: 'Open on PoEDB ↗', onClick: function () { openUrl(poedbUrl(state)); },
-        title: 'Mod tiers and weights for this base on poedb.tw' }
+        title: 'Mod tiers and weights for this base on poedb.tw' },
+      { label: 'Open on poe.ninja ↗', hidden: !ninjaCategory(state),
+        onClick: function () { openUrl(ninjaUrl(ninjaCategory(state), refName(state))); },
+        title: 'Price history and variants (links, corrupted) on poe.ninja, in the league you picked' }
     ];
   }, { ariaLabel: 'More actions for ' + slot });
   [priceBtn, liveBtn, openBtn, more].forEach(function (b) { actions.appendChild(b); });

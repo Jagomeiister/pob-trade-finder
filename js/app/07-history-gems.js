@@ -446,7 +446,9 @@ function makeGemsCard(gemGroups) {
         gemState.liveBtn = lBtn;
         var oBtn = UI.button('secondary', { cls: 'act-search', label: 'Search on trade ↗',
           onClick: function () { var url = buildTradeUrl(gemState); if (url) openUrl(url); } });
-        bar.appendChild(pBtn); bar.appendChild(lBtn); bar.appendChild(oBtn);
+        var nBtn = UI.button('ghost', { label: 'poe.ninja ↗', title: 'Price history for this gem on poe.ninja',
+          onClick: function () { openUrl(ninjaUrl('skill-gems', gem.name)); } });
+        bar.appendChild(pBtn); bar.appendChild(lBtn); bar.appendChild(oBtn); bar.appendChild(nBtn);
         panel.appendChild(bar);
 
         var lBox = document.createElement('div');
