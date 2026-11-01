@@ -26,3 +26,5 @@ data/fossils.min.json
 data/timeless_cache/
 data/art_cache/
 data/unique_icons_meta.json
+
+server/node_modules/

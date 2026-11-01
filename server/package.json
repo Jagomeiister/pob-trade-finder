@@ -1,0 +1,11 @@
+{
+  "name": "pobtf-api",
+  "private": true,
+  "description": "PoB Trade Finder backend: poe.ninja price proxy (cached), future OAuth/sync",
+  "type": "module",
+  "engines": { "node": "24.x" },
+  "scripts": { "test": "node test/prices.test.mjs" },
+  "dependencies": {
+    "@vercel/functions": "^3.10.5"
+  }
+}
