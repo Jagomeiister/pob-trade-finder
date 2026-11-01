@@ -1,14 +1,6 @@
-## v2.5.17: your builds at launch, the app without a build, and an Atlas tree
+## v2.5.17: screen scaling in diagnostics
 
-- **Builds page**: the app opens on your saved builds (newest opened first, with ascendancy,
-  level and Atlas strategy) above the paste box. Importing a new build offers ☆ Save, saving asks
-  for a name, and ⋯ renames, links an Atlas strategy or deletes. Up to 100 builds, with search.
-- **No build needed**: the sidebar is there from launch. Watcher's Eye & co., Search text, Div
-  cards, Cheat sheets, the Atlas tree, Dust explorer, Market and the Trade helper all work
-  without importing a build. Gear, the planner and the skill tree tools appear once you load one.
-- **Atlas tree** (Tools → Atlas tree): import an official Atlas tree link, a PoB code or pobb.in
-  link with Atlas links in its notes, or a list of node names. See your path on the tree with the
-  in-game icons and background, search it, and save it as a strategy with notes. Link a strategy
-  to each saved build; the build's card shows it, and the strategy shows which builds use it.
-- **Skill tree**: the in-game background behind the tree, and masteries drawn like in game: grey when
-  locked, lit when a notable next to them is taken, glowing with their pattern when chosen.
+- **Settings → Copy diagnostics** now lists every screen with its size, position and scaling,
+  and says **Mixed scaling: yes** when your screens use different scaling (e.g. 100% and 150%).
+  On such setups the in-game overlays can look stretched or sit slightly off on the second
+  screen. If you see that, send the diagnostics so it can be fixed for your setup.

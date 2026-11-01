@@ -41,6 +41,11 @@ check("other 32-hex tokens redacted", OTHER not in text)
 check("Windows user name redacted", "SomePlayer" not in text and "Users\\<user>" in text)
 check("says a session is saved, not what it is", "POESESSID saved: yes" in text)
 check("log tail included", "HTTP 429 POST /api/trade/search/Allflame" in text)
+if sys.platform == "win32":
+    disp = [l for l in text.splitlines() if l.startswith("Display ")]
+    check("each screen listed with its scaling (overlay reports on mixed-DPI setups)",
+          disp and all(l.rstrip(" (main)").endswith("%") for l in disp)
+          and sum(l.endswith("(main)") for l in disp) == 1, disp)
 
 # log cap: an oversized debug.log is cut to its newest half on the next write
 path = os.path.join(tmp, "debug.log")
