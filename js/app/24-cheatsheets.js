@@ -10,7 +10,12 @@
 // Your part: sheets of your own (text + pictures), for one act or for every act.
 // "Follow my act": the log reader (the one the trade helper uses) sees the game generate a
 // campaign area ("2_6_town" = Act 6) and the sheet turns to that act. Display only.
-var SHEET_OV = /[?&]sheet=1(&|$)/.test(location.search);
+// Mechanic sheets (Betrayal, Blight, Delve, …) come in the same data under "mechanics". Entering
+// a mechanic's area doesn't open anything big: a small pill (index.html?sheethint=1, its own
+// movable overlay, top centre by default) offers "Open", and the sheet shows only if you click.
+// The data updates from the app's server between releases (cheatsheets_data in gui.py).
+var SHEET_HINT = /[?&]sheethint=1(&|$)/.test(location.search);
+var SHEET_OV = SHEET_HINT || /[?&]sheet=1(&|$)/.test(location.search); // either sheet overlay page
 if (SHEET_OV) document.body.classList.add('trades', 'trade-cards', 'sheet-ov');
 
 var SHEET_PREFS_KEY = 'pobtf-sheet-prefs', SHEETS_KEY = 'pobtf-sheets';
@@ -18,6 +23,7 @@ var SHEET_IMG_PREFIX = 'data/cheatsheets/';
 var sheetOpen = false;     // overlay: showing
 var sheetArea = null;      // overlay: the area you're in (from "You have entered ...")
 var sheetViewAct = null;   // main view: the act being previewed
+var sheetViewMech = null;  // main view: the mechanic being previewed (instead of an act)
 var sheetEditing = null;   // main view: id of the sheet open in the editor ('new' for a new one)
 
 function sheetPrefs() {
@@ -27,6 +33,10 @@ function sheetPrefs() {
   if (p.opacity === undefined) p.opacity = 92;
   if (!p.scale) p.scale = 100;
   if (!p.width) p.width = 320;
+  if (!p.height) p.height = 520;          // the sheet scrolls past this (mechanic tables are long)
+  if (p.suggest === undefined) p.suggest = true;
+  if (!Array.isArray(p.muted)) p.muted = []; // mechanics you said not to suggest
+  if (p.sheet && !mechanicById(p.sheet)) p.sheet = null; // null: the act sheet; else a mechanic id
   p.show = Object.assign({ points: true, trials: true, notes: true, mine: true }, p.show || {});
   return p;
 }
@@ -49,6 +59,70 @@ function sheetImgOk(src) {
 
 // ---- the sheet itself (overlay and main-view preview) ---------------------------------------
 function sheetData() { return window.POE_CHEATSHEETS || null; }
+function sheetMechanics() { var d = sheetData(); return (d && Array.isArray(d.mechanics)) ? d.mechanics : []; }
+function mechanicById(id) { return sheetMechanics().filter(function (m) { return m.id === id; })[0] || null; }
+
+// newer sheets from the app's server (fixes between releases); the shipped copy otherwise
+var sheetSynced = false;
+async function sheetSync(onNew) {
+  if (sheetSynced || !isGui() || !window.pywebview.api.cheatsheets_data) return;
+  sheetSynced = true;
+  try {
+    var r = await window.pywebview.api.cheatsheets_data();
+    var mine = sheetData();
+    if (r && r.ok && r.data && r.data.version > ((mine && mine.version) || 0)) {
+      window.POE_CHEATSHEETS = r.data;
+      if (onNew) onNew();
+    }
+  } catch (e) { /* keep the shipped copy */ }
+}
+
+// which mechanic's sheet fits this area: an area id ("Generating level 68 area ...") or name
+function sheetMatch(ev) {
+  return sheetMechanics().filter(function (m) {
+    var mt = m.match || {};
+    if (ev.type === 'area' && ev.id) {
+      return (mt.areaIds || []).some(function (pre) { return pre && ev.id.indexOf(pre) === 0; });
+    }
+    return ev.type === 'zone' && (mt.areaNames || []).indexOf(ev.area) !== -1;
+  })[0] || null;
+}
+
+// a mechanic sheet: tables and lists straight from the data
+function mechanicContent(m, opts) {
+  opts = opts || {};
+  var box = UI.el('div', 'sheet-content');
+  (m.sections || []).forEach(function (s) {
+    var sec = UI.el('div', 'sheet-sec');
+    if (s.title) sec.appendChild(UI.el('div', 'sheet-sec-title', s.title));
+    if (Array.isArray(s.columns) && Array.isArray(s.rows)) {
+      var t = UI.el('table', 'sheet-table');
+      var hr = UI.el('tr');
+      s.columns.forEach(function (c) { hr.appendChild(UI.el('th', null, c)); });
+      var th = UI.el('thead');
+      th.appendChild(hr);
+      t.appendChild(th);
+      var tb = UI.el('tbody');
+      s.rows.forEach(function (row) {
+        var tr = UI.el('tr');
+        (row || []).forEach(function (cell) { tr.appendChild(UI.el('td', null, cell == null ? '' : String(cell))); });
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      sec.appendChild(t);
+    } else if (Array.isArray(s.lines)) {
+      var ul = UI.el('ul', 'sheet-list');
+      s.lines.forEach(function (l) { ul.appendChild(UI.el('li', 'sheet-li', String(l))); });
+      sec.appendChild(ul);
+    }
+    box.appendChild(sec);
+  });
+  if (!opts.noSource) {
+    box.appendChild(UI.el('div', 'sheet-foot', (m.source || 'Path of Exile Wiki') + (m.patch ? ' · checked for ' + m.patch : '') +
+      ' · CC BY-NC-SA 3.0'));
+  }
+  return box;
+}
 
 // the act whose trials finish a labyrinth difficulty gets a line about that labyrinth
 function sheetLabFor(act) {
@@ -140,29 +214,76 @@ function renderSheetOverlay() {
   root.style.zoom = String(p.scale / 100);
   reportOverlay('sheet', sheetOpen);
   if (!sheetOpen) { fitSheetOverlay(); return; }
+  var mech = p.sheet ? mechanicById(p.sheet) : null;
   var panel = UI.el('div', 'sheet-panel');
-  panel.style.width = Math.max(220, Math.min(640, p.width)) + 'px';
+  panel.style.width = Math.max(220, Math.min(640, mech ? Math.max(p.width, 420) : p.width)) + 'px';
   var head = UI.el('div', 'sheet-head');
   var grip = overlayGrip(p, 'the cheat sheet', 'sheet', renderSheetOverlay);
   if (grip) head.appendChild(grip);
-  head.appendChild(UI.iconButton('‹', 'Previous act', { size: 'sm', onClick: function () { sheetStep(-1); } }));
-  var title = UI.el('span', 'sheet-title', 'Act ' + p.act);
-  if (p.follow) {
-    var dot = UI.el('span', 'sheet-follow-dot');
-    dot.title = 'Follows your act from the game log';
-    title.appendChild(dot);
+  if (mech) {
+    head.appendChild(UI.iconButton('‹', 'Back to the act sheet', { size: 'sm', onClick: function () { sheetShow(null); } }));
+    head.appendChild(UI.el('span', 'sheet-title', mech.title));
+  } else {
+    head.appendChild(UI.iconButton('‹', 'Previous act', { size: 'sm', onClick: function () { sheetStep(-1); } }));
+    var title = UI.el('span', 'sheet-title', 'Act ' + p.act);
+    if (p.follow) {
+      var dot = UI.el('span', 'sheet-follow-dot');
+      dot.title = 'Follows your act from the game log';
+      title.appendChild(dot);
+    }
+    head.appendChild(title);
+    head.appendChild(UI.iconButton('›', 'Next act', { size: 'sm', onClick: function () { sheetStep(1); } }));
   }
-  head.appendChild(title);
-  head.appendChild(UI.iconButton('›', 'Next act', { size: 'sm', onClick: function () { sheetStep(1); } }));
+  if (sheetMechanics().length) {
+    var pick = UI.iconButton('☰', sheetPicking ? 'Close the sheet list' : 'Other sheets: mechanics and acts',
+      { size: 'sm', cls: sheetPicking ? 'is-on' : '', onClick: function () { sheetPicking = !sheetPicking; renderSheetOverlay(); } });
+    head.appendChild(pick);
+  }
   var hk = (overlayState.hotkeys || {}).sheet;
   head.appendChild(UI.iconButton('✕', 'Hide the cheat sheet' + (hk ? ' (' + hk + ' brings it back)' : ''),
-    { size: 'sm', onClick: function () { sheetOpen = false; renderSheetOverlay(); } }));
+    { size: 'sm', onClick: function () { sheetOpen = false; sheetPicking = false; renderSheetOverlay(); } }));
   panel.appendChild(head);
   var body = UI.el('div', 'sheet-body');
-  body.appendChild(sheetContent(p.act));
+  body.style.maxHeight = Math.max(200, Math.min(1400, p.height)) + 'px';
+  if (sheetPicking) body.appendChild(sheetPicker(function (id) { sheetPicking = false; sheetShow(id); }, p.sheet));
+  else body.appendChild(mech ? mechanicContent(mech) : sheetContent(p.act));
   panel.appendChild(body);
   root.appendChild(panel);
   fitSheetOverlay();
+}
+var sheetPicking = false;
+
+// the list of sheets: the act sheet, then each mechanic by group (click-only: no typing in game)
+function sheetPicker(onPick, current) {
+  var box = UI.el('div', 'sheet-picker');
+  var acts = UI.el('button', 'sheet-pick' + (!current ? ' is-current' : ''), '📜 Leveling: act sheet');
+  acts.type = 'button';
+  acts.addEventListener('click', function () { onPick(null); });
+  box.appendChild(acts);
+  var groups = {};
+  sheetMechanics().forEach(function (m) { (groups[m.group || 'Mechanics'] = groups[m.group || 'Mechanics'] || []).push(m); });
+  Object.keys(groups).forEach(function (g) {
+    box.appendChild(UI.el('div', 'sheet-sec-title', g));
+    var row = UI.el('div', 'sheet-pick-row');
+    groups[g].forEach(function (m) {
+      var b = UI.el('button', 'sheet-pick' + (current === m.id ? ' is-current' : ''), m.title);
+      b.type = 'button';
+      b.addEventListener('click', function () { onPick(m.id); });
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+  });
+  return box;
+}
+
+// show the act sheet (id null or an act number) or a mechanic's sheet in the overlay
+function sheetShow(id) {
+  var p = sheetPrefs();
+  var act = parseInt(id, 10);
+  if (act >= 1 && act <= 10) { p.act = act; p.sheet = null; }
+  else p.sheet = id && mechanicById(id) ? id : null;
+  persist(SHEET_PREFS_KEY, JSON.stringify(p));
+  renderSheetOverlay();
 }
 
 function sheetStep(d) {
@@ -172,34 +293,102 @@ function sheetStep(d) {
   renderSheetOverlay();
 }
 
-function fitSheetOverlay() {
+// ---- the suggestion pill (index.html?sheethint=1) ----------------------------------------------
+var hintFor = null;      // the mechanic being suggested
+var hintTimer = null;
+var hintLast = null;     // don't suggest the same mechanic again until you've been elsewhere
+var HINT_SECONDS = 20;
+function renderSheetHint() {
+  var root = document.getElementById('sheet-root');
+  if (!root) return;
+  if (ovDrag) { setTimeout(renderSheetHint, 300); return; }
+  var p = sheetPrefs();
+  root.textContent = '';
+  root.style.setProperty('--ov-opacity', String(Math.max(30, Math.min(100, p.opacity)) / 100));
+  root.style.zoom = String(p.scale / 100);
+  reportOverlay('hint', !!hintFor);
+  if (hintFor) {
+    var pill = UI.el('div', 'sheet-hint');
+    var grip = overlayGrip(p, 'the sheet suggestion', 'hint', renderSheetHint);
+    if (grip) pill.appendChild(grip);
+    pill.appendChild(UI.el('span', 'sheet-hint-text', '📜 ' + hintFor.title + ' cheat sheet'));
+    var m = hintFor;
+    pill.appendChild(UI.button('primary', { size: 'sm', label: 'Open', onClick: function () {
+      if (window.pywebview.api.overlay_sheet_open) window.pywebview.api.overlay_sheet_open(m.id);
+      sheetHintClear();
+    } }));
+    pill.appendChild(UI.iconButton('🔕', 'Don\'t suggest ' + m.title + ' again (Tools → Cheat sheets to undo)', { size: 'sm',
+      onClick: function () {
+        var q = sheetPrefs();
+        if (q.muted.indexOf(m.id) === -1) q.muted.push(m.id);
+        saveSheetPrefs(q);
+        sheetHintClear();
+      } }));
+    pill.appendChild(UI.iconButton('✕', 'Not now', { size: 'sm', onClick: sheetHintClear }));
+    root.appendChild(pill);
+  }
+  fitSheetOverlay('hint', '.sheet-hint');
+}
+function sheetHintClear() {
+  hintFor = null;
+  clearTimeout(hintTimer);
+  renderSheetHint();
+}
+function sheetHintFor(ev) {
+  var p = sheetPrefs();
+  if (!ev.test && !(p.suggest && (p.follow || tradePrefs().enabled))) return false;
+  if (ev.type !== 'area' && ev.type !== 'zone') return false;
+  var m = sheetMatch(ev);
+  if (!m) { if (ev.type === 'area') hintLast = null; return false; } // left the mechanic's areas
+  if (!ev.test && (p.muted.indexOf(m.id) !== -1 || hintLast === m.id)) return false;
+  hintLast = m.id;
+  hintFor = m;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(sheetHintClear, HINT_SECONDS * 1000); // it goes away on its own
+  renderSheetHint();
+  return true;
+}
+
+// size the window to the drawn piece and clip it to that shape (see-through elsewhere)
+function fitSheetOverlay(name, selector) {
+  name = name || 'sheet';
   if (!isGui() || !window.pywebview.api.overlay_fit) return;
   requestAnimationFrame(function () {
     var root = document.getElementById('sheet-root');
     if (!root) return;
     // rects already include the CSS zoom (as in fitOverlay, 19-trades.js)
     var r = root.getBoundingClientRect();
-    window.pywebview.api.overlay_fit('sheet', Math.ceil(r.width) + 2, Math.ceil(r.height) + 2);
-    var panel = root.querySelector('.sheet-panel');
+    window.pywebview.api.overlay_fit(name, Math.ceil(r.width) + 2, Math.ceil(r.height) + 2);
+    var panel = root.querySelector(selector || '.sheet-panel');
     if (!panel || !window.pywebview.api.overlay_shape) return;
     var b = panel.getBoundingClientRect();
-    var rad = parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0;
-    window.pywebview.api.overlay_shape('sheet', [[Math.floor(b.left), Math.floor(b.top),
+    var rad = Math.min(parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0, b.height / 2); // the pill is round
+    window.pywebview.api.overlay_shape(name, [[Math.floor(b.left), Math.floor(b.top),
       Math.ceil(b.width), Math.ceil(b.height), Math.round(rad * (parseFloat(root.style.zoom) || 1))]]);
   });
 }
 
 // hotkey / "Show in game" (via gui.py)
 window.__sheetToggle = function () {
-  if (!SHEET_OV) return false;
+  if (!SHEET_OV || SHEET_HINT) return false;
   sheetOpen = !sheetOpen;
+  sheetPicking = false;
   renderSheetOverlay();
   return sheetOpen;
+};
+// the hint's Open (via gui.py): show that sheet (a mechanic id or an act number)
+window.__sheetOpen = function (id) {
+  if (!SHEET_OV || SHEET_HINT) return false;
+  sheetOpen = true;
+  sheetPicking = false;
+  sheetShow(id);
+  return true;
 };
 // area / zone lines from Client.txt (via gui.py); test mode's made-up ones always count
 window.__sheetEvent = function (ev) {
   if (!SHEET_OV || !ev) return false;
   if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch (e) { return false; } }
+  if (SHEET_HINT) return sheetHintFor(ev);
   var p = sheetPrefs();
   if (!ev.test && !p.follow) return false;
   if (ev.type === 'zone') {
@@ -207,8 +396,8 @@ window.__sheetEvent = function (ev) {
   } else if (ev.type === 'area' && ev.act) {
     var changed = ev.act !== p.act;
     p.act = ev.act;
+    if (changed && (p.autoOpen || ev.test)) { sheetOpen = true; p.sheet = null; } // a new act: its sheet
     if (changed) persist(SHEET_PREFS_KEY, JSON.stringify(p));
-    if (changed && (p.autoOpen || ev.test)) sheetOpen = true;
   } else {
     return false;
   }
@@ -220,15 +409,17 @@ window.__sheetPrefsChanged = async function () {
   if (!SHEET_OV) return false;
   if (sheetHydrate) { try { await sheetHydrate(); } catch (e) { /* keep */ } }
   overlayWanted = null;
-  renderSheetOverlay();
+  sheetRender();
   return true;
 };
+function sheetRender() { if (SHEET_HINT) renderSheetHint(); else renderSheetOverlay(); }
 
 var sheetHydrate = null;
-function sheetReady(hydrate) { // markGui() in the overlay window (02-init.js)
+function sheetReady(hydrate) { // markGui() in the sheet / hint overlay windows (02-init.js)
   document.body.classList.add('gui');
   sheetHydrate = hydrate;
   Promise.resolve(hydrate()).then(sheetStatusLoop, sheetStatusLoop);
+  sheetSync(sheetRender);
 }
 function sheetStatusLoop() {
   refreshSheetStatus();
@@ -238,7 +429,7 @@ async function refreshSheetStatus() { // hotkey labels for the tooltips
   if (isGui() && window.pywebview.api.overlay_status) {
     try { var st = await window.pywebview.api.overlay_status(); if (st && st.ok) overlayState = st; } catch (e) { /* keep */ }
   }
-  renderSheetOverlay();
+  sheetRender();
 }
 
 // ---- main window: Tools → Cheat sheets ------------------------------------------------------
@@ -262,9 +453,47 @@ function renderSheetsView() {
   bar.appendChild(UI.button('ghost', { size: 'sm', label: '← Back', onClick: sheetsClose, title: 'Back to where you were (Esc)' }));
   bar.appendChild(UI.el('span', 'ov-title', 'Cheat sheets'));
   page.appendChild(bar);
-  page.appendChild(UI.el('p', 'finder-sub', 'A sheet for each act over the game: skill point quests, trials, bandits ' +
-    'and the resistance penalties, plus your own notes and pictures. Open it in game with its hotkey.'));
+  page.appendChild(UI.el('p', 'finder-sub', 'Sheets over the game: one for each act (skill point quests, trials, bandits, ' +
+    'resistance penalties), one for each mechanic (Betrayal, Blight, Delve, …), and your own notes and pictures. Open it ' +
+    'in game with its hotkey; entering a mechanic\'s area offers its sheet in a small pop-up.'));
   if (isGui()) page.appendChild(renderSheetGameControls(p));
+  sheetSync(renderSheetsView); // newer sheets from the server, if there are any
+
+  // mechanics: pick one to preview it
+  var mechs = sheetMechanics();
+  if (mechs.length) {
+    var mcol = UI.el('div', 'sheets-mech');
+    mcol.appendChild(UI.el('h3', 'trade-h3', 'Mechanics'));
+    mcol.appendChild(sheetPicker(function (id) { sheetViewMech = id; renderSheetsView(); }, sheetViewMech || ''));
+    page.appendChild(mcol);
+  }
+  var vm = sheetViewMech ? mechanicById(sheetViewMech) : null;
+  if (vm) {
+    var mprev = UI.el('div', 'sheets-col');
+    var mh = UI.el('div', 'trade-row');
+    mh.appendChild(UI.el('h3', 'trade-h3', vm.title));
+    if (isGui() && window.pywebview.api.overlay_sheet_open) {
+      mh.appendChild(UI.button('primary', { size: 'sm', label: 'Show in game', title: 'Opens this sheet over the game',
+        onClick: function () { window.pywebview.api.overlay_sheet_open(vm.id); UI.toast('Switch to the game to see it', 'info'); } }));
+    }
+    var muted = p.muted.indexOf(vm.id) !== -1;
+    if ((vm.match || {}).areaIds && (vm.match.areaIds.length || (vm.match.areaNames || []).length)) {
+      mh.appendChild(sheetToggle('Suggest it in its areas', !muted, function (on) {
+        var q = sheetPrefs();
+        q.muted = q.muted.filter(function (x) { return x !== vm.id; });
+        if (!on) q.muted.push(vm.id);
+        saveSheetPrefs(q);
+      }));
+    }
+    mh.appendChild(UI.button('ghost', { size: 'sm', label: '← Act sheets', onClick: function () { sheetViewMech = null; renderSheetsView(); } }));
+    mprev.appendChild(mh);
+    var mcard = UI.el('div', 'sheet-panel is-preview is-mech');
+    mcard.appendChild(mechanicContent(vm));
+    mprev.appendChild(mcard);
+    page.appendChild(mprev);
+    view.appendChild(page);
+    return;
+  }
 
   // preview: the same sheet the game shows
   var acts = UI.el('div', 'sheet-acts');
@@ -346,7 +575,17 @@ function renderSheetGameControls(p) {
   follow.appendChild(sheetToggle('Open it when a new act starts', p.autoOpen, function (on) {
     var q = sheetPrefs(); q.autoOpen = on; saveSheetPrefs(q);
   }));
+  follow.appendChild(sheetToggle('Suggest a mechanic\'s sheet in its areas', p.suggest, function (on) {
+    var q = sheetPrefs(); q.suggest = on; saveSheetPrefs(q);
+  }));
+  if (p.muted.length) {
+    follow.appendChild(UI.button('ghost', { size: 'sm', label: 'Suggest all again (' + p.muted.length + ' off)',
+      onClick: function () { var q = sheetPrefs(); q.muted = []; saveSheetPrefs(q); renderSheetsView(); } }));
+  }
   box.appendChild(follow);
+  box.appendChild(UI.el('p', 'finder-sub', 'Following your act and the suggestions read the game log; the suggestions ' +
+    'also work while the trade helper is on. A suggestion is a small pop-up at the top of the game for ' + HINT_SECONDS +
+    ' seconds: Open shows the sheet, 🔕 stops it for that mechanic. Drag it by ⠿ to put it elsewhere.'));
 
   function slider(label, value, min, max, step, unit, key) {
     var r = UI.input({ type: 'range', min: min, max: max, step: step, value: value, ariaLabel: label, cls: 'trade-slider' });
@@ -359,6 +598,7 @@ function renderSheetGameControls(p) {
   }
   var look = UI.el('div', 'trade-row');
   look.appendChild(slider('Width', p.width, 220, 640, 20, 'px', 'width'));
+  look.appendChild(slider('Max height', p.height, 200, 1400, 20, 'px', 'height'));
   look.appendChild(slider('Size', p.scale, 70, 150, 5, '%', 'scale'));
   look.appendChild(slider('Opacity', p.opacity, 30, 100, 2, '%', 'opacity'));
   box.appendChild(look);
@@ -377,6 +617,23 @@ function renderSheetGameControls(p) {
       });
     } });
     more.appendChild(go);
+    // a mechanic's area: the suggestion pop-up should appear at the top of the game
+    var withArea = sheetMechanics().filter(function (m) {
+      var mt = m.match || {};
+      return (mt.areaNames || []).length || (mt.areaIds || []).length;
+    });
+    if (withArea.length) {
+      var mSel = UI.select(withArea.map(function (m) { return [m.id, m.title]; }), withArea[0].id, { ariaLabel: 'Mechanic to test' });
+      more.appendChild(UI.field('Test', mSel, { title: 'Pretends you entered that mechanic\'s area: the suggestion pops up in game' }));
+      var goM = UI.button('ghost', { size: 'sm', label: '▶ Pretend I entered its area', onClick: function () {
+        var mt = mechanicById(mSel.value).match || {};
+        var area = (mt.areaNames || [])[0] || (mt.areaIds || [])[0];
+        Promise.resolve(api.trade_test('enter', null, null, area)).then(function (r) {
+          UI.toast(r && r.ok ? 'Switch to the game to see the suggestion' : 'Test failed: ' + ((r && r.error) || 'no answer'), r && r.ok ? 'info' : 'danger');
+        });
+      } });
+      more.appendChild(goM);
+    }
   }
   box.appendChild(more);
   return box;
@@ -494,7 +751,7 @@ document.addEventListener('DOMContentLoaded', function () {
     root.id = 'sheet-root';
     var container = document.querySelector('.container');
     container.insertBefore(root, container.firstChild);
-    renderSheetOverlay();
+    sheetRender();
     return;
   }
   var opener = document.getElementById('open-sheets');

@@ -110,9 +110,20 @@ for msg, want in areas:
     check("area line -> act " + str(want["act"]), got == dict(want, type="area", time="2026/11/01 13:01:03"), got)
 
 # test mode: made-up lines go through the real parser
+def raises_value(fn, *a, **k):
+    try:
+        fn(*a, **k)
+    except ValueError:
+        return True
+    return False
+
+
+
 want_types = {"whisper": "whisper", "bulk": "whisper", "joined": "joined", "accepted": "trade_accepted",
               "left": "left", "buying": "whisper", "zone": "zone", "act": "area"}
 for kind in th.TEST_SCENARIOS:
+    if kind == "enter":
+        continue  # needs an area: below
     evs = [th.parse_line(l) for l in th.test_lines(kind, "Mercenaries", 7)]
     check("test line '%s' parses as %s" % (kind, want_types[kind]), evs and all(e and e["type"] == want_types[kind]
           for e in evs), evs)
@@ -124,6 +135,11 @@ check("test bulk whisper is a bulk trade", th.parse_line(th.test_lines("bulk")[0
 check("test act lines give acts 1-10", [th.parse_line(th.test_lines("act", act=a)[0])["act"] for a in (1, 5, 6, 10, 99)]
       == [1, 5, 6, 10, 10])
 check("test zone has a starter zone note area", th.parse_line(th.test_lines("zone")[0])["area"] == "The Lower Prison")
+e1 = th.parse_line(th.test_lines("enter", area="Azurite Mine")[0])
+e2 = th.parse_line(th.test_lines("enter", area="Delve_Main")[0])
+check("test 'enter' by name is a zone line, by id an area line", e1 == dict(e1, type="zone", area="Azurite Mine")
+      and e2["type"] == "area" and e2["id"] == "Delve_Main" and e2["act"] is None, (e1, e2))
+check("test 'enter' needs an area", raises_value(th.test_lines, "enter") and raises_value(th.test_lines, "enter", area='a"b'))
 try:
     th.test_lines("kick")
     check("unknown test kind refused", False)
