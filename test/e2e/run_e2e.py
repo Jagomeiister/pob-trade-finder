@@ -2798,6 +2798,98 @@ return out;
 """
 
 
+S34_UPDATE = r"""
+const H = window.__e2e;
+const out = {};
+window.__stubOverrides.check_update = { ok: true, current: '2.5.3', latest: 'v2.5.4', newer: true,
+  notes: '## v2.5.4: socket colours in the gem compare\n\n- more', page: 'https://github.com/x/y/releases/tag/v2.5.4',
+  url: 'https://github.com/x/y/releases/download/v2.5.4/PoBTradeFinder-v2.5.4.zip' };
+window.__stubOverrides.apply_update = { ok: true };
+checkForUpdates(true);
+await H.waitFor(() => !document.getElementById('update-banner').classList.contains('hidden'), 3000, 'banner');
+out.label = H.text('#update-label');
+out.summary = H.text('#update-summary');
+out.bannerText = H.text('#update-banner');
+out.status = H.text('#update-check-status');
+const sb = document.getElementById('update-now-settings');
+out.settingsBtn = !sb.classList.contains('hidden') && sb.textContent;
+document.getElementById('update-notes').click();
+await H.sleep(20);
+out.notesOpened = (H.calls('open_url').slice(-1)[0] || { args: [] }).args;
+document.getElementById('update-later').click();
+out.hiddenAfterLater = document.getElementById('update-banner').classList.contains('hidden');
+sb.click();
+await H.sleep(30);
+out.applied = (H.calls('apply_update').slice(-1)[0] || { args: [] }).args;
+out.busy = document.getElementById('update-now-settings').disabled;
+delete window.__stubOverrides.check_update;
+delete window.__stubOverrides.apply_update;
+return out;
+"""
+
+S34_SAVEDCHARS = r"""
+const H = window.__e2e;
+const out = {};
+await H.loadBuild();
+window.__stubOverrides.get_character_items = { ok: true, items: [] };
+window.__stubOverrides.get_characters = { ok: true, characters: [{ name: 'MyWitch', league: 'Standard', level: 95, 'class': 'Necromancer' }] };
+out.hiddenFirst = document.getElementById('char-saved').classList.contains('hidden');
+document.getElementById('acct-input').value = 'Me#1234';
+document.getElementById('acct-load').click();
+await H.waitFor(() => !document.getElementById('char-compare').classList.contains('hidden'), 3000, 'chars');
+document.getElementById('char-compare').click();
+await H.waitFor(() => /comparing against/.test(H.text('#char-status') || ''), 4000, 'compare');
+const save = document.getElementById('char-save');
+out.saveShown = !save.classList.contains('hidden');
+save.click();
+await H.sleep(30);
+out.saved = JSON.parse(localStorage.getItem('pobtf-saved-chars') || '[]');
+out.persisted = H.calls('storage_set').some(c => c.args[0] === 'pobtf-saved-chars');
+out.chips = [...document.querySelectorAll('#char-saved .char-chip-go')].map(b => b.textContent);
+out.saveHidden = save.classList.contains('hidden');
+// a fresh start: one click on the saved chip compares again, no typing
+document.getElementById('acct-input').value = '';
+const before = H.calls('get_character_items').length;
+document.querySelector('#char-saved .char-chip-go').click();
+await H.waitFor(() => H.calls('get_character_items').length > before, 3000, 'chip compare');
+out.chipCall = H.calls('get_character_items').slice(-1)[0].args;
+out.acct = document.getElementById('acct-input').value;
+document.querySelector('#char-saved .btn-icon').click();
+await H.sleep(20);
+out.afterForget = JSON.parse(localStorage.getItem('pobtf-saved-chars') || '[]').length;
+out.hiddenAfter = document.getElementById('char-saved').classList.contains('hidden');
+delete window.__stubOverrides.get_character_items;
+delete window.__stubOverrides.get_characters;
+return out;
+"""
+
+
+def scenario_ui_batch(s, tag):
+    s.fresh()
+    r = s.run(S34_UPDATE, timeout=60)
+    check(tag + " update banner: version once, no double dash, what's new from the notes",
+          r["label"] == "PoB Trade Finder v2.5.4 is ready" and "--" not in (r["bannerText"] or "") and
+          "vv" not in r["bannerText"] and "Socket colours in the gem compare" in (r["summary"] or "")
+          and "You have v2.5.3" in r["summary"], (r["label"], r["summary"]))
+    check(tag + " Settings → Check for updates gets its own Update now", r["settingsBtn"] == "Update now" and
+          "v2.5.4 is ready" in (r["status"] or ""), (r["settingsBtn"], r["status"]))
+    check(tag + " What's new opens the release page; Later hides the banner", r["notesOpened"] ==
+          ["https://github.com/x/y/releases/tag/v2.5.4"] and r["hiddenAfterLater"], r)
+    check(tag + " Update now in Settings installs that release", r["applied"] ==
+          ["https://github.com/x/y/releases/download/v2.5.4/PoBTradeFinder-v2.5.4.zip"] and r["busy"], r["applied"])
+    s.fresh()
+    r = s.run(S34_SAVEDCHARS, timeout=60)
+    check(tag + " no saved characters yet: no row", r["hiddenFirst"], r)
+    check(tag + " ☆ Save after a compare keeps it (shared storage)", r["saveShown"] and r["persisted"] and
+          r["saved"][:1] and r["saved"][0]["account"] == "Me#1234" and r["saved"][0]["name"] == "MyWitch" and
+          r["saved"][0]["cls"] == "Necromancer" and r["saveHidden"], r["saved"])
+    check(tag + " saved chip shows name, class, level, account", r["chips"] and "MyWitch" in r["chips"][0] and
+          "Necromancer lvl 95" in r["chips"][0] and "Me#1234" in r["chips"][0], r["chips"])
+    check(tag + " one click on it compares again without typing", r["chipCall"] == ["Me#1234", "MyWitch"] and
+          r["acct"] == "Me#1234", (r["chipCall"], r["acct"]))
+    check(tag + " ✕ forgets it", r["afterForget"] == 0 and r["hiddenAfter"], r)
+
+
 def scenario_mechanics(s, tag):
     s.fresh("?sheet=1")
     r = s.run(S32_MECH_SHEET, timeout=60)
@@ -2884,6 +2976,7 @@ SCENARIOS = [
     ("31 sheets", scenario_sheets),
     ("32 gemdiff", scenario_gemdiff),
     ("33 mechanics", scenario_mechanics),
+    ("34 uibatch", scenario_ui_batch),
 ]
 
 

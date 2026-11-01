@@ -959,9 +959,44 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-    def div_cards(self, league):
+    DIVCARDS_LAST = "divcards_last.json"  # last full answer per league, shown at once after a restart
+
+    def div_cards(self, league, last=False):
         """Div cards tool: every card with where it drops (wiki, via the backend), its stack
-        size and its price each from GGG's hourly exchange feed."""
+        size and its price each from GGG's hourly exchange feed. last=True: no network, the
+        last answer saved for this league (marked "cached"), so the view opens at once while
+        the page asks again for fresh prices."""
+        path = os.path.join(DATA_DIR, self.DIVCARDS_LAST)
+        if last:
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    saved = (json.load(f) or {}).get(league)
+                if not (saved and saved.get("cards")):
+                    return {"ok": False, "error": "no saved copy"}
+                return dict(saved, cached=True)
+            except (OSError, ValueError, AttributeError):
+                return {"ok": False, "error": "no saved copy"}
+        out = self._div_cards_fresh(league)
+        if out.get("ok"):
+            try:
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        keep = json.load(f)
+                    keep = keep if isinstance(keep, dict) else {}
+                except (OSError, ValueError):
+                    keep = {}
+                keep.pop(league, None)
+                keep = dict(list(keep.items())[-3:])  # this league + the 3 most recent others
+                keep[league] = out
+                tmp = path + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(keep, f, separators=(",", ":"))
+                os.replace(tmp, path)
+            except OSError:
+                pass
+        return out
+
+    def _div_cards_fresh(self, league):
         try:
             data = self._divcard_drops()
             ids = {m["name"]: (code, m["id"]) for code, m in self._currency_map.items() if m.get("cat") == "Cards"}
@@ -2598,6 +2633,7 @@ class Api:
             return {"ok": True, "current": VERSION, "latest": latest,
                     "newer": self._semver(latest) > self._semver(VERSION),
                     "notes": (rel.get("body") or "")[:500],
+                    "page": rel.get("html_url") or None,  # "What's new" in the banner
                     "url": asset.get("browser_download_url") if asset else None}
         except Exception as e:
             return {"ok": False, "current": VERSION, "error": str(e)}

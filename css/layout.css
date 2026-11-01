@@ -331,6 +331,17 @@ body.hide-matched .slot-row.diff-matched { display: none; }
 body.gui .char-pop #char-bar.gui-only-flex:not(.hidden) { display: flex; }
 body:not(.gui) #char-bar { display: none !important; }
 .char-label { color: var(--text); font-weight: 600; font-size: var(--fs-sm); }
+/* saved characters: one click compares (02-init.js) */
+.char-saved { display: flex; flex-direction: column; gap: 4px; width: 340px; margin-bottom: 10px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border); }
+.char-saved.hidden { display: none; }
+.char-chip { display: flex; align-items: center; gap: 2px; background: var(--s2); border: 1px solid var(--border);
+  border-radius: var(--r-sm); }
+.char-chip:hover { border-color: var(--accent); }
+.char-chip-go { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  padding: 5px 8px; background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.char-chip-go b { font-size: var(--fs-sm); }
+.char-chip-sub { color: var(--text-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 #char-bar input, #char-bar select { height: 32px; padding-top: 0; padding-bottom: 0; }
 #acct-input, #sessid-input {
   background: var(--s2); color: var(--text); border: 1px solid var(--border-strong);

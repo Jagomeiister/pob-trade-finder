@@ -84,12 +84,19 @@ body:not(.gui) .btn.act-search { background: var(--accent); border-color: var(--
 .welcome ol { margin: 0 0 8px 18px; padding: 0; color: var(--text); line-height: 1.6; }
 .welcome kbd { border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 0 4px; font-size: var(--fs-xs); }
 #update-banner {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   background: color-mix(in srgb, var(--success) var(--chip-tint), var(--s1));
   border: 1px solid var(--success); border-radius: var(--r-lg);
-  padding: 10px 16px; margin-bottom: 14px; color: var(--text);
+  padding: 10px 12px 10px 14px; margin-bottom: 14px; color: var(--text);
 }
 #update-banner.hidden { display: none; }
+.update-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 50%;
+  background: var(--success); color: var(--on-accent, #0b0b0b); font-weight: 700; }
+.update-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 200px; }
+.update-summary { color: var(--text-2); font-size: var(--fs-sm); }
+.update-actions { display: flex; gap: 6px; margin-left: auto; }
+.update-actions .hidden, .update-check-row .hidden { display: none; }
+.update-check-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #league-banner {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   background: color-mix(in srgb, var(--accent) var(--chip-tint), var(--s1));

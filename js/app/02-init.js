@@ -153,12 +153,29 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('value-gear').classList.remove('hidden');
       charName_ = charName;
       status.textContent = '⚖ comparing against ' + charName;
+      var saveBtn = document.getElementById('char-save');
+      var isSaved = loadSavedChars().some(function (c) { return sameChar(c, acct, charName); });
+      saveBtn.classList.toggle('hidden', isSaved);
     } catch (e) {
       status.textContent = '❌ ' + e.message;
     } finally {
       this.disabled = false;
     }
   });
+  document.getElementById('char-save').addEventListener('click', function () {
+    var acct = document.getElementById('acct-input').value.trim();
+    var sel = document.getElementById('char-select');
+    var o = sel.options[sel.selectedIndex];
+    if (!acct || !o) return;
+    var list = loadSavedChars().filter(function (c) { return !sameChar(c, acct, o.value); });
+    list.unshift({ account: acct, name: o.value, league: o.dataset.league || '', cls: o.dataset.cls || '',
+                   level: parseInt(o.dataset.level, 10) || null, at: Date.now() });
+    saveSavedChars(list.slice(0, SAVED_CHARS_MAX));
+    this.classList.add('hidden');
+    renderSavedChars();
+    UI.toast(o.value + ' saved: one click to compare next time', 'success');
+  });
+  renderSavedChars();
   document.getElementById('value-gear').addEventListener('click', function () { valueMyGear(this); });
   document.getElementById('hide-matched').addEventListener('change', function () {
     document.body.classList.toggle('hide-matched', this.checked);
@@ -375,22 +392,106 @@ function checkForUpdates(manual) {
       var foot = document.querySelector('.footer');
       if (foot && foot.textContent.indexOf('· v') === -1) foot.textContent += ' · v' + res.current;
     }
+    var latest = 'v' + String(res.latest || '').replace(/^v/i, ''), current = 'v' + String(res.current || '').replace(/^v/i, '');
+    var settingsBtn = document.getElementById('update-now-settings');
     if (manual && statusEl) {
-      statusEl.textContent = res.newer
-        ? '⬆ ' + res.latest + ' available — see the banner above'
-        : '✓ up to date (v' + res.current + ')';
+      statusEl.textContent = res.newer ? '⬆ ' + latest + ' is ready (you have ' + current + ')' : '✓ Up to date (' + current + ')';
     }
-    if (!res.newer || !res.url) return;
+    if (!res.newer || !res.url) { if (settingsBtn) settingsBtn.classList.add('hidden'); return; }
+    // the same Update now in Settings → Data and updates, so you don't have to find the banner
+    if (settingsBtn) {
+      settingsBtn.classList.remove('hidden');
+      settingsBtn.onclick = function () { startUpdate(res.url); };
+    }
     var bar = document.getElementById('update-banner');
+    if (updateLaterFor === res.latest && !manual) return; // "Later" hides it until the next version
     bar.classList.remove('hidden');
-    document.getElementById('update-label').textContent =
-      'Update ' + res.latest + ' available — you have v' + res.current;
-    document.getElementById('update-btn').onclick = function () {
-      this.disabled = true;
-      this.textContent = 'Updating… the app will restart itself';
-      window.pywebview.api.apply_update(res.url);
+    document.getElementById('update-label').textContent = 'PoB Trade Finder ' + latest + ' is ready';
+    document.getElementById('update-summary').textContent = 'You have ' + current +
+      (releaseHeadline(res.notes) ? ' · New: ' + releaseHeadline(res.notes) : '');
+    var notes = document.getElementById('update-notes');
+    notes.classList.toggle('hidden', !res.page);
+    notes.onclick = function () { if (res.page) openUrl(res.page); };
+    document.getElementById('update-later').onclick = function () {
+      updateLaterFor = res.latest;
+      bar.classList.add('hidden');
     };
+    document.getElementById('update-btn').onclick = function () { startUpdate(res.url); };
   }).catch(function () { /* offline — skip */ });
+}
+var updateLaterFor = null;
+
+// ---- saved characters (Compare with your character) ------------------------------------
+// Yours or anyone's: one click fills the account and character and compares, no re-typing.
+var SAVED_CHARS_KEY = 'pobtf-saved-chars', SAVED_CHARS_MAX = 12;
+function loadSavedChars() {
+  try { var l = JSON.parse(localStorage.getItem(SAVED_CHARS_KEY)); return Array.isArray(l) ? l.filter(function (c) { return c && c.account && c.name; }) : []; }
+  catch (e) { return []; }
+}
+function saveSavedChars(list) { persist(SAVED_CHARS_KEY, JSON.stringify(list)); }
+function sameChar(c, acct, name) {
+  return c.account.toLowerCase() === String(acct || '').toLowerCase() && c.name.toLowerCase() === String(name || '').toLowerCase();
+}
+function renderSavedChars() {
+  var box = document.getElementById('char-saved');
+  if (!box) return;
+  var list = loadSavedChars();
+  box.textContent = '';
+  box.classList.toggle('hidden', !list.length || !isGui());
+  if (!list.length) return;
+  box.appendChild(UI.el('span', 'char-label', 'Saved'));
+  list.forEach(function (c) {
+    var chip = UI.el('span', 'char-chip');
+    var go = UI.el('button', 'char-chip-go');
+    go.type = 'button';
+    go.title = 'Compare with ' + c.name + ' (' + c.account + (c.league ? ', ' + c.league : '') + ')';
+    go.appendChild(UI.el('b', null, c.name));
+    var info = [c.cls, c.level ? 'lvl ' + c.level : ''].filter(Boolean).join(' ');
+    go.appendChild(UI.el('span', 'char-chip-sub', (info ? info + ' · ' : '') + c.account));
+    go.addEventListener('click', function () { compareSavedChar(c); });
+    chip.appendChild(go);
+    chip.appendChild(UI.iconButton('✕', 'Forget ' + c.name, { size: 'sm', onClick: function () {
+      saveSavedChars(loadSavedChars().filter(function (x) { return !sameChar(x, c.account, c.name); }));
+      renderSavedChars();
+    } }));
+    box.appendChild(chip);
+  });
+}
+// fill the account + character from a saved one and run the usual Compare gear
+function compareSavedChar(c) {
+  document.getElementById('acct-input').value = c.account;
+  populateCharSelect([{ name: c.name, league: c.league || '', level: c.level || '?', 'class': c.cls || '' }]);
+  document.getElementById('char-select').value = c.name;
+  document.getElementById('char-status').textContent = '';
+  document.getElementById('char-compare').click();
+}
+
+// "## v2.5.4: socket colours in the gem compare" → "Socket colours in the gem compare"
+function releaseHeadline(notes) {
+  var first = String(notes || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean)[0] || '';
+  var h = first.replace(/^#+\s*/, '').replace(/^v?\d+(\.\d+)+\s*[:\-–—]?\s*/i, '').trim();
+  if (!h || h.length > 90) return '';
+  return h.charAt(0).toUpperCase() + h.slice(1);
+}
+
+// both Update now buttons (banner and Settings): one download, then the app restarts itself
+function startUpdate(url) {
+  ['update-btn', 'update-now-settings'].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (b) { b.disabled = true; b.textContent = 'Updating… the app restarts itself'; }
+  });
+  var st = document.getElementById('update-check-status');
+  if (st) st.textContent = 'Downloading the update…';
+  Promise.resolve(window.pywebview.api.apply_update(url)).then(function (r) {
+    if (r && r.ok === false) {
+      UI.toast('Update failed: ' + (r.error || 'unknown error'), 'danger');
+      ['update-btn', 'update-now-settings'].forEach(function (id) {
+        var b = document.getElementById(id);
+        if (b) { b.disabled = false; b.textContent = 'Update now'; }
+      });
+      if (st) st.textContent = '❌ Update failed: ' + (r.error || 'unknown error');
+    }
+  }, function () { /* the app is closing to install it */ });
 }
 
 function sessidDisclaimer() {

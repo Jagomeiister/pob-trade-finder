@@ -213,7 +213,10 @@
           <button id="refresh-data" class="btn btn-secondary" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
           <button id="check-updates-btn" class="btn btn-secondary">Check for updates</button>
         </div>
-        <div id="update-check-status" class="settings-note"></div>
+        <div class="update-check-row">
+          <div id="update-check-status" class="settings-note"></div>
+          <button id="update-now-settings" class="btn btn-primary btn-sm hidden" type="button">Update now</button>
+        </div>
       </section>
       <section class="settings-section">
         <h3>Reporting a problem</h3>
@@ -236,9 +239,17 @@
       </section>
     </aside>
 
-    <div id="update-banner" class="hidden">
-      <span id="update-label"></span>
-      <button id="update-btn" class="btn btn-primary">Install &amp; restart</button>
+    <div id="update-banner" class="hidden" role="status">
+      <span class="update-icon" aria-hidden="true">⬆</span>
+      <span class="update-text">
+        <b id="update-label"></b>
+        <span id="update-summary" class="update-summary"></span>
+      </span>
+      <span class="update-actions">
+        <button id="update-notes" class="btn btn-ghost btn-sm" type="button">What's new</button>
+        <button id="update-later" class="btn btn-ghost btn-sm" type="button">Later</button>
+        <button id="update-btn" class="btn btn-primary btn-sm" type="button">Update now</button>
+      </span>
     </div>
     <div id="league-banner" class="hidden" role="status">
       <span id="league-label"></span>
@@ -380,12 +391,14 @@
   </div>
 </div>
 <div id="char-pop" class="char-pop">
+  <div id="char-saved" class="char-saved hidden" aria-label="Saved characters"></div>
   <div id="char-bar" class="hidden gui-only-flex">
     <span class="char-label">Compare with your character</span>
     <input type="text" id="acct-input" aria-label="Account name" placeholder="Account (Name#1234)">
     <button id="acct-load" class="btn btn-secondary">Load characters</button>
     <select id="char-select" class="hidden" aria-label="Character"></select>
     <button id="char-compare" class="btn btn-primary hidden">Compare gear</button>
+    <button id="char-save" class="btn btn-ghost hidden" title="Keep this character at the top, to compare with one click next time">☆ Save</button>
     <label class="toggle hidden" id="hide-matched-wrap"><input type="checkbox" id="hide-matched"> Hide matched slots</label>
     <button id="value-gear" class="btn btn-secondary hidden" title="Price what your character is wearing — one search per item, rate-limit safe">💰 Value my gear</button>
     <span id="char-status"></span>

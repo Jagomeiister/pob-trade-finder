@@ -180,6 +180,9 @@ function populateCharSelect(characters) {
     o.value = c.name;
     o.textContent = (c.league === league ? '★ ' : '') + c.name +
       ' (' + c.league + ' lvl ' + c.level + ' ' + c['class'] + ')';
+    o.dataset.league = c.league || '';      // kept for ☆ Save (saved characters, 02-init.js)
+    o.dataset.cls = c['class'] || '';
+    o.dataset.level = c.level || '';
     sel.appendChild(o);
   });
   sel.classList.remove('hidden');
