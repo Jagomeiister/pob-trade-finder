@@ -186,10 +186,10 @@ var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                     timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', divcards: 'Div cards', tree: 'Skill tree', pasted: 'Pasted item',
                     planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets', dust: 'Dust explorer',
-                    home: 'Builds' };
+                    atlas: 'Atlas tree', home: 'Builds' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨', home: '⌂' };
+                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨', atlas: '🗺', home: '⌂' };
 
 // views with line-art icons in css/navicons.css (tools/make_navicons.py); the rest keep VIEW_ICONS
 var NAV_ICON_NAMES = { gear: 1, jewels: 1, flasks: 1, gems: 1, pasted: 1, planner: 1, timeless: 1, finder: 1,
@@ -241,6 +241,7 @@ function setView(k) {
   if (k === 'trades') showTradeHelperView(); // re-reads what the overlay saved
   if (k === 'sheets') renderSheetsView(); // cheat sheets: built-in acts + your own
   if (k === 'dust') renderDustView(); // dust per chaos for every unique (26-dust.js)
+  if (k === 'atlas') showAtlasView(); // Atlas tree: built once, canvas sized once visible (28-atlas.js)
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
     if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');

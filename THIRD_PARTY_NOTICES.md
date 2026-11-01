@@ -63,6 +63,7 @@ SOFTWARE.
 
 ## Game data
 
-Item, mod, passive-tree and currency data © Grinding Gear Games, via the public
-trade API, GGG's passive tree export, GGG's currency exchange feed and RePoE
+Item, mod, passive-tree, Atlas-tree and currency data © Grinding Gear Games, via the public
+trade API, GGG's passive tree export, GGG's Atlas tree export
+(github.com/grindinggear/atlastree-export), GGG's currency exchange feed and RePoE
 (repoe-fork.github.io).

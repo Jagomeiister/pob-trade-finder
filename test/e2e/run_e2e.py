@@ -3803,6 +3803,137 @@ def scenario_sheets(s, tag):
           "Through Sacred Ground" in r["preview"], r["preview"])
 
 
+S42_ATLAS = r"""
+const H = window.__e2e;
+const out = {};
+const V = () => document.getElementById('view-atlas');
+const btn = label => H.button(V(), label);
+const dlg = () => document.querySelector('dialog.ui-dialog[open]');
+openAtlasView();
+await H.waitFor(() => ATLAS && ATLAS.main.w > 0, 3000, 'atlas canvas sized');
+await H.frame();
+out.view = [document.body.dataset.view, H.visible(V()), H.text('#view-title')];
+// colour of the pixel at a node's centre, after centring it
+const probe = document.createElement('canvas').getContext('2d');
+const hex = c => { probe.fillStyle = c; return probe.fillStyle; };
+const rgbAt = id => {
+  atlasFocusNode(id); ATLAS.flash = null; atlasDraw();
+  const cv = ATLAS.main, d = cv.ctx.getImageData(Math.round(cv.w / 2 * cv.dpr), Math.round(cv.h / 2 * cv.dpr), 1, 1).data;
+  return '#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+};
+out.accent = hex(treeColors().alloc);
+// import the official link
+const paste = t => { V().querySelector('.atlas-input').value = t; btn('Import').click(); }; // the side panel re-renders
+paste(URL_);
+await H.waitFor(() => ATLAS.M.points > 0, 3000, 'import');
+out.status = H.text('.atlas-status', V());
+out.points = [ATLAS.M.points, H.text('.atlas-points', V()), H.text('.atlas-current .tv-stat', V())];
+out.ids = Object.keys(ATLAS.M.alloc).map(Number).sort((a, b) => a - b);
+out.title = H.text('.atlas-title', V());
+out.onPx = rgbAt(SMALL);
+out.offPx = rgbAt(OFF);
+// tooltip on hover
+const cv = ATLAS.main, n = ATLAS.I.byId[SMALL], r = cv.el.getBoundingClientRect();
+atlasFocusNode(SMALL);
+cv.el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1,
+  clientX: r.left + (n.x - cv.cx) * cv.s + cv.w / 2, clientY: r.top + (n.y - cv.cy) * cv.s + cv.h / 2 }));
+out.tip = [!ATLAS.tip.hidden, H.text('.tv-tip-name', ATLAS.tip), H.text('.tv-tip-stat', ATLAS.tip), H.text('.tv-tip-meta .badge', ATLAS.tip)];
+// search
+const q = V().querySelector('.atlas-search'); q.value = SEARCH; q.dispatchEvent(new Event('input'));
+out.search = H.text('.tv-count', V());
+q.value = ''; q.dispatchEvent(new Event('input'));
+// unknown input: a clear error, the tree stays
+paste('hello world'); await H.sleep(50);
+out.junk = [H.text('.atlas-status', V()), ATLAS.M.points];
+// save under a name
+const nameEl = () => V().querySelector('.atlas-name');
+nameEl().value = 'Essence farm'; btn('Save').click(); await H.sleep(20);
+const stored = () => JSON.parse(localStorage.getItem('pobtf-atlas') || '[]');
+out.saved = stored().map(s => [s.name, s.nodes.length, s.url === URL_]);
+out.persisted = H.calls('storage_set').some(c => c.args[0] === 'pobtf-atlas');
+const id = ATLAS.savedId;
+out.savedTitle = H.text('.atlas-title', V());
+out.usedNone = H.text('.atlas-used-by', V());
+// rename + notes
+nameEl().value = 'Essence + Harvest'; btn('Rename').click(); await H.sleep(20);
+out.renamed = [stored()[0].name, atlasName(id), H.text('.atlas-title', V())];
+const notes = V().querySelector('.atlas-notes'); notes.value = 'Rusted essence scarabs'; notes.dispatchEvent(new Event('change'));
+out.notes = stored()[0].notes;
+// linked from a saved build (04-library.js entries carry atlas: id)
+localStorage.setItem('pobtf-builds', JSON.stringify([{ name: 'My Witch · Necromancer', code: 'x', atlas: id }, { name: 'Other', code: 'y' }]));
+setView('market'); await H.sleep(20); setView('atlas'); await H.sleep(20);
+out.usedBy = H.text('.atlas-used-by', V());
+out.list = atlasList();
+// another tree (node names), then reopen the saved one from the list and through atlasOpen
+paste(NAMES);
+await H.waitFor(() => ATLAS.savedId === null, 3000, 'second import');
+out.second = [ATLAS.M.points, H.text('.atlas-title', V())];
+[...V().querySelectorAll('.atlas-saved-item')].find(b => b.textContent.startsWith('Essence + Harvest')).click();
+await H.sleep(20);
+out.reopened = [ATLAS.savedId === id, ATLAS.M.points, H.text('.atlas-title', V()), V().querySelector('.atlas-notes').value];
+setView('market'); await H.sleep(20);
+out.open = [atlasOpen(id), document.body.dataset.view, ATLAS.savedId === id, atlasOpen('nope')];
+// delete: asks first, Cancel keeps it
+btn('Delete').click(); await H.waitFor(dlg, 2000, 'confirm');
+out.confirm = [H.text('.ui-dialog-title', dlg()), H.text('.ui-dialog-body', dlg())];
+H.button(dlg(), 'Cancel').click(); await H.sleep(20);
+out.afterCancel = stored().length;
+btn('Delete').click(); await H.waitFor(dlg, 2000, 'confirm again');
+H.button(dlg(), 'Delete').click(); await H.sleep(30);
+out.afterDelete = [stored().length, atlasName(id), H.text('.atlas-title', V()), ATLAS.M.points];
+// the Tools nav lists it
+await H.loadBuild();
+out.nav = !!document.querySelector('#nav .nav-item[data-view="atlas"]');
+return out;
+"""
+
+
+def scenario_atlas(s, tag):
+    with open(os.path.join(ROOT, "data", "atlasview.js"), encoding="utf-8") as f:
+        src = f.read()
+    av = json.loads(src[src.index("{"):src.rindex("}") + 1])
+    nodes = av["nodes"]
+    names = {}
+    for n in nodes:
+        names[n[4]] = names.get(n[4], 0) + 1
+    smalls = [n[0] for n in nodes if n[3] == 0]
+    notables = [n for n in nodes if n[3] == 1 and names[n[4]] == 1]
+    ids = sorted(smalls[:12] + [n[0] for n in notables[:5]] + [next(n[0] for n in nodes if n[3] == 2)])
+    body = bytes([0, 0, 0, 6, 0, 0, len(ids)]) + b"".join(bytes([i >> 8, i & 255]) for i in ids) + bytes([0, 0])
+    url = "https://www.pathofexile.com/fullscreen-atlas-skill-tree/" + base64.urlsafe_b64encode(body).decode()
+    s.fresh()
+    r = s.run(S42_ATLAS, timeout=90, URL_=url, SMALL=smalls[0], OFF=smalls[-1], SEARCH=notables[0][4],
+              NAMES="\n".join(n[4] for n in notables[5:8]))
+    check(tag + " Atlas tree view opens", r["view"] == ["atlas", True, "Atlas tree"], r["view"])
+    check(tag + " official link imported: its nodes allocated, points shown", r["ids"] == ids and
+          r["points"][0] == len(ids) and r["points"][1] == str(len(ids)) and "/ %d Atlas points" % av["totalPoints"] in r["points"][2],
+          (r["points"], len(ids)))
+    check(tag + " import message", "Imported %d points from the Atlas link" % len(ids) in (r["status"] or ""), r["status"])
+    check(tag + " allocated node drawn in the accent colour, others not", r["onPx"] == r["accent"] and r["offPx"] != r["accent"],
+          (r["onPx"], r["offPx"], r["accent"]))
+    check(tag + " tooltip: name, stat, Allocated", r["tip"][0] and r["tip"][1] and r["tip"][2] and r["tip"][3] == "Allocated", r["tip"])
+    check(tag + " search counts matches", " match" in (r["search"] or "") and r["search"].endswith(" · 1 allocated"), r["search"])
+    check(tag + " unknown input: clear error, tree kept", "isn't an Atlas tree" in (r["junk"][0] or "") and r["junk"][1] == len(ids), r["junk"])
+    check(tag + " saved under its name (pobtf-atlas, through the bridge)", r["saved"] == [["Essence farm", len(ids), True]] and
+          r["persisted"] and r["savedTitle"] == "Essence farm", (r["saved"], r["savedTitle"]))
+    check(tag + " Used by: none yet", "no saved build" in (r["usedNone"] or ""), r["usedNone"])
+    check(tag + " rename", r["renamed"] == ["Essence + Harvest"] * 3, r["renamed"])
+    check(tag + " notes kept", r["notes"] == "Rusted essence scarabs", r["notes"])
+    check(tag + " Used by: the saved build that links it", r["usedBy"] == "Used by: My Witch", r["usedBy"])
+    check(tag + " atlasList for the build library", r["list"] and r["list"][0]["name"] == "Essence + Harvest" and
+          r["list"][0]["points"] == len(ids), r["list"])
+    check(tag + " node names import as an unsaved tree", r["second"] == [3, "Imported tree (not saved)"], r["second"])
+    check(tag + " reopen from the saved list (points, name, notes)", r["reopened"] == [True, len(ids), "Essence + Harvest",
+          "Rusted essence scarabs"], r["reopened"])
+    check(tag + " atlasOpen(id) switches to the view; unknown id refused", r["open"] == [True, "atlas", True, False], r["open"])
+    check(tag + " delete asks first, naming the linked build", "Essence + Harvest" in (r["confirm"][0] or "") and
+          "1 saved build links to it" in (r["confirm"][1] or ""), r["confirm"])
+    check(tag + " Cancel keeps it", r["afterCancel"] == 1, r["afterCancel"])
+    check(tag + " Delete removes it, the tree stays on screen unsaved", r["afterDelete"] == [0, None, "Imported tree (not saved)", len(ids)],
+          r["afterDelete"])
+    check(tag + " Tools nav lists the Atlas tree", r["nav"], r["nav"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -3845,6 +3976,7 @@ SCENARIOS = [
     ("39 autocompare", scenario_autocompare),
     ("40 anoints", scenario_anoints),
     ("41 nobuild", scenario_nobuild),
+    ("42 atlas", scenario_atlas),
 ]
 
 

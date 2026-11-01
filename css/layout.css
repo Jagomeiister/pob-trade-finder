@@ -263,6 +263,18 @@ body:not(.has-build)[data-view="dust"] #input-panel { display: none; }
 .dust-table-wrap { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; max-width: 100%; overflow-x: auto; }
 .dust-name { display: inline-flex; flex-wrap: wrap; gap: 0 4px; align-items: baseline; }
 .qp-dust { color: var(--text-2); font-size: var(--fs-sm); }
+/* atlas: Atlas tree view (js/app/28-atlas.js); the canvas, tooltip and side panels reuse the tv-* styles */
+body[data-view="atlas"] #view-atlas { display: block; }
+.atlas-page { display: flex; flex-direction: column; gap: 10px; }
+.atlas-side .tv-row { margin-top: 6px; }
+.atlas-input, .atlas-notes { box-sizing: border-box; width: 100%; resize: vertical; font: inherit; font-size: var(--fs-sm); }
+.atlas-notes { margin-top: 8px; }
+.atlas-name { flex: 1; min-width: 0; }
+.atlas-status { margin-top: 4px; overflow-wrap: anywhere; }
+.atlas-status-error { color: var(--danger); }
+.atlas-status-ok { color: var(--success); }
+.atlas-used-by { margin-top: 2px; }
+.atlas-saved-item[aria-current="true"] { background: var(--s2); box-shadow: inset 3px 0 0 var(--accent); }
 #view-trades .trades-root { display: block; }
 /* a pasted item without a loaded build still shows under the landing */
 body:not(.has-build)[data-view="home"] .tab-section[data-tab="pasted"] { display: block; margin-top: 16px; }
