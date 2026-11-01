@@ -298,14 +298,14 @@ var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'uni
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                     timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', divcards: 'Div cards', tree: 'Skill tree', pasted: 'Pasted item',
-                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets', dust: 'Dust explorer' };
+                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets', dust: 'Dust explorer', filter: 'Loot filter' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨' };
+                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨', filter: '⏚' };
 
 // views with line-art icons in css/navicons.css (tools/make_navicons.py); the rest keep VIEW_ICONS
 var NAV_ICON_NAMES = { gear: 1, jewels: 1, flasks: 1, gems: 1, pasted: 1, planner: 1, timeless: 1, finder: 1,
-  uniques: 1, search: 1, divcards: 1, tree: 1, market: 1, stash: 1, trades: 1, sheets: 1, settings: 1, home: 1, dust: 1 };
+  uniques: 1, search: 1, divcards: 1, tree: 1, market: 1, stash: 1, trades: 1, sheets: 1, settings: 1, home: 1, dust: 1, filter: 1 };
 function navIcon(k, cls) {
   var art = NAV_ICON_NAMES[k];
   var ic = UI.el('span', (cls || 'nav-icon') + (art ? ' ni ni-' + k : ''), art ? '' : VIEW_ICONS[k] || '•');
@@ -330,6 +330,7 @@ function setView(k) {
   if (k === 'trades') showTradeHelperView(); // re-reads what the overlay saved
   if (k === 'sheets') renderSheetsView(); // cheat sheets: built-in acts + your own
   if (k === 'dust') renderDustView(); // dust per chaos for every unique (26-dust.js)
+  if (k === 'filter') renderFilterView(); // loot filter tools (29-lootfilter.js)
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
     if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -367,10 +368,10 @@ function renderNav() {
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'sheets', 'dust', 'market', 'stash', 'trades'].filter(function (k) {
+  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'sheets', 'dust', 'filter', 'market', 'stash', 'trades'].filter(function (k) {
     if (k === 'stash') return OAUTH.signedIn; // official login only
     if (k === 'trades') return isGui();
-    return k === 'planner' || k === 'market' || k === 'sheets' || k === 'dust' || viewSection(k);
+    return k === 'planner' || k === 'market' || k === 'sheets' || k === 'dust' || k === 'filter' || viewSection(k);
   }).forEach(item);
   setView(document.body.dataset.view || 'gear');
 }
