@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.4.2 released 2026-11-01** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.0 released 2026-11-01** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -152,7 +152,7 @@ Source: Scalpel's README and repo (github.com/scalpelpoe/scalpel, AGPL-3.0). We 
 it works, but we can't copy its code or data files into this MIT project. Use original
 sources, or ask the author.
 
-- [x] **Cheat sheets** (built 2026-11-01, not released yet). Tools → Cheat sheets, plus an
+- [x] **Cheat sheets** (released in v2.5.0). Tools → Cheat sheets, plus an
       overlay with its own hotkey (Alt+C):
   - Ready-made per act 1–10, all from the PoE Wiki via `tools/make_cheatsheets.py` (CC BY-NC-SA,
     credited on the sheet): skill point and respec quests, trials and which labyrinth they
@@ -163,7 +163,7 @@ sources, or ask the author.
   - Still to do: league mechanic sheets; layout tips per zone (needs a source we may use).
   - [ ] In game: Alt+C shows / hides it; it follows the game window; drag, lock, opacity,
         size and width work; "Follow my act" turns it when you change act.
-- [x] **Trade helper test mode** (built 2026-11-01, not released yet): Setup → Test mode makes up
+- [x] **Trade helper test mode** (released in v2.5.0): Setup → Test mode makes up
       whispers / arrivals / trade accepted / leaving / your own buy / a zone, through the real
       log parser, as TEST cards in the overlay. Their buttons send nothing and nothing is saved.
       "Whole trade" plays one out over 12 s; "Clear test cards" removes them.
