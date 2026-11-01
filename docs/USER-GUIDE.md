@@ -630,6 +630,12 @@ and **Alt+C** shows it over the game. Use ‹ › to change act; drag it by ⠿.
   against the current league's changes (rows the wiki hasn't caught up on are left out), and
   update from the app's server between releases. Long sheets get a filter box on the
   Cheat sheets page.
+- **Anoint helper** (in the Blight sheet): every amulet, ring and blighted-map anoint with its
+  oils and what they cost now (GGG's currency exchange). Search a notable by name or by what it
+  does ("critical strike chance"), sort cheapest first, or click oils to see what they make; one
+  oil picked lists every recipe that uses it. Click a row to pick its oils. Your build's current
+  anoint is listed first and notables already in your tree are marked. Over the game it's
+  click-only (no search box), so it never takes your keyboard.
 - **Suggestions**: entering a mechanic's area (a Syndicate safehouse, the Azurite Mine, the
   Temple, a Sanctum floor, a map whose boss holds a Pantheon soul, …) shows a small pop-up at
   the top of the game for 20 seconds: **Open** shows that sheet, 🔕 stops suggestions for that

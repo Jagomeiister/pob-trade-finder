@@ -262,6 +262,14 @@ STUB_JS = r"""
     delete_sheet_image: function () { return { ok: true }; },
     cheatsheets_data: function () { return { ok: false, error: 'offline (e2e)' }; },
     overlay_sheet_open: function () { return { ok: true }; },
+    anoint_oils: function () {  // every oil 2c, Golden 40c; divine 200c
+      var o = {};
+      ['Clear', 'Sepia', 'Amber', 'Verdant', 'Teal', 'Azure', 'Indigo', 'Violet', 'Crimson', 'Black', 'Opalescent',
+       'Silver', 'Golden', 'Prismatic', 'Tainted', 'Reflective'].forEach(function (n) {
+        o[n + ' Oil'] = { img: null, chaos: n === 'Golden' ? 40 : 2 };
+      });
+      return { ok: true, oils: o, divine: 200, hour: 1 };
+    },
     set_price_hotkey: function (spec) { return { ok: true, hotkey: spec, label: spec, running: false, active: false, error: null }; }
   };
   // every bridge method exists; unknown ones resolve to a soft failure and are recorded.
@@ -3440,6 +3448,92 @@ return out;
 """
 
 
+S40_ANOINT_APP = r"""
+const H = window.__e2e;
+const out = {};
+localStorage.setItem('pobtf-sheet-build', JSON.stringify({ cls: 'Witch', gems: [], anoint: 'Whispers of Doom', treeNodes: [] }));
+document.getElementById('open-sheets').click();
+await H.sleep(60);
+[...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => /Blight/.test(b.textContent)).click();
+await H.waitFor(() => document.querySelector('#view-sheets .anoint-row'), 3000, 'anoint rows');
+await H.sleep(60);
+out.tabs = [...document.querySelectorAll('#view-sheets .anoint-tab')].map(b => b.textContent);
+out.bigTablesGone = ![...document.querySelectorAll('#view-sheets .sheet-sec-title')].some(t => /^Amulet anoints/.test(t.textContent));
+out.firstRow = H.text('#view-sheets .anoint-row .anoint-name');  // your anoint first
+// search by what a notable does
+const q = document.querySelector('#view-sheets .anoint-search');
+q.value = 'whispers'; q.dispatchEvent(new Event('input'));
+await H.sleep(30);
+const rows = () => [...document.querySelectorAll('#view-sheets .anoint-row')];
+out.searchRows = rows().map(r => r.querySelector('.anoint-name').textContent);
+const wod = rows()[0];
+out.wodOils = [...wod.querySelectorAll('.anoint-row-oils .anoint-oil-name')].map(e => e.textContent);
+out.wodCost = H.text('.anoint-cost', wod);
+out.wodStats = H.text('.anoint-text', wod);
+// click oils: the recipe that uses them
+q.value = ''; q.dispatchEvent(new Event('input'));
+wod.click();  // picks its oils
+await H.sleep(30);
+out.picked = [...document.querySelectorAll('#view-sheets .anoint-picked .anoint-oil-name')].map(e => e.textContent);
+out.afterPick = rows().map(r => r.querySelector('.anoint-name').textContent);
+out.countText = H.text('#view-sheets .anoint-count');
+H.button(document.querySelector('#view-sheets .anoint-bar'), 'Clear oils').click();
+await H.sleep(30);
+// one oil picked: every recipe using it
+[...document.querySelectorAll('#view-sheets .anoint-oil-btn')].find(b => /Golden/.test(b.textContent)).click();
+await H.sleep(30);
+out.goldenAll = rows().every(r => /Golden/.test(r.textContent));
+out.goldenCount = H.text('#view-sheets .anoint-count');
+// cheapest first
+const sel = document.querySelector('#view-sheets .anoint-bar select');
+sel.value = 'cost'; sel.dispatchEvent(new Event('change'));
+await H.sleep(30);
+const costs = rows().map(r => H.text('.anoint-cost', r));
+out.sortedCosts = costs.slice(0, 3);
+// ring tab
+[...document.querySelectorAll('#view-sheets .anoint-tab')].find(b => /^Ring/.test(b.textContent)).click();
+await H.sleep(30);
+out.ringSlots = document.querySelectorAll('#view-sheets .anoint-picked > *').length;
+out.calls = H.calls('anoint_oils').length;
+return out;
+"""
+
+S40_ANOINT_OV = r"""
+const H = window.__e2e;
+const out = {};
+window.__sheetOpen('blight');
+await H.waitFor(() => document.querySelector('.anoint-row'), 3000, 'overlay rows');
+out.noSearch = !document.querySelector('.anoint-search') && !document.querySelector('.sheet-panel input, .sheet-panel select');
+['Clear', 'Black'].forEach(n => [...document.querySelectorAll('.anoint-oil-btn')].find(b => b.textContent.startsWith(n)).click());
+await H.sleep(30);
+out.rowsHaveBoth = [...document.querySelectorAll('.anoint-row')].every(r => /Clear/.test(r.textContent) && /Black/.test(r.textContent));
+out.fits = H.calls('overlay_fit').length > 0;
+return out;
+"""
+
+
+def scenario_anoints(s, tag):
+    s.fresh()
+    r = s.run(S40_ANOINT_APP, timeout=60)
+    check(tag + " Blight sheet has the anoint helper: amulet / ring / map, not the long tables",
+          len(r["tabs"]) == 3 and r["tabs"][0].startswith("Amulet") and r["bigTablesGone"], r["tabs"])
+    check(tag + " your build's anoint is listed first", (r["firstRow"] or "").startswith("Whispers of Doom"), r["firstRow"])
+    check(tag + " search finds a notable, with its stats, oils and price", r["searchRows"] and
+          r["searchRows"][0].startswith("Whispers of Doom") and len(r["wodOils"]) == 3 and r["wodStats"] and
+          r["wodCost"].endswith("c"), (r["searchRows"][:2], r["wodOils"], r["wodCost"]))
+    check(tag + " clicking a row picks its oils and shows what they make", r["picked"] == r["wodOils"] and
+          r["afterPick"][:1] and r["afterPick"][0].startswith("Whispers of Doom") and "make" in (r["countText"] or ""),
+          (r["picked"], r["afterPick"][:2], r["countText"]))
+    check(tag + " one oil picked lists every recipe using it", r["goldenAll"] and "match" in (r["goldenCount"] or ""), r["goldenCount"])
+    check(tag + " cheapest first by oil prices", r["sortedCosts"] and all(c == r["sortedCosts"][0] or c for c in r["sortedCosts"])
+          and r["sortedCosts"][0] <= r["sortedCosts"][-1] if r["sortedCosts"] else False, r["sortedCosts"])
+    check(tag + " ring anoints take 2 oils", r["ringSlots"] == 2, r["ringSlots"])
+    check(tag + " oil prices asked once (exchange feed)", r["calls"] == 1, r["calls"])
+    s.fresh("?sheet=1")
+    r = s.run(S40_ANOINT_OV, timeout=60)
+    check(tag + " over the game: click oils, no typing", r["noSearch"] and r["rowsHaveBoth"] and r["fits"], r)
+
+
 def scenario_sheets2(s, tag):
     s.fresh("?sheet=1")
     r = s.run(S38_SHEETS2, timeout=60)
@@ -3574,6 +3668,7 @@ SCENARIOS = [
     ("36 dust", scenario_dust),
     ("37 ledger", scenario_ledger),
     ("38 sheets2", scenario_sheets2),
+    ("40 anoints", scenario_anoints),
 ]
 
 

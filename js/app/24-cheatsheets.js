@@ -51,7 +51,19 @@ function sheetRememberBuild(b) {
   var names = {};
   (b.gems || []).forEach(function (g) { if (g && g.name) names[g.name] = 1; });
   (b.gemGroups || []).forEach(function (gr) { (gr.offGems || []).forEach(function (g) { if (g && g.name) names[g.name] = 1; }); });
-  try { persist(SHEET_BUILD_KEY, JSON.stringify({ cls: b.className || '', gems: Object.keys(names) })); } catch (e) { /* storage full */ }
+  // the amulet's anoint ("Allocates X") and the active tree's nodes, for the anoint helper (27-anoints.js)
+  var anointed = null;
+  (b.slots || []).forEach(function (s) {
+    var it = s.slot === 'Amulet' && b.items ? b.items[s.itemId] : null;
+    ((it && it.mods) || []).forEach(function (m) {
+      var a = /^Allocates (.+)$/.exec((m && m.line) || '');
+      if (a) anointed = a[1].trim();
+    });
+  });
+  var nodes = ((b.tree || {}).nodes || []).slice(0, 400);
+  try {
+    persist(SHEET_BUILD_KEY, JSON.stringify({ cls: b.className || '', gems: Object.keys(names), anoint: anointed, treeNodes: nodes }));
+  } catch (e) { /* storage full */ }
 }
 function sheetBuild() {
   try { return JSON.parse(localStorage.getItem(SHEET_BUILD_KEY)) || {}; } catch (e) { return {}; }
@@ -121,7 +133,17 @@ function sheetMatch(ev) {
 function mechanicContent(m, opts) {
   opts = opts || {};
   var box = UI.el('div', 'sheet-content');
+  // Blight: the anoint helper (27-anoints.js) replaces the long anoint tables with search, oils
+  // and prices
+  var helper = m.id === 'blight' && typeof anointHelper === 'function';
+  if (helper) {
+    var hs = UI.el('div', 'sheet-sec');
+    hs.appendChild(UI.el('div', 'sheet-sec-title', 'Anoint helper'));
+    hs.appendChild(anointHelper({ overlay: SHEET_OV, onChange: SHEET_OV ? function () { fitSheetOverlay(); } : null }));
+    box.appendChild(hs);
+  }
   (m.sections || []).forEach(function (s) {
+    if (helper && /^(Amulet|Ring|Blighted map) anoints/i.test(s.title || '')) return; // in the helper
     var sec = UI.el('div', 'sheet-sec');
     if (s.title) sec.appendChild(UI.el('div', 'sheet-sec-title', s.title));
     if (Array.isArray(s.columns) && Array.isArray(s.rows)) {

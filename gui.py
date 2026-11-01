@@ -849,6 +849,28 @@ class Api:
         The grids nest, so a finer view reuses the coarser views' cached hours."""
         return 2 if days <= 1 else 6 if days <= 7 else 24
 
+    def anoint_oils(self, league):
+        """Anoint helper (Cheat sheets → Blight): every oil with its icon and chaos price from GGG's
+        hourly exchange feed only (no trade-site calls). {'ok', 'oils': {name: {img, chaos}},
+        'divine', 'hour'}; a price is missing when the feed has none."""
+        try:
+            oils = {m["name"]: m for m in self._currency_map.values()
+                    if (m.get("name") or "").endswith(" Oil") and m.get("id")}
+            div_id = (self._currency_map.get("divine") or {}).get("id")
+            want = [m["id"] for m in oils.values()] + ([div_id] if div_id else [])
+            try:
+                rates, hour = self._feed.rates(league, want)
+            except Exception:
+                rates, hour = {}, None  # offline: icons still show, prices don't
+            out = {}
+            for name, m in oils.items():
+                img = m.get("img") or ""
+                out[name] = {"img": ("https://web.poecdn.com" + img) if img.startswith("/") else None,
+                             "chaos": rates.get(m["id"])}
+            return {"ok": True, "oils": out, "divine": rates.get(div_id) if div_id else None, "hour": hour}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     def cx_overview(self, league):
         """Every currency-exchange item priced in the latest hour, with 7 days of
         6-hourly history: {'ok', 'hour', 'items': {code: {name, cat, img, s: [[unix hour,
