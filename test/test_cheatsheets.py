@@ -1,9 +1,9 @@
 """Cheat sheet data — run: python test/test_cheatsheets.py
 
 Checks the generated data/cheatsheets.js (tools/make_cheatsheets.py) without touching the network:
-the payload schema, the leveling part (acts 1-10, labs), the mechanic sheets (schema, unique ids,
-plain short cells, match triggers), that server/public/cheatsheets.json is the same payload, and a
-few spot facts that came from the wiki."""
+the payload schema, the leveling part (acts 1-10, labs, the act routes and quest gem rewards), the
+mechanic sheets (schema, unique ids, plain short cells, match triggers, the new sheets), that
+server/public/cheatsheets.json is the same payload, and a few spot facts that came from the wiki."""
 import json
 import os
 import re
@@ -56,6 +56,63 @@ check("skill-point quests and trials", n_skill >= 15 and n_trials >= 9, (n_skill
 check("act 2 has the bandit note", any("Bandit" in n.get("title", "") for n in acts.get("2", {}).get("notes", [])))
 check("labs have area levels", isinstance(data.get("labs"), dict) and data["labs"]
       and all(isinstance(x, int) for x in data["labs"].values()), data.get("labs"))
+
+# -- act route ----------------------------------------------------------------------
+BAD = re.compile(r"\[\[|\{\{|<|&#")
+ROUTE_KEYS = {"area", "id", "level", "wp", "town", "notes"}
+AREA_ID = re.compile(r"^[12]_\d+_\w+$")
+bad_route, dup_ids, short_routes = [], [], []
+for n, a in acts.items():
+    route = a.get("route")
+    if not isinstance(route, list) or len(route) < 6:
+        short_routes.append((n, len(route) if isinstance(route, list) else route))
+        continue
+    for e in route:
+        ok = (isinstance(e, dict) and set(e) == ROUTE_KEYS and isinstance(e["area"], str) and e["area"]
+              and isinstance(e["id"], str) and AREA_ID.match(e["id"]) and int(e["id"].split("_")[1]) == int(n)
+              and isinstance(e["level"], int) and not isinstance(e["level"], bool)
+              and isinstance(e["wp"], bool) and isinstance(e["town"], bool) and isinstance(e["notes"], list)
+              and all(isinstance(x, str) and x and len(x) <= 140 and not BAD.search(x) for x in e["notes"]))
+        if not ok:
+            bad_route.append((n, e))
+    ids_ = [e.get("id") for e in route if isinstance(e, dict)]
+    if len(ids_) != len(set(ids_)):
+        dup_ids.append(n)
+check("every act has a route of at least 6 zones", not short_routes, short_routes)
+check("route entries have the documented shape (area, id, level, wp, town, notes)", not bad_route, bad_route[:3])
+check("route area ids are unique per act", not dup_ids, dup_ids)
+check("every act route has exactly one town", all(sum(1 for e in a.get("route", []) if e.get("town")) == 1
+                                                  for a in acts.values()))
+r1 = acts.get("1", {}).get("route", [])
+check("act 1 route starts at The Twilight Strand (1_1_1) with the Hillock quest",
+      bool(r1) and r1[0].get("id") == "1_1_1" and any("Hillock" in x for x in r1[0].get("notes", [])), r1[:1])
+check("act routes carry trial notes", sum(1 for a in acts.values() for e in a.get("route", [])
+                                          for x in e.get("notes", []) if x.startswith("Trial of Ascendancy")) >= 9)
+
+# -- quest gems ---------------------------------------------------------------------
+CLASSES = {"Marauder", "Duelist", "Ranger", "Shadow", "Witch", "Templar", "Scion"}
+bad_gems = []
+for n, a in acts.items():
+    gl = a.get("gems")
+    if not isinstance(gl, list):
+        bad_gems.append((n, "gems not a list"))
+        continue
+    for q in gl:
+        if not (isinstance(q, dict) and {"quest", "npc", "reward", "vendor"} <= set(q) and isinstance(q["quest"], str)
+                and q["quest"] and isinstance(q["npc"], str)):
+            bad_gems.append((n, q))
+            continue
+        for g in q["reward"] + q["vendor"]:
+            if not (isinstance(g, dict) and set(g) == {"gem", "classes"} and isinstance(g["gem"], str) and g["gem"]
+                    and isinstance(g["classes"], list) and g["classes"] and set(g["classes"]) <= CLASSES):
+                bad_gems.append((n, q["quest"], g))
+check("gem rewards have the documented shape (quest, npc, reward/vendor: gem + classes)", not bad_gems, bad_gems[:3])
+g1 = acts.get("1", {}).get("gems", [])
+check("act 1 has at least 5 quests with gems", len([q for q in g1 if q.get("reward") or q.get("vendor")]) >= 5, len(g1))
+got1 = set(c for q in g1 for g in q.get("reward", []) for c in g.get("classes", []))
+check("all 7 classes get a gem reward in act 1", got1 == CLASSES, sorted(CLASSES - got1))
+eatg = next((q for q in g1 if q.get("quest") == "Enemy at the Gate"), None)
+check("act 1: Enemy at the Gate is handed out by Tarkleigh", eatg and eatg.get("npc") == "Tarkleigh", eatg and eatg.get("npc"))
 
 # -- mechanics schema ----------------------------------------------------------------
 mech = data.get("mechanics", [])
@@ -145,6 +202,10 @@ if "blight" in by:
                                                                       for r in t["rows"]))
     a = table("blight", "Blighted map anoints")
     check("blight: 13 blighted-map anoints", a and len(a["rows"]) == 13, a and len(a["rows"]))
+    am = table("blight", "Amulet anoints")
+    check("blight: the full amulet anoint list (Notable, Oils; 400+ rows)", am and am["columns"] == ["Notable", "Oils"]
+          and len(am["rows"]) >= 400 and all(len(r[1].split(", ")) == 3 for r in am["rows"]), am and len(am["rows"]))
+    check("blight: ring anoints table", table("blight", "Ring anoints") is not None)
 if "harvest" in by:
     text = " ".join(c for s in by["harvest"]["sections"] for r in s.get("rows", []) for c in r)
     check("harvest: no removed crafts (flask enchants, Synthesise, white socket)",
@@ -174,6 +235,26 @@ if "delve" in by:
     t = table("delve", "Fossils")
     check("delve: fossils carry a biome", t and all(r[2] for r in t["rows"]) and len(t["rows"]) >= 20)
 check("no Kirac missions or lab enchant sheets", not any(re.search(r"kirac|enchant", m["id"]) for m in mech), ids)
+NEW_IDS = ["heist", "breach", "legion", "abyss", "delirium", "ritual", "labyrinth", "scarabs", "atlas"]
+check("at least 15 mechanic sheets", len(mech) >= 15, len(mech))
+check("the new mechanic sheets are present", all(i in by for i in NEW_IDS), [i for i in NEW_IDS if i not in by])
+if "breach" in by:
+    text = " ".join(c for s in by["breach"]["sections"] for r in s.get("rows", []) for c in r)
+    check("breach: no Breachstones (non-functional since 3.28/3.29)", "Breachstone" not in text)
+if "legion" in by:
+    text = " ".join(c for s in by["legion"]["sections"] for r in s.get("rows", []) for c in r)
+    check("legion: no Unrelenting Emblems (removed in 3.29)", "Unrelenting" not in text)
+if "labyrinth" in by:
+    rows = [" ".join(r) for s in by["labyrinth"]["sections"] for r in s.get("rows", [])]
+    check("labyrinth: enchants are not listed as lab rewards", not any(re.search(r"enchant", r, re.I) for r in rows))
+    check("labyrinth: matches the labyrinth areas", "EndGame_Labyrinth" in by["labyrinth"]["match"]["areaIds"])
+if "heist" in by:
+    check("heist: matches the heist areas", "Heist" in by["heist"]["match"]["areaIds"])
+if "legion" in by:
+    check("legion: matches the Domain of Timeless Conflict",
+          "Domain of Timeless Conflict" in by["legion"]["match"]["areaNames"], by["legion"]["match"])
+if "delirium" in by:
+    check("delirium: matches the Simulacrum arenas", "AfflictionTown" in by["delirium"]["match"]["areaIds"])
 
 print("\nALL TESTS PASSED" if not failures else "\n%d FAILED" % failures)
 sys.exit(1 if failures else 0)

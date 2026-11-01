@@ -3178,6 +3178,80 @@ return out;
 """
 
 
+S38_SHEETS2 = r"""
+const H = window.__e2e;
+const out = {};
+const D = window.POE_CHEATSHEETS;
+const route1 = D.acts['1'].route || [];
+out.routeLen = route1.length;
+// the build's class + gems, as saved when a build loads (the overlay reads them from storage)
+localStorage.setItem('pobtf-sheet-build', JSON.stringify({ cls: 'Witch', gems: ['Freezing Pulse', 'Spell Cascade'] }));
+localStorage.setItem('pobtf-sheet-prefs', JSON.stringify({ follow: true, ack: true, act: 1 }));
+window.__sheetToggle();
+await H.sleep(30);
+out.zones = document.querySelectorAll('.sheet-route .sheet-zone').length;
+const z = route1[3];
+window.__sheetEvent({ type: 'area', id: z.id, level: z.level, act: 1 });
+await H.sleep(30);
+out.here = H.text('.sheet-zone.is-here .sheet-zone-name');
+out.hereWant = z.area;
+out.townLvl = [...document.querySelectorAll('.sheet-zone.is-town .sheet-zone-lvl')].length;
+out.gemsTitle = [...document.querySelectorAll('.sheet-sec-title')].map(e => e.textContent).find(t => /^Gems/.test(t));
+out.mine = [...document.querySelectorAll('.sheet-gem.is-mine')].map(e => e.textContent);
+out.firstInRow = (document.querySelector('.sheet-gems .sheet-gem') || {}).textContent;
+// a map: no zone marked
+window.__sheetEvent({ type: 'area', id: 'MapWorldsBeach', level: 70, act: null });
+await H.sleep(30);
+out.noneOnMap = !document.querySelector('.sheet-zone.is-here');
+return out;
+"""
+
+S38_VIEW = r"""
+const H = window.__e2e;
+const out = {};
+document.getElementById('open-sheets').click();
+await H.sleep(60);
+// a long mechanic sheet gets a filter box (app only)
+[...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => /Blight/.test(b.textContent)).click();
+await H.sleep(60);
+const f = document.querySelector('#view-sheets .sheet-filter');
+out.filter = !!f;
+const all = document.querySelectorAll('#view-sheets .sheet-table tbody tr').length;
+f.value = 'Whispers of Doom';
+f.dispatchEvent(new Event('input'));
+await H.sleep(30);
+const vis = [...document.querySelectorAll('#view-sheets .sheet-table tbody tr')].filter(r => r.style.display !== 'none');
+out.rows = [all, vis.length];
+out.hit = vis.map(r => r.textContent).join(' | ').slice(0, 200);
+// gems for a picked class
+[...document.querySelectorAll('#view-sheets button')].find(b => b.textContent === '← Act sheets').click();
+await H.sleep(40);
+const sel = [...document.querySelectorAll('#view-sheets select')].find(s => s.getAttribute('aria-label') === 'Gems for class');
+sel.value = 'Marauder'; sel.dispatchEvent(new Event('change'));
+await H.sleep(40);
+out.gemsTitle = [...document.querySelectorAll('#view-sheets .sheet-sec-title')].map(e => e.textContent).find(t => /^Gems/.test(t));
+out.newCount = (window.POE_CHEATSHEETS.mechanics || []).length;
+return out;
+"""
+
+
+def scenario_sheets2(s, tag):
+    s.fresh("?sheet=1")
+    r = s.run(S38_SHEETS2, timeout=60)
+    check(tag + " act route drawn in order", r["routeLen"] >= 6 and r["zones"] == r["routeLen"], (r["routeLen"], r["zones"]))
+    check(tag + " the zone you're in is marked on the route", r["here"] == r["hereWant"], (r["here"], r["hereWant"]))
+    check(tag + " towns show no level", r["townLvl"] == 0, r["townLvl"])
+    check(tag + " gems for your build's class, your gems marked and first", r["gemsTitle"] == "Gems · Witch" and
+          "Freezing Pulse" in r["mine"] and r["firstInRow"] in r["mine"], (r["gemsTitle"], r["mine"], r["firstInRow"]))
+    check(tag + " a map marks no zone", r["noneOnMap"], r)
+    s.fresh()
+    r = s.run(S38_VIEW, timeout=60)
+    check(tag + " long sheets get a filter that narrows rows", r["filter"] and r["rows"][0] > 100 and
+          0 < r["rows"][1] < 10 and "Whispers of Doom" in (r["hit"] or ""), (r["rows"], r["hit"]))
+    check(tag + " gems for a picked class", r["gemsTitle"] == "Gems · Marauder", r["gemsTitle"])
+    check(tag + " 20+ mechanic sheets", r["newCount"] >= 20, r["newCount"])
+
+
 def scenario_ui_batch(s, tag):
     s.fresh()
     r = s.run(S34_UPDATE, timeout=60)
@@ -3293,6 +3367,7 @@ SCENARIOS = [
     ("34 quickwins", scenario_quickwins),
     ("35 uibatch", scenario_ui_batch),
     ("36 dust", scenario_dust),
+    ("38 sheets2", scenario_sheets2),
 ]
 
 

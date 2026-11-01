@@ -225,7 +225,7 @@ function sheetContent(act, opts) {
       var li = UI.el('li', 'sheet-zone' + (here ? ' is-here' : '') + (z.town ? ' is-town' : ''));
       var top = UI.el('span', 'sheet-zone-top');
       top.appendChild(UI.el('span', 'sheet-zone-name', z.area));
-      if (z.level) top.appendChild(UI.el('span', 'sheet-zone-lvl', 'lvl ' + z.level));
+      if (z.level && !z.town) top.appendChild(UI.el('span', 'sheet-zone-lvl', 'lvl ' + z.level)); // a town's level isn't a leveling hint
       if (z.wp) { var wp = UI.el('span', 'sheet-zone-wp', 'WP'); wp.title = 'Waypoint'; top.appendChild(wp); }
       if (here) top.appendChild(UI.chip('you\'re here', 'success'));
       li.appendChild(top);

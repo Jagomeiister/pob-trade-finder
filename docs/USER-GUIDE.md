@@ -581,13 +581,19 @@ and **Alt+C** shows it over the game. Use ‹ › to change act; drag it by ⠿.
 - **Follow my act** (asks first) reads the game's log file to see which act you're in and turns
   the sheet to it. It also marks the trial you're standing in. **Open it when a new act
   starts** pops it up for you.
-- **Mechanics**: ☰ on the sheet (or the Mechanics list on the Cheat sheets page) opens a sheet
-  for Betrayal (Syndicate rewards per member and division), Blight oils and anoints, Delve
-  fossils, Incursion temple rooms, Expedition vendors, Sanctum afflictions, Kingsmarch shipping,
-  Ultimatum modifiers, Eldritch altars, the Pantheon (and which map boss holds each soul),
-  Corruption (Vaal Orb outcomes), Bestiary recipes, Harvest crafts, vendor recipes and essences.
-  They come from the Path of Exile Wiki, checked against the current league's changes, and
-  update from the app's server between releases.
+- **Route**: every zone of the act in order, with its level, waypoint, the quest steps and
+  bosses there, and where the trials and skill-point quests are. With **Follow my act** on, the
+  zone you're in is highlighted.
+- **Gems**: each quest's gem rewards and what you can buy afterwards, for your build's class
+  (or pick one), with your build's gems highlighted and listed first.
+- **Mechanics**: ☰ on the sheet (or the Mechanics list on the Cheat sheets page) opens one of
+  24 sheets: Betrayal, Blight (every amulet and ring anoint), Delve, Incursion, Expedition,
+  Sanctum, Kingsmarch, Ultimatum, Eldritch altars, Pantheon, Vaal Orb outcomes, Bestiary,
+  Harvest, vendor recipes, essences, Heist, Breach, Legion, Abyss, Delirium, Ritual, the
+  Labyrinth, scarabs and Atlas map tiers. They come from the Path of Exile Wiki, checked
+  against the current league's changes (rows the wiki hasn't caught up on are left out), and
+  update from the app's server between releases. Long sheets get a filter box on the
+  Cheat sheets page.
 - **Suggestions**: entering a mechanic's area (a Syndicate safehouse, the Azurite Mine, the
   Temple, a Sanctum floor, a map whose boss holds a Pantheon soul, …) shows a small pop-up at
   the top of the game for 20 seconds: **Open** shows that sheet, 🔕 stops suggestions for that
