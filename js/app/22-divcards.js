@@ -5,9 +5,45 @@
 
 // Drop areas + stack sizes: the community Path of Exile Wiki via tools/make_divcards.py, shipped
 // in data/divcards.json and served (newer) from the backend's static divcards.json. Prices: GGG's hourly currency exchange feed
-// (Api.div_cards). Drop *rates* aren't public, so "by map" ranks maps by the value of the
-// cards that can drop there — it is not an expected value per map.
-var DIV = { data: null, loading: null, league: null, mode: 'maps', q: '', min: 5, mapsOnly: true, open: null };
+// (Api.div_cards). Drop weights: community stacked deck data (data/divweights.js), so "by
+// area" can rank areas by card value per 1,000 item drops (see dcAreaValue).
+var DIV = { data: null, loading: null, league: null, mode: 'maps', q: '', min: 5, mapsOnly: true, open: null,
+  voidstones: true };
+var DC_PER = 1000;      // value is shown per this many item drops
+var DC_MAP_LEVEL = 83;  // maps with 4 voidstones
+
+// ---- drop weights: a card's share of an area's item drops ---------------------------------
+// weight / (drop pool weight + weights of the cards that can drop there), the model the
+// weights' source (maps-of-exile) uses. Community estimates from opening stacked decks, not
+// GGG numbers: good for comparing areas, not a promise of what one map gives.
+function dcWeight(name) {
+  var w = (window.POE_DIV_WEIGHTS || {}).cards || {};
+  return w[name] || null; // [weight, min area level]
+}
+function dcAreaLevel(area) {
+  return area.map && DIV.voidstones ? Math.max(area.lvl || 0, DC_MAP_LEVEL) : area.lvl || 0;
+}
+// every card that can drop in an area at its level: { cards: [{c, w, share, value}], unknown, total }
+function dcAreaValue(d, areaIndex) {
+  var area = d.areas[areaIndex], lvl = dcAreaLevel(area);
+  var pool = (window.POE_DIV_WEIGHTS || {}).pool || 0;
+  var here = [], unknown = 0, sumW = 0;
+  d.cards.forEach(function (c) {
+    if (c.off || !c.a || c.a.indexOf(areaIndex) === -1) return;
+    var w = dcWeight(c.n);
+    if (!w) { unknown++; return; }
+    if (lvl && w[1] && lvl < w[1]) return; // needs a higher area level
+    here.push({ c: c, w: w[0] });
+    sumW += w[0];
+  });
+  var denom = pool + sumW, total = 0;
+  here.forEach(function (h) {
+    h.share = denom ? h.w / denom : 0;
+    h.value = h.c.c != null ? h.share * h.c.c * DC_PER : 0;
+    total += h.value;
+  });
+  return { cards: here, unknown: unknown, total: total, level: lvl };
+}
 
 // 1 divine or more reads as divines (e.g. "3.4 div"), under that as chaos — whatever the
 // app-wide "Show prices in" setting says; card prices span 1c to hundreds of divines
@@ -171,10 +207,12 @@ function divcardsByMap(d, min, mapsOnly) {
     if (c.off || c.c == null || !c.a) return;
     c.a.forEach(function (i) { if (maps[i]) maps[i].cards.push(c); });
   });
+  var weights = !!window.POE_DIV_WEIGHTS;
   return maps.filter(function (m) { return (!mapsOnly || m.area.map) && m.cards.length; }).map(function (m) {
     var worth = m.cards.filter(function (c) { return c.c >= min; }).sort(function (a, b) { return b.c - a.c; });
     var best = worth[0] || null;
-    return { area: m.area, all: m.cards.length, worth: worth, best: best,
+    var ev = weights ? dcAreaValue(d, m.i) : null;
+    return { area: m.area, index: m.i, all: m.cards.length, worth: worth, best: best, ev: ev,
       bestStack: best ? best.c * best.s : 0, total: worth.reduce(function (s, c) { return s + c.c; }, 0) };
   }).filter(function (m) { return m.worth.length; });
 }
@@ -215,10 +253,20 @@ function renderDivcards() {
         render: function (m) { return m.best ? dcFmt(m.bestStack) + ' (' + m.best.s + ')' : ''; } },
       { key: 'total', label: 'Sum of one each', num: true, sort: function (m) { return m.total; },
         render: function (m) { return dcFmt(m.total); } }
-    ], rows.sort(function (a, b) { return b.best.c - a.best.c; }), { sortable: true,
+    ].concat(window.POE_DIV_WEIGHTS ? [
+      { key: 'ev', label: '≈ per ' + fmtCompact(DC_PER) + ' drops', num: true, sort: function (m) { return m.ev.total; },
+        render: function (m) {
+          var s = UI.el('span', 'dc-ev', dcFmt(m.ev.total));
+          s.title = 'Card value you\'d expect per ' + fmtCompact(DC_PER) + ' items dropped here (area level ' + m.ev.level + '), ' +
+            'from community drop weights' + (m.ev.unknown ? '. ' + m.ev.unknown + ' card' + (m.ev.unknown > 1 ? 's' : '') +
+            ' here have no known weight and aren\'t counted' : '');
+          if (m.ev.unknown) s.appendChild(UI.el('sup', 'dc-ev-unknown', ' +' + m.ev.unknown + '?'));
+          return s;
+        } }] : []),
+    rows.sort(function (a, b) { return a.ev && b.ev ? b.ev.total - a.ev.total : b.best.c - a.best.c; }), { sortable: true,
       emptyText: 'No area drops a card worth ' + DIV.min + 'c or more' + (q ? ' matching "' + DIV.q + '"' : '') + '.' }));
     var openRow = rows.filter(function (m) { return m.area.id === DIV.open; })[0];
-    if (openRow) box.insertBefore(divcardList(openRow.area.name + ': cards that can drop here', openRow.worth, league),
+    if (openRow) box.insertBefore(divcardList(openRow.area.name + ': cards that can drop here', openRow.worth, league, openRow.ev),
       mapTable);
     return;
   }
@@ -229,10 +277,28 @@ function renderDivcards() {
   box.appendChild(divcardList(null, cards, league));
 }
 
-function divcardList(title, cards, league) {
+// ev (an area's dcAreaValue): adds each card's chance and value per DC_PER drops there
+function divcardList(title, cards, league, ev) {
   var d = DIV.data;
   var wrap = UI.el('div', 'dc-list');
   if (title) wrap.appendChild(UI.el('h3', 'trade-h3', title));
+  var inArea = {};
+  if (ev) {
+    ev.cards.forEach(function (h) { inArea[h.c.n] = h; });
+    wrap.appendChild(UI.el('p', 'finder-sub', 'At area level ' + ev.level + ': ≈ ' + dcFmt(ev.total) + ' in cards per ' +
+      fmtCompact(DC_PER) + ' items dropped' + (ev.unknown ? ' (' + ev.unknown + ' card' + (ev.unknown > 1 ? 's' : '') +
+      ' without a known weight left out)' : '') + '.'));
+  }
+  var areaCols = ev ? [
+    { key: 'odds', label: 'One per', num: true, sort: function (c) { var h = inArea[c.n]; return h ? -h.share : 1; },
+      render: function (c) {
+        var h = inArea[c.n];
+        if (!h) return dcWeight(c.n) ? 'level too low' : 'weight unknown';
+        return '≈ ' + fmtCompact(Math.round(1 / h.share)) + ' drops';
+      } },
+    { key: 'ev', label: '≈ per ' + fmtCompact(DC_PER), num: true, sort: function (c) { var h = inArea[c.n]; return h ? h.value : -1; },
+      render: function (c) { var h = inArea[c.n]; return h && c.c != null ? dcFmt(h.value) : ''; } }
+  ] : [];
   wrap.appendChild(UI.table([
     { key: 'n', label: 'Card', render: function (c) {
       var cell = UI.el('span', 'dc-card');
@@ -257,7 +323,9 @@ function divcardList(title, cards, league) {
       return c.code ? UI.button('ghost', { size: 'sm', label: '↗', title: 'Bulk exchange on the trade site',
         onClick: function () { openUrl(exchangeUrlFor(league, c.code)); } }) : '';
     } }
-  ], cards, { sortable: true, emptyText: 'No cards match.' }));
+  ].concat(areaCols), ev ? cards.slice().sort(function (a, b) {
+    return ((inArea[b.n] || {}).value || 0) - ((inArea[a.n] || {}).value || 0);
+  }) : cards, { sortable: true, emptyText: 'No cards match.' }));
   return wrap;
 }
 
@@ -287,12 +355,28 @@ function makeDivcards() {
   mo.appendChild(mcb);
   mo.appendChild(UI.el('span', null, 'Maps only'));
   bar.appendChild(mo);
+  if (window.POE_DIV_WEIGHTS) { // some cards only drop from a higher area level
+    var vs = UI.el('label', 'toggle');
+    vs.title = 'Count maps at area level ' + DC_MAP_LEVEL + ', as with all 4 voidstones (otherwise their listed level)';
+    var vcb = document.createElement('input');
+    vcb.type = 'checkbox';
+    vcb.checked = DIV.voidstones;
+    vcb.addEventListener('change', function () { DIV.voidstones = vcb.checked; renderDivcards(); });
+    vs.appendChild(vcb);
+    vs.appendChild(UI.el('span', null, '4 voidstones'));
+    bar.appendChild(vs);
+  }
   bar.appendChild(UI.button('ghost', { size: 'sm', cls: 'gui-only', label: '↻', title: 'Reload prices',
     onClick: function () { loadDivcardsView(true); } }));
   wrap.appendChild(bar);
-  wrap.appendChild(UI.el('div', 'finder-sub dc-note', 'Drop rates aren\'t public, so areas are ranked by the cards that ' +
-    'can drop there, not by expected value. Prices: GGG\'s currency exchange (last hour). Drop areas: Path of Exile ' +
-    'Wiki (CC BY-NC-SA), updated through the app\'s server between releases.'));
+  var dw = window.POE_DIV_WEIGHTS;
+  wrap.appendChild(UI.el('div', 'finder-sub dc-note', (dw
+    ? 'Areas are ranked by the card value you\'d expect per ' + fmtCompact(DC_PER) + ' items dropped there. Drop weights are ' +
+      'community estimates from opening stacked decks (Prohibited Library, via maps-of-exile, MIT; ' + (dw.league || '') +
+      '), not GGG numbers, and monster density isn\'t counted: use it to compare areas. '
+    : 'Drop rates aren\'t public, so areas are ranked by the cards that can drop there, not by expected value. ') +
+    'Prices: GGG\'s currency exchange (last hour). Drop areas: Path of Exile Wiki (CC BY-NC-SA), updated through the ' +
+    'app\'s server between releases.'));
   var body = UI.el('div', 'dc-body');
   body.appendChild(UI.el('div', 'finder-sub', isGui() ? 'Open this view to load drop data and prices.'
     : 'The Div cards tool needs the desktop app.'));
