@@ -189,7 +189,11 @@ sources, or ask the author.
   - [ ] In game: try every test button and look at the cards over the game.
 - [x] Crafted / enchanted mods are bright light blue (and semi-bold), clearly apart from normal
       mods (asked 2026-11-01).
-- [ ] **Dust explorer** (was parked as impossible; it isn't):
+- [x] **Dust explorer** (built 2026-11-01): Tools → Dust explorer + "Dust ≈" on the price check.
+      Per-unique values from deronek/poe-disenchant-tool (MIT, pinned; `tools/make_dust.py`),
+      which also gives built-in influences (Starforge, Astrolabe) through its q0/q20 columns.
+      Formula is additive: × (ilvl − 64) / 20 × (1 + 0.02·q + 0.5·influences). Bump the
+      pinned commit after 3.30 for new uniques. Notes from before:
   - Scalpel's dust formula: dust = base × 125 × (20 − (84 − ilvl)), with ilvl clamped to
     65–84, × (1 + (2 × quality + 50 × influences) / 100).
   - The formula is a fact we can use. The per-unique base value table

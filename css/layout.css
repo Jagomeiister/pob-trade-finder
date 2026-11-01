@@ -247,10 +247,18 @@ body[data-view="planner"] #view-planner,
 body[data-view="market"] #view-market,
 body[data-view="stash"] #view-stash,
 body[data-view="trades"] #view-trades,
-body[data-view="sheets"] #view-sheets { display: block; }
-/* the Trade helper and cheat sheets work without a build: they take the landing's place */
+body[data-view="sheets"] #view-sheets,
+body[data-view="dust"] #view-dust { display: block; }
+/* the Trade helper, cheat sheets and dust explorer work without a build: they take the landing's place */
 body:not(.has-build)[data-view="trades"] #input-panel,
-body:not(.has-build)[data-view="sheets"] #input-panel { display: none; }
+body:not(.has-build)[data-view="sheets"] #input-panel,
+body:not(.has-build)[data-view="dust"] #input-panel { display: none; }
+/* dust explorer (js/app/26-dust.js) */
+.dust-page { display: flex; flex-direction: column; gap: 10px; }
+.dust-controls { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.dust-table-wrap { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; max-width: 100%; overflow-x: auto; }
+.dust-name { display: inline-flex; flex-wrap: wrap; gap: 0 4px; align-items: baseline; }
+.qp-dust { color: var(--text-2); font-size: var(--fs-sm); }
 #view-trades .trades-root { display: block; }
 /* a pasted item without a loaded build still shows under the landing */
 body:not(.has-build) .tab-section[data-tab="pasted"] { display: block; margin-top: 16px; }
