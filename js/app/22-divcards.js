@@ -74,8 +74,12 @@ function dcHour(hour) {
 // into view: the global art cache (08-cards.js) swaps a cached copy in, or queues the URL —
 // 40 per call, 1.5 s apart — so a few hundred rows never fire a few hundred downloads.
 // The <img> stays invisible until it has loaded: a missing image shows nothing, never a
-// broken icon. Hover a thumbnail for the full card.
+// broken icon. Hover a card (thumbnail or name) for the whole card, laid out like the game's:
+// name, the picture with the stack size, the reward in its colours, the flavour text.
 var DC_ART = 'https://web.poecdn.com/image/divination-card/';
+// reward colours as the game uses them (data: tools/make_divcards.py "r")
+var DC_COLOURS = { unique: 1, currency: 1, divination: 1, gem: 1, magic: 1, rare: 1, normal: 1, corrupted: 1,
+                   enchanted: 1, fractured: 1, crafted: 1, augmented: 1, default: 1 };
 
 function dcArtObserver() {
   if (!DIV.io && window.IntersectionObserver) {
@@ -101,26 +105,57 @@ function dcArtThumb(c) {
   img.addEventListener('load', function () { img.classList.add('ok'); });
   img.addEventListener('error', function () { img.classList.remove('ok'); }); // the art cache may retry the CDN
   box.appendChild(img);
-  box.addEventListener('mouseenter', function () { if (img.classList.contains('ok')) dcArtPop(img, box); });
-  box.addEventListener('mouseleave', function () { dcArtPop(null); });
   var io = dcArtObserver();
   if (io) io.observe(box);
   else img.setAttribute('src', img.dataset.src);
   return box;
 }
 
-// one shared enlarged view, beside the thumbnail, kept on screen
-function dcArtPop(img, anchor) {
+// the whole card: name, picture (when its art loaded) with the stack size, reward, flavour text
+function dcFullCard(c, img) {
+  var card = UI.el('div', 'dc-full');
+  card.appendChild(UI.el('div', 'dc-full-name', c.n));
+  var art = UI.el('div', 'dc-full-art');
+  if (img && img.classList.contains('ok')) {
+    var big = document.createElement('img');
+    big.alt = '';
+    big.src = img.currentSrc || img.src;
+    art.appendChild(big);
+  } else {
+    art.classList.add('is-empty');
+  }
+  art.appendChild(UI.el('span', 'dc-full-stack', (c.s || 1) > 1 ? '1 / ' + c.s : '1 / 1'));
+  card.appendChild(art);
+  var reward = UI.el('div', 'dc-full-reward');
+  (c.r || []).forEach(function (line) {
+    var row = UI.el('div', 'dc-full-line');
+    line.forEach(function (seg) {
+      row.appendChild(UI.el('span', 'dc-c-' + (DC_COLOURS[seg[1]] ? seg[1] : 'default'), seg[0]));
+    });
+    reward.appendChild(row);
+  });
+  if (!(c.r || []).length) reward.appendChild(UI.el('div', 'dc-full-line dc-c-default', 'Reward: see the wiki'));
+  card.appendChild(reward);
+  if (c.f) {
+    var fl = UI.el('div', 'dc-full-flavour');
+    c.f.split('\n').forEach(function (t) { fl.appendChild(UI.el('div', null, t)); });
+    card.appendChild(fl);
+  }
+  return card;
+}
+
+// one shared pop-up beside the card's row, kept on screen
+function dcArtPop(c, anchor, img) {
   var pop = document.getElementById('dc-art-pop');
-  if (!img) { if (pop) pop.hidden = true; return; }
+  if (!c) { if (pop) pop.hidden = true; return; }
   if (!pop) {
     pop = UI.el('div', 'dc-art-pop');
     pop.id = 'dc-art-pop';
     pop.setAttribute('aria-hidden', 'true');
-    pop.appendChild(document.createElement('img'));
     document.body.appendChild(pop);
   }
-  pop.firstChild.src = img.currentSrc || img.src;
+  pop.textContent = '';
+  pop.appendChild(dcFullCard(c, img));
   pop.hidden = false;
   var r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
   var x = r.right + 10 + w > window.innerWidth ? r.left - 10 - w : r.right + 10;
@@ -201,8 +236,11 @@ function divcardList(title, cards, league) {
   wrap.appendChild(UI.table([
     { key: 'n', label: 'Card', render: function (c) {
       var cell = UI.el('span', 'dc-card');
-      cell.appendChild(dcArtThumb(c));
+      var thumb = dcArtThumb(c);
+      cell.appendChild(thumb);
       cell.appendChild(UI.el('span', null, c.n));
+      cell.addEventListener('mouseenter', function () { dcArtPop(c, cell, thumb.querySelector('img')); });
+      cell.addEventListener('mouseleave', function () { dcArtPop(null); });
       return cell;
     } },
     { key: 'c', label: 'Each', num: true, render: function (c) { return c.c != null ? dcFmt(c.c) : '?'; } },

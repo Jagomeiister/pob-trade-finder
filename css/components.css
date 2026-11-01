@@ -610,7 +610,30 @@ body.gui .settings-section.gui-only { display: flex; }
   border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--s1);
   box-shadow: 0 8px 24px var(--shadow);
 }
-.dc-art-pop img { display: block; width: 312px; height: 224px; object-fit: cover; border-radius: var(--r-sm); }
+.dc-card { cursor: zoom-in; }
+/* the whole card on hover, laid out like the game's: dark in every app theme, the game's text colours */
+.dc-art-pop { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.dc-full {
+  width: 300px; display: flex; flex-direction: column; align-items: stretch; gap: 0;
+  background: var(--dc-bg); color: var(--dc-normal); border: 2px solid var(--dc-frame); border-radius: 10px;
+  box-shadow: 0 10px 28px var(--dc-shadow), inset 0 0 0 1px var(--dc-frame-in); overflow: hidden;
+  font-family: Georgia, 'Times New Roman', serif; text-align: center;
+}
+.dc-full-name { padding: 7px 10px 6px; background: linear-gradient(var(--dc-title-hi), var(--dc-title-lo)); color: var(--on-dc-title);
+  font-size: 16px; font-weight: 700; letter-spacing: .02em; border-bottom: 2px solid var(--dc-frame); }
+.dc-full-art { position: relative; aspect-ratio: 237 / 170; background: var(--dc-bg); border-bottom: 2px solid var(--dc-frame); }
+.dc-full-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.dc-full-art.is-empty { aspect-ratio: auto; height: 28px; }
+.dc-full-stack { position: absolute; left: 6px; bottom: 6px; padding: 1px 7px; border-radius: 4px;
+  background: var(--dc-stack-bg); border: 1px solid var(--dc-frame); color: var(--dc-stack); font-size: 13px;
+  font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.dc-full-reward { padding: 10px 12px 8px; font-size: 15px; line-height: 1.35; }
+.dc-full-flavour { margin: 0 14px 12px; padding-top: 8px; border-top: 1px solid var(--dc-rule); color: var(--dc-unique);
+  font-style: italic; font-size: 13px; line-height: 1.35; }
+.dc-c-unique { color: var(--dc-unique); } .dc-c-currency { color: var(--dc-currency); } .dc-c-divination { color: var(--dc-divination); }
+.dc-c-gem { color: var(--dc-gem); } .dc-c-magic, .dc-c-augmented { color: var(--dc-magic); } .dc-c-rare { color: var(--dc-rare); }
+.dc-c-normal { color: var(--dc-normal); } .dc-c-corrupted { color: var(--dc-corrupted); } .dc-c-fractured { color: var(--dc-fractured); }
+.dc-c-enchanted, .dc-c-crafted { color: var(--dc-enchanted); } .dc-c-default { color: var(--dc-default); }
 /* Skill tree (js/app/23-tree.js) */
 .tv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .tv-zoom { display: inline-flex; gap: 4px; }

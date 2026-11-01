@@ -655,11 +655,13 @@ Tools → **Div cards** shows where each divination card drops and what it's wor
   one of each. Click an area for its card list. Drop rates aren't public, so this ranks
   areas by the cards that *can* drop there; it isn't an expected value per map.
 - Prices of 1 divine or more show in divines, smaller ones in chaos.
-- **By card**: the card's picture (hover it for a bigger one), price each, set size, full set
-  value, where it drops (or "no longer drops") and ↗ to the bulk exchange.
+- **By card**: the card's picture, price each, set size, full set value, where it drops (or
+  "no longer drops") and ↗ to the bulk exchange. Hover a card (its picture or name) to see the
+  whole card as in the game: name, picture with the stack size, the reward in its colours
+  (unique, currency, gem, corrupted…) and the flavour text.
 - Filter by card or area name, and set a minimum value.
 - Prices come from GGG's currency exchange (last hour) for the selected league. Drop areas
-  come from the community Path of Exile Wiki (CC BY-NC-SA): they ship with the app and update
+  and the cards' reward and flavour text come from the community Path of Exile Wiki (CC BY-NC-SA): they ship with the app and update
   through the app's server between releases. They keep working offline.
 - The page loads once per session. After a restart it shows your last result straight away
   ("Showing prices from …") and refreshes the prices in the background.

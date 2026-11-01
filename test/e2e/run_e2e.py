@@ -2110,7 +2110,8 @@ window.__stubOverrides.div_cards = { ok: true, source: 'Path of Exile Wiki', div
     { id: 'MapWorldsColdRiver_', name: 'Cold River', lvl: 78, map: true },
     { id: 'Act3Docks', name: 'The Docks', lvl: 33, map: false }],
   cards: [
-    { n: 'The Doctor', s: 8, a: [0], c: 1500, code: 'the-doctor', i: 'TheDoctor' },
+    { n: 'The Doctor', s: 8, a: [0], c: 1500, code: 'the-doctor', i: 'TheDoctor', r: [[['Headhunter', 'unique']]],
+      f: 'They said I needed my head examined,\nbut I would rather just take yours.' },
     { n: 'A Chilling Wind', s: 4, a: [1, 0], c: 6, code: 'a-chilling-wind', i: 'AChillingWind' },
     { n: 'Rain of Chaos', s: 8, a: [0, 1, 2], c: 0.5, code: 'rain-of-chaos' },
     { n: 'Act Card', s: 3, a: [2], c: 40, code: 'act-card' },
@@ -2150,11 +2151,22 @@ out.docArt = docImg && { remote: docImg.dataset.remote, local: (docImg.getAttrib
 out.windArt = windImg && { src: windImg.getAttribute('src'), ok: windImg.classList.contains('ok'),
   vis: getComputedStyle(windImg).visibility };
 out.goneArt = [cardRow('Gone').querySelectorAll('img').length, !!cardRow('Gone').querySelector('.dc-art-none')];
-docImg && docImg.parentNode.dispatchEvent(new MouseEvent('mouseenter'));
+const docCell = cardRow('The Doctor').querySelector('.dc-card');
+docCell.dispatchEvent(new MouseEvent('mouseenter'));
 const pop = document.getElementById('dc-art-pop');
-out.pop = pop && { shown: !pop.hidden, src: (pop.querySelector('img').getAttribute('src') || '').slice(0, 15) };
-docImg && docImg.parentNode.dispatchEvent(new MouseEvent('mouseleave'));
+out.pop = pop && { shown: !pop.hidden, src: ((pop.querySelector('.dc-full-art img') || {}).getAttribute ?
+    pop.querySelector('.dc-full-art img').getAttribute('src') : '').slice(0, 15),
+  name: H.text('.dc-full-name', pop), stack: H.text('.dc-full-stack', pop),
+  reward: [...pop.querySelectorAll('.dc-full-reward span')].map(e => [e.textContent, e.className]),
+  flavour: [...pop.querySelectorAll('.dc-full-flavour div')].map(e => e.textContent),
+  rewardColour: getComputedStyle(pop.querySelector('.dc-full-reward span')).color };
+docCell.dispatchEvent(new MouseEvent('mouseleave'));
 out.popHidden = !pop || pop.hidden;
+// a card without art or reward data still shows: name, stack, "see the wiki"
+const goneCell = cardRow('Gone').querySelector('.dc-card');
+goneCell.dispatchEvent(new MouseEvent('mouseenter'));
+out.popNoArt = { img: !!pop.querySelector('.dc-full-art img'), name: H.text('.dc-full-name', pop), reward: H.text('.dc-full-reward', pop) };
+goneCell.dispatchEvent(new MouseEvent('mouseleave'));
 const n0 = H.calls('open_url').length;
 H.button(sec.querySelector('.data-table'), '↗').click();
 await H.sleep(20);
@@ -2209,9 +2221,14 @@ def scenario_divcards(s, tag):
     check(tag + " card art that fails to load stays invisible (no broken icon)",
           (wa.get("src") or "").endswith("/AChillingWind.png") and not wa.get("ok") and wa.get("vis") == "hidden", wa)
     check(tag + " a card without art has no image at all", r["goneArt"] == [0, True], r["goneArt"])
-    check(tag + " hovering a thumbnail shows the larger card, leaving hides it",
-          (r["pop"] or {}).get("shown") and (r["pop"] or {}).get("src") == "data:image/png;" and r["popHidden"],
-          (r["pop"], r["popHidden"]))
+    pp = r["pop"] or {}
+    check(tag + " hovering a card shows the whole card, leaving hides it", pp.get("shown") and pp.get("src") == "data:image/png;"
+          and pp.get("name") == "The Doctor" and pp.get("stack") == "1 / 8" and r["popHidden"], (pp, r["popHidden"]))
+    check(tag + " full card: reward in its colour, flavour text by line", pp.get("reward") == [["Headhunter", "dc-c-unique"]]
+          and pp.get("rewardColour") == "rgb(175, 96, 37)" and pp.get("flavour") == ["They said I needed my head examined,",
+          "but I would rather just take yours."], pp)
+    check(tag + " a card without art or reward still shows its name", r["popNoArt"] == {"img": False, "name": "Gone",
+          "reward": "Reward: see the wiki"}, r["popNoArt"])
     check(tag + " saved copy after a restart: shown at once, marked as refreshing",
           "Showing prices from" in (r["cachedNote"] or "") and "refreshing" in (r["cachedNote"] or "") and
           r["cachedRows"] > 0, (r["cachedNote"], r["cachedRows"]))

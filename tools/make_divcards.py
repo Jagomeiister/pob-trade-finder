@@ -26,6 +26,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from html.parser import HTMLParser
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WIKI = "https://www.poewiki.net/w/api.php"
@@ -35,6 +36,74 @@ SOURCE = "Path of Exile Wiki (poewiki.net), CC BY-NC-SA 3.0"
 ART_CDN = "https://web.poecdn.com/image/divination-card/%s.png"
 ART_CHECKED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "divcard_art_checked.json")
 ART_PACE, ART_RECHECK_DAYS = 0.2, 30
+
+
+class _RewardParser(HTMLParser):
+    """The wiki's reward markup -> lines of [text, colour]: <span class="tc -unique">…</span>
+    sets the colour (unique, currency, divination, gem, magic, rare, normal, corrupted, …),
+    <br> starts a new line; everything else is plain text."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.lines, self.stack = [[]], []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "br":
+            self.lines.append([])
+            return
+        if tag == "span":
+            cls = dict(attrs).get("class") or ""
+            m = re.search(r"(?:^|\s)-([a-z]+)", cls) if re.search(r"(?:^|\s)tc(?:\s|$)", cls) else None
+            self.stack.append(m.group(1) if m else None)
+
+    def handle_startendtag(self, tag, attrs):
+        if tag == "br":
+            self.lines.append([])
+
+    def handle_endtag(self, tag):
+        if tag == "span" and self.stack:
+            self.stack.pop()
+
+    def handle_data(self, data):
+        colour = next((c for c in reversed(self.stack) if c), "default")
+        line = self.lines[-1]
+        if line and line[-1][1] == colour:
+            line[-1][0] += data
+        else:
+            line.append([data, colour])
+
+
+def wiki_text(s):
+    """Wiki markup -> HTML a parser can read: no file links, [[Page|Shown]] -> Shown, and the
+    hover pop-up copies (hoverbox__display) dropped so an item isn't named twice."""
+    s = html.unescape(s or "")
+    s = re.sub(r'<span class="hoverbox__display[^"]*">.*?</span>', "", s, flags=re.S)
+    s = re.sub(r"\[\[File:[^\]]*\]\]", "", s)
+    s = re.sub(r"\[\[[^\]|]*\|([^\]]*)\]\]", r"\1", s)
+    s = re.sub(r"\[\[([^\]]*)\]\]", r"\1", s)
+    return s
+
+
+def parse_reward(desc):
+    """Reward lines for the card picture: [[[text, colour], ...], ...], blank lines dropped."""
+    p = _RewardParser()
+    p.feed(wiki_text(desc))
+    p.close()
+    out = []
+    for line in p.lines:
+        segs = [[re.sub(r"\s+", " ", t), c] for t, c in line if t.strip()]
+        if segs:
+            segs[0][0] = segs[0][0].lstrip()
+            segs[-1][0] = segs[-1][0].rstrip()
+            out.append(segs)
+    return out
+
+
+def parse_flavour(text):
+    """Flavour text as plain lines joined by newlines ("" when the card has none)."""
+    s = re.sub(r"<br\s*/?>", "\n", wiki_text(text), flags=re.I)
+    s = re.sub(r"<[^>]+>", "", s)
+    return "\n".join(line.strip() for line in s.split("\n") if line.strip())
 
 
 def cargo(params):
@@ -121,7 +190,8 @@ def build():
         page = cargo({"tables": "items,stackables,divination_cards",
                       "join_on": "items._pageID=stackables._pageID,items._pageID=divination_cards._pageID",
                       "fields": "items.name=name,items.drop_areas=areas,items.drop_enabled=enabled,"
-                                "items.metadata_id=mid,divination_cards.card_art=art,stackables.stack_size=stack",
+                                "items.metadata_id=mid,divination_cards.card_art=art,stackables.stack_size=stack,"
+                                "items.description=desc,items.flavour_text=flav",
                       "where": 'items.class_id="DivinationCard"', "order_by": "items.name",
                       "limit": str(PAGE), "offset": str(offset)})
         rows += page
@@ -149,6 +219,11 @@ def build():
             o["off"] = 1
         if r["name"] in arts:
             o["i"] = arts[r["name"]]
+        reward, flavour = parse_reward(r.get("desc")), parse_flavour(r.get("flav"))
+        if reward:
+            o["r"] = reward   # what the full set gives, coloured like the card: [[[text, colour], ...], ...]
+        if flavour:
+            o["f"] = flavour  # flavour text, "\n" between lines
         cards.append(o)
     print("Card art: %(first)d matched on the first guess, %(second)d on the second, %(none)d not at all "
           "(%(requests)d CDN checks this run)" % art_counts)
