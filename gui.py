@@ -29,7 +29,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.5.1"
+VERSION = "2.5.2"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -454,6 +454,7 @@ class Api:
                     "icon": it.get("icon", ""),
                     "ilvl": it.get("ilvl", 0),
                     "corrupted": bool(it.get("corrupted")),
+                    "linkGroups": self._char_links(it),
                     **self._char_mods(it),
                 })
             return {"ok": True, "items": items}
@@ -493,6 +494,50 @@ class Api:
                     "jewels": jewels}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    # worn slots whose gems count (main inventory items carry socketed gems too)
+    GEM_INV = {"Helm", "BodyArmour", "Gloves", "Boots", "Amulet", "Ring", "Ring2", "Belt",
+               "Weapon", "Offhand", "Weapon2", "Offhand2"}
+
+    @staticmethod
+    def _gem_prop(gem, name):
+        for p in gem.get("properties") or []:
+            if p.get("name") == name and p.get("values"):
+                m = re.search(r"\d+", str(p["values"][0][0]))
+                return int(m.group()) if m else 0
+        return 0
+
+    @staticmethod
+    def _char_links(it):
+        """An equipped item's link groups for the gem compare, in socket order:
+        [{"links": sockets in the group, "gems": [{name, level, quality}],
+          "sockets": [{"c": socket colour, "gem": gem name or ""}]}] — empty groups included,
+        so the socket picture shows every link group on the item."""
+        if it.get("inventoryId") not in Api.GEM_INV:
+            return []
+        sockets = it.get("sockets") or []
+        in_socket = {}
+        for gem in it.get("socketedItems") or []:
+            i = gem.get("socket")
+            if isinstance(i, int) and 0 <= i < len(sockets):
+                in_socket[i] = gem
+        groups, order = {}, []
+        for i, s in enumerate(sockets):
+            g = s.get("group", 0)
+            if g not in groups:
+                groups[g] = {"links": 0, "gems": [], "sockets": []}
+                order.append(g)
+            grp = groups[g]
+            grp["links"] += 1
+            gem = in_socket.get(i)
+            if gem is None or gem.get("frameType") != 4:  # abyss jewels sit in sockets too
+                grp["sockets"].append({"c": s.get("sColour") or s.get("attr") or "W", "gem": ""})
+                continue
+            name = (gem.get("typeLine") or gem.get("baseType") or "").strip()
+            grp["sockets"].append({"c": s.get("sColour") or s.get("attr") or "W", "gem": name})
+            grp["gems"].append({"name": name, "level": Api._gem_prop(gem, "Level"),
+                                "quality": Api._gem_prop(gem, "Quality")})
+        return [groups[g] for g in order]
 
     @staticmethod
     def _char_mods(it):

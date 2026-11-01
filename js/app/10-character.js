@@ -240,7 +240,238 @@ function renderCharDiff(state) {
   state.card.insertBefore(strip, state.card.children[1]);
 }
 
+// ---- gem setups: each PoB link group finds your best link group on ANY worn item, so a
+// setup PoB keeps in the body armour still counts when you run it in your helmet. Each of
+// your link groups fills one PoB group (best matches claim first, like tree jewels).
+var GEM_WHERE = Object.assign({}, INV_SLOT, { Weapon2: 'Weapon 1 Swap', Offhand2: 'Weapon 2 Swap' });
+// [{item, where, label, links, gems: [{name, level, quality}], sockets: [{c, gem}]}] from the
+// worn gear. label names the link group: "Boots", or "Boots A" / "Boots B" when the item has
+// several, so the gem tags and the socket picture point at the same group
+var charLinks = [];
+var gemGroupViews = []; // makeGemsCard: {group, card, row, gemRows: [{gem, el}]} per PoB link group
+
+function setCharLinks(items) {
+  charLinks = [];
+  items.forEach(function (it, n) {
+    var where = GEM_WHERE[it.inventoryId];
+    var groups = it.linkGroups || [];
+    if (!where) return;
+    groups.forEach(function (g, k) {
+      charLinks.push({ item: n, where: where, links: g.links, gems: g.gems || [], sockets: g.sockets || [],
+                       label: where + (groups.length > 1 ? ' ' + String.fromCharCode(65 + k) : '') });
+    });
+  });
+}
+
+function gemKey(name) { return String(name || '').toLowerCase().replace(/ support$/, '').trim(); }
+// "herald of ice" / "purity of fire" are separate gems, not transfigured versions of each other
+var NATURAL_OF_BASE = /^(herald|purity|orb|sigil|eye|wave|tornado|fist)$/;
+
+// how well a gem you have stands in for the build's: 1 the same gem (or its Awakened/Vaal
+// upgrade), 0.5 a near version (plain instead of Awakened/Vaal, another transfigured
+// version), 0 a different gem
+function gemFit(want, have) {
+  var w = gemKey(want), h = gemKey(have);
+  if (w === h || h === 'awakened ' + w || h === 'vaal ' + w) return 1;
+  if (w === 'awakened ' + h || w === 'vaal ' + h) return 0.5;
+  if (w.indexOf(h + ' of ') === 0 || h.indexOf(w + ' of ') === 0) return 0.5;
+  var wb = w.split(' of ')[0];
+  if (w.indexOf(' of ') > 0 && h.indexOf(' of ') > 0 && wb === h.split(' of ')[0] && !NATURAL_OF_BASE.test(wb)) return 0.5;
+  return 0;
+}
+
+// a PoB group against one of your link groups: { score, full, variants, missing, low, options, linksShort }
+function groupFit(gems, cg, offGems) {
+  var used = {}, pick = {}, full = 0, variants = [], missing = [], low = [];
+  // same gems first, then near versions: a build running both "Summon Stone Golem" and its
+  // transfigured version mustn't lose the exact match to whichever is listed first
+  [1, 0.5].forEach(function (need) {
+    gems.forEach(function (g, gi) {
+      if (gi in pick) return;
+      cg.gems.forEach(function (h, i) {
+        if (gi in pick || used[i] || gemFit(g.name, h.name) !== need) return;
+        used[i] = true;
+        pick[gi] = { h: h, fit: need };
+      });
+    });
+  });
+  gems.forEach(function (g, gi) {
+    var p = pick[gi];
+    if (!p) { missing.push(g.name); return; }
+    var h = p.h;
+    if (p.fit === 1) {
+      full++;
+      if ((h.level || 0) < (g.level || 0) || (h.quality || 0) < (g.quality || 0)) {
+        low.push(h.name + ' ' + (h.level || 0) + '/' + (h.quality || 0) + ' (build ' + g.level + '/' + g.quality + ')');
+      }
+    } else {
+      variants.push(h.name + ' instead of ' + g.name);
+    }
+  });
+  // your gems that are one of PoB's unticked options for this group (swap-ins, not wrong gems)
+  var options = [];
+  cg.gems.forEach(function (h, i) {
+    if (used[i]) return;
+    if ((offGems || []).some(function (o) { return gemFit(o.name, h.name) === 1; })) options.push(h.name);
+  });
+  var total = gems.length || 1;
+  return { score: (full + variants.length * 0.5) / total, full: full, total: gems.length,
+           picked: gems.map(function (g, gi) { return pick[gi] ? pick[gi].fit : 0; }),
+           variants: variants, missing: missing, low: low, options: options,
+           linksShort: cg.links < Math.min(6, gems.length) };
+}
+
+// a build gem outside the matched group: socketed in the same item but another link group
+// ("unlinked"), on another worn item ("elsewhere"), or nowhere in your worn gear ("missing")
+function gemWhere(gem, best) {
+  var elsewhere = null;
+  for (var i = 0; i < charLinks.length; i++) {
+    var c = charLinks[i];
+    if (best && i === best.i) continue;
+    if (!c.gems.some(function (h) { return gemFit(gem.name, h.name) > 0; })) continue;
+    if (best && c.item === best.c.item) return { state: 'unlinked', link: c };
+    if (!elsewhere) elsewhere = c;
+  }
+  return elsewhere ? { state: 'elsewhere', link: elsewhere } : { state: 'missing' };
+}
+
+var GEM_LINK_CHIP = { // text + tone per gem state, never colour alone; %s = the link group
+  linked: ['linked · %s', 'success', 'In the link group matched to this setup'],
+  near: ['near version · %s', 'warn', 'A near version of this gem is in the matched link group'],
+  unlinked: ['not linked · %s', 'warn', 'Socketed in the same item, but in a separate link group'],
+  elsewhere: ['in %s', 'warn', 'You have it, but not linked with this setup'],
+  missing: ['missing', 'danger', 'Not in any gear you are wearing']
+};
+
+// your sockets, item by item: each link group a chain of socket dots joined by a gold bar, the
+// gem in each socket beside its dot. The group matched to this setup is outlined; gems that
+// belong to the setup are bright, the rest dimmed
+function gemLinksViz(v, best, links) {
+  var items = [];
+  if (best) items.push(best.c.item);
+  links.forEach(function (c) { if (items.indexOf(c.item) === -1) items.push(c.item); });
+  if (!items.length) return null;
+  var NAMES = { R: 'Red', G: 'Green', B: 'Blue', W: 'White', A: 'Abyssal', DV: 'Resonator' };
+  var inSetup = function (name) {
+    return !!name && v.group.gems.some(function (g) { return gemFit(g.name, name) > 0; });
+  };
+  var wrap = UI.el('div', 'gem-links-viz');
+  items.forEach(function (n) {
+    var groups = charLinks.filter(function (c) { return c.item === n; });
+    var box = UI.el('div', 'glv-item');
+    box.appendChild(UI.el('div', 'glv-item-name', 'Your ' + groups[0].where));
+    var row = UI.el('div', 'glv-groups');
+    groups.forEach(function (c) {
+      var matched = best && c === best.c;
+      var g = UI.el('div', 'glv-group' + (matched ? ' matched' : ''));
+      var head = UI.el('div', 'glv-head', (c.label !== c.where ? 'Link ' + c.label.slice(-1) + ' · ' : '') + c.links + 'L');
+      if (matched) head.appendChild(UI.chip('this setup', 'success'));
+      g.appendChild(head);
+      var chain = UI.el('div', 'glv-chain' + (c.sockets.length > 1 ? ' linked' : ''));
+      c.sockets.forEach(function (s) {
+        var r = UI.el('div', 'glv-sock' + (s.gem ? (inSetup(s.gem) ? ' in-setup' : ' other') : ' empty'));
+        var dot = UI.el('span', 'sock sock-' + s.c);
+        dot.title = (NAMES[s.c] || s.c) + ' socket';
+        r.appendChild(dot);
+        r.appendChild(UI.el('span', 'glv-gem', s.gem || 'empty'));
+        chain.appendChild(r);
+      });
+      g.appendChild(chain);
+      row.appendChild(g);
+    });
+    box.appendChild(row);
+    wrap.appendChild(box);
+  });
+  return wrap;
+}
+
+function renderGemDiff(v, best) {
+  var strip = UI.el('div', 'char-diff');
+  var status, html = '<b>You:</b> ';
+  var states = v.group.gems.map(function (g, gi) {
+    var fit = best ? best.f.picked[gi] : 0;
+    return fit === 1 ? { state: 'linked' } : fit ? { state: 'near' } : gemWhere(g, best);
+  });
+  function named(state) {
+    return v.group.gems.filter(function (g, gi) { return states[gi].state === state; }).map(function (g) { return g.name; });
+  }
+  var unlinked = named('unlinked'), missing = named('missing');
+  var elsewhere = v.group.gems.map(function (g, gi) {
+    return states[gi].state === 'elsewhere' ? g.name + ' (your ' + states[gi].link.label + ')' : null;
+  }).filter(Boolean);
+  if (!best) {
+    status = 'diff-missing';
+    html += '<span class="miss">no link group with these gems</span>';
+  } else {
+    var f = best.f, c = best.c;
+    status = (!f.missing.length && !f.variants.length && !f.linksShort) ? 'diff-matched'
+      : f.score >= 0.5 ? 'diff-close' : 'diff-missing';
+    html += 'your ' + esc(c.label) + ' · ' + c.links + 'L' +
+      (v.group.slot && v.group.slot !== c.where ? ' <span class="finder-sub">(PoB has it in ' + esc(v.group.slot) + ')</span>' : '') +
+      ' — <span class="' + (status === 'diff-matched' ? 'ok' : 'miss') + '">' + f.full + '/' + f.total + ' linked</span>';
+  }
+  if (unlinked.length) html += ' · <span class="miss">' + unlinked.length + ' socketed but not linked: ' + esc(unlinked.join(' · ')) + '</span>';
+  if (elsewhere.length) html += ' · <span class="miss">in another item: ' + esc(elsewhere.join(' · ')) + '</span>';
+  if (missing.length) html += ' · missing: <span class="miss">' + esc(missing.join(' · ')) + '</span>';
+  if (best) {
+    if (f.variants.length) html += ' · <span class="miss">' + esc(f.variants.join(' · ')) + '</span>';
+    if (f.options.length) html += ' · running unticked option' + (f.options.length > 1 ? 's' : '') + ': ' + esc(f.options.join(' · '));
+    if (f.linksShort) html += ' · <span class="miss">' + c.links + ' links, build uses ' + Math.min(6, f.total) + '</span>';
+    if (f.low.length) html += ' · lower: ' + esc(f.low.slice(0, 3).join(' · ')) + (f.low.length > 3 ? ' +' + (f.low.length - 3) : '');
+  }
+  strip.innerHTML = html;
+  v.card.classList.add(status);
+  v.row.classList.add(status);
+  var viz = gemLinksViz(v, best, states.map(function (s) { return s.link; }).filter(Boolean));
+  if (viz) strip.appendChild(viz);
+  v.card.insertBefore(strip, v.card.children[1]);
+  v.gemRows.forEach(function (gr, gi) {
+    var s = states[gi], spec = GEM_LINK_CHIP[s.state];
+    var name = gr.el.querySelector('.gem-name');
+    if (!name || !spec) return;
+    var label = s.link ? s.link.label : best ? best.c.label : '';
+    var chip = UI.chip(spec[0].replace('%s', label), spec[1], 'gem-you gem-link-' + s.state);
+    chip.title = spec[2];
+    name.appendChild(chip);
+  });
+}
+
+function applyGemDiff() {
+  gemGroupViews.forEach(function (v) {
+    var old = v.card.querySelector('.char-diff');
+    if (old) old.remove();
+    v.card.querySelectorAll('.gem-you').forEach(function (e) { e.remove(); });
+    ['diff-matched', 'diff-close', 'diff-missing'].forEach(function (d) {
+      v.card.classList.remove(d);
+      v.row.classList.remove(d);
+    });
+  });
+  if (!charGear) return;
+  var ranked = gemGroupViews.map(function (v) {
+    var top = 0;
+    charLinks.forEach(function (c) { top = Math.max(top, groupFit(v.group.gems, c).score); });
+    return { v: v, top: top };
+  }).sort(function (a, b) { return b.top - a.top; });
+  var claimed = {};
+  ranked.forEach(function (r) {
+    var best = null;
+    charLinks.forEach(function (c, i) {
+      if (claimed[i]) return;
+      var f = groupFit(r.v.group.gems, c, r.v.group.offGems);
+      // one shared support isn't the setup: a lone socket holding the build's Intensify
+      // mustn't stand in for a 6-link (single-gem groups need just the one)
+      if (f.full + f.variants.length < Math.min(2, f.total)) return;
+      var better = !best || f.score > best.f.score ||
+        (f.score === best.f.score && (c.where === r.v.group.slot) && best.c.where !== r.v.group.slot);
+      if (better) best = { i: i, c: c, f: f };
+    });
+    if (best) claimed[best.i] = true;
+    renderGemDiff(r.v, best);
+  });
+}
+
 function applyCharDiff() {
+  applyGemDiff();
   charJewelClaims = {};
   // jewels: best-matching cards claim their jewel first, so a weak match can't take a jewel
   // that another card matches exactly

@@ -228,6 +228,7 @@ function makeGemsCard(gemGroups) {
   view.className = 'gems-view';
   var rows = [];             // every gem row: {gem, lvlIn, qIn, priceSpan, group}
   var groupStatus = [];      // per group: the status cell in its list row
+  gemGroupViews = [];        // the character compare marks these (10-character.js)
   var mainName = (build && build.mainSkill && build.mainSkill[0]) || '';
   // open on the main skill's group (★), else the first one
   var startGroup = Math.max(0, gemGroups.findIndex(function (g) {
@@ -306,6 +307,8 @@ function makeGemsCard(gemGroups) {
     var card = document.createElement('div');
     card.className = 'card gem-group-card';
     var groupRows = [];
+    var gv = { group: group, card: card, row: null, gemRows: [] };
+    gemGroupViews.push(gv);
 
     // ---- detail header: the group, its gear piece, its actions
     var ch = document.createElement('div');
@@ -315,7 +318,9 @@ function makeGemsCard(gemGroups) {
     var mainIcon = gemImg(group.gems[0], 'card-icon gem-head-icon');
     if (mainIcon) title.appendChild(mainIcon);
     var id = UI.el('div', 'card-id');
-    id.appendChild(UI.el('span', 'slot-tag', (group.slot || 'No gear slot') + ' · ' + gemsWord(group.gems.length)));
+    var offGems = group.offGems || [];
+    var offWord = offGems.length ? ' + ' + offGems.length + ' unticked' : '';
+    id.appendChild(UI.el('span', 'slot-tag', (group.slot || 'No gear slot') + ' · ' + gemsWord(group.gems.length) + offWord));
     id.appendChild(UI.el('span', 'item-name gem-name', group.title));
     if (isMain) {
       var meta = UI.el('span', 'item-meta');
@@ -341,17 +346,28 @@ function makeGemsCard(gemGroups) {
     th.innerHTML = '<span></span><span>Gem</span><span>Level / quality</span><span class="num">Cheapest</span><span></span>';
     body.appendChild(th);
 
-    group.gems.forEach(function (gem) {
+    // unticked gems: PoB keeps them in the group as swap-in options. Listed after the setup,
+    // dimmed, left out of the group's prices, totals and the character compare
+    group.gems.concat(offGems).forEach(function (gem, k) {
+      var off = gem.enabled === false;
+      if (off && k === group.gems.length) {
+        body.appendChild(UI.el('div', 'gem-off-head', 'Unticked in PoB — options, not part of the setup'));
+      }
       var f = gemFlags(gem.name);
       var corruptOnly = gem.level >= 21 || gem.quality >= 23 || f.vaal;
       var row = document.createElement('div');
-      row.className = 'gem-row';
+      row.className = 'gem-row' + (off ? ' gem-off' : '');
       var ic = gemImg(gem, 'gem-icon');
       row.appendChild(ic || UI.el('span', 'gem-icon'));
 
       var label = document.createElement('span');
       label.className = 'gem-name' + (f.vaal ? ' vaal' : '');
       label.textContent = gem.name + (gem.count > 1 ? ' ×' + gem.count : '');
+      if (off) {
+        var ob = UI.chip('unticked', 'neutral', 'off-badge');
+        ob.title = 'Disabled in PoB: kept in the group but not used — not priced with the group';
+        label.appendChild(ob);
+      }
       if (f.vaal) label.appendChild(UI.chip('vaal', 'danger', 'vaal-badge'));
       if (f.awakened) {
         var ab = UI.chip('awakened', 'unique', 'awakened-badge');
@@ -458,6 +474,8 @@ function makeGemsCard(gemGroups) {
 
       body.appendChild(row);
       body.appendChild(panel);
+      if (off) return; // the row's own ↗ and listings still work
+      gv.gemRows.push({ gem: gem, el: row });
       var r = { gem: gem, lvlIn: lvlIn, qIn: qIn, priceSpan: priceSpan, group: gi };
       rows.push(r);
       groupRows.push(r);
@@ -470,11 +488,12 @@ function makeGemsCard(gemGroups) {
     var lr = UI.el('button', 'slot-row');
     lr.type = 'button';
     lr.slotCard = card;
+    gv.row = lr;
     var lic = gemImg(group.gems[0], 'slot-ic');
     if (lic) { lic.classList.remove('pending'); lr.appendChild(lic); } else lr.appendChild(UI.el('span', 'slot-ic'));
     var txt = UI.el('span', 'slot-txt');
     txt.appendChild(UI.el('span', 'slot-label', (isMain ? '★ ' : '') + (group.slot || 'No gear slot') +
-      ' · ' + gemsWord(group.gems.length)));
+      ' · ' + gemsWord(group.gems.length) + offWord));
     txt.appendChild(UI.el('span', 'slot-name gem-name', group.title));
     lr.appendChild(txt);
     var st = UI.el('span', 'slot-status');
