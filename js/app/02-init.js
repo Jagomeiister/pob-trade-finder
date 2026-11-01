@@ -153,6 +153,7 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('value-gear').classList.remove('hidden');
       charName_ = charName;
       status.textContent = '⚖ comparing against ' + charName;
+      rememberLastCompare(acct, charName);
       var saveBtn = document.getElementById('char-save');
       var isSaved = loadSavedChars().some(function (c) { return sameChar(c, acct, charName); });
       saveBtn.classList.toggle('hidden', isSaved);
@@ -176,6 +177,11 @@ document.addEventListener('DOMContentLoaded', function () {
     UI.toast(o.value + ' saved: one click to compare next time', 'success');
   });
   renderSavedChars();
+  var autoCb = document.getElementById('char-auto');
+  if (autoCb) {
+    autoCb.checked = PREFS.autoCompare !== false;
+    autoCb.addEventListener('change', function () { PREFS.autoCompare = this.checked; savePrefs(); });
+  }
   document.getElementById('value-gear').addEventListener('click', function () { valueMyGear(this); });
   document.getElementById('hide-matched').addEventListener('change', function () {
     document.body.classList.toggle('hide-matched', this.checked);
@@ -302,7 +308,11 @@ document.addEventListener('DOMContentLoaded', function () {
     refreshOAuth(); // official login: off until GGG issues a client id (17-stash.js)
     setInterval(function () { refreshSessionStatus(true); }, 30 * 60 * 1000);
     // market history loads after the saved league is restored; the feed is hourly
-    hydrateFromBridge().then(function () { setTimeout(loadMarket, 1500); setTimeout(checkNewLeague, 4000); });
+    hydrateFromBridge().then(function () {
+      setTimeout(loadMarket, 1500);
+      setTimeout(checkNewLeague, 4000);
+      setTimeout(autoCompareOnStart, 2500); // the compare isn't kept across restarts: run the last one again
+    });
     setInterval(checkNewLeague, 6 * 3600 * 1000);
     setTimeout(remindTrackedBuilds, 60 * 1000); // reminders only: searches need a click
     setInterval(remindTrackedBuilds, 60 * 60 * 1000);
@@ -371,6 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
       renderBasket();
       loadPrefs();
       applyPrefs();
+      if (typeof syncInGameSettings === 'function') syncInGameSettings(); // hotkeys, tray, macros… (16-overlay.js)
       syncWelcome();
       updateContextChips();
     } catch (e) { /* browser mode / bridge unavailable */ }
@@ -457,6 +468,34 @@ function renderSavedChars() {
     box.appendChild(chip);
   });
 }
+// The character compare lives in memory, so a restart (an update installs with one) cleared it
+// and the gear / gem marks were gone until you compared again. The last compare is remembered and,
+// unless you untick "Compare again when the app starts", run once at launch: the same requests
+// as pressing Compare gear (gear, then tree jewels), never repeated on its own.
+var LAST_COMPARE_KEY = 'pobtf-last-compare';
+function rememberLastCompare(acct, name) {
+  var o = document.getElementById('char-select');
+  o = o && o.options[o.selectedIndex];
+  try {
+    persist(LAST_COMPARE_KEY, JSON.stringify({ account: acct, name: name, league: (o && o.dataset.league) || '',
+      cls: (o && o.dataset.cls) || '', level: (o && parseInt(o.dataset.level, 10)) || null, at: Date.now() }));
+  } catch (e) { /* storage full: nothing to remember */ }
+}
+function loadLastCompare() {
+  try {
+    var c = JSON.parse(localStorage.getItem(LAST_COMPARE_KEY));
+    return c && c.account && c.name ? c : null;
+  } catch (e) { return null; }
+}
+var autoCompared = false;
+function autoCompareOnStart() {
+  if (autoCompared || !isGui() || PREFS.autoCompare === false || charGear) return;
+  var last = loadLastCompare();
+  if (!last || !window.pywebview.api.get_character_items) return;
+  autoCompared = true;
+  compareSavedChar(last);
+}
+
 // fill the account + character from a saved one and run the usual Compare gear
 function compareSavedChar(c) {
   document.getElementById('acct-input').value = c.account;

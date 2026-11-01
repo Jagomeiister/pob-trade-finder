@@ -40,6 +40,7 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -180,6 +181,8 @@ STUB_JS = r"""
   window.__calls = [];
   window.__clip = null;
   var store = {};
+  // a scenario can pre-fill the bridge's storage (what the app saved last time): ?e2eStore=<json>
+  try { var seed = new URLSearchParams(location.search).get('e2eStore'); if (seed) store = JSON.parse(seed); } catch (e) { /* none */ }
   var NO_ART = { ok: false, error: 'stub: no art offline' };
   var impl = {
     storage_get: function () { return { ok: true, data: Object.assign({}, store) }; },
@@ -2727,7 +2730,7 @@ out.flaskKept = sec.querySelector('.st-text').value;
 const ml = document.getElementById('macro-list');
 const rows = () => [...ml.querySelectorAll('.macro-row')];
 out.macroDefaults = rows().map(r => r.querySelector('.macro-cmd').value);
-out.firstSave = (H.calls('set_macros')[0] || {}).args;
+out.firstSave = H.calls('set_macros').length;
 H.button(rows()[2], '▶').click(); await H.sleep(20);
 out.sent = H.calls('chat_macro').map(c => c.args[0]);
 const key = rows()[2].querySelector('select'); key.value = 'f2'; key.dispatchEvent(new Event('change')); await H.sleep(20);
@@ -2787,8 +2790,7 @@ def scenario_quickwins(s, tag):
     check(tag + " each tab keeps its picks", r["flaskKept"] == r["flaskText"], r["flaskKept"])
     check(tag + " default macros (no /hideout)", r["macroDefaults"] == ["/kingsmarch", "/menagerie", "/delve", "/exit"],
           r["macroDefaults"])
-    check(tag + " defaults handed to the app on first run", r["firstSave"] and len(json.loads(r["firstSave"][0])) == 4,
-          r["firstSave"])
+    check(tag + " first run saves nothing (defaults have no hotkeys)", r["firstSave"] == 0, r["firstSave"])
     check(tag + " ▶ sends one command", r["sent"] == ["/delve"], r["sent"])
     check(tag + " hotkey saved", [m["hotkey"] for m in r["afterKey"]] == ["off", "off", "f2", "off"], r["afterKey"])
     check(tag + " command without / refused, not saved", r["invalid"] == [True, True], r["invalid"])
@@ -3064,6 +3066,81 @@ def scenario_dust(s, tag):
     check(tag + " price check line: built-in influence not counted twice", r["lineStar"] and r["lineStar"]["dust"] == 3341578
           and r["lineStar"]["extra"] == 0, r["lineStar"])
     check(tag + " no dust line for non-uniques", r["rare"] is None, r["rare"])
+
+
+S39_AUTOCOMPARE = r"""
+const H = window.__e2e;
+const out = {};
+// what the character API answers (set before the 2.5 s start-up delay runs out)
+window.__stubOverrides.get_character_items = { ok: true, items: [{ inventoryId: 'Ring', x: 0, name: 'Some Ring', base: 'Gold Ring',
+  frameType: 2, icon: '', ilvl: 84, corrupted: false, implicitMods: [], explicitMods: [], craftedMods: [], fracturedMods: [],
+  enchantMods: [], linkGroups: [] }] };
+window.__stubOverrides.get_character_passives = { ok: true, hashes: [], hashesEx: [], masteries: {}, jewels: [] };
+await H.waitFor(() => H.calls('get_character_items').length > 0 || WANT_NONE, 6000, 'auto compare');
+if (WANT_NONE) await H.sleep(4000);
+out.calls = H.calls('get_character_items').map(c => c.args);
+out.passives = H.calls('get_character_passives').length;
+await H.sleep(50);
+out.status = H.text('#char-status');
+out.gear = typeof charGear !== 'undefined' && charGear ? Object.keys(charGear) : null;
+out.box = (document.getElementById('char-auto') || {}).checked;
+out.last = JSON.parse(localStorage.getItem('pobtf-last-compare') || 'null');
+// running it again does nothing: once per launch
+autoCompareOnStart();
+await H.sleep(50);
+out.callsAfter = H.calls('get_character_items').length;
+// unticking the box is remembered
+const cb = document.getElementById('char-auto');
+cb.checked = false; cb.dispatchEvent(new Event('change'));
+out.prefOff = JSON.parse(localStorage.getItem('pobtf-prefs')).autoCompare;
+return out;
+"""
+
+
+S39_RESTART = r"""
+const H = window.__e2e;
+await H.waitFor(() => H.calls('storage_get').length > 0, 5000, 'settings read back');
+await H.sleep(300);
+const v = id => { const e = document.getElementById(id); return e.type === 'checkbox' ? e.checked : e.value; };
+const out = {};
+out.ui = [v('pref-hotkey-app'), v('pref-hotkey-sheet'), v('pref-close-tray'), v('pref-over-opacity'), v('char-auto'),
+  [...document.querySelectorAll('#macro-list .macro-cmd')].map(i => i.value),
+  (document.querySelector('#macro-list select') || {}).value];
+const theme = document.getElementById('pref-theme'); theme.value = 'slate'; theme.dispatchEvent(new Event('change'));
+await H.sleep(50);
+const p = JSON.parse(H.calls('storage_set').filter(c => c.args[0] === 'pobtf-prefs').slice(-1)[0].args[1]);
+out.saved = [p.hotkeyApp, p.hotkeySheet, p.closeToTray, p.overGameOpacity, p.autoCompare, (p.macros || [{}])[0].command];
+return out;
+"""
+
+
+def scenario_autocompare(s, tag):
+    last = json.dumps({"account": "Me#1", "name": "MyChar", "league": "Standard", "cls": "Witch", "level": 90, "at": 1})
+    for want_none, seed in ((False, {"pobtf-last-compare": last}),
+                            (True, {"pobtf-last-compare": last, "pobtf-prefs": json.dumps({"autoCompare": False})}),
+                            (True, {})):
+        s.fresh("?e2eStore=" + urllib.parse.quote(json.dumps(seed)))
+        r = s.run(S39_AUTOCOMPARE, timeout=40, WANT_NONE=want_none)
+        if not want_none:
+            check(tag + " app start re-runs the last compare (gear, then tree jewels)", r["calls"] == [["Me#1", "MyChar"]] and
+                  r["passives"] == 1 and "comparing against MyChar" in (r["status"] or "") and r["gear"] == ["Ring 1"],
+                  (r["calls"], r["status"], r["gear"]))
+            check(tag + " once per launch", r["callsAfter"] == 1, r["callsAfter"])
+            check(tag + " box on by default; the compare is remembered again", r["box"] is True and
+                  (r["last"] or {}).get("name") == "MyChar" and (r["last"] or {}).get("at", 0) > 1, (r["box"], r["last"]))
+            check(tag + " unticking is saved", r["prefOff"] is False, r["prefOff"])
+        elif seed:
+            check(tag + " box unticked: nothing at start", r["calls"] == [] and r["box"] is False, (r["calls"], r["box"]))
+        else:
+            check(tag + " never compared: nothing at start", r["calls"] == [], r["calls"])
+    # settings the app saved last time come back after a restart, and survive the next save
+    seed = {"pobtf-prefs": json.dumps({"theme": "dark", "hotkeyApp": "f9", "hotkeySheet": "off", "closeToTray": False,
+                                       "overGameOpacity": 90, "autoCompare": False,
+                                       "macros": [{"label": "Delve", "command": "/delve", "hotkey": "f2"}]})}
+    s.fresh("?e2eStore=" + urllib.parse.quote(json.dumps(seed)))
+    r = s.run(S39_RESTART, timeout=30)
+    check(tag + " in-game settings come back after a restart", r["ui"] == ["f9", "off", False, "90", False, ["/delve"], "f2"], r["ui"])
+    check(tag + " ...and survive the next settings change", r["saved"] == ["f9", "off", False, 90, False, "/delve"], r["saved"])
 
 
 def scenario_gemdiff(s, tag):
@@ -3671,6 +3748,7 @@ SCENARIOS = [
     ("36 dust", scenario_dust),
     ("37 ledger", scenario_ledger),
     ("38 sheets2", scenario_sheets2),
+    ("39 autocompare", scenario_autocompare),
     ("40 anoints", scenario_anoints),
 ]
 
