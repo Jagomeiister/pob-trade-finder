@@ -510,6 +510,58 @@ function renderMoreRow(card) {
   return row;
 }
 
+// ---- the price you actually got: − / + on the card (no typing in the overlay) ---------------
+// steps sized to the price, so 180c → 170c or 2 div → 1.5 div is one click
+function priceStep(v, currency) {
+  if (currency === 'divine') return v < 1 ? 0.1 : v < 10 ? 0.5 : 1;
+  return v < 10 ? 1 : v < 100 ? 5 : 10;
+}
+function soldPrice(card) {
+  var t = card.trade || {};
+  return card.sold || { price: t.price, currency: t.currency };
+}
+function stepSoldPrice(card, dir) {
+  var s = soldPrice(card), v = s.price || 0;
+  // going down uses the step of the range below (10c - 1 = 9c, not 5c)
+  var next = Math.round((v + dir * priceStep(dir < 0 ? v - 1e-9 : v, s.currency)) * 100) / 100;
+  if (next <= 0) return;
+  card.sold = { price: next, currency: s.currency };
+  renderTrades();
+}
+// chaos ⇄ divines, converted at the current rate (kept as is when there's no rate)
+async function swapSoldCurrency(card) {
+  var s = soldPrice(card), t = card.trade || {};
+  var to = s.currency === 'divine' ? 'chaos' : 'divine';
+  var div = await tradeDivRate(t.league || (document.getElementById('league') || {}).value);
+  var price = s.price;
+  if (div && price != null) {
+    price = to === 'divine' ? price / div : price * div;
+    var st = priceStep(price, to);
+    price = Math.round(Math.max(st, Math.round(price / st) * st) * 100) / 100;
+  }
+  card.sold = { price: price, currency: to };
+  renderTrades();
+}
+function renderSoldRow(card, sold, changed) {
+  var t = card.trade || {};
+  var row = UI.el('div', 'tc-sold');
+  row.appendChild(UI.el('span', 'tc-sold-label', 'Sold for'));
+  row.appendChild(UI.iconButton('−', 'Lower the price you got', { size: 'sm', onClick: function () { stepSoldPrice(card, -1); } }));
+  row.appendChild(UI.el('b', 'tc-sold-price', priceText(sold.price, sold.currency)));
+  row.appendChild(UI.iconButton('+', 'Raise the price you got', { size: 'sm', onClick: function () { stepSoldPrice(card, 1); } }));
+  if (sold.currency === 'chaos' || sold.currency === 'divine') {
+    row.appendChild(UI.button('ghost', { size: 'sm', label: sold.currency === 'chaos' ? 'in div' : 'in c',
+      title: 'Paid in ' + (sold.currency === 'chaos' ? 'divines' : 'chaos') + ' instead (converted at the current rate)',
+      onClick: function () { swapSoldCurrency(card); } }));
+  }
+  if (changed) {
+    row.appendChild(UI.el('span', 'tc-sold-listed', 'listed ' + priceText(t.price, t.currency)));
+    row.appendChild(UI.button('ghost', { size: 'sm', label: 'Reset', title: 'Back to the listed price',
+      onClick: function () { card.sold = null; renderTrades(); } }));
+  }
+  return row;
+}
+
 function renderOutcomes(card, p) {
   var t = card.trade || {};
   var box = UI.el('div', 'tc-outcomes');
@@ -522,12 +574,15 @@ function renderOutcomes(card, p) {
     return box;
   }
   // click-only (the overlay never takes the keyboard from the game): Completed records the
-  // listed price; a different price or a note is edited later in Trade helper → Sales
+  // price on the "Sold for" row, which starts at the listed price; a note is added later in
+  // Trade helper → Sales
+  var sold = soldPrice(card), changed = sold.price !== t.price || sold.currency !== t.currency;
+  if (t.price != null) box.appendChild(renderSoldRow(card, sold, changed));
   var done = UI.button(card.acceptHint ? 'primary' : 'secondary', { size: 'sm',
-    label: '✓ Completed' + (t.price != null ? ' · ' + priceText(t.price, t.currency) : ''),
+    label: '✓ Completed' + (sold.price != null ? ' · ' + priceText(sold.price, sold.currency) : ''),
     title: (card.acceptHint ? 'The game logged "Trade accepted". ' : '') +
-      'Records the sale at the listed price. Got a different price? Edit it in Trade helper → Sales.',
-    onClick: function () { recordOutcome(card, 'completed'); } });
+      'Records the sale at the "Sold for" price. A note can be added in Trade helper → Sales.',
+    onClick: function () { recordOutcome(card, 'completed', changed ? { price: sold.price, currency: sold.currency } : {}); } });
   done.classList.add('tc-complete');
   if (card.acceptHint) done.classList.add('suggested');
   var more = UI.el('div', 'tc-other');

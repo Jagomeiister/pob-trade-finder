@@ -242,6 +242,9 @@ STUB_JS = r"""
     open_main: function () { return { ok: true }; },
     app_overlay_size: function () { return { ok: true }; },
     app_overlay_move: function () { return { ok: true }; },
+    price_overlay_move: function () { return { ok: true }; },
+    chat_macro: function () { return { ok: true }; },
+    set_macros: function (j) { return { ok: true, macros: JSON.parse(j), errors: [] }; },
     overlay_shape: function () { return { ok: true }; },
     overlay_drag: function () { return { ok: true }; },
     game_search_paste: function () { return { ok: true }; },
@@ -1536,7 +1539,7 @@ await H.sleep(20);
 c = card('BuyerOne');
 out.joined = { here: H.text('.tc-status', c) === 'In your hideout' && c.dataset.status === 'success',
   actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent),
-  outcomes: [...c.querySelectorAll('.tc-outcomes .btn')].map(b => b.textContent),
+  outcomes: [...c.querySelectorAll('.tc-outcomes .tc-other .btn')].map(b => b.textContent),
   headLines: Math.round(c.querySelector('.tc-head').getBoundingClientRect().height / 20) };
 window.__tradeEvent({ type: 'trade_accepted' });
 await H.sleep(20);
@@ -1544,6 +1547,20 @@ out.acceptedStatus = H.text('.tc-status', card('BuyerOne'));
 c = card('BuyerOne');
 out.suggested = c.querySelector('.tc-outcomes .btn.suggested') ? c.querySelector('.tc-outcomes .btn.suggested').textContent : null;
 out.sendsAfterEvents = sends().length;
+// "Sold for": − / + in price-sized steps, chaos ⇄ div at the current rate, Reset; no typing
+const soldStep = async (label) => { card('BuyerOne').querySelector('.tc-sold [aria-label="' + label + '"]').click(); await H.sleep(20); };
+const soldNow = () => [H.text('.tc-sold-price', card('BuyerOne')), (H.text('.tc-outcomes .btn.suggested', card('BuyerOne')) || '')];
+await soldStep('Raise the price you got'); out.soldUp = soldNow();
+await soldStep('Lower the price you got'); await soldStep('Lower the price you got'); out.soldDown = soldNow();
+out.soldListed = H.text('.tc-sold-listed', card('BuyerOne'));
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
+tradeRates = {};
+H.button(card('BuyerOne'), 'Reset').click(); await H.sleep(20);
+H.button(card('BuyerOne'), 'in c').click(); await H.waitFor(() => /c$/.test(H.text('.tc-sold-price', card('BuyerOne')) || ''), 2000, 'swap');
+out.soldChaos = soldNow();
+H.button(card('BuyerOne'), 'Reset').click(); await H.sleep(20);
+out.soldReset = [soldNow()[0], !card('BuyerOne').querySelector('.tc-sold-listed'), card('BuyerOne').querySelectorAll('input').length];
+out.sendsAfterSold = sends().length;
 window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
 c.querySelector('.tc-outcomes .btn.suggested').click();
 await H.waitFor(() => !card('BuyerOne'), 3000, 'card closed');
@@ -1705,6 +1722,12 @@ def scenario_trades(s, tag):
     check(tag + " buyer joined: badge, Trade · Kick · Thanks, outcomes", r["joined"]["here"] and
           r["joined"]["actions"][:3] == ["Trade", "Kick", "Thanks"] and
           r["joined"]["outcomes"][0].startswith("✓ Completed") and "⌛ Time wasted" in r["joined"]["outcomes"], r["joined"])
+    check(tag + " Sold for: + / − step 0.5 div and Completed follows", r["soldUp"] == ["2.5 div", "✓ Completed · 2.5 div"]
+          and r["soldDown"] == ["1.5 div", "✓ Completed · 1.5 div"] and r["soldListed"] == "listed 2 div",
+          (r["soldUp"], r["soldDown"], r["soldListed"]))
+    check(tag + " Sold for: in c converts at the rate (2 div × 200c)", r["soldChaos"] == ["400 c", "✓ Completed · 400 c"], r["soldChaos"])
+    check(tag + " Sold for: Reset goes back to the listed price; no inputs, nothing sent",
+          r["soldReset"] == ["2 div", True, 0] and r["sendsAfterSold"] == r["sendsAfterEvents"], (r["soldReset"], r["sendsAfterSold"]))
     check(tag + " Trade accepted highlights Completed (listed price), sends nothing",
           (r["suggested"] or "").startswith("✓ Completed · 2 div") and r["sendsAfterEvents"] == 3, r)
     sale = (r["sales"] or [{}])[0]
@@ -2636,6 +2659,141 @@ return out;
 """
 
 
+S34_QUICKWINS = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+const urls = () => H.calls('open_url').map(c => c.args[0]);
+// 1. poe.ninja: league slugs, the card menu (uniques yes, rares no), gem panels, market categories
+out.slugs = ['Allflame', 'Hardcore Allflame', 'SSF Allflame', 'Hardcore SSF Allflame', 'Standard', 'Hardcore'].map(ninjaLeague);
+const uniq = cards.find(c => c.unique && c.card && !/jewel|flask/i.test(c.slot));
+const rare = cards.find(c => !c.unique && c.card && c.item.rarity === 'RARE');
+const menuItems = st => { st.card.querySelector('.menu-trigger').click();
+  const items = [...document.querySelectorAll('.menu .menu-item')]; return items; };
+let items = menuItems(uniq);
+out.uniqMenu = items.map(b => b.textContent);
+items.find(b => b.textContent === 'Open on poe.ninja ↗').click();
+await H.sleep(20);
+out.uniqUrl = urls().pop(); out.uniqCat = ninjaCategory(uniq); out.uniqName = uniq.resolvedName || uniq.item.name;
+items = menuItems(rare);
+out.rareMenu = items.map(b => b.textContent);
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+await H.sleep(10);
+out.cats = [ninjaCategory({ item: { rarity: 'GEM', name: 'x' } }),
+  ninjaCategory({ unique: true, slot: 'Ring 1', item: { base: 'Gold Ring' } }),
+  ninjaCategory({ unique: true, slot: 'Weapon 1', item: { base: 'Imperial Claw' } }),
+  ninjaCategory({ unique: true, slot: 'Weapon 2', item: { base: 'Titanium Spirit Shield' } }),
+  ninjaCategory({ unique: true, slot: 'Flask 1', item: { base: 'Quicksilver Flask' } }),
+  ninjaCategory({ item: { rarity: 'CURRENCY', itemClass: 'Stackable Currency', name: 'Divine Orb' } })];
+out.market = [{ name: 'Divine Orb', cat: 'Currency' }, { name: 'Gilded Ambush Scarab', cat: 'Fragments, Scarabs & Mapping' },
+  { name: 'The Doctor', cat: 'Cards' }, { name: 'Omen of Amelioration', cat: 'Tattoos & Omens' }, { name: 'Some Ember', cat: 'Allflame Embers' }]
+  .map(marketNinjaCategory);
+setView('gems');
+await H.sleep(20);
+const gemRow = document.querySelector('.gem-group-card.is-active .gem-row:not(.gem-off)');
+gemRow.querySelector('button[aria-label^="Listings for"]').click();
+await H.sleep(20);
+H.button(gemRow.nextElementSibling, 'poe.ninja ↗').click();
+await H.sleep(20);
+out.gemUrl = urls().pop(); out.gemName = gemRow.querySelector('.gem-name').firstChild.textContent;
+// 3. search text: Flasks and Vendor tabs
+setView('search');
+await H.sleep(20);
+const sec = document.querySelector('.tab-section[data-tab="search"]');
+const tab = label => [...sec.querySelectorAll('.segmented .seg')].find(b => b.textContent === label);
+const want = label => [...sec.querySelectorAll('.st-mod')].find(r => r.querySelector('.st-mod-text').textContent === label)
+  .querySelector('button[title="Want"]');
+tab('Flasks').click(); await H.sleep(10);
+out.flaskRows = sec.querySelectorAll('.st-mod').length;
+want('Bleeding immunity').click(); await H.sleep(10);
+want('Instant recovery').click(); await H.sleep(10);
+out.flaskText = sec.querySelector('.st-text').value;
+tab('Vendor').click(); await H.sleep(10);
+want('Chromatic recipe (R, G and B linked)').click(); await H.sleep(10);
+out.vendorText = sec.querySelector('.st-text').value;
+tab('Flasks').click(); await H.sleep(10);
+out.flaskKept = sec.querySelector('.st-text').value;
+// 2. chat macros (Settings → In game)
+const ml = document.getElementById('macro-list');
+const rows = () => [...ml.querySelectorAll('.macro-row')];
+out.macroDefaults = rows().map(r => r.querySelector('.macro-cmd').value);
+out.firstSave = (H.calls('set_macros')[0] || {}).args;
+H.button(rows()[2], '▶').click(); await H.sleep(20);
+out.sent = H.calls('chat_macro').map(c => c.args[0]);
+const key = rows()[2].querySelector('select'); key.value = 'f2'; key.dispatchEvent(new Event('change')); await H.sleep(20);
+out.afterKey = JSON.parse(H.calls('set_macros').pop().args[0]);
+const n = H.calls('set_macros').length;
+const cmd = rows()[0].querySelector('.macro-cmd'); cmd.value = 'kingsmarch'; cmd.dispatchEvent(new Event('change')); await H.sleep(20);
+out.invalid = [cmd.classList.contains('invalid'), H.calls('set_macros').length === n];
+document.getElementById('macro-add').click(); await H.sleep(10);
+out.added = rows().length;
+H.button(rows()[1], '✕').click();
+await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'remove dialog');
+H.button(document.querySelector('dialog[open]'), 'Remove').click();
+await H.sleep(40);
+out.afterRemove = rows().map(r => r.querySelector('.macro-cmd').value);
+out.prefs = JSON.parse(localStorage.getItem('pobtf-prefs')).macros.map(m => m.command + ':' + m.hotkey);
+return out;
+"""
+
+S34_PRICE_OVERLAY = r"""
+const H = window.__e2e;
+const out = {};
+const bar = document.getElementById('overlay-bar');
+out.bar = !!bar && !!bar.querySelector('.ov-grip') && getComputedStyle(bar).cursor;
+bar.setPointerCapture = () => {};
+const t = bar.querySelector('.ov-title');
+t.dispatchEvent(new PointerEvent('pointerdown', { screenX: 10, screenY: 10, pointerId: 3, button: 0, bubbles: true }));
+t.dispatchEvent(new PointerEvent('pointermove', { screenX: 40, screenY: 25, pointerId: 3, bubbles: true }));
+await H.sleep(20);
+bar.dispatchEvent(new PointerEvent('pointerup', { screenX: 50, screenY: 30, pointerId: 3, bubbles: true }));
+await H.sleep(20);
+out.move = H.calls('price_overlay_move').map(c => c.args);
+const close = document.getElementById('overlay-close');
+close.dispatchEvent(new PointerEvent('pointerdown', { screenX: 1, screenY: 1, pointerId: 4, button: 0, bubbles: true }));
+await H.sleep(10);
+out.closeNoDrag = H.calls('price_overlay_move').length === out.move.length;
+return out;
+"""
+
+
+def scenario_quickwins(s, tag):
+    s.fresh()
+    r = s.run(S34_QUICKWINS, timeout=60)
+    check(tag + " poe.ninja league slugs", r["slugs"] == ["allflame", "allflamehc", "allflame", "allflamehc", "standard", "hardcore"],
+          r["slugs"])
+    check(tag + " unique card menu opens poe.ninja", "Open on poe.ninja ↗" in r["uniqMenu"] and (r["uniqUrl"] or "").startswith(
+        "https://poe.ninja/poe1/economy/") and ("/" + r["uniqCat"] + "?name=") in r["uniqUrl"], (r["uniqUrl"], r["uniqCat"]))
+    check(tag + " rare card menu has no poe.ninja", "Open on poe.ninja ↗" not in r["rareMenu"], r["rareMenu"])
+    check(tag + " categories by item kind", r["cats"] == ["skill-gems", "unique-accessories", "unique-weapons", "unique-armours",
+          "unique-flasks", "currency"], r["cats"])
+    check(tag + " market categories (unknown ones get no link)", r["market"] == ["currency", "scarabs", "divination-cards",
+          "omens", None], r["market"])
+    check(tag + " gem panel opens poe.ninja", "/skill-gems?name=" in (r["gemUrl"] or "") and r["gemName"].replace(" ", "%20")
+          in r["gemUrl"], (r["gemUrl"], r["gemName"]))
+    check(tag + " flasks tab builds the search", r["flaskRows"] >= 15 and r["flaskText"] == '"bleed|nt recovery|d instantly"',
+          r["flaskText"])
+    check(tag + " vendor tab builds the search", r["vendorText"] == '"r-g-b|r-b-g|g-r-b|g-b-r|b-r-g|b-g-r"', r["vendorText"])
+    check(tag + " each tab keeps its picks", r["flaskKept"] == r["flaskText"], r["flaskKept"])
+    check(tag + " default macros (no /hideout)", r["macroDefaults"] == ["/kingsmarch", "/menagerie", "/delve", "/exit"],
+          r["macroDefaults"])
+    check(tag + " defaults handed to the app on first run", r["firstSave"] and len(json.loads(r["firstSave"][0])) == 4,
+          r["firstSave"])
+    check(tag + " ▶ sends one command", r["sent"] == ["/delve"], r["sent"])
+    check(tag + " hotkey saved", [m["hotkey"] for m in r["afterKey"]] == ["off", "off", "f2", "off"], r["afterKey"])
+    check(tag + " command without / refused, not saved", r["invalid"] == [True, True], r["invalid"])
+    check(tag + " add a macro", r["added"] == 5, r["added"])
+    # the refused edit was never saved, so the redrawn list shows /kingsmarch again
+    check(tag + " remove asks first, then removes", r["afterRemove"] == ["/kingsmarch", "/delve", "/exit", ""], r["afterRemove"])
+    check(tag + " macros kept in prefs", "/delve:f2" in r["prefs"] and "/menagerie:off" not in r["prefs"], r["prefs"])
+    s.fresh("?overlay=1")
+    r = s.run(S34_PRICE_OVERLAY)
+    check(tag + " price check banner is the drag handle", r["bar"] == "move", r["bar"])
+    check(tag + " dragging moves the window", [m[0] for m in r["move"]] == ["start", "move", "end"]
+          and r["move"][1][1:] == [30, 15], r["move"])
+    check(tag + " the close button doesn't start a drag", r["closeNoDrag"])
+
+
 def scenario_gemdiff(s, tag):
     s.fresh()
     r = s.run(S32_GEMDIFF, timeout=60)
@@ -3073,6 +3231,7 @@ SCENARIOS = [
     ("31 sheets", scenario_sheets),
     ("32 gemdiff", scenario_gemdiff),
     ("33 mechanics", scenario_mechanics),
+    ("34 quickwins", scenario_quickwins),
     ("35 uibatch", scenario_ui_batch),
 ]
 

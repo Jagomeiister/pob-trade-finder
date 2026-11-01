@@ -167,6 +167,9 @@ async function renderQuickPrice(state) {
     ? 'poe.ninja\'s estimate from public stash listings (refreshed about every 30 min). Thin or price-fixed items can be off.'
     : 'Average traded price on GGG\'s currency exchange in the last hour';
   box.appendChild(src);
+  var nCat = ninjaCategory(state);
+  if (nCat) box.appendChild(UI.button('ghost', { size: 'sm', label: 'poe.ninja ↗', title: 'Price history on poe.ninja',
+    onClick: function () { openUrl(ninjaUrl(nCat, refName(state), league)); } }));
   if (r.code && window.pywebview.api.bulk_exchange) {
     box.appendChild(UI.button('ghost', { size: 'sm', label: 'Live offers',
       title: 'Ask the trade site\'s bulk exchange who sells this right now (one request)',

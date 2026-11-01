@@ -41,6 +41,52 @@ function buildSearchText(s) {
   return parts.join(' ');
 }
 
+// Ready-made picks for flasks and vendors. Flask tokens are pieces of the mods' own text (every
+// tier shares it), each checked against every current flask mod (test/test_search_presets.py)
+// so it finds only the mod it names. Vendor tokens read the item's sockets ("R-G-B") and mods.
+var SEARCH_PRESET_TABS = {
+  flasks: [
+    { group: 'Suffixes', items: [
+      { label: 'Bleeding immunity', token: 'bleed' },
+      { label: 'Freeze and chill immunity', token: 'nity to (fre|chil)' },
+      { label: 'Shock immunity', token: 'nity to sh' },
+      { label: 'Ignite immunity', token: 'nity to ig' },
+      { label: 'Poison immunity', token: 'nity to po' },
+      { label: 'Maim and hinder immunity', token: 'nity to hi' },
+      { label: 'Removes curses', token: 'es curs' },
+      { label: 'Movement speed during effect', token: 'speed d' },
+      { label: 'Armour during effect', token: 'armour d' },
+      { label: 'Evasion during effect', token: 'rating d' },
+      { label: 'Resistances during effect', token: 'resistances d' },
+      { label: 'Critical strike chance during effect', token: 'chance d' }
+    ] },
+    { group: 'Prefixes', items: [
+      { label: 'Increased effect', token: 'increased effect' },
+      { label: 'Reduced charges per use', token: 'reduced charges' },
+      { label: 'Increased duration', token: 'increased duration' },
+      { label: 'More maximum charges', token: 'maximum charges' },
+      { label: 'Charge recovery', token: 'charge recovery' },
+      { label: 'Charge on critical strike', token: 'deal a crit' },
+      { label: 'Charge when hit', token: 'hit by an' },
+      { label: 'Instant recovery', token: 'nt recovery|d instantly' }
+    ] }
+  ],
+  vendor: [
+    { group: 'Sockets', items: [
+      { label: 'Chromatic recipe (R, G and B linked)', token: 'r-g-b|r-b-g|g-r-b|g-b-r|b-r-g|b-g-r' },
+      { label: '3 linked sockets or more', token: '(.-){2}' },
+      { label: '4 linked sockets or more', token: '(.-){3}' },
+      { label: '5 linked sockets or more', token: '(.-){4}' }
+    ] },
+    { group: 'Mods', items: [
+      { label: 'Movement speed (boots)', token: 'increased movement' },
+      { label: '+ level of socketed gems', token: 'level of socketed' },
+      { label: 'Adds damage to spells', token: 'to spells' },
+      { label: 'Life', token: 'maximum life' }
+    ] }
+  ]
+};
+
 function loadSearchPresets() {
   try { return JSON.parse(localStorage.getItem(SEARCH_PRESETS_KEY)) || []; } catch (e) { return []; }
 }
@@ -48,8 +94,9 @@ function saveSearchPresets(list) { persist(SEARCH_PRESETS_KEY, JSON.stringify(li
 
 function makeSearchText() {
   var wrap = UI.el('div', 'finder st');
-  var state = { tab: 'maps', picks: {}, wantAll: false, quant: '', filter: '', t17: true, custom: '', customMode: 'any' };
-  var tabs = UI.segmented([['maps', 'Maps'], ['custom', 'Your own words']], 'maps', {
+  var state = { tab: 'maps', picks: {}, wantAll: false, quant: '', filter: '', t17: true, custom: '', customMode: 'any',
+                preset: { flasks: {}, vendor: {} }, presetAll: { flasks: false, vendor: false } };
+  var tabs = UI.segmented([['maps', 'Maps'], ['flasks', 'Flasks'], ['vendor', 'Vendor'], ['custom', 'Your own words']], 'maps', {
     ariaLabel: 'Search for', onChange: function (v) { state.tab = v; draw(); } });
   wrap.appendChild(tabs);
   var body = UI.el('div', 'st-body');
@@ -62,6 +109,11 @@ function makeSearchText() {
       var words = state.custom.split('\n').map(function (w) { return w.trim().replace(/"/g, ''); }).filter(Boolean);
       return buildSearchText({ avoid: state.customMode === 'exclude' ? words : [],
         want: state.customMode === 'exclude' ? [] : words, wantAll: state.customMode === 'all', quant: 0 });
+    }
+    if (SEARCH_PRESET_TABS[state.tab]) {
+      var picked = (state.preset || {})[state.tab] || {};
+      return buildSearchText({ avoid: [], want: Object.keys(picked).filter(function (t) { return picked[t]; }),
+        wantAll: !!(state.presetAll || {})[state.tab], quant: 0 });
     }
     var avoid = [], want = [];
     Object.keys(state.picks).forEach(function (tok) { (state.picks[tok] === 'avoid' ? avoid : want).push(tok); });
@@ -203,9 +255,47 @@ function makeSearchText() {
     body.appendChild(ta);
   }
 
+  // Flasks / Vendor: tick what you want; any (or all) of them must be on the item
+  function drawPresetTab(kind) {
+    state.preset = state.preset || { flasks: {}, vendor: {} }; // presets saved before these tabs existed
+    state.presetAll = state.presetAll || { flasks: false, vendor: false };
+    var picked = state.preset[kind] = state.preset[kind] || {};
+    var bar = UI.el('div', 'st-controls');
+    UI.field('Items must have', UI.select([['any', 'any of these'], ['all', 'all of these']], state.presetAll[kind] ? 'all' : 'any',
+      { onChange: function () { state.presetAll[kind] = this.value === 'all'; drawOut(); } }), { parent: bar });
+    bar.appendChild(UI.button('ghost', { size: 'sm', label: 'Clear', onClick: function () { state.preset[kind] = {}; draw(); } }));
+    body.appendChild(bar);
+    body.appendChild(UI.el('div', 'finder-sub', kind === 'flasks'
+      ? 'Matches the mod text, so every tier of a mod counts. Open your stash or a vendor, then paste.'
+      : 'For vendors while levelling: sockets read like "R-G-B" on the item. Open the vendor, then paste.'));
+    SEARCH_PRESET_TABS[kind].forEach(function (grp) {
+      body.appendChild(UI.el('div', 'st-group', grp.group));
+      var list = UI.el('div', 'st-list st-preset-list');
+      grp.items.forEach(function (p) {
+        var on = !!picked[p.token];
+        var row = UI.el('div', 'st-mod' + (on ? ' is-want' : ''));
+        var b = UI.button('ghost', { size: 'sm', cls: 'st-pick', label: '✓', ariaLabel: 'Want: ' + p.label, title: 'Want',
+          onClick: function () {
+            if (picked[p.token]) delete picked[p.token]; else picked[p.token] = true;
+            draw();
+          } });
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        row.appendChild(b);
+        row.appendChild(UI.el('span', 'st-mod-text', p.label));
+        var tok = UI.el('code', 'st-token', p.token);
+        tok.title = 'Searched as "' + p.token + '"';
+        row.appendChild(tok);
+        list.appendChild(row);
+      });
+      body.appendChild(list);
+    });
+  }
+
   function draw() {
     body.textContent = '';
-    if (state.tab === 'custom') drawCustom(); else drawMaps();
+    if (state.tab === 'custom') drawCustom();
+    else if (SEARCH_PRESET_TABS[state.tab]) drawPresetTab(state.tab);
+    else drawMaps();
     drawOut();
   }
   draw();

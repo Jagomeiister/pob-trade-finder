@@ -259,7 +259,7 @@ main button for the way that listing is bought. Everything else is under **⋯**
   laid out like the gear pages: **link groups** on the left (gear piece, gem count, and
   their total once priced; your main skill's group is marked ★ and opens first), the
   selected group's gems on the right. Each gem has editable min level/quality, the
-  cheapest price, **↗** to open its search, and **▾** for full listings, live search and
+  cheapest price, **↗** to open its search, and **▾** for full listings, poe.ninja, live search and
   pinning. **Price this group** / **Price all gems** fill in the prices and totals
   ("Gems ≈ 3.2 div"); **Open searches ↗** opens a group's (or every) gem search.
   Gems unticked in PoB (swap-in options kept in a group, often more than the item can
@@ -278,9 +278,11 @@ Price an item without leaving the game:
 1. Keep PoB Trade Finder running and play in **Windowed** or **Windowed Fullscreen** mode
    (an overlay can't draw over exclusive fullscreen)
 2. Hover an item in Path of Exile and press **Ctrl+D**
-3. A small always-on-top **Price check** window opens on the side of the screen away
-   from your cursor, shows the item's card and prices it straight away. The listings
-   work like the main window's: sort, page, whisper, pin, live search
+3. A small always-on-top **Price check** overlay opens on the side of the screen away
+   from your cursor, shows the item's card and prices it straight away. It has no title
+   bar: drag its banner (⠿ Price check) to move it, and resize it from its edges. The next
+   press places it beside the item again. The listings work like the main window's: sort,
+   page, whisper, pin, live search
 4. Selling it? The **List at ~X** line above the listings suggests a price. It matches
    the cheapest *real* competitor: listings under 60% of the typical price on the first
    page are bait or price fixers and are ignored. **Open full search ↗** opens the same
@@ -296,11 +298,12 @@ Price an item without leaving the game:
    app's own server. It shows before the trade search finishes
    For exchange items, **Live offers** asks the trade site's bulk exchange who sells it right
    now (one request per press): seller, online/away, what they want, chaos each and stock, plus
-   **Open on trade site ↗**
+   **Open on trade site ↗**. **poe.ninja ↗** opens the item's price history there
 7. **Sensible filters for one item**: the game's Ctrl+C copy now includes mod tiers, shown as
    **T1, T2…**. Mods worse than tier 2 start unticked (they rarely set the price), crafted mods
    start off, and minimums are 90% of each roll, so you compare like with like. ⋯ also has
-   **Open on PoE Wiki / PoEDB**
+   **Open on PoE Wiki / PoEDB**, and **Open on poe.ninja** for uniques, gems, currency and
+   divination cards (in the league you picked)
    **Preset** switches in one click: **Similar** (those defaults), **Exact** (every mod at its
    full roll, all must match, this exact base) or **Base** (no mods: the base, item level and
    influence alone). If you already checked the price it checks again
@@ -348,6 +351,13 @@ Trade helper → Setup pins them):
 | Alt+T | Show or hide the trade cards |
 | Alt+C | Show or hide the cheat sheet (see 5i2) |
 
+**Chat macros** (⚙ Settings → In game → Chat macros): one click on **▶**, or one press of
+the macro's hotkey, sends one command to the game chat. It starts with /kingsmarch,
+/menagerie, /delve and /exit (log out); change them, give each a hotkey (F2–F6, Alt+1–5,
+Ctrl+Shift+1–3) or **+ Add a macro** of your own, up to 12. A macro must be one chat command
+starting with /. A hotkey that's already used elsewhere is refused. Like the other hotkeys,
+they only work while the game is focused. (For your hideout, use the game's own hideout key.)
+
 **Tray**: closing the window keeps the app running in the tray (bottom right of the taskbar).
 Click the icon to open it; right-click it for Open, Trade helper, Settings or **Quit**. You can
 turn this off in Settings → In game.
@@ -371,9 +381,14 @@ note:
    blue for a quad tab (the whisper doesn't say which, so both show when it could be either)
 2. When the buyer enters your area the card shows **In your hideout** and switches to
    **Trade**, **Kick**, **Thanks**
-3. Then record what happened: **✓ Completed** (records the listed price), **✗ Not completed**,
-   **⌛ Time wasted** or **Other**. If the game logged "Trade accepted", Completed is
-   highlighted for you. Got a different price, or want a note? **Edit** the row in **Sales**.
+3. Then record what happened: **✓ Completed**, **✗ Not completed**, **⌛ Time wasted** or
+   **Other**. If the game logged "Trade accepted", Completed is highlighted for you.
+   Completed records the **Sold for** price above it. That starts at the listed price:
+   - **−** / **+** change it in steps that suit it (1, 5 or 10 chaos; 0.1, 0.5 or 1 divine);
+   - **in div** / **in c** converts it if you were paid in the other currency;
+   - **Reset** goes back to the listed price.
+
+   To add a note, **Edit** the row in **Sales**.
    If you invited someone and they didn't come within 5 minutes (change it in Setup),
    **Mark as no-show** appears
 
@@ -524,6 +539,12 @@ poe.re:
 - **Maps**: mark mods **✗ avoid** or **✓ want**. Each mod is searched by the shortest piece of
   its text that no other map mod (or map name) has, so every roll matches. You can also add
   **Item quantity ≥** a number, and choose whether the wanted mods are *any* or *all*.
+- **Flasks**: tick the mods you want (bleeding / freeze / shock / ignite / poison immunity,
+  increased effect, reduced charges per use, instant recovery…). Each is searched by a piece of
+  the mod's own text, so every tier matches, and each was checked against every flask mod so
+  it finds only the one it names.
+- **Vendor**: for levelling vendors: the chromatic recipe (R, G and B linked), 3 / 4 / 5 linked
+  sockets, movement speed, + level of socketed gems, added spell damage, life.
 - **Your own words**: one word or phrase per line, matching any, all or none of them.
 - The box counts characters against the game's limit of 50.
 - **Copy** the text, or **Paste into game**: one press, with your stash or a vendor open,

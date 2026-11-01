@@ -626,6 +626,20 @@ async function renderFlips() {
     'gaps close, cheap items bought with divines trade in batches, and each trade costs gold.'));
 }
 
+// the poe.ninja page for an exchange item: by the feed's category, a few split by name;
+// categories poe.ninja files differently get no link rather than a wrong one
+function marketNinjaCategory(it) {
+  var n = it.name || '', cat = it.cat || 'Currency';
+  if (/Scarab/.test(n)) return 'scarabs';
+  if (/^Omen of /.test(n)) return 'omens';
+  if (/Tattoo/.test(n)) return 'tattoos';
+  if (/Fossil$/.test(n)) return 'fossils';
+  if (/Resonator$/.test(n)) return 'resonators';
+  if (/ Oil$/.test(n)) return 'oils';
+  return { 'Currency': 'currency', 'Cards': 'divination-cards', 'Essences': 'essences',
+           'Delirium Orbs': 'delirium-orbs', 'Fragments, Scarabs & Mapping': 'fragments' }[cat] || null;
+}
+
 async function renderChartCard() {
   if (!MK.els) return;
   var box = MK.els.chart;
@@ -658,6 +672,9 @@ async function renderChartCard() {
     } });
   bell.setAttribute('aria-expanded', MK.alertOpen ? 'true' : 'false');
   acts.appendChild(bell);
+  var nCat = marketNinjaCategory(it);
+  if (nCat) acts.appendChild(UI.button('ghost', { label: 'poe.ninja ↗', title: 'This item on poe.ninja, in the same league',
+    onClick: function () { openUrl(ninjaUrl(nCat, it.name, market.league)); } }));
   var range = UI.segmented([['1', '1 day'], ['7', '7 days'], ['30', '30 days']], String(MK.range), {
     ariaLabel: 'Chart range', onChange: function (v) { MK.range = parseInt(v, 10); renderChartCard(); } });
   acts.appendChild(range);
