@@ -641,7 +641,21 @@ function fitOverlay(name) {
     if (!root) return;
     var r = root.getBoundingClientRect();
     window.pywebview.api.overlay_fit(name, Math.ceil(r.width) + 2, Math.ceil(r.height) + 2);
+    if (window.pywebview.api.overlay_shape) window.pywebview.api.overlay_shape(name, overlayShapes(root));
   });
+}
+
+// What's actually drawn, as rounded rectangles: gui.py clips the overlay window to these
+// (SetWindowRgn), so everything else is truly see-through and clicks go to the game.
+// WebView2 can't do real transparency here, so the window is cut to shape instead.
+var OVERLAY_SHAPES = '.ov-icon, .ov-grip, .ov-bar > .btn, .ov-head, .ov-zone, .ov-note, .ov-cards > .trade-card, ' +
+  '.ov-cards > .disclosure';
+function overlayShapes(root) {
+  return Array.prototype.map.call(root.querySelectorAll(OVERLAY_SHAPES), function (el) {
+    var b = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    var rad = el.classList.contains('ov-icon') ? b.width / 2 : parseFloat(cs.borderTopLeftRadius) || 0;
+    return [Math.floor(b.left), Math.floor(b.top), Math.ceil(b.width), Math.ceil(b.height), Math.round(rad)];
+  }).filter(function (s) { return s[2] > 0 && s[3] > 0; });
 }
 
 async function refreshOverlayStatus() {

@@ -137,7 +137,12 @@ GGG rules, enforced by the shape of the code. Keep them:
 
 ## In-game overlays, hotkeys, tray (gui.py)
 
-- `OVERLAYS` = separate frameless, transparent, `focus=False` (WS_EX_NOACTIVATE) windows:
+- `OVERLAYS` = separate frameless, `focus=False` (WS_EX_NOACTIVATE) windows. They are *not*
+  pywebview `transparent=True`: on Windows that leaves the form's grey background, and it
+  `Show()`+`Activate()`s the window on navigation. A colour key (LWA_COLORKEY) doesn't work
+  on WebView2 content either (tested). Instead each page reports its drawn shapes
+  (`overlayShapes`) and `overlay_shape` clips the window with `SetWindowRgn`. Outside the
+  shapes the window doesn't exist (see-through, clicks reach the game). The windows are:
   `icon` (`?ovicon=1`) and `cards` (`?cards=1`, which also owns the Client.txt reader).
 - `_follow_game` (0.3 s) shows each one only while the game or one of our windows is in
   front. It checks the real visibility every tick, because pywebview shows transparent

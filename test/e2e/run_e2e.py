@@ -239,6 +239,7 @@ STUB_JS = r"""
     trade_status: function () { return { ok: true, watching: true, logName: 'Client.txt' }; },
     trade_prefs_changed: function () { return { ok: true }; },
     open_main: function () { return { ok: true }; },
+    overlay_shape: function () { return { ok: true }; },
     overlay_drag: function () { return { ok: true }; },
     game_search_paste: function () { return { ok: true }; },
     overlay_toggle_cards: function () { return { ok: true }; },
@@ -1761,6 +1762,10 @@ await H.sleep(30);
 g.dispatchEvent(new PointerEvent('pointerup', { screenX: 150, screenY: 80, pointerId: 1, bubbles: true }));
 await H.sleep(30);
 out.drag = H.calls('overlay_drag').map(c => c.args);
+const sh = H.calls('overlay_shape').slice(-1)[0];
+out.shape = sh ? sh.args : null;
+const ib = document.querySelector('.ov-icon').getBoundingClientRect();
+out.iconBox = [Math.floor(ib.left), Math.floor(ib.top), Math.ceil(ib.width)];
 return out;
 """
 
@@ -1777,6 +1782,10 @@ def scenario_overlay_icon(s, tag):
     check(tag + " 'only when there are trades' hides the icon with none", r["lastVisible"][:2] == ["icon", False],
           r["lastVisible"])
     check(tag + " icon window sized to the button", r["fit"][0] == "icon" and 0 < r["fit"][1] < 200, r["fit"])
+    sh = r["shape"] or [None, []]
+    icon = [x for x in (sh[1] or []) if x[2] == r["iconBox"][2] and x[4] * 2 == x[2]]
+    check(tag + " window clipped to what's drawn: round icon + grip, nothing else", sh[0] == "icon" and
+          len(icon) == 1 and len(sh[1]) == 2, (sh, r["iconBox"]))
     check(tag + " dragging the grip moves the window through gui.py", r["drag"][:1] == [["icon", "start", 0, 0]] and
           ["icon", "move", 40, -10] in r["drag"] and r["drag"][-1] == ["icon", "end", 50, -20], r["drag"])
 

@@ -102,7 +102,7 @@ function wireExtraHotkeys() {
   });
   var op = document.getElementById('pref-over-opacity');
   if (op) {
-    op.value = String(PREFS.overGameOpacity || 96);
+    op.value = String(PREFS.overGameOpacity || 100);
     op.addEventListener('change', function () { PREFS.overGameOpacity = parseInt(this.value, 10); savePrefs(); });
   }
   var tray = document.getElementById('pref-close-tray');

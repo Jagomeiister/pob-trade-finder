@@ -1251,9 +1251,10 @@ class Api:
                                      price_hotkey.window_rect(hwnd))
             style, ex = self._frame_saved[0], self._frame_saved[1]
             u.SetWindowLongW(hwnd, GWL_STYLE, style & ~FRAME)
-            u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED)
-            pct = self._prefs().get("overGameOpacity", 96)
-            u.SetLayeredWindowAttributes(hwnd, 0, int(255 * max(60, min(100, int(pct))) / 100), LWA_ALPHA)
+            pct = int(self._prefs().get("overGameOpacity", 100))
+            if pct < 100:  # see-through only when asked for (WebView2 + layered windows varies by GPU/driver)
+                u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED)
+                u.SetLayeredWindowAttributes(hwnd, 0, int(255 * max(60, pct) / 100), LWA_ALPHA)
             mx, my = int(g[2] * 0.03), int(g[3] * 0.03)
             u.SetWindowPos(hwnd, 0, g[0] + mx, g[1] + my, g[2] - 2 * mx, g[3] - 2 * my, SWP)
             return
@@ -1445,8 +1446,8 @@ class Api:
 
     def _follow_one(self, u, name, hwnd, game, want, lbutton, now):
         st = self._ov[name]
-        # check the real window state each tick: pywebview shows a transparent window by
-        # itself once its page loads, whatever hidden=True said
+        # check the real window state each tick (cheap, and robust to anything else
+        # showing or hiding the window)
         vis = bool(u.IsWindowVisible(hwnd))
         if st["replace"]:  # Setup → Reset position
             st["replace"], st["placed"] = False, None
@@ -1565,6 +1566,35 @@ class Api:
             self._eval_in(self._overlay_windows.get("icon"), "window.__ovCount && window.__ovCount(%d, %s)"
                           % (int(count), "true" if on else "false"))
         return {"ok": True}
+
+    def overlay_shape(self, name, shapes):
+        """Clip an overlay window to what its page draws: [[x, y, w, h, radius], ...] in CSS
+        px. Outside them the window is gone (see-through, clicks reach the game); WebView2
+        can't be made transparent, so the window is cut to shape instead."""
+        try:
+            if name not in OVERLAYS or sys.platform != "win32":
+                return {"ok": False}
+            import ctypes
+            u, gdi = ctypes.windll.user32, ctypes.windll.gdi32
+            hwnd = price_hotkey.find_window(OVERLAYS[name]["title"])
+            if not hwnd:
+                return {"ok": False}
+            scale = u.GetDpiForWindow(hwnd) / 96.0 if hasattr(u, "GetDpiForWindow") else 1.0
+            gdi.CreateRectRgn.restype = gdi.CreateRoundRectRgn.restype = ctypes.c_void_p
+            gdi.CombineRgn.argtypes = [ctypes.c_void_p] * 3 + [ctypes.c_int]
+            gdi.DeleteObject.argtypes = [ctypes.c_void_p]
+            u.SetWindowRgn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_bool]
+            rgn = gdi.CreateRectRgn(0, 0, 0, 0)
+            for s in (shapes or [])[:60]:
+                x, y, w, h = (int(round(float(v) * scale)) for v in s[:4])
+                rad = int(round(float(s[4]) * scale)) if len(s) > 4 else 0
+                part = gdi.CreateRoundRectRgn(x, y, x + w + 1, y + h + 1, 2 * rad + 1, 2 * rad + 1)
+                gdi.CombineRgn(rgn, rgn, part, 2)  # RGN_OR
+                gdi.DeleteObject(part)
+            u.SetWindowRgn(hwnd, rgn, True)  # the system owns rgn from here
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def overlay_drag(self, name, phase, dx, dy):
         """The overlay's ⠿ grip: start / move by (dx, dy) CSS px from where the drag began /
@@ -2275,7 +2305,11 @@ def main():
             on_top=True,
             frameless=True,
             easy_drag=False,
-            transparent=True,
+            # not pywebview's transparent=True: on Windows it leaves the window's grey
+            # background showing and Show()+Activate()s the window when its page loads
+            # (stealing focus from the game). The window is clipped to its content instead
+            # (overlay_shape), on a dark background for the edges.
+            background_color="#0f0e0c",
             focus=False,
             shadow=False,
             resizable=False,
