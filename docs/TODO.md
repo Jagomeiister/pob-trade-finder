@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.5.1 released 2026-11-01** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
