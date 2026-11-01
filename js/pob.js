@@ -380,26 +380,31 @@
       };
     }
 
-    // Passive tree (active spec): allocated nodes, chosen masteries, jewel sockets
-    out.tree = { nodes: [], masteries: [], sockets: [], version: '' };
+    // Passive trees: every spec (PoB's tree "stages", e.g. Level 30 / 60 / Endgame) with its
+    // allocated nodes, chosen masteries and jewel sockets; out.tree is the active one
+    out.tree = { nodes: [], masteries: [], sockets: [], version: '', title: '' };
+    out.treeSpecs = [];
+    out.treeActive = 0;
     var treeTag = xml.match(/<Tree\b([^>]*)>([\s\S]*?)<\/Tree>/);
     if (treeTag) {
       var activeSpec = parseInt(attr(treeTag[1], 'activeSpec') || '1', 10);
-      var specRe = /<Spec\b([^>]*)>([\s\S]*?)<\/Spec>/g, sp, specN = 0, chosen = null;
+      // lazy attributes: a self-closing <Spec .../> must not swallow the next spec
+      var specRe = /<Spec\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Spec>)/g, sp;
       while ((sp = specRe.exec(treeTag[2]))) {
-        specN++;
-        if (chosen === null || specN === activeSpec) chosen = sp;
-        if (specN === activeSpec) break;
-      }
-      if (chosen) {
-        out.tree.version = attr(chosen[1], 'treeVersion') || '';
-        out.tree.nodes = (attr(chosen[1], 'nodes') || '').split(',').filter(Boolean).map(Number);
-        var me = attr(chosen[1], 'masteryEffects') || '', mm, meRe = /\{(\d+),(\d+)\}/g;
-        while ((mm = meRe.exec(me))) out.tree.masteries.push([+mm[1], +mm[2]]);
+        var spec = { nodes: [], masteries: [], sockets: [], version: attr(sp[1], 'treeVersion') || '',
+                     title: attr(sp[1], 'title') || '' };
+        spec.nodes = (attr(sp[1], 'nodes') || '').split(',').filter(Boolean).map(Number);
+        var me = attr(sp[1], 'masteryEffects') || '', mm, meRe = /\{(\d+),(\d+)\}/g;
+        while ((mm = meRe.exec(me))) spec.masteries.push([+mm[1], +mm[2]]);
         var sRe = /<Socket\b([^>]*)\/?>/g, so;
-        while ((so = sRe.exec(chosen[2]))) {
-          out.tree.sockets.push({ nodeId: +attr(so[1], 'nodeId'), itemId: attr(so[1], 'itemId') || '0' });
+        while ((so = sRe.exec(sp[2] || ''))) {
+          spec.sockets.push({ nodeId: +attr(so[1], 'nodeId'), itemId: attr(so[1], 'itemId') || '0' });
         }
+        out.treeSpecs.push(spec);
+      }
+      if (out.treeSpecs.length) {
+        out.treeActive = Math.min(Math.max(activeSpec, 1), out.treeSpecs.length) - 1;
+        out.tree = out.treeSpecs[out.treeActive];
       }
     }
 

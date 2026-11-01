@@ -553,6 +553,11 @@ Tools → **Div cards** shows where each divination card drops and what it's wor
 Tools → **Skill tree** is a small Path of Building: the build's passive tree, so you can see
 where your points go in game and where the jewels sit.
 
+**Tree stages**: if your PoB build has several trees (e.g. "Level 30", "Level 70",
+"Endgame"), a menu at the top left picks which one to show; the one active in PoB is marked
+and opens first. A character comparison carries over when you switch, so you can check your
+character against the stage you're at.
+
 - **Move and zoom**: drag to move, mouse wheel or **−** / **+** to zoom, **Fit** for the
   whole tree. With the tree focused, the arrow keys move it and **0** fits it.
 - The build's nodes and links are in your accent colour; everything else is dimmed.

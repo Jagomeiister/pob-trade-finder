@@ -2342,6 +2342,56 @@ def scenario_tree(s, tag):
           (r["statusTake"], r["statusRefund"], r["legend"], r["statusBuildMode"]))
 
 
+S28_STAGES = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+const full = build.tree;
+const early = { title: 'Level 30', version: full.version, nodes: full.nodes.slice(0, 40), masteries: [], sockets: [] };
+const staged = Object.assign({}, build, { treeSpecs: [early, full], treeActive: 1, tree: full });
+const sec = document.querySelector('.tab-section[data-tab="tree"]');
+sec.textContent = '';
+sec.appendChild(makeTreeView(staged));
+setView('tree');
+await H.sleep(100);
+const sel = () => sec.querySelector('select.tv-stage-select');
+const pts = () => (sec.querySelector('.tv-side').textContent.match(/(\d+)\s*passive points/) || [])[1];
+out.options = sel() ? [...sel().options].map(o => o.textContent) : null;
+out.value = sel() && sel().value;
+out.ptsFull = pts();
+window.__stubOverrides.get_character_passives = { ok: true, hashes: full.nodes.filter(n => n < 65536).slice(0, 60), masteries: {} };
+document.getElementById('acct-input').value = 'Me#1';
+charName_ = 'MyChar';
+setView('tree');
+await H.sleep(50);
+const btn = [...sec.querySelectorAll('button')].find(b => /Compare with/.test(b.textContent));
+if (btn) btn.click();
+await H.waitFor(() => /Compared with/.test(sec.textContent), 4000, 'compare');
+out.callsBefore = H.calls('get_character_passives').length;
+sel().value = '0';
+sel().dispatchEvent(new Event('change'));
+await H.sleep(150);
+out.ptsEarly = pts();
+out.valueAfter = sel() && sel().value;
+out.callsAfter = H.calls('get_character_passives').length;
+out.stillCompared = /Compared with/.test(sec.textContent);
+delete window.__stubOverrides.get_character_passives;
+return out;
+"""
+
+
+def scenario_stages(s, tag):
+    s.fresh()
+    r = s.run(S28_STAGES, timeout=60)
+    o = r["options"] or []
+    check(tag + " tree stages listed with titles, active one marked", len(o) == 2 and o[0].startswith("Level 30") and
+          "(active in PoB)" in o[1] and r["value"] == "1", o)
+    check(tag + " switching stage shows that tree", r["ptsEarly"] and r["ptsFull"] and
+          int(r["ptsEarly"]) < int(r["ptsFull"]) and r["valueAfter"] == "0", (r["ptsEarly"], r["ptsFull"]))
+    check(tag + " character compare kept across stages without asking the site again",
+          r["stillCompared"] and r["callsAfter"] == r["callsBefore"] == 1, r)
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -2370,6 +2420,7 @@ SCENARIOS = [
     ("25 tradeview", scenario_trade_embed),
     ("26 overgame", scenario_overgame),
     ("27 tree", scenario_tree),
+    ("28 stages", scenario_stages),
 ]
 
 

@@ -335,6 +335,19 @@ async function main() {
   }
   assert(corpusMisses === 0, 'every real listing mod line matches (misses: ' + corpusMisses + ')');
 
+  console.log('== tree stages (several PoB specs) ==');
+  const specsXml = '<PathOfBuilding><Build className="Witch" ascendClassName="Elementalist"/><Tree activeSpec="2">' +
+    '<Spec title="Level 30" treeVersion="3_29" nodes="1,2,3" masteryEffects="{10,20}"/>' +
+    '<Spec title="Level 70" treeVersion="3_29" nodes="1,2,3,4,5" masteryEffects="{10,20},{11,21}">' +
+    '<Sockets><Socket nodeId="26725" itemId="7"/></Sockets></Spec>' +
+    '<Spec treeVersion="3_29" nodes="1,2,3,4,5,6,7"></Spec></Tree></PathOfBuilding>';
+  const st = PoB.parseBuild(specsXml);
+  assert(st.treeSpecs.length === 3, 'all three trees read (' + st.treeSpecs.length + ')');
+  assert(st.treeSpecs[0].title === 'Level 30' && st.treeSpecs[2].title === '', 'tree titles kept');
+  assert(st.treeActive === 1 && st.tree === st.treeSpecs[1] && st.tree.nodes.length === 5, 'active tree = activeSpec');
+  assert(st.tree.masteries.length === 2 && st.tree.sockets[0].nodeId === 26725, 'masteries + sockets per tree');
+  assert(st.treeSpecs[0].sockets.length === 0 && st.treeSpecs[2].nodes.length === 7, 'self-closing and empty specs');
+
   console.log('== pseudo ids exist in DB ==');
   ['pseudo.pseudo_total_life', 'pseudo.pseudo_total_fire_resistance',
    'pseudo.pseudo_total_elemental_resistance', 'pseudo.pseudo_total_all_elemental_resistances',

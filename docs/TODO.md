@@ -114,6 +114,7 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
       `get-passive-skills` wasn't checked live). It shows: the build's tree
       (pan / zoom / search), jewel sockets with their jewels, mastery picks, and "points still
       to take" vs your imported character (`get-passive-skills`), in a BFS order.
+- [x] Skill tree stages (PoB's several specs, e.g. Level 30 / 70 / Endgame): stage menu, compare carries over (v2.4.1, built; release pending your OK)
 - [x] Div cards: 1+ divine shows as divines, under that as chaos (done 2026-11-01)
 - [x] Custom trade sounds: your own mp3/wav/ogg/m4a for new trade / buyer arrived (done)
 

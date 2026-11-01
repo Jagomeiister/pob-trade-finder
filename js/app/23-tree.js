@@ -752,6 +752,7 @@ async function treeRunCompare(btn) {
   }
   T.cmp = treeCompare(T.I, T.M, r);
   T.cmp.name = name;
+  T.charRaw = r; // kept so switching tree stage compares again without asking the site
   T.cmpMsg = 'Compared with ' + name + '. Rings mark the points you can take now.';
   T.mode = 'compare';
   renderTreeSide();
@@ -772,6 +773,37 @@ function makeTreeView(b) {
                        hitCount: 0, hover: null, flash: null, insetAsc: -1, shown: false };
 
   var bar = UI.el('div', 'tv-bar');
+  // PoB's tree stages (several specs, e.g. Level 30 / 60 / Endgame): pick one to see that tree
+  var specs = b.treeSpecs || [];
+  if (specs.length > 1) {
+    var stageNo = b.treeStage !== undefined ? b.treeStage : (b.treeActive || 0);
+    var stageSel = UI.select(specs.map(function (s, i) {
+      return [String(i), (s.title || 'Tree ' + (i + 1)) + (i === (b.treeActive || 0) ? ' (active in PoB)' : '') +
+        ' · ' + s.nodes.length + ' nodes'];
+    }), String(stageNo), { ariaLabel: 'Tree stage', onChange: function () {
+      var i = parseInt(this.value, 10);
+      var root = b.treeRoot || b;
+      var nb = Object.assign({}, root, { tree: specs[i], treeStage: i, treeRoot: root });
+      var keep = T.charRaw, keepQ = q.value;
+      var next = makeTreeView(nb);
+      wrap.parentNode.replaceChild(next, wrap);
+      var T2 = TREEVIEW;
+      if (keep) { // compare the new stage with the character already read
+        T2.cmp = treeCompare(T2.I, T2.M, keep);
+        T2.cmp.name = T.cmp && T.cmp.name;
+        T2.charRaw = keep;
+        T2.cmpMsg = T.cmpMsg;
+        T2.mode = 'compare';
+        renderTreeSide();
+      }
+      if (keepQ) { next.querySelector('.tv-search').value = keepQ; treeSearch(keepQ); }
+      renderTreeLegend();
+      showTreeView();
+    } });
+    stageSel.classList.add('tv-stage-select');
+    stageSel.title = 'Your PoB build has ' + specs.length + ' trees (stages). Pick one to see it, and to compare it with your character.';
+    bar.appendChild(stageSel);
+  }
   var q = UI.input({ type: 'search', placeholder: 'Search nodes (name or stat)', width: '240px', ariaLabel: 'Search the tree' });
   q.classList.add('tv-search');
   q.addEventListener('input', function () { treeSearch(q.value); renderTreeLegend(); });
