@@ -50,7 +50,7 @@ function tradePrefs() {
   if (p.sound === undefined || p.sound === true) p.sound = 'chime';
   if (p.sound === false) p.sound = 'off';
   if (p.volume === undefined) p.volume = 40;
-  if (p.opacity === undefined) p.opacity = 92;
+  if (p.opacity === undefined) p.opacity = 95; // nearly solid: readable over bright scenes
   if (!p.scale) p.scale = 100;
   if (!p.iconMode) p.iconMode = 'always';  // 'always' | 'trades': only while there are trades
   if (p.autoOpen === undefined) p.autoOpen = true;
@@ -387,32 +387,48 @@ function tradeAge(ms) {
   return s < 60 ? s + 's' : s < 3600 ? Math.floor(s / 60) + 'm' : Math.floor(s / 3600) + 'h';
 }
 
+// one status per card, in words, with the matching colour on the card's edge (never colour alone)
+function tradeCardStatus(card) {
+  if (card.dir === 'out') return card.sent.hideout ? ['Going to their hideout', 'info'] : ['You whispered', 'neutral'];
+  if (card.left) return ['Left', 'neutral'];
+  if (card.acceptHint) return ['Trade accepted', 'success'];
+  if (card.joined) return ['In your hideout', 'success'];
+  if (card.invitedAt) return ['Invited', 'warn'];
+  return ['Waiting', 'neutral'];
+}
+
 function renderTradeCard(card) {
   var p = tradePrefs();
   var t = card.trade || {};
+  var status = tradeCardStatus(card);
   var el = UI.el('div', 'trade-card ' + card.dir + (card.joined ? ' joined' : '') + (card.acceptHint ? ' accepted' : ''));
   el.dataset.id = card.id;
+  el.dataset.status = status[1];
+  // line 1: who + age + dismiss (never wraps: a long name is cut short)
   var head = UI.el('div', 'tc-head');
-  head.appendChild(UI.el('span', 'tc-dir', card.dir === 'in' ? 'Buyer' : 'Seller'));
+  head.appendChild(UI.el('span', 'tc-dir', card.dir === 'in' ? 'Selling to' : 'Buying from'));
   var who = UI.el('b', 'tc-name', card.name);
-  if (card.guild) who.title = '<' + card.guild + '>';
+  who.title = card.name + (card.guild ? ' <' + card.guild + '>' : '');
   head.appendChild(who);
-  if (card.test) head.appendChild(UI.chip('test', 'warn', 'tc-test'));
-  if (card.dir === 'in') { var bb = buyerBadge(buyerFor(card)); if (bb) head.appendChild(bb); }
-  if (card.joined && !card.left) head.appendChild(UI.chip('In your hideout', 'success', 'tc-here'));
-  if (card.left) head.appendChild(UI.chip('Left', 'warn'));
-  if (card.repeats > 1) head.appendChild(UI.chip('×' + card.repeats + ' whispers', 'info'));
   head.appendChild(UI.el('span', 'tc-age', tradeAge(card.at)));
   head.appendChild(UI.iconButton('✕', 'Dismiss this card', { size: 'sm', onClick: function () { closeCard(card); } }));
   el.appendChild(head);
+  // line 2: where the trade is at, then anything else worth knowing about it
+  var tags = UI.el('div', 'tc-tags');
+  tags.appendChild(UI.chip(status[0], status[1], 'tc-status'));
+  if (card.test) tags.appendChild(UI.chip('test', 'warn', 'tc-test'));
+  if (card.dir === 'in') { var bb = buyerBadge(buyerFor(card)); if (bb) tags.appendChild(bb); }
+  if (card.repeats > 1) tags.appendChild(UI.chip('×' + card.repeats + ' whispers', 'info'));
+  el.appendChild(tags);
 
   var what = UI.el('div', 'tc-item');
   what.appendChild(UI.el('span', 'tc-item-name', (t.count ? fmtCompact(t.count) + ' × ' : '') + (t.item || card.text)));
   if (t.item) what.appendChild(UI.el('b', 'tc-price', priceText(t.price, t.currency)));
   el.appendChild(what);
   var where = [];
-  if (t.league) where.push(t.league);
-  if (t.tab) where.push('tab "' + t.tab + '"' + (t.left ? ' · left ' + t.left + ', top ' + t.top : ''));
+  var myLeague = (document.getElementById('league') || {}).value;
+  if (t.league && t.league !== myLeague) where.push(t.league); // only when it isn't your league
+  if (t.tab) where.push('Tab "' + t.tab + '"' + (t.left ? ' · left ' + t.left + ', top ' + t.top : ''));
   if (where.length) el.appendChild(UI.el('div', 'tc-where', where.join(' · ')));
   if (t.note) el.appendChild(UI.el('div', 'tc-note', '“' + t.note + '”'));
   if (card.lastText) el.appendChild(UI.el('div', 'tc-last', (card.lastDir === 'out' ? 'You: ' : card.name + ': ') + card.lastText));
@@ -512,12 +528,14 @@ function renderOutcomes(card, p) {
     title: (card.acceptHint ? 'The game logged "Trade accepted". ' : '') +
       'Records the sale at the listed price. Got a different price? Edit it in Trade helper → Sales.',
     onClick: function () { recordOutcome(card, 'completed'); } });
+  done.classList.add('tc-complete');
   if (card.acceptHint) done.classList.add('suggested');
   var more = UI.el('div', 'tc-other');
   more.appendChild(done);
-  more.appendChild(UI.button('ghost', { size: 'sm', label: '✗ Not completed', onClick: function () { recordOutcome(card, 'not_completed'); } }));
-  more.appendChild(UI.button('ghost', { size: 'sm', label: '⌛ Time wasted', onClick: function () { recordOutcome(card, 'wasted'); } }));
-  more.appendChild(UI.button('ghost', { size: 'sm', label: 'Other', title: 'Add a note in Trade helper → Sales',
+  // the other outcomes: one even row of quiet buttons
+  more.appendChild(UI.button('secondary', { size: 'sm', label: '✗ Not completed', onClick: function () { recordOutcome(card, 'not_completed'); } }));
+  more.appendChild(UI.button('secondary', { size: 'sm', label: '⌛ Time wasted', onClick: function () { recordOutcome(card, 'wasted'); } }));
+  more.appendChild(UI.button('secondary', { size: 'sm', label: 'Other', title: 'Add a note in Trade helper → Sales',
     onClick: function () { recordOutcome(card, 'other'); } }));
   box.appendChild(more);
   return box;
@@ -632,7 +650,8 @@ function renderIconOverlay(root) {
     (hk.price ? '\n• ' + hk.price + ': price the item under your cursor' : '') +
     (hk.app ? '\n• ' + hk.app + ': open the app over the game' : '') +
     (hk.trades ? '\n• ' + hk.trades + ': show / hide trade cards' : '') +
-    (overlayState.logWatching ? '\n• Trade helper: reading the chat log' : '\n• Trade helper: off') +
+    (hk.sheet ? '\n• ' + hk.sheet + ': show / hide the cheat sheet' : '') +
+    (overlayState.logWatching ? '\n• Reading the game log' : '\n• Trade helper: off') +
     '\nClick: show / hide trade cards';
   icon.appendChild(UI.el('span', 'ov-logo', 'PoB'));
   icon.appendChild(UI.el('span', 'ov-dot'));
@@ -642,12 +661,18 @@ function renderIconOverlay(root) {
   var grip = overlayGrip(p, 'the icon');
   if (grip) bar.appendChild(grip);
   if (iconHover) { // extra buttons only while the mouse is over it: out of the way otherwise
+    // the same icons as the app's sidebar, so each one means one thing everywhere
+    var api = window.pywebview.api;
+    bar.appendChild(UI.iconButton(VIEW_ICONS.trades, 'Trade helper: sales, buyers, setup', { size: 'sm',
+      onClick: function () { api.trades_show(); } }));
+    if (api.overlay_toggle_sheet) {
+      bar.appendChild(UI.iconButton(VIEW_ICONS.sheets, 'Show / hide the cheat sheet' + (hk.sheet ? ' (' + hk.sheet + ')' : ''),
+        { size: 'sm', onClick: function () { api.overlay_toggle_sheet(); } }));
+    }
+    bar.appendChild(UI.iconButton('⌂', 'Open PoB Trade Finder' + (hk.app ? ' (' + hk.app + ')' : ''), { size: 'sm',
+      onClick: function () { api.open_main(false); } }));
     bar.appendChild(UI.iconButton('⚙', 'Settings (app over the game)', { size: 'sm',
-      onClick: function () { window.pywebview.api.open_main(true); } }));
-    bar.appendChild(UI.iconButton('⌂', 'Open PoB Trade Finder', { size: 'sm',
-      onClick: function () { window.pywebview.api.open_main(false); } }));
-    bar.appendChild(UI.iconButton('$', 'Trade helper: sales, buyers, setup', { size: 'sm',
-      onClick: function () { window.pywebview.api.trades_show(); } }));
+      onClick: function () { api.open_main(true); } }));
   }
   root.appendChild(bar);
   fitOverlay('icon');

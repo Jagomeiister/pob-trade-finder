@@ -24,7 +24,7 @@ function sheetPrefs() {
   var p;
   try { p = JSON.parse(localStorage.getItem(SHEET_PREFS_KEY)) || {}; } catch (e) { p = {}; }
   if (!(p.act >= 1 && p.act <= 10)) p.act = 1;
-  if (p.opacity === undefined) p.opacity = 92;
+  if (p.opacity === undefined) p.opacity = 95; // nearly solid: readable over bright scenes
   if (!p.scale) p.scale = 100;
   if (!p.width) p.width = 320;
   p.show = Object.assign({ points: true, trials: true, notes: true, mine: true }, p.show || {});
@@ -93,7 +93,10 @@ function sheetContent(act, opts) {
       var here = sheetArea && sheetArea === t.area;
       var li = UI.el('li', 'sheet-li' + (here ? ' is-here' : ''));
       li.appendChild(UI.el('span', 'sheet-tag is-trial', 'trial'));
-      li.appendChild(UI.el('span', null, t.area + ' · ' + t.trap));
+      var txt = UI.el('span', 'sheet-li-text'); // area on top, its traps quieter underneath
+      txt.appendChild(UI.el('span', null, t.area));
+      txt.appendChild(UI.el('span', 'sheet-li-sub', t.trap));
+      li.appendChild(txt);
       if (here) li.appendChild(UI.chip('you\'re here', 'success'));
       tl.appendChild(li);
     });
@@ -147,6 +150,8 @@ function renderSheetOverlay() {
   if (grip) head.appendChild(grip);
   head.appendChild(UI.iconButton('‹', 'Previous act', { size: 'sm', onClick: function () { sheetStep(-1); } }));
   var title = UI.el('span', 'sheet-title', 'Act ' + p.act);
+  var src = sheetData();
+  if (src) title.title = 'Game data: ' + src.source; // the full credit line is in Tools → Cheat sheets
   if (p.follow) {
     var dot = UI.el('span', 'sheet-follow-dot');
     dot.title = 'Follows your act from the game log';
@@ -159,7 +164,7 @@ function renderSheetOverlay() {
     { size: 'sm', onClick: function () { sheetOpen = false; renderSheetOverlay(); } }));
   panel.appendChild(head);
   var body = UI.el('div', 'sheet-body');
-  body.appendChild(sheetContent(p.act));
+  body.appendChild(sheetContent(p.act, { noSource: true }));
   panel.appendChild(body);
   root.appendChild(panel);
   fitSheetOverlay();
@@ -360,7 +365,7 @@ function renderSheetGameControls(p) {
   var look = UI.el('div', 'trade-row');
   look.appendChild(slider('Width', p.width, 220, 640, 20, 'px', 'width'));
   look.appendChild(slider('Size', p.scale, 70, 150, 5, '%', 'scale'));
-  look.appendChild(slider('Opacity', p.opacity, 30, 100, 2, '%', 'opacity'));
+  look.appendChild(slider('Opacity', p.opacity, 30, 100, 5, '%', 'opacity'));
   box.appendChild(look);
 
   var more = UI.el('div', 'trade-row');
