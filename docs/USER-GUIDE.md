@@ -701,6 +701,43 @@ Tools → **Dust explorer** finds the uniques worth buying to break down for Tha
   data, credited to a community list and PoEDB). It's pinned in the app; see
   THIRD_PARTY_NOTICES.md.
 
+## 5j3. ⏚ Loot filter
+
+Tools → **Loot filter** tunes your own .filter file (from Documents\My Games\Path of Exile). It
+works without a build. Pick the filter at the top.
+
+How the app changes it:
+- Everything the app adds lives in **one section at the top of the file**, between marker
+  lines. A filter shows an item using the first block that matches, so these blocks win
+  without the filter's own blocks being rewritten.
+- When you download a new version of your filter (NeverSink / FilterBlade), open it here and
+  **Save to filter**: your changes go back in. That's what keeps them through filter updates.
+- **Before every save the app keeps a checkpoint** of the file (the last 50).
+- The app never touches the game. After saving, pick the filter again in game
+  (Options → UI) to load it.
+- If the file changed on disk since the app read it (you edited it, or downloaded a new
+  version), the save stops and asks you to **Reload** first.
+
+Tabs:
+- **Price re-tier**: for filters with NeverSink's tier tags (`$type->… $tier->…`). It lists
+  items whose price today is at least 3× off their tier (currency, cards, scarabs and more
+  from GGG's exchange feed; uniques by their most valuable unique on that base, from
+  poe.ninja), with the tier they fit now. Tick the ones to change and **Use the ticked
+  re-tiers**. They're shown like that tier from the app section.
+- **Build items**: highlights your loaded build's rare bases (to craft on, from an item level
+  you choose), its uniques' bases and optionally its gems, in a look you choose. Filters can't
+  see a unique's name, so every unique on that base is highlighted.
+- **Your rules**: hide or show an item class and/or base types (with rarity and item level),
+  with one of four looks or the look of any tier in your filter. Your rules come first, so they
+  beat everything else.
+- **Find an item**: paste an item (Ctrl+C in game) to see which block shows or hides it, with
+  **Hide it** / **Highlight it** buttons.
+- **Checkpoints**: every saved version. **Restore** puts one back; the current file is kept
+  as a checkpoint first.
+
+The **Ctrl+D price check** (and a pasted item) shows the same line: which block of your filter
+catches the item, with **Hide it** / **Highlight it**. Both add a rule and save straight away.
+
 ## 5k. 🌳 Skill tree
 
 Tools → **Skill tree** is a small Path of Building: the build's passive tree, so you can see

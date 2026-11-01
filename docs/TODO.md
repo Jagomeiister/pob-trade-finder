@@ -228,10 +228,16 @@ sources, or ask the author.
       Flasks tab (useful affixes, e.g. "of the Armadillo") and vendor presets (movement speed
       boots, chromatic r-g-b, links).
 - [x] **Socket recolour calculator**: became the socket colour helper (section 3; 3.29 changed the system).
-- [ ] **Loot filter tools** (Scalpel's biggest feature: an in-game filter editor, FilterBlade
-      online sync, "economy audit" re-tiering by poe.ninja prices, filter checkpoints). Big,
-      and needs care: it rewrites your own .filter file (that's allowed, it's your file) but
-      must never trigger reloads or game input on its own. Decide whether we want it.
+- [x] **Loot filter tools** (built 2026-11-01): Tools → Loot filter + a line on the price check.
+  - js/filter.js parses and matches; filter_files.py handles files and checkpoints; the page
+    is js/app/29-lootfilter.js.
+  - Price re-tier (economy audit), build items, your rules, find an item, checkpoints.
+  - All edits go in one managed section at the top of the file, so they survive filter
+    updates. That's our answer to Scalpel's FilterBlade sync: online filters on GGG's site
+    would need the OAuth login GGG hasn't granted.
+  - No reloads, no game input.
+  - [ ] In game: save, re-select the filter (Options → UI), and check a re-tiered item and a
+        hidden base drop as expected; Ctrl+D shows the block line.
 - [ ] Maybe later / probably not:
   - Art mode: drawing on top of the game, for content creators.
   - Plugins.
