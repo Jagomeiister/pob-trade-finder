@@ -29,7 +29,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.5.6"
+VERSION = "2.5.7"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -985,6 +985,30 @@ class Api:
             return {"ok": True, "source": data.get("source"), "fetchedAt": data.get("fetchedAt"),
                     "stale": bool(data.get("stale")), "areas": data.get("areas", []), "cards": cards,
                     "divine": rates.get(div_id) if div_id else None, "priceHour": hour}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def unique_prices(self, league):
+        """Dust explorer: the cheapest plain copy of every unique (not 5/6-linked, not
+        corrupted, no variant unless that's all there is) from the backend's poe.ninja
+        snapshot: [[name, base, chaos, listings, poe.ninja type], ...], plus chaos per divine."""
+        try:
+            data = self._ninja_prices(league)
+            best = {}
+            for k, t in ((data or {}).get("types") or {}).items():
+                if not k.startswith("Unique"):
+                    continue
+                for l in t.get("lines", []):
+                    if (l.get("l") or 0) >= 5 or l.get("cr"):
+                        continue
+                    key = (l.get("n"), l.get("b") or "")
+                    old = best.get(key)
+                    if old is None or (bool(l.get("v")), l.get("c", 0)) < (bool(old[1].get("v")), old[1].get("c", 0)):
+                        best[key] = (k, l)
+            div_id = (self._currency_map.get("divine") or {}).get("id")
+            rates, _ = self._feed.rates(league, [div_id]) if div_id else ({}, None)
+            return {"ok": True, "divine": rates.get(div_id) if div_id else None,
+                    "items": [[n, b, l.get("c", 0), l.get("lc"), k] for (n, b), (k, l) in best.items()]}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

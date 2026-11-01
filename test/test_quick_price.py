@@ -98,5 +98,18 @@ check("bulk exchange: cheapest first, divine converted", [o["seller"] for o in r
 check("bulk exchange: afk + stock carried", r["offers"][0]["afk"] and r["offers"][0]["stock"] == 900, r["offers"][0])
 check("bulk exchange: refuses non-exchange items", not api.bulk_exchange("L", "nonsense")["ok"] and len(sent) == 1)
 
+# dust explorer: the cheapest plain copy of each unique, its poe.ninja type, chaos per divine
+api._ninja_prices = lambda league: NINJA  # (the outage test above swapped it out)
+NINJA["types"]["UniqueArmour"]["lines"] += [{"n": "Tabula Rasa", "c": 7, "cr": 1},           # corrupted: skipped
+                                             {"n": "Tabula Rasa", "c": 8, "v": "Legacy"}]    # variant: only if alone
+r = api.unique_prices("L")
+got = {(i[0], i[1]): i for i in r.get("items", [])}
+check("unique prices: one row per unique + base, no gems", r["ok"] and len(got) == 3 and ("Vaal Grace", "") not in got,
+      r if not r.get("ok") else sorted(got))
+check("unique prices: plain copy beats corrupted / variant / 6-link",
+      got[("Tabula Rasa", "")][2] == 10 and got[("Shavronne's Wrappings", "")][2] == 50, got)
+check("unique prices: listings + poe.ninja type", got[("Headhunter", "Leather Belt")][3:] == [470, "UniqueAccessory"], got)
+check("unique prices: chaos per divine", r["divine"] == 200.0, r["divine"])
+
 print("\nALL TESTS PASSED" if not failures else "\n%d FAILED" % failures)
 sys.exit(1 if failures else 0)

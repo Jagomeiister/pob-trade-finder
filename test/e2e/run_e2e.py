@@ -213,6 +213,7 @@ STUB_JS = r"""
     },
     notify: function () { return { ok: true }; },
     open_url: function () { return { ok: true }; },
+    unique_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },  // dust explorer
     unique_icon: function () { return NO_ART; },
     gem_icon: function () { return NO_ART; },
     art_manifest: function () { return { ok: true, art: {} }; },
@@ -2848,6 +2849,44 @@ return out;
 """
 
 
+S36_DUST = r"""
+const H = window.__e2e;
+const out = {};
+await H.loadBuild();
+out.nav = [...document.querySelectorAll('#nav .nav-item')].some(b => b.dataset.view === 'dust' && b.querySelector('.ni-dust'));
+window.__stubOverrides.unique_prices = { ok: true, divine: 200, items: [
+  ['Mageblood', 'Heavy Belt', 36000, 50, 'UniqueAccessory'], ['Starforge', 'Infernal Sword', 300, 20, 'UniqueWeapon'],
+  ["Kaom's Heart", 'Glorious Plate', 50, 3, 'UniqueArmour'], ['Tabula Rasa', 'Simple Robe', 10, 300, 'UniqueArmour'],
+  ['Goldrim', 'Leather Cap', 1, 500, 'UniqueArmour']] };
+setView('dust');
+await H.waitFor(() => DUST.prices && document.querySelectorAll('#view-dust tbody tr').length > 0, 3000, 'dust rows');
+const rows = () => [...document.querySelectorAll('#view-dust tbody tr')].map(tr => (tr.querySelector('.dust-name b') || {}).textContent);
+const cell = (name, i) => { const tr = [...document.querySelectorAll('#view-dust tbody tr')].find(t => t.querySelector('.dust-name b').textContent === name);
+  return tr ? tr.children[i].textContent : null; };
+out.first = rows();
+out.league = H.calls('unique_prices').slice(-1)[0].args[0];
+out.mageblood = [cell('Mageblood', 1), cell('Mageblood', 2), cell('Mageblood', 3)];
+const pick = (label) => [...document.querySelectorAll('.dust-controls .field')].find(f => f.textContent.startsWith(label)).querySelector('select');
+const listed = pick('Listed at least'); listed.value = '0'; listed.dispatchEvent(new Event('change')); await H.sleep(20);
+out.withThin = rows().length;
+const quality = [...document.querySelectorAll('.dust-controls input[type=range]')][1];
+quality.value = 20; quality.dispatchEvent(new Event('change')); await H.sleep(20);
+out.starQ20 = cell('Starforge', 1);
+const q = document.querySelector('.dust-controls input[type=search]'); q.value = 'gold'; q.dispatchEvent(new Event('input')); await H.sleep(20);
+out.search = rows();
+const before = H.calls('open_url').length;
+H.button(document.querySelector('#view-dust tbody tr'), 'poe.ninja ↗').click(); await H.sleep(20);
+out.url = (H.calls('open_url')[before] || { args: [] }).args[0];
+// the price check's line: its own item level / quality, influences beyond the built-in ones
+out.line = dustLineFor({ rarity: 'UNIQUE', name: 'Mageblood', base: 'Heavy Belt', itemLevel: 75, quality: 0, influences: ['Shaper'] });
+out.lineStar = dustLineFor({ rarity: 'UNIQUE', name: 'Starforge', base: 'Infernal Sword', itemLevel: 84, quality: 20, influences: ['Shaper'] });
+out.rare = dustLineFor({ rarity: 'RARE', name: 'Doom Loop' });
+out.data = [window.POE_DUST.items.length, window.POE_DUST.source];
+delete window.__stubOverrides.unique_prices;
+return out;
+"""
+
+
 def scenario_ledger(s, tag):
     s.fresh("?cards=1")
     r = s.run(S37_LEDGER_CARDS, timeout=60)
@@ -2900,6 +2939,26 @@ def scenario_ledger(s, tag):
     check(tag + " backup: one file with sales, purchases and people", r["backup"][:2] == [True, "trade-backup"] and
           r["backup"][2] == 4 and r["backup"][3] == 3 and r["backup"][4] >= 4, r["backup"])
     check(tag + " import adds only what's new", r["afterImport"] == [5, True], r["afterImport"])
+
+
+def scenario_dust(s, tag):
+    s.fresh()
+    r = s.run(S36_DUST, timeout=60)
+    check(tag + " Tools → Dust explorer with its icon", r["nav"], r["nav"])
+    check(tag + " dust data: 1000+ uniques, source credited", r["data"][0] > 1000 and "MIT" in r["data"][1], r["data"])
+    check(tag + " sorted by dust per chaos, thin markets hidden (Kaom's: 3 listed)",
+          r["first"] == ["Starforge", "Goldrim", "Tabula Rasa", "Mageblood"], r["first"])
+    check(tag + " prices for the selected league", bool(r["league"]), r["league"])
+    check(tag + " row: dust, price in div, dust per chaos", r["mageblood"] == ["2.23M", "180 div", "62"], r["mageblood"])
+    check(tag + " 'Listed at least: any' shows thin markets too", r["withThin"] == 5, r["withThin"])
+    check(tag + " quality 20 = +40% (Starforge, built-in Shaper: the dataset's own q20 value)", r["starQ20"] == "3.34M", r["starQ20"])
+    check(tag + " search filters", r["search"] == ["Goldrim"], r["search"])
+    check(tag + " poe.ninja link for the row", (r["url"] or "").endswith("/unique-armours?name=Goldrim"), r["url"])
+    check(tag + " price check line: ilvl 75 + 1 extra influence", r["line"] and r["line"]["dust"] == 1838018
+          and r["line"]["extra"] == 1, r["line"])
+    check(tag + " price check line: built-in influence not counted twice", r["lineStar"] and r["lineStar"]["dust"] == 3341578
+          and r["lineStar"]["extra"] == 0, r["lineStar"])
+    check(tag + " no dust line for non-uniques", r["rare"] is None, r["rare"])
 
 
 def scenario_gemdiff(s, tag):
@@ -3248,6 +3307,7 @@ SCENARIOS = [
     ("32 gemdiff", scenario_gemdiff),
     ("33 mechanics", scenario_mechanics),
     ("34 quickwins", scenario_quickwins),
+    ("36 dust", scenario_dust),
     ("37 ledger", scenario_ledger),
 ]
 

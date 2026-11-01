@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.5.6 released 2026-11-01** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.7 released 2026-11-01** (dust explorer + dust on the price check). Before: **v2.5.6** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -197,7 +197,11 @@ sources, or ask the author.
   - [ ] In game: try every test button and look at the cards over the game.
 - [x] Crafted / enchanted mods are bright light blue (and semi-bold), clearly apart from normal
       mods (asked 2026-11-01).
-- [ ] **Dust explorer** (was parked as impossible; it isn't):
+- [x] **Dust explorer** (built 2026-11-01): Tools → Dust explorer + "Dust ≈" on the price check.
+      Per-unique values from deronek/poe-disenchant-tool (MIT, pinned; `tools/make_dust.py`),
+      which also gives built-in influences (Starforge, Astrolabe) through its q0/q20 columns.
+      Formula is additive: × (ilvl − 64) / 20 × (1 + 0.02·q + 0.5·influences). Bump the
+      pinned commit after 3.30 for new uniques. Notes from before:
   - Scalpel's dust formula: dust = base × 125 × (20 − (84 − ilvl)), with ilvl clamped to
     65–84, × (1 + (2 × quality + 50 × influences) / 100).
   - The formula is a fact we can use. The per-unique base value table
