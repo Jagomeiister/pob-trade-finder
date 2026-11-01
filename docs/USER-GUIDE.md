@@ -616,6 +616,32 @@ Tools → **Div cards** shows where each divination card drops and what it's wor
 - The page loads once per session. After a restart it shows your last result straight away
   ("Showing prices from …") and refreshes the prices in the background.
 
+## 5j2. ✨ Dust explorer
+
+Tools → **Dust explorer** finds the uniques worth buying to break down for Thaumaturgic Dust
+(your Kingsmarch disenchanter). It works without a build.
+
+- Each row shows:
+  - the unique and its base;
+  - its **dust**;
+  - its **price** (the cheapest plain copy on poe.ninja: not corrupted, not 5/6-linked);
+  - **dust per chaos**;
+  - the **gold fee** for disenchanting it;
+  - its **size** in inventory squares;
+  - how often it's **listed**.
+- It's sorted by dust per chaos; click any column to sort by it instead.
+- Settings: **Item level** (65–84; dust grows from 65 to 84), **Quality** (+2% dust per 1%) and
+  **Extra** (+50% per influence type or corruption implicit). A unique that always comes
+  influenced, like Starforge, already counts its own influence.
+- **Listed at least** hides thin markets, where poe.ninja's price is often off. **Price up to**
+  caps the price.
+- The **Ctrl+D price check** and a pasted unique show **Dust ≈ …** next to the quick price
+  (with dust per chaos), worked out from that item's own item level, quality and influences.
+- Dust values come from the MIT-licensed
+  [poe-disenchant-tool](https://github.com/deronek/poe-disenchant-tool) dataset (item level 84
+  data, credited to a community list and PoEDB). It's pinned in the app; see
+  THIRD_PARTY_NOTICES.md.
+
 ## 5k. 🌳 Skill tree
 
 Tools → **Skill tree** is a small Path of Building: the build's passive tree, so you can see

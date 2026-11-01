@@ -31,6 +31,7 @@ STEPS = [
     [sys.executable, "tools/make_timeless.py", "--update"],  # re-pin PoB timeless data (after jeweldata: needs tree)
     [sys.executable, "tools/make_treeview.py"],  # Skill tree view layout (after jeweldata: needs tree)
     [sys.executable, "tools/make_cheatsheets.py"],  # leveling cheat sheets (Path of Exile Wiki)
+    [sys.executable, "tools/make_dust.py"],  # dust per unique (pinned MIT dataset: bump its COMMIT for new uniques)
     ["node", "test/test.js"],
     [sys.executable, "test/test_currency_feed.py"],
     ["node", "test/test_craft.js"],
