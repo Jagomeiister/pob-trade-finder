@@ -563,28 +563,25 @@ body.trade-cards .sheet-head .btn-icon { width: 30px; height: 30px; font-size: v
 .trade-h3 { font-size: var(--fs-md); margin: 8px 0 0; }
 .trade-warn { color: var(--warn); }
 
-/* ---- medium windows (the app opens 1280 wide; users shrink it): icon rail ---- */
-.nav-icon { display: none; width: 18px; text-align: center; flex: none; }
-.nav-item .nav-label { flex: 1; }
+/* icon art (css/navicons.css, tools/make_navicons.py): line-art masks painted in the text
+   colour, so they follow the theme and accent; quieter than the label until hovered / current */
+.ni { display: inline-block; flex: none; width: 18px; height: 18px; background-color: currentColor;
+  -webkit-mask: var(--ni) center / contain no-repeat; mask: var(--ni) center / contain no-repeat; }
+.nav-item .ni { color: var(--text-3); }
+.nav-item:hover .ni { color: var(--text-2); }
+.nav-item[aria-current="page"] .ni { color: var(--accent); }
+.btn-icon .ni { width: 18px; height: 18px; }
+body.trade-cards .ov-bar .btn-icon .ni { width: 20px; height: 20px; color: var(--accent); }
+
+/* ---- medium windows (the app opens 1280 wide; users shrink it): a narrower sidebar that
+   keeps every icon's name next to it (an icon-only rail was harder to read) ---- */
+.nav-icon { display: inline-block; width: 18px; text-align: center; flex: none; }
+.nav-item .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #rail-build-btn { display: none; }
 @media (min-width: 1001px) and (max-width: 1180px) {
-  body.has-build .app-shell { grid-template-columns: 64px minmax(0, 1fr); }
-  .sidebar { padding: 12px 8px; align-items: center; }
-  .brand span { display: none; }
-  #rail-build-btn { display: inline-flex; }
-  .sidebar .build-card { display: none; }
-  .sidebar.show-build .build-card:not(.hidden) {
-    display: flex; position: fixed; left: 72px; top: 12px; width: 260px; z-index: 30;
-    border: 1px solid var(--border-strong); box-shadow: 0 8px 24px var(--shadow);
-  }
-  .nav { align-items: center; }
-  .nav-group { display: none; }
-  .nav-item { width: 44px; justify-content: center; padding: 0; }
-  .nav-item .nav-label, .nav-item .nav-count, #settings-btn-side .nav-label { display: none; }
-  .nav-icon { display: inline; font-size: var(--fs-lg); }
-  .side-foot { align-items: center; }
+  body.has-build .app-shell { grid-template-columns: 216px minmax(0, 1fr); }
+  .sidebar { padding-left: 8px; padding-right: 8px; }
   .side-foot .market-tile { display: none !important; }
-  #settings-btn-side { width: 44px; padding: 0; justify-content: center; }
   .master-detail { grid-template-columns: 220px minmax(0, 1fr); }
 }
 

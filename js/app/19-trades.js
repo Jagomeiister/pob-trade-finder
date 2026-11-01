@@ -663,16 +663,14 @@ function renderIconOverlay(root) {
   if (iconHover) { // extra buttons only while the mouse is over it: out of the way otherwise
     // the same icons as the app's sidebar, so each one means one thing everywhere
     var api = window.pywebview.api;
-    bar.appendChild(UI.iconButton(VIEW_ICONS.trades, 'Trade helper: sales, buyers, setup', { size: 'sm',
-      onClick: function () { api.trades_show(); } }));
+    bar.appendChild(navIconButton('trades', 'Trade helper: sales, buyers, setup', function () { api.trades_show(); }));
     if (api.overlay_toggle_sheet) {
-      bar.appendChild(UI.iconButton(VIEW_ICONS.sheets, 'Show / hide the cheat sheet' + (hk.sheet ? ' (' + hk.sheet + ')' : ''),
-        { size: 'sm', onClick: function () { api.overlay_toggle_sheet(); } }));
+      bar.appendChild(navIconButton('sheets', 'Show / hide the cheat sheet' + (hk.sheet ? ' (' + hk.sheet + ')' : ''),
+        function () { api.overlay_toggle_sheet(); }));
     }
-    bar.appendChild(UI.iconButton('⌂', 'Open PoB Trade Finder' + (hk.app ? ' (' + hk.app + ')' : ''), { size: 'sm',
-      onClick: function () { api.open_main(false); } }));
-    bar.appendChild(UI.iconButton('⚙', 'Settings (app over the game)', { size: 'sm',
-      onClick: function () { api.open_main(true); } }));
+    bar.appendChild(navIconButton('home', 'Open PoB Trade Finder' + (hk.app ? ' (' + hk.app + ')' : ''),
+      function () { api.open_main(false); }));
+    bar.appendChild(navIconButton('settings', 'Settings (app over the game)', function () { api.open_main(true); }));
   }
   root.appendChild(bar);
   fitOverlay('icon');
