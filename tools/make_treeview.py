@@ -23,6 +23,15 @@ Output: window.POE_TREE_VIEW = {
   jewelSlots: [socket node ids]            character-window jewels give x = an index here
   icons: {zoom, active, inactive, size, at} passive icon sprite sheets (GGG CDN URLs) and each
                                            node's x, y in them (see icons())
+  masteryArt: the mastery icons and the pattern behind a chosen one (see mastery_art()): {
+      zoom, size: [w, h], inactive, connected, active   the three icon sheets (locked / connected /
+                                                        effect chosen), one zoom, one icon size
+      effect: {url, zoom, size: [w, h]}                 the pattern sheet (a smaller zoom: see below)
+      art:   [[ix, iy, ax, ay, ex, ey], ...]            distinct art: x, y in the inactive + connected
+                                                        sheets (same layout), the active sheet, the
+                                                        pattern sheet
+      nodes: [mastery node id, art index, ...]
+  }
   background: the in-game backdrop (see background()): {
       tile:   {url, zoom, rect: [x, y, w, h]}  the dark tile, repeated; one tile = w / zoom tree units
       sheet:  {url, zoom}                      the group-background sheet
@@ -126,6 +135,67 @@ def icons(tree, out_nodes):
 
 BG_ZOOM = "0.5"  # the icons' zoom level (the largest sheets)
 CDN = "https://web.poecdn.com/"  # the only host the art cache (art_cache.py) fetches from
+
+# Mastery sheets: the art cache refuses files over art_cache.MAX_BYTES (2 MB). Measured on the CDN:
+# the icon sheets at 0.5 are 0.49 MB (inactive), 0.54 MB (connected) and 1.2 MB (active, selected);
+# the pattern sheet is 1.6 MB at 0.2109, 3.0 MB at 0.2972 and 7.6 MB at 0.5, so it comes from
+# 0.2109 and is drawn at w / zoom tree units like every other sprite (the same size in the tree).
+MASTERY_ZOOM = "0.5"
+MASTERY_EFFECT_ZOOM = "0.2109"
+MASTERY_SHEETS = (("inactive", "masteryInactive"), ("connected", "masteryConnected"),
+                  ("active", "masteryActiveSelected"))
+
+
+def mastery_art(tree, out_nodes):
+    """The mastery icons as the game draws them: masteryInactive (no notable of the group taken),
+    masteryConnected (a notable taken, no effect chosen), masteryActiveSelected (effect chosen) plus
+    the masteryActiveEffect pattern behind that group. The inactive and connected sheets are keyed
+    by a node's inactiveIcon and share one layout; the active sheet by its activeIcon; the pattern
+    sheet by its activeEffectImage. Masteries share art (about 60 kinds for 300+ masteries), so the
+    coords are listed once and each mastery points at its entry."""
+    sprites = tree.get("sprites") or {}
+
+    def sheet(kind, zoom):
+        s = (sprites.get(kind) or {}).get(zoom)
+        if not s or not s.get("filename", "").startswith(CDN):
+            raise SystemExit("no %s sprite sheet at zoom %s on %s: update mastery_art()" % (kind, zoom, CDN))
+        return s
+
+    sheets = {name: sheet(kind, MASTERY_ZOOM) for name, kind in MASTERY_SHEETS}
+    effect = sheet("masteryActiveEffect", MASTERY_EFFECT_ZOOM)
+    if sheets["inactive"]["coords"] != sheets["connected"]["coords"]:
+        raise SystemExit("mastery inactive and connected sheets no longer share a layout: update mastery_art()")
+    size, esize, art, index, flat = None, None, [], {}, []
+
+    def one_size(c, have, what):
+        if have and have != [c["w"], c["h"]]:
+            raise SystemExit("%s sprites differ in size: update mastery_art()" % what)
+        return [c["w"], c["h"]]
+
+    for rec in out_nodes:
+        if rec[3] != MASTERY:
+            continue
+        n = tree["nodes"][str(rec[0])]
+        ci = sheets["inactive"]["coords"].get(n.get("inactiveIcon"))
+        ca = sheets["active"]["coords"].get(n.get("activeIcon"))
+        ce = effect["coords"].get(n.get("activeEffectImage"))
+        if not (ci and ca and ce):
+            continue  # drawn as a plain ring
+        size = one_size(ci, size, "mastery icon")
+        size = one_size(ca, size, "mastery icon")
+        esize = one_size(ce, esize, "mastery pattern")
+        key = (ci["x"], ci["y"], ca["x"], ca["y"], ce["x"], ce["y"])
+        if key not in index:
+            index[key] = len(art)
+            art.append(list(key))
+        flat.extend([rec[0], index[key]])
+    if not art:
+        return None
+    out = {"zoom": float(MASTERY_ZOOM), "size": size}
+    out.update({name: s["filename"] for name, s in sheets.items()})
+    out.update({"effect": {"url": effect["filename"], "zoom": float(MASTERY_EFFECT_ZOOM), "size": esize},
+                "art": art, "nodes": flat})
+    return out
 
 
 def bg_sheet(tree, kind, zoom):
@@ -275,6 +345,7 @@ def build(tree):
     return {
         "tree": tree.get("tree", ""), "orbitRadii": tree["constants"]["orbitRadii"],
         "icons": icons(tree, out_nodes),
+        "masteryArt": mastery_art(tree, out_nodes),
         "background": background(tree, bg_groups, bg_starts, inactive="PSStartNodeBackgroundInactive"),
         "bounds": bounds, "nodes": out_nodes, "edges": edges, "arcs": arcs,
         "ascendancies": asc_list, "classes": classes, "masteryEffects": effects,

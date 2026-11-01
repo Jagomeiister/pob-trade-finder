@@ -2483,6 +2483,7 @@ out.spriteState = TREE_SPRITES.state;
 out.artCalls = H.calls('cache_art').slice(nCalls).map(c => JSON.parse(c.args[0]));
 treeDraw(cv);
 out.iconsZoomed = cv.iconsDrawn;
+out.masteryNoSheets = [!!TREE_SPRITES.mastery, cv.masteryDrawn]; // mastery sheets missing: plain rings
 const px = cv.ctx.getImageData(Math.round(cv.w / 2 * cv.dpr), Math.round(cv.h / 2 * cv.dpr), 1, 1).data;
 out.centrePixel = [px[0], px[1], px[2]];
 const t0 = performance.now();
@@ -2522,6 +2523,63 @@ out.insetBg = T.inset ? T.inset.bgDrawn : 'no inset';
 cv.cx = notable.x; cv.cy = notable.y; cv.s = 0.5; treeDraw(cv);
 out.bgZoomed = cv.bgDrawn;
 out.centreOverBg = pixel(cv.w / 2, cv.h / 2); // the allocated notable's icon still on top
+delete window.__stubOverrides.cache_art;
+// mastery art: locked (red), connected (blue) and chosen (green) sheets plus the pattern (yellow),
+// flat colours sized to cover every sprite in the data
+const MA = D.masteryArt, mErrs = [];
+const ext = (ks, sz) => [Math.max(...MA.art.flatMap(a => ks.map(k => a[k]))) + sz[0], Math.max(...MA.art.flatMap(a => ks.map(k => a[k + 1]))) + sz[1]];
+const mArt = {}, iw = ext([0, 2], MA.size), ew = ext([4], MA.effect.size);
+mArt[MA.inactive] = sized(iw[0], iw[1], 'rgb(220,30,30)');
+mArt[MA.connected] = sized(iw[0], iw[1], 'rgb(30,30,220)');
+mArt[MA.active] = sized(iw[0], iw[1], 'rgb(30,220,30)');
+mArt[MA.effect.url] = sized(ew[0], ew[1], 'rgb(230,230,20)');
+window.__stubOverrides.cache_art = { ok: true, art: mArt };
+const nM = H.calls('cache_art').length;
+TREE_SPRITES = null;
+const mDraw = () => { try { treeDraw(cv); } catch (e) { mErrs.push(String(e && e.stack || e)); } };
+const linked = n => (T.I.mnotes[n.id] || []).some(id => T.M.alloc[id]);
+const chosenM = cv.masteries.find(n => T.M.mastery[n.id] === build.tree.masteries[0][1]);
+const connM = cv.masteries.find(n => !T.M.mastery[n.id] && linked(n));
+const lockedM = cv.masteries.find(n => !T.M.mastery[n.id] && !linked(n));
+out.mStates = [chosenM, connM, lockedM].map(n => n ? treeMasteryState(T, n) : null);
+cv.cx = chosenM.x; cv.cy = chosenM.y; cv.s = 0.5; mDraw();
+await H.waitFor(() => TREE_SPRITES && TREE_SPRITES.state !== 'loading', 5000, 'mastery sheets');
+out.mSprites = [TREE_SPRITES.state, !!TREE_SPRITES.mastery, !!(TREE_SPRITES.mastery && TREE_SPRITES.mastery.effect)];
+out.mCalls = H.calls('cache_art').slice(nM).map(c => JSON.parse(c.args[0]));
+out.mCentre = {}; out.mDrawn = {};
+[['chosen', chosenM], ['connected', connM], ['locked', lockedM]].forEach(([k, n]) => {
+  cv.cx = n.x; cv.cy = n.y; cv.s = 0.5; mDraw();
+  out.mCentre[k] = pixel(cv.w / 2, cv.h / 2);
+  out.mDrawn[k] = Object.assign({}, cv.masteryDrawn);
+});
+// the pattern: behind the chosen mastery's group, past its icon (diagonal, between the orbits)
+cv.cx = chosenM.x; cv.cy = chosenM.y; cv.s = 0.5; mDraw();
+const off = 70; // px: outside the 56 px half icon, inside the 193 px half pattern
+out.mPattern = pixel(cv.w / 2 + off, cv.h / 2 + off);
+const fx = TREE_SPRITES.mastery.effect;
+TREE_SPRITES.mastery.effect = null; mDraw();
+out.mNoPattern = pixel(cv.w / 2 + off, cv.h / 2 + off);
+TREE_SPRITES.mastery.effect = fx;
+// compare colours stay as rings on top: the build's first mastery has another effect on the character
+T.mode = 'compare'; mDraw();
+const tc = document.createElement('canvas').getContext('2d'); tc.fillStyle = treeColors().take;
+const take = [1, 3, 5].map(i => parseInt(tc.fillStyle.slice(i, i + 2), 16));
+const ringPx = Math.max(treeNodeRadius(chosenM, cv.s), MA.size[0] / MA.zoom * cv.s * 0.42) + 4;
+out.mChangeRing = 0;
+for (let k = 0; k < 72; k++) {
+  const p = pixel(cv.w / 2 + ringPx * Math.cos(k * Math.PI / 36), cv.h / 2 + ringPx * Math.sin(k * Math.PI / 36));
+  if (p.every((v, i) => Math.abs(v - take[i]) < 40)) out.mChangeRing++;
+}
+T.mode = 'build';
+// a zoomed-in redraw with many masteries on screen stays fast; zoomed out to fit, no mastery art
+cv.s = 0.25; mDraw();
+out.mMany = Object.assign({}, cv.masteryDrawn);
+const t2 = performance.now();
+for (let i = 0; i < 10; i++) mDraw();
+out.mMs = (performance.now() - t2) / 10;
+H.button(sec.querySelector('.tv-zoom'), 'Fit').click();
+out.mFit = Object.assign({}, cv.masteryDrawn);
+out.mErrs = mErrs;
 delete window.__stubOverrides.cache_art;
 return out;
 """
@@ -2580,11 +2638,15 @@ def scenario_tree(s, tag):
           r["notableIcon"] == ic["at"][2 * k:2 * k + 2], (r["notableIcon"], ic["at"][2 * k:2 * k + 2]))
     check(tag + " icons: no sheets in the art cache -> plain dots, nothing drawn", r["iconFallback"] == ["failed", 0],
           r["iconFallback"])
-    check(tag + " icons: sheets fetched through cache_art (active + inactive, one call)",
-          r["spriteState"] == "ready" and r["artCalls"] == [[ic["active"], ic["inactive"]]], (r["spriteState"], r["artCalls"]))
+    ma = tv["masteryArt"]
+    m_urls = [ma["inactive"], ma["connected"], ma["active"], ma["effect"]["url"]]
+    check(tag + " icons: sheets fetched through cache_art (active + inactive + the 4 mastery sheets, one call)",
+          r["spriteState"] == "ready" and r["artCalls"] == [[ic["active"], ic["inactive"]] + m_urls], (r["spriteState"], r["artCalls"]))
     px = r["centrePixel"]
     check(tag + " icons: zoomed in, allocated notable drawn from the active sheet", r["iconsZoomed"] > 10 and
           px[1] > 150 and px[0] < 80 and px[2] < 90, (r["iconsZoomed"], px))
+    check(tag + " masteries: no mastery sheets in the art cache -> icons still drawn, masteries keep plain rings",
+          r["masteryNoSheets"] == [False, {"locked": 0, "connected": 0, "chosen": 0, "effects": 0}], r["masteryNoSheets"])
     check(tag + " icons: none when zoomed out to fit", r["iconsFit"] == 0, r["iconsFit"])
     check(tag + " icons: a zoomed-in redraw stays fast (< 30 ms)", r["drawMs"] < 30, r["drawMs"])
     bg = tv["background"]
@@ -2607,6 +2669,30 @@ def scenario_tree(s, tag):
           zb.get("tile") and c[1] > 150 and c[0] < 80 and c[2] < 90, (zb, c))
     check(tag + " backdrop: a fitted redraw stays fast (< 40 ms, < plain + 15 ms)",
           r["bgMs"][1] < 40 and r["bgMs"][1] < r["bgMs"][0] + 15, r["bgMs"])
+    check(tag + " masteries: test picks a chosen, a connected and a locked one", r["mStates"] == ["chosen", "connected", "locked"],
+          r["mStates"])
+    check(tag + " masteries: the 4 sheets fetched through cache_art (one call), cut once, pattern included",
+          r["mSprites"] == ["ready", True, True] and r["mCalls"] == [m_urls], (r["mSprites"], r["mCalls"]))
+    mc, md = r["mCentre"], r["mDrawn"]
+    check(tag + " masteries: chosen drawn from the active-selected sheet", md["chosen"]["chosen"] >= 1 and
+          mc["chosen"][1] > 150 and mc["chosen"][0] < 90 and mc["chosen"][2] < 90, (md["chosen"], mc["chosen"]))
+    check(tag + " masteries: connected drawn from the connected sheet", md["connected"]["connected"] >= 1 and
+          mc["connected"][2] > 150 and mc["connected"][0] < 90 and mc["connected"][1] < 90, (md["connected"], mc["connected"]))
+    lk = mc["locked"]
+    check(tag + " masteries: locked drawn from the inactive sheet, dimmed", md["locked"]["locked"] >= 1 and
+          lk[0] > 100 and lk[0] < 215 and lk[0] > lk[1] + 50 and lk[0] > lk[2] + 50, (md["locked"], lk))
+    pp, np_ = r["mPattern"], r["mNoPattern"]
+    check(tag + " masteries: the chosen one's pattern drawn large behind its group (past its icon)",
+          md["chosen"]["effects"] >= 1 and pp != np_ and pp[0] > 150 and pp[1] > 150 and pp[2] < 120, (pp, np_))
+    check(tag + " masteries: 'effect to change' ring (compare colour) drawn round the chosen icon", r["mChangeRing"] >= 4,
+          r["mChangeRing"])
+    many = r["mMany"]
+    check(tag + " masteries: zoomed in on a wide area, all three states drawn", many["chosen"] >= 1 and many["connected"] >= 1 and
+          many["locked"] >= 3, many)
+    check(tag + " masteries: no mastery art zoomed out to fit", r["mFit"] == {"locked": 0, "connected": 0, "chosen": 0, "effects": 0},
+          r["mFit"])
+    check(tag + " masteries: no exceptions while drawing", not r["mErrs"], r["mErrs"][:2])
+    check(tag + " masteries: a zoomed-in redraw with mastery art stays fast (< 40 ms)", r["mMs"] < 40, r["mMs"])
 
 
 S28_STAGES = r"""

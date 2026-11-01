@@ -105,6 +105,48 @@ odd = [n[0] for i, n in enumerate(TV["nodes"]) if n[3] > 2 and at[2 * i] != -1]
 check("icons: masteries, sockets and starts have none (-1)", not odd, odd[:5])
 check("icons: coords are non-negative integers", all(isinstance(v, int) and (v >= 0 or v == -1) for v in at))
 
+# mastery art: locked / connected / chosen icon sheets and the pattern behind a chosen one
+ma = TV.get("masteryArt") or {}
+m_urls = [ma.get("inactive"), ma.get("connected"), ma.get("active"), (ma.get("effect") or {}).get("url")]
+check("mastery art: 3 icon sheets + the pattern sheet, all distinct, on GGG's CDN",
+      all(str(u).startswith("https://web.poecdn.com/image/passive-skill/") for u in m_urls) and len(set(m_urls)) == 4, m_urls)
+check("mastery art: one icon size and one pattern size, the pattern from a smaller zoom",
+      ma["size"][0] > 50 and ma["size"][0] == ma["size"][1] and len(ma["effect"]["size"]) == 2 and
+      ma["effect"]["size"][0] > ma["size"][0] and 0 < ma["effect"]["zoom"] < ma["zoom"],
+      (ma.get("size"), ma.get("effect")))
+m_art = ma.get("art") or []
+check("mastery art: distinct art entries [ix, iy, ax, ay, ex, ey] of non-negative ints",
+      m_art and all(len(a) == 6 and all(isinstance(v, int) and v >= 0 for v in a) for a in m_art) and
+      len({tuple(a) for a in m_art}) == len(m_art), m_art[:2])
+m_nodes = dict(zip(ma["nodes"][0::2], ma["nodes"][1::2]))
+masteries = [n[0] for n in TV["nodes"] if n[3] == 3]
+check("mastery art: every mastery node (and only those) points at an art entry",
+      len(ma["nodes"]) == 2 * len(m_nodes) and sorted(m_nodes) == sorted(masteries) and
+      all(0 <= v < len(m_art) for v in m_nodes.values()), (len(m_nodes), len(masteries)))
+# drawn at w / zoom tree units: the pattern spans a mastery group's notables (orbits 2 and 3), the icon fits inside orbit 2
+pat = ma["effect"]["size"][0] / ma["effect"]["zoom"]
+icon = ma["size"][0] / ma["zoom"]
+check("mastery art: pattern %.0f units across (past orbit 3), icon %.0f (inside orbit 2)" % (pat, icon),
+      2 * TV["orbitRadii"][3] < pat < 2 * TV["orbitRadii"][4] and icon < 2 * TV["orbitRadii"][2], (pat, icon))
+check("mastery art: small (< 8 KB of the file)", len(json.dumps(ma, separators=(",", ":"))) < 8 * 1024,
+      len(json.dumps(ma, separators=(",", ":"))))
+# every sheet the tree view fetches fits the art cache (art_cache.MAX_BYTES); checked on the copies
+# already downloaded into data/art_cache (skipped for the ones that aren't)
+import art_cache  # noqa: E402
+
+try:
+    cached = json.load(open(os.path.join(ROOT, "data", "art_cache", "index.json"), encoding="utf-8"))
+except (OSError, ValueError):
+    cached = {}
+sheets = m_urls + [TV["icons"]["active"], TV["icons"]["inactive"], TV["background"]["tile"]["url"], TV["background"]["sheet"]["url"]]
+sized = {u: os.path.getsize(os.path.join(ROOT, "data", "art_cache", cached[u])) for u in sheets
+         if u in cached and os.path.exists(os.path.join(ROOT, "data", "art_cache", cached[u]))}
+if sized:
+    check("sheets in the art cache are all under art_cache.MAX_BYTES (%d of %d checked)" % (len(sized), len(sheets)),
+          all(v <= art_cache.MAX_BYTES for v in sized.values()), sized)
+else:
+    print("SKIP sheet sizes (none in data/art_cache yet)")
+
 # the in-game backdrop: tile, group circles, class start art (make_treeview.background())
 bg = TV.get("background") or {}
 art = bg.get("art") or []
@@ -153,6 +195,27 @@ if os.path.exists(tree_path):
     check("backdrop: the sheet URL and pieces match the export (group + start sprites, one sheet)",
           gs["filename"] == bg["sheet"]["url"] and all(a[1] + a[3] <= gs["w"] and a[2] + a[4] <= gs["h"] for a in art),
           gs["filename"])
+    sp = tree["sprites"]
+
+    def zsheet(kind, zoom):
+        return next(v for z, v in sp[kind].items() if float(z) == zoom)
+
+    msh = {k: zsheet(kind, ma["zoom"]) for k, kind in (("inactive", "masteryInactive"), ("connected", "masteryConnected"),
+                                                        ("active", "masteryActiveSelected"))}
+    esh = zsheet("masteryActiveEffect", ma["effect"]["zoom"])
+    check("mastery art: sheet URLs match the export at their zoom levels",
+          all(msh[k]["filename"] == ma[k] for k in msh) and esh["filename"] == ma["effect"]["url"])
+    wrong = []
+    for nid, k in m_nodes.items():
+        n, a = tree["nodes"][str(nid)], m_art[k]
+        ci, ca, ce = msh["inactive"]["coords"][n["inactiveIcon"]], msh["active"]["coords"][n["activeIcon"]], \
+            esh["coords"][n["activeEffectImage"]]
+        if [ci["x"], ci["y"], ca["x"], ca["y"], ce["x"], ce["y"]] != a or msh["connected"]["coords"][n["inactiveIcon"]] != ci:
+            wrong.append(nid)
+    check("mastery art: each mastery's coords are its inactiveIcon / activeIcon / activeEffectImage sprites", not wrong, wrong[:5])
+    outside = [a for a in m_art if a[0] + ma["size"][0] > msh["inactive"]["w"] or a[2] + ma["size"][0] > msh["active"]["w"] or
+               a[4] + ma["effect"]["size"][0] > esh["w"] or a[5] + ma["effect"]["size"][1] > esh["h"]]
+    check("mastery art: every sprite lies inside its sheet", not outside, outside[:3])
     main_groups = {str(n.get("group")) for n in tree["nodes"].values() if not n.get("ascendancyName") and not n.get("isProxy")}
     want = sorted((round(g["x"]), round(g["y"])) for gid, g in tree["groups"].items()
                   if g.get("background") and not g.get("isProxy") and gid in main_groups)

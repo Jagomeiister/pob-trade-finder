@@ -10,4 +10,5 @@
   link with Atlas links in its notes, or a list of node names. See your path on the tree with the
   in-game icons and background, search it, and save it as a strategy with notes. Link a strategy
   to each saved build; the build's card shows it, and the strategy shows which builds use it.
-- **Skill tree**: the in-game background behind the tree.
+- **Skill tree**: the in-game background behind the tree, and masteries drawn like in game: grey when
+  locked, lit when a notable next to them is taken, glowing with their pattern when chosen.

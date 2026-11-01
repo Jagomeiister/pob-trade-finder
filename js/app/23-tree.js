@@ -9,7 +9,8 @@
 // so this file only draws. Node kinds: 0 small, 1 notable, 2 keystone, 3 mastery,
 // 4 jewel socket, 5 class start, 6 ascendancy start.
 var TREE_KIND_LABEL = ['Passive', 'Notable', 'Keystone', 'Mastery', 'Jewel socket', 'Class start', 'Ascendancy start'];
-var TREE_R = [26, 40, 56, 34, 38, 80, 30];            // node radius in tree units
+// (a mastery: its glyph's radius in the game's art, about 46 of its 226 units)
+var TREE_R = [26, 40, 56, 46, 38, 80, 30];            // node radius in tree units
 var TREE_MIN_PX = [1.6, 2.6, 3.6, 2.2, 3.2, 5, 2.4];  // and never smaller than this on screen
 var TREE_MAX_SCALE = 2.5;
 var TREE_IDX = null;  // index over POE_TREE_VIEW, built once
@@ -17,13 +18,16 @@ var TREEVIEW = null;  // the current build's view: { b, I, M, cmp, mode, q, hits
 
 function treeIndex() {
   if (TREE_IDX || !window.POE_TREE_VIEW) return TREE_IDX;
-  var D = window.POE_TREE_VIEW, byId = {}, adj = {}, mlink = {}, lines = [], arcs = [], i;
+  var D = window.POE_TREE_VIEW, byId = {}, adj = {}, mlink = {}, mnotes = {}, lines = [], arcs = [], i;
   var at = D.icons ? D.icons.at : [];
   D.nodes.forEach(function (r, k) {
     byId[r[0]] = { id: r[0], x: r[1], y: r[2], kind: r[3], name: r[4], stats: r[5] || '',
                    asc: r.length > 6 ? r[6] : -1, flags: r[7] || 0,
-                   icon: at[2 * k] >= 0 ? [at[2 * k], at[2 * k + 1]] : null }; // x, y in the icon sheets
+                   icon: at[2 * k] >= 0 ? [at[2 * k], at[2 * k + 1]] : null, // x, y in the icon sheets
+                   mart: -1 };                                               // masteries: D.masteryArt.art index
   });
+  var ma = D.masteryArt ? D.masteryArt.nodes : [];
+  for (i = 0; i < ma.length; i += 2) if (byId[ma[i]]) byId[ma[i]].mart = ma[i + 1];
   function link(a, b) { (adj[a] = adj[a] || []).push(b); (adj[b] = adj[b] || []).push(a); }
   for (i = 0; i < D.edges.length; i += 2) {
     var a = byId[D.edges[i]], b = byId[D.edges[i + 1]];
@@ -45,6 +49,7 @@ function treeIndex() {
   // a mastery is reached from its notables but is never a way through
   for (i = 0; i < D.masteryLinks.length; i += 2) {
     (mlink[D.masteryLinks[i + 1]] = mlink[D.masteryLinks[i + 1]] || []).push(D.masteryLinks[i]);
+    (mnotes[D.masteryLinks[i]] = mnotes[D.masteryLinks[i]] || []).push(D.masteryLinks[i + 1]); // its notables
   }
   var ascBounds = D.ascendancies.map(function () { return null; });
   D.nodes.forEach(function (r) {
@@ -54,7 +59,7 @@ function treeIndex() {
     bb[0] = Math.min(bb[0], r[1]); bb[1] = Math.min(bb[1], r[2]);
     bb[2] = Math.max(bb[2], r[1]); bb[3] = Math.max(bb[3], r[2]);
   });
-  TREE_IDX = { D: D, byId: byId, adj: adj, mlink: mlink, lines: lines, arcs: arcs, ascBounds: ascBounds };
+  TREE_IDX = { D: D, byId: byId, adj: adj, mlink: mlink, mnotes: mnotes, lines: lines, arcs: arcs, ascBounds: ascBounds };
   return TREE_IDX;
 }
 
@@ -202,6 +207,7 @@ function treeCanvas(canvas, nodes, bounds, opts) {
     el: canvas, ctx: canvas.getContext('2d'), nodes: nodes, opts: opts || {},
     lines: I.lines.filter(function (l) { return set[l.a.id] && set[l.b.id]; }),
     arcs: I.arcs.filter(function (l) { return set[l.a.id] && set[l.b.id]; }),
+    masteries: nodes.filter(function (n) { return n.kind === 3 && n.mart >= 0; }), // with art
     bounds: bounds, w: 0, h: 0, dpr: 1, s: 0.05, cx: 0, cy: 0, fitted: false, minS: 0.01
   };
 }
@@ -261,33 +267,59 @@ function treeShape(ctx, kind, x, y, r) {
 // plain dots. The backdrop under them (tile, group circles, start art) is loaded the same way:
 // see treeBgLoad below.
 var TREE_ICON_MIN_PX = 7; // a node shows its icon once its radius on screen is at least this
-var TREE_SPRITES = null;  // { state: 'loading' | 'ready' | 'failed', active, inactive: canvases }
+// { state: 'loading' | 'ready' | 'failed', active, inactive: canvases,
+//   mastery: { inactive, connected, active, effect (or null): canvases } or null }
+var TREE_SPRITES = null;
 
+// The mastery sheets (D.masteryArt) come in the same cache_art call as the icon sheets but are
+// optional: without them masteries keep their plain rings and the icons still show.
 function treeSprites() {
   if (TREE_SPRITES) return TREE_SPRITES.state === 'ready' ? TREE_SPRITES : null;
   var I = treeIndex(), ic = I && I.D.icons, api = isGui() && window.pywebview.api;
   if (!ic || !api || !api.cache_art) { TREE_SPRITES = { state: 'failed' }; return null; }
-  var S = TREE_SPRITES = { state: 'loading' }, urls = [ic.active, ic.inactive];
-  function cached() { return urls.every(function (u) { return ART[u]; }); }
-  (cached() ? Promise.resolve() : api.cache_art(JSON.stringify(urls)).then(function (r) {
+  var S = TREE_SPRITES = { state: 'loading' }, urls = [ic.active, ic.inactive], ma = I.D.masteryArt;
+  var all = urls.concat(ma ? [ma.inactive, ma.connected, ma.active, ma.effect.url] : []);
+  var need = all.filter(function (u) { return !ART[u]; });
+  (need.length ? api.cache_art(JSON.stringify(need)).then(function (r) {
     if (r && r.ok) Object.keys(r.art || {}).forEach(function (u) { ART[u] = r.art[u]; });
-  })).then(function () {
-    if (!cached()) throw new Error('icon sheets not cached');
-    return Promise.all(urls.map(function (u) {
+  }) : Promise.resolve()).then(function () {
+    if (!urls.every(function (u) { return ART[u]; })) throw new Error('icon sheets not cached');
+    return Promise.all(all.map(function (u, k) {
       return new Promise(function (ok, fail) {
+        if (!ART[u]) { ok(null); return; }
         var img = new Image();
         img.onload = function () { ok(img); };
-        img.onerror = fail;
+        img.onerror = k < 2 ? fail : function () { ok(null); }; // a broken mastery sheet: no mastery art
         img.src = ART[u];
       });
     }));
   }).then(function (imgs) {
     S.active = treeCutIcons(I, imgs[0]);
     S.inactive = treeCutIcons(I, imgs[1]);
+    S.mastery = imgs[2] && imgs[3] && imgs[4] ? { inactive: treeSheetCanvas(imgs[2]), connected: treeSheetCanvas(imgs[3]),
+      active: treeSheetCanvas(imgs[4]), effect: imgs[5] ? treeSheetCanvas(imgs[5]) : null } : null;
     S.state = 'ready';
     treeRedraw();
   }).catch(function () { S.state = 'failed'; });
   return null;
+}
+
+// a transparent sheet (the mastery ones) copied once to a canvas: decoded for good, drawn as is
+function treeSheetCanvas(img) {
+  var c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  return c;
+}
+
+// a mastery as the game shows it: 'chosen' (the build picks an effect), 'connected' (a notable of
+// its group is allocated) or 'locked'
+function treeMasteryState(T, n) {
+  if (T.M.mastery[n.id]) return 'chosen';
+  var l = T.I.mnotes[n.id] || [];
+  for (var i = 0; i < l.length; i++) if (T.M.alloc[l[i]]) return 'connected';
+  return 'locked';
 }
 
 function treeCutIcons(I, img) {
@@ -475,6 +507,27 @@ function treeDraw(cv) {
     } });
   }
 
+  // zoomed in far enough, nodes show the game's art (sheets loaded on first need)
+  var sprites = TREE_R[2] * s >= TREE_ICON_MIN_PX ? treeSprites() : null;
+  var MS = sprites && sprites.mastery, MA = MS && T.I.D.masteryArt;
+  var mArt = cv.masteryDrawn = { locked: 0, connected: 0, chosen: 0, effects: 0 };
+  // a chosen mastery's pattern, large behind its group: over the backdrop, under the links
+  if (MS && MS.effect && TREE_R[3] * s >= TREE_ICON_MIN_PX) {
+    var es = MA.effect.size, ew = es[0] / MA.effect.zoom * s, eh = es[1] / MA.effect.zoom * s;
+    // the art is dark smoke round a bright core: on light themes fade it as much as the backdrop
+    var dim = treeBgDim(ctx, C.bg);
+    ctx.globalAlpha = dim > 0.5 ? 1 - dim : 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'medium';
+    cv.masteries.forEach(function (n) {
+      if (!T.M.mastery[n.id]) return;
+      var x = n.x * s + ox, y = n.y * s + oy, a = MA.art[n.mart];
+      if (x + ew / 2 < 0 || y + eh / 2 < 0 || x - ew / 2 > w || y - eh / 2 > h) return;
+      ctx.drawImage(MS.effect, a[4], a[5], es[0], es[1], x - ew / 2, y - eh / 2, ew, eh);
+      mArt.effects++;
+    });
+  }
+
   // links: one path per colour
   var cats = { dim: [], alloc: [], take: [], refund: [] };
   cv.lines.forEach(function (l) { cats[treeEdgeCat(l.a.id, l.b.id)].push(l); });
@@ -494,10 +547,11 @@ function treeDraw(cv) {
     ctx.stroke();
   });
 
-  // nodes: zoomed in far enough, small nodes, notables and keystones show their icon
-  var onScreen = [];
-  var sprites = TREE_R[2] * s >= TREE_ICON_MIN_PX ? treeSprites() : null;
+  // nodes: zoomed in far enough, small nodes, notables and keystones show their icon, masteries
+  // their locked / connected / chosen art
+  var onScreen = [], ringR = {};
   var iconSize = sprites && T.I.D.icons.size;
+  var mw = MA ? MA.size[0] / MA.zoom * s : 0, mh = MA ? MA.size[1] / MA.zoom * s : 0;
   cv.iconsDrawn = 0;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -506,6 +560,24 @@ function treeDraw(cv) {
     if (x < -r - 60 || y < -r - 60 || x > w + r + 60 || y > h + r + 60) return;
     onScreen.push(n);
     var st = treeStatus(n.id), col = st ? C[st] : C.dim;
+    if (MS && n.mart >= 0 && r >= TREE_ICON_MIN_PX) {
+      var ms = treeMasteryState(T, n), a = MA.art[n.mart], chosen = ms === 'chosen';
+      ctx.globalAlpha = ms === 'locked' ? 0.65 : 1;
+      ctx.drawImage(chosen ? MS.active : ms === 'connected' ? MS.connected : MS.inactive,
+        chosen ? a[2] : a[0], chosen ? a[3] : a[1], MA.size[0], MA.size[1], x - mw / 2, y - mh / 2, mw, mh);
+      mArt[ms]++;
+      // the chosen icon is a disc (about 0.42 of the sprite across): rings go round it
+      if (chosen) ringR[n.id] = Math.max(r, mw * 0.42);
+      if (st === 'take' || st === 'refund') { // the compare colours, as a ring on top
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, ringR[n.id] || r, 0, 2 * Math.PI);
+        ctx.lineWidth = Math.max(1.5, r * 0.16);
+        ctx.strokeStyle = col;
+        ctx.stroke();
+      }
+      return;
+    }
     if (sprites && n.icon && r >= TREE_ICON_MIN_PX) {
       var sz = iconSize[n.kind];
       ctx.globalAlpha = st ? 1 : 0.8;
@@ -549,22 +621,27 @@ function treeDraw(cv) {
     }
   });
 
-  // rings: search hits, next steps, the hovered / just-centred node
+  // rings: search hits, next steps, mastery effects to change (dashed), the hovered / just-centred node
   ctx.globalAlpha = 1;
+  var change = {};
+  if (T.mode === 'compare' && T.cmp) T.cmp.masteryChanges.forEach(function (m) { change[m.node] = true; });
   onScreen.forEach(function (n) {
-    var ring = null, width = 2;
+    var ring = null, width = 2, dash = false;
     if (T.flash === n.id) { ring = C.text; width = 3; }
     else if (T.hover && T.hover.n === n && T.hover.cv === cv) ring = C.text;
     else if (T.hits && T.hits[n.id]) ring = C.hit;
     else if (T.mode === 'compare' && T.cmp && T.cmp.steps[n.id] === 1) ring = C.take;
     else if (T.mode === 'compare' && T.cmp && T.cmp.refundSet[n.id]) ring = C.refund;
+    else if (change[n.id]) { ring = C.take; dash = true; }
     if (!ring) return;
-    var x = n.x * s + ox, y = n.y * s + oy, r = treeNodeRadius(n, s);
+    var x = n.x * s + ox, y = n.y * s + oy, r = ringR[n.id] || treeNodeRadius(n, s);
     ctx.beginPath();
     ctx.arc(x, y, r + (T.flash === n.id ? 9 : 4), 0, 2 * Math.PI);
     ctx.lineWidth = width;
     ctx.strokeStyle = ring;
+    if (dash) ctx.setLineDash([5, 4]);
     ctx.stroke();
+    if (dash) ctx.setLineDash([]);
   });
 
   // labels (12px: the app's smallest text size)
@@ -773,7 +850,7 @@ function treeSetInset(k) {
   var nodes = I.D.nodes.filter(function (r) { return (r.length > 6 ? r[6] : -1) === k; })
     .map(function (r) { return I.byId[r[0]]; });
   var fresh = treeCanvas(T.insetEl, nodes, I.ascBounds[k], { inset: true });
-  ['nodes', 'lines', 'arcs', 'bounds'].forEach(function (f) { T.inset[f] = fresh[f]; });
+  ['nodes', 'lines', 'arcs', 'masteries', 'bounds'].forEach(function (f) { T.inset[f] = fresh[f]; });
   T.inset.fitted = false;
   T.insetTitle.textContent = I.D.ascendancies[k].name + (I.D.ascendancies[k].bloodline ? ' (bloodline)' : '');
   if (treeResize(T.inset)) treeDraw(T.inset);
