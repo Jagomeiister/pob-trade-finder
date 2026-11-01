@@ -384,6 +384,21 @@ single `league` parameter are accepted, so nobody can bypass the cache to fan re
 Other. Tests: `cd server && npm install && npm test`. It must never proxy trade searches: GGG's
 limits are per IP, so those stay on each user's PC.
 
+`GET /api/divcards` (no parameters) returns every divination card with its drop areas
+(names, level, map flag) and stack size. It reads the community wiki's Cargo tables
+(`items` + `stackables`, then `areas` in chunks; area ids are validated before going into a
+query). Results are cached 12 h in the Runtime Cache and on the CDN, with a 502 when fewer
+than 100 cards come back. Credit: Path of Exile Wiki, CC BY-NC-SA 3.0.
+
+The app's `Api.div_cards(league)` keeps it 6 h in memory, plus a disk copy
+(`data/divcards_cache.json`) for offline use. It joins prices from GGG's exchange feed by
+card name (`currencymap.json`, cat "Cards"). Tests: `server/test/divcards.test.mjs`,
+`test/test_divcards.py`.
+
+A dust (disenchant) tool isn't built: no reachable source has per-unique dust values. The
+wiki only gives the rules (each 1% quality = +2%; each corruption implicit or influence =
++50%).
+
 ## Styling
 
 CSS lives in `css/` (loaded cache-busted from `index.html`): `tokens.css` (all colours,

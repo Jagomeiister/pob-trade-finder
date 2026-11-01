@@ -53,6 +53,7 @@ SHIP = [
     "js/app/19-trades.js",
     "js/app/20-unique-jewels.js",
     "js/app/21-search-text.js",
+    "js/app/22-divcards.js",
     "data/stats.js",
     "data/leagues.js",
     "data/ranges.js",

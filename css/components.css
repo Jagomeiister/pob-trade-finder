@@ -546,6 +546,11 @@ body.cb-sockets .sock-A::after { content: 'A'; }
 body.gui .settings-section.gui-only { display: flex; }
 .settings-section .char-sessid { border-top: 0; padding-top: 0; }
 .finder-step + .finder-step { margin-top: 12px; }
+/* Div cards (js/app/22-divcards.js) */
+.dc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.dc-body { display: flex; flex-direction: column; gap: 12px; }
+.dc-body .data-table { width: 100%; }
+.dc-list { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); }
 /* Search text builder (js/app/21-search-text.js) */
 .st > .segmented { align-self: flex-start; }
 .st-body { display: flex; flex-direction: column; gap: 6px; }

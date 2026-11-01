@@ -50,6 +50,10 @@ TRADE_BASE = "https://www.pathofexile.com/api/trade"
 # the app's backend (server/): poe.ninja prices proxied and cached, as poe.ninja asks of desktop apps
 PRICES_API = "https://pob-trade-finder.vercel.app/api/prices"
 PRICES_TTL = 1800
+# where div cards drop (the backend reads the community wiki twice a day); prices come
+# from GGG's currency exchange feed
+DIVCARDS_API = "https://pob-trade-finder.vercel.app/api/divcards"
+DIVCARDS_TTL = 6 * 3600
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
 MIN_INTERVAL = 2.5
@@ -772,6 +776,52 @@ class Api:
             data = json.loads(r.read().decode("utf-8"))
         cache[league] = (time.time(), data)
         return data
+
+    def _divcard_drops(self):
+        """Drop data from the backend: memory for DIVCARDS_TTL, a disk copy for offline use."""
+        hit = getattr(self, "_divcards_cache", None)
+        if hit and time.time() - hit[0] < DIVCARDS_TTL:
+            return hit[1]
+        disk = os.path.join(DATA_DIR, "divcards_cache.json")
+        try:
+            req = urllib.request.Request(DIVCARDS_API, headers={"User-Agent": UA, "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=40) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            try:
+                with open(disk, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+            except OSError:
+                pass
+        except Exception:
+            with open(disk, "r", encoding="utf-8") as f:  # offline: last good copy (raises if none)
+                data = json.load(f)
+            data["stale"] = True
+        self._divcards_cache = (time.time(), data)
+        return data
+
+    def div_cards(self, league):
+        """Div cards tool: every card with where it drops (wiki, via the backend), its stack
+        size and its price each from GGG's hourly exchange feed."""
+        try:
+            data = self._divcard_drops()
+            ids = {m["name"]: (code, m["id"]) for code, m in self._currency_map.items() if m.get("cat") == "Cards"}
+            div_id = (self._currency_map.get("divine") or {}).get("id")
+            want = [v[1] for v in ids.values()] + ([div_id] if div_id else [])
+            rates, hour = self._feed.rates(league, want)
+            cards = []
+            for c in data.get("cards", []):
+                o = dict(c)
+                code_id = ids.get(c.get("n"))
+                if code_id:
+                    o["code"] = code_id[0]
+                    if rates.get(code_id[1]) is not None:
+                        o["c"] = rates[code_id[1]]
+                cards.append(o)
+            return {"ok": True, "source": data.get("source"), "fetchedAt": data.get("fetchedAt"),
+                    "stale": bool(data.get("stale")), "areas": data.get("areas", []), "cards": cards,
+                    "divine": rates.get(div_id) if div_id else None, "priceHour": hour}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     @staticmethod
     def _ninja_match(data, item):

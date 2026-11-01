@@ -519,6 +519,21 @@ to the trade cards. It starts with the Act 1–3 Trials of Ascendancy. Add your 
 or delete them) in **Trade helper → Setup → Zone notes**. This only reads the chat log and
 shows text; it never does anything in the game.
 
+## 5j. 🃏 Div cards
+
+Tools → **Div cards** shows where each divination card drops and what it's worth.
+
+- **By area**: every map (untick **Maps only** for other areas), with how many of its cards
+  are worth at least your minimum, its best card (price each and full set) and the sum of
+  one of each. Click an area for its card list. Drop rates aren't public, so this ranks
+  areas by the cards that *can* drop there; it isn't an expected value per map.
+- **By card**: price each, set size, full set value, where it drops (or "no longer drops")
+  and ↗ to the bulk exchange.
+- Filter by card or area name, and set a minimum value.
+- Prices come from GGG's currency exchange (last hour) for the selected league. Drop areas
+  come from the community Path of Exile Wiki (CC BY-NC-SA), refreshed twice a day through the
+  app's server. They keep working offline from the last copy.
+
 ## 6b. Compare with your character
 
 Click **⚖ Compare with character…** in the sidebar, enter your account name

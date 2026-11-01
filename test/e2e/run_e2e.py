@@ -1977,6 +1977,72 @@ def scenario_habits(s, tag):
     check(tag + " presets don't count as habits", r["afterPreset"] in ("{}", None), r["afterPreset"])
 
 
+S24_DIVCARDS = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+window.__stubOverrides.div_cards = { ok: true, source: 'Path of Exile Wiki', divine: 200, priceHour: 1, areas: [
+    { id: 'MapWorldsBurialChambers', name: 'Burial Chambers', lvl: 75, map: true },
+    { id: 'MapWorldsColdRiver_', name: 'Cold River', lvl: 78, map: true },
+    { id: 'Act3Docks', name: 'The Docks', lvl: 33, map: false }],
+  cards: [
+    { n: 'The Doctor', s: 8, a: [0], c: 1500, code: 'the-doctor' },
+    { n: 'A Chilling Wind', s: 4, a: [1, 0], c: 6, code: 'a-chilling-wind' },
+    { n: 'Rain of Chaos', s: 8, a: [0, 1, 2], c: 0.5, code: 'rain-of-chaos' },
+    { n: 'Act Card', s: 3, a: [2], c: 40, code: 'act-card' },
+    { n: 'Gone', s: 1, off: 1, c: 900 },
+    { n: 'Unpriced', s: 5, a: [1] }] };
+setView('divcards');
+const sec = document.querySelector('.tab-section[data-tab="divcards"]');
+await H.waitFor(() => sec.querySelector('.data-table tbody tr'), 4000, 'table');
+out.visible = sec.getBoundingClientRect().height > 100;
+out.calls = H.calls('div_cards').map(c => c.args[0]);
+const rows = () => [...sec.querySelectorAll('.data-table tbody tr')].map(r => [...r.children].map(td => td.textContent.trim()));
+out.byMap = rows();
+sec.querySelector('.dc-controls input[type=checkbox]').click(); // include non-map areas
+await H.sleep(20);
+out.withActs = rows().map(r => r[0]);
+H.button(sec, 'Burial Chambers ▸').click();
+await H.sleep(20);
+out.openTitle = H.text('.dc-list h3', sec);
+out.openCards = [...sec.querySelectorAll('.dc-list tbody tr')].map(r => r.children[0].textContent);
+sec.querySelector('.segmented [data-value="cards"]').click();
+await H.sleep(20);
+out.byCard = rows().map(r => [r[0], r[1], r[3], r[4]]);
+const n0 = H.calls('open_url').length;
+H.button(sec.querySelector('.data-table'), '↗').click();
+await H.sleep(20);
+out.url = decodeURIComponent((H.calls('open_url')[n0] || { args: [''] }).args[0]);
+const f = sec.querySelector('input[aria-label="Filter cards or areas"]');
+f.value = 'cold'; f.dispatchEvent(new Event('input'));
+await H.sleep(20);
+out.filtered = rows().map(r => r[0]);
+delete window.__stubOverrides.div_cards;
+return out;
+"""
+
+
+def scenario_divcards(s, tag):
+    s.fresh()
+    r = s.run(S24_DIVCARDS, timeout=60)
+    check(tag + " Div cards view visible, loads once for the league", r["visible"] and len(r["calls"]) == 1, r["calls"])
+    bm = r["byMap"]
+    check(tag + " by area: maps only, ranked by best card, cards >= 5c counted", len(bm) == 2 and
+          bm[0][0].startswith("Burial Chambers") and "The Doctor" in bm[0][3] and bm[0][2] == "2 / 3" and
+          bm[1][0].startswith("Cold River") and bm[1][2] == "1 / 2", bm)
+    check(tag + " full set value = price x stack", "12000" in bm[0][4] or "60 div" in bm[0][4], bm[0][4])
+    check(tag + " 'Maps only' off adds other areas", any(x.startswith("The Docks") for x in r["withActs"]), r["withActs"])
+    check(tag + " opening an area lists its cards, best first", "Burial Chambers" in (r["openTitle"] or "") and
+          r["openCards"] == ["The Doctor", "A Chilling Wind"], r["openCards"])
+    bc = r["byCard"]
+    check(tag + " by card: priced >= 5c, no longer dropping marked, best first",
+          [x[0] for x in bc] == ["The Doctor", "Gone", "Act Card", "A Chilling Wind"] and
+          bc[1][3] == "no longer drops" and "Burial Chambers" in bc[0][3], bc)
+    check(tag + " card link opens the bulk exchange", "/trade/exchange/" in r["url"] and '"want":["the-doctor"]' in r["url"],
+          r["url"][:160])
+    check(tag + " filter by area name", r["filtered"] == ["A Chilling Wind"], r["filtered"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -2001,6 +2067,7 @@ SCENARIOS = [
     ("21 uniques", scenario_uniques),
     ("22 search", scenario_search),
     ("23 habits", scenario_habits),
+    ("24 divcards", scenario_divcards),
 ]
 
 
