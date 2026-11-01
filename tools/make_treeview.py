@@ -21,6 +21,8 @@ Output: window.POE_TREE_VIEW = {
   masteries: {mastery node id: [effect ids]}
   masteryLinks: [mastery, node, ...]       the notables next to each mastery (not drawn)
   jewelSlots: [socket node ids]            character-window jewels give x = an index here
+  icons: {zoom, active, inactive, size, at} passive icon sprite sheets (GGG CDN URLs) and each
+                                           node's x, y in them (see icons())
 }
 Run: python tools/make_treeview.py
 """
@@ -77,6 +79,40 @@ def kind_of(n):
 def stat_text(n):
     s = "\n".join(x.replace("\n", " ") for x in (n.get("stats") or []))
     return s if len(s) <= MAX_STATS else s[:MAX_STATS - 1].rstrip() + "…"
+
+
+ICON_SHEETS = {SMALL: "normal", NOTABLE: "notable", KEYSTONE: "keystone"}
+
+
+def icons(tree, out_nodes):
+    """The passive icons of small nodes, notables and keystones (ascendancy ones too), from the
+    largest sprite-sheet zoom level. GGG's sheets hold every icon once; the Active (coloured) and
+    Inactive (greyed) sheets share one layout, so each node needs only its x, y in the sheet and
+    the size comes from its kind. Returns {zoom, active, inactive, size: [[w, h] per kind 0..2],
+    at: [x, y, ...] aligned with nodes, -1, -1 = no icon}."""
+    sprites = tree.get("sprites") or {}
+    sheets = sprites.get("notableActive") or {}
+    if not sheets:
+        return None
+    zoom = max(sheets, key=float)
+    active, inactive = sprites["normalActive"][zoom], sprites["normalInactive"][zoom]
+    if any(sprites[k + s][zoom]["filename"] != (active if s == "Active" else inactive)["filename"]
+           for k in ICON_SHEETS.values() for s in ("Active", "Inactive")):
+        raise SystemExit("passive icon sprites are no longer one sheet per zoom level: update icons()")
+    size, at = [None] * 3, []
+    for rec in out_nodes:
+        n, kind = tree["nodes"][str(rec[0])], rec[3]
+        sheet = ICON_SHEETS.get(kind)
+        c = sheet and n.get("icon") and sprites[sheet + "Active"][zoom]["coords"].get(n["icon"])
+        if not c:
+            at.extend([-1, -1])
+            continue
+        if sprites[sheet + "Inactive"][zoom]["coords"].get(n["icon"]) != c:
+            raise SystemExit("active and inactive icon sheets differ for %s: update icons()" % n["icon"])
+        size[kind] = size[kind] or [c["w"], c["h"]]
+        at.extend([c["x"], c["y"]])
+    return {"zoom": float(zoom), "active": active["filename"], "inactive": inactive["filename"],
+            "size": size, "at": at}
 
 
 def build(tree):
@@ -172,6 +208,7 @@ def build(tree):
 
     return {
         "tree": tree.get("tree", ""), "orbitRadii": tree["constants"]["orbitRadii"],
+        "icons": icons(tree, out_nodes),
         "bounds": bounds, "nodes": out_nodes, "edges": edges, "arcs": arcs,
         "ascendancies": asc_list, "classes": classes, "masteryEffects": effects,
         "masteries": masteries, "masteryLinks": mastery_links,

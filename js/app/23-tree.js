@@ -18,9 +18,11 @@ var TREEVIEW = null;  // the current build's view: { b, I, M, cmp, mode, q, hits
 function treeIndex() {
   if (TREE_IDX || !window.POE_TREE_VIEW) return TREE_IDX;
   var D = window.POE_TREE_VIEW, byId = {}, adj = {}, mlink = {}, lines = [], arcs = [], i;
-  D.nodes.forEach(function (r) {
+  var at = D.icons ? D.icons.at : [];
+  D.nodes.forEach(function (r, k) {
     byId[r[0]] = { id: r[0], x: r[1], y: r[2], kind: r[3], name: r[4], stats: r[5] || '',
-                   asc: r.length > 6 ? r[6] : -1, flags: r[7] || 0 };
+                   asc: r.length > 6 ? r[6] : -1, flags: r[7] || 0,
+                   icon: at[2 * k] >= 0 ? [at[2 * k], at[2 * k + 1]] : null }; // x, y in the icon sheets
   });
   function link(a, b) { (adj[a] = adj[a] || []).push(b); (adj[b] = adj[b] || []).push(a); }
   for (i = 0; i < D.edges.length; i += 2) {
@@ -237,6 +239,73 @@ function treeZoomAt(cv, mx, my, f) {
 
 function treeNodeRadius(n, s) { return Math.max(TREE_MIN_PX[n.kind], TREE_R[n.kind] * s); }
 
+// a node's outline: a hexagon for keystones, a circle for the rest
+function treeShape(ctx, kind, x, y, r) {
+  if (kind === 2) {
+    for (var k = 0; k < 6; k++) {
+      var a = Math.PI / 6 + k * Math.PI / 3;
+      if (k) ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)); else ctx.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
+    }
+    ctx.closePath();
+  } else {
+    ctx.moveTo(x + r, y);
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
+  }
+}
+
+// ---- passive icons ----------------------------------------------------------------------
+// GGG's icon sprite sheets (data/treeview.js icons: one sheet in colour for allocated nodes, one
+// greyed for the rest), loaded once through the art cache (08-cards.js). Each sheet is copied
+// once to a canvas with every icon already cut to its node's shape, so a frame only copies
+// sub-rects: no clipping, no image decoding. Without the bridge (browser) the tree keeps its
+// plain dots.
+var TREE_ICON_MIN_PX = 7; // a node shows its icon once its radius on screen is at least this
+var TREE_SPRITES = null;  // { state: 'loading' | 'ready' | 'failed', active, inactive: canvases }
+
+function treeSprites() {
+  if (TREE_SPRITES) return TREE_SPRITES.state === 'ready' ? TREE_SPRITES : null;
+  var I = treeIndex(), ic = I && I.D.icons, api = isGui() && window.pywebview.api;
+  if (!ic || !api || !api.cache_art) { TREE_SPRITES = { state: 'failed' }; return null; }
+  var S = TREE_SPRITES = { state: 'loading' }, urls = [ic.active, ic.inactive];
+  function cached() { return urls.every(function (u) { return ART[u]; }); }
+  (cached() ? Promise.resolve() : api.cache_art(JSON.stringify(urls)).then(function (r) {
+    if (r && r.ok) Object.keys(r.art || {}).forEach(function (u) { ART[u] = r.art[u]; });
+  })).then(function () {
+    if (!cached()) throw new Error('icon sheets not cached');
+    return Promise.all(urls.map(function (u) {
+      return new Promise(function (ok, fail) {
+        var img = new Image();
+        img.onload = function () { ok(img); };
+        img.onerror = fail;
+        img.src = ART[u];
+      });
+    }));
+  }).then(function (imgs) {
+    S.active = treeCutIcons(I, imgs[0]);
+    S.inactive = treeCutIcons(I, imgs[1]);
+    S.state = 'ready';
+    treeRedraw();
+  }).catch(function () { S.state = 'failed'; });
+  return null;
+}
+
+function treeCutIcons(I, img) {
+  var ic = I.D.icons, c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  var g = c.getContext('2d');
+  g.beginPath();
+  I.D.nodes.forEach(function (r) {
+    var n = I.byId[r[0]], sz = ic.size[n.kind];
+    if (!n.icon || !sz) return;
+    treeShape(g, n.kind, n.icon[0] + sz[0] / 2, n.icon[1] + sz[1] / 2, Math.min(sz[0], sz[1]) / 2);
+  });
+  g.fill();
+  g.globalCompositeOperation = 'source-in'; // keep the sheet only inside the shapes
+  g.drawImage(img, 0, 0);
+  return c;
+}
+
 function treeDraw(cv) {
   var T = TREEVIEW;
   if (!cv || !T || !cv.w) return;
@@ -266,26 +335,37 @@ function treeDraw(cv) {
     ctx.stroke();
   });
 
-  // nodes
+  // nodes: zoomed in far enough, small nodes, notables and keystones show their icon
   var onScreen = [];
+  var sprites = TREE_R[2] * s >= TREE_ICON_MIN_PX ? treeSprites() : null;
+  var iconSize = sprites && T.I.D.icons.size;
+  cv.iconsDrawn = 0;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   cv.nodes.forEach(function (n) {
     var x = n.x * s + ox, y = n.y * s + oy, r = treeNodeRadius(n, s);
     if (x < -r - 60 || y < -r - 60 || x > w + r + 60 || y > h + r + 60) return;
     onScreen.push(n);
     var st = treeStatus(n.id), col = st ? C[st] : C.dim;
+    if (sprites && n.icon && r >= TREE_ICON_MIN_PX) {
+      var sz = iconSize[n.kind];
+      ctx.globalAlpha = st ? 1 : 0.8;
+      ctx.drawImage(st ? sprites.active : sprites.inactive, n.icon[0], n.icon[1], sz[0], sz[1], x - r, y - r, 2 * r, 2 * r);
+      cv.iconsDrawn++;
+      // the frame keeps the status colours (allocated / still to take / to refund)
+      ctx.globalAlpha = st ? 1 : 0.7;
+      ctx.beginPath();
+      treeShape(ctx, n.kind, x, y, r);
+      ctx.lineWidth = Math.max(1.5, r * (n.kind === 0 ? 0.13 : 0.16));
+      ctx.strokeStyle = col;
+      ctx.stroke();
+      return;
+    }
     ctx.globalAlpha = st ? 1 : n.kind === 0 ? 0.5 : 0.85;
     ctx.fillStyle = col;
     ctx.strokeStyle = col;
     ctx.beginPath();
-    if (n.kind === 2) { // keystone: hexagon
-      for (var k = 0; k < 6; k++) {
-        var a = Math.PI / 6 + k * Math.PI / 3;
-        if (k) ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)); else ctx.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
-      }
-      ctx.closePath();
-    } else {
-      ctx.arc(x, y, r, 0, 2 * Math.PI);
-    }
+    treeShape(ctx, n.kind, x, y, r);
     if (n.kind === 3 || n.kind === 4 || n.kind === 5 || n.kind === 6) { // rings
       if (n.kind === 3 && st) { ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1; }
       ctx.lineWidth = n.kind === 4 ? Math.max(1.5, r * 0.32) : n.kind === 5 ? Math.max(1.5, 10 * s) : Math.max(1, r * 0.22);
@@ -773,6 +853,7 @@ function makeTreeView(b) {
     return wrap;
   }
   if (TREEVIEW && TREEVIEW.ro) TREEVIEW.ro.disconnect(); // the previous build's view
+  if (TREE_SPRITES && TREE_SPRITES.state === 'failed') TREE_SPRITES = null; // icons: try again
   var T = TREEVIEW = { b: b, I: I, M: treeModel(b, I), cmp: null, mode: 'build', q: '', hits: null, hitList: [],
                        hitCount: 0, hover: null, flash: null, insetAsc: -1, shown: false };
 

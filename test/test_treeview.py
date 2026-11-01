@@ -89,6 +89,22 @@ b = TV["bounds"]
 check("bounds cover the main tree only", b[0] < -7000 and b[2] > 7000 and
       all(b[0] <= n[1] <= b[2] and b[1] <= n[2] <= b[3] for n in TV["nodes"] if asc(n) < 0 and not (len(n) > 7 and n[7] & 1)), b)
 
+# passive icons: sprite sheets the art cache may fetch, each icon node's x, y in them
+ic = TV.get("icons") or {}
+check("icons: active + inactive sheets on GGG's CDN (the art cache allowlist)",
+      all(str(ic.get(k, "")).startswith("https://web.poecdn.com/image/passive-skill/") for k in ("active", "inactive")) and
+      ic["active"] != ic["inactive"], {k: ic.get(k) for k in ("active", "inactive")})
+check("icons: one size per kind (small, notable, keystone), growing",
+      len(ic.get("size") or []) == 3 and all(s and s[0] > 10 and s[1] > 10 for s in ic["size"]) and
+      ic["size"][0][0] < ic["size"][1][0] < ic["size"][2][0], ic.get("size"))
+at = ic.get("at") or []
+check("icons: x, y per node, aligned with nodes", len(at) == 2 * len(TV["nodes"]), (len(at), len(TV["nodes"])))
+no_icon = [n[0] for i, n in enumerate(TV["nodes"]) if n[3] <= 2 and at[2 * i] < 0]
+check("icons: every small node, notable and keystone has one", not no_icon, no_icon[:5])
+odd = [n[0] for i, n in enumerate(TV["nodes"]) if n[3] > 2 and at[2 * i] != -1]
+check("icons: masteries, sockets and starts have none (-1)", not odd, odd[:5])
+check("icons: coords are non-negative integers", all(isinstance(v, int) and (v >= 0 or v == -1) for v in at))
+
 # the shipped file matches a fresh build from the cached export (skipped without the cache)
 tree_path = os.path.join(ROOT, "data", "tree.min.json")
 if os.path.exists(tree_path):
@@ -96,6 +112,16 @@ if os.path.exists(tree_path):
     fresh = make_treeview.build(tree)
     check("treeview.js is up to date with data/tree.min.json", fresh == TV,
           "run python tools/make_treeview.py")
+    zooms = tree["sprites"]["notableActive"]
+    check("icons: from the largest zoom level", ic["zoom"] == max(float(z) for z in zooms), ic["zoom"])
+    sheet = next(v for z, v in zooms.items() if float(z) == ic["zoom"])
+    outside = []
+    for i, n in enumerate(TV["nodes"]):
+        if at[2 * i] >= 0:
+            w, h = ic["size"][n[3]]
+            if at[2 * i] + w > sheet["w"] or at[2 * i + 1] + h > sheet["h"]:
+                outside.append(n[0])
+    check("icons: every icon lies inside its %dx%d sheet" % (sheet["w"], sheet["h"]), not outside, outside[:5])
     g = geometry(tree)
     check("make_timeless geometry and make_treeview agree on every shared node",
           all(abs(nodes[int(k)][1] - v[0]) <= 1 and abs(nodes[int(k)][2] - v[1]) <= 1 for k, v in g.items()))
