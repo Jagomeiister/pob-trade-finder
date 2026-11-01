@@ -24,16 +24,36 @@ async function loadDivcardsView(force) {
   var sec = viewSection('divcards');
   if (!sec || !isGui() || !window.pywebview.api.div_cards) return;
   var league = document.getElementById('league').value;
-  if (DIV.data && DIV.league === league && !force) return renderDivcards();
+  var have = DIV.data && DIV.league === league;
+  if (have && !DIV.data.cached && !force) return renderDivcards();
   if (DIV.loading) return DIV.loading;
   var box = sec.querySelector('.dc-body');
-  if (box) box.textContent = 'Loading drop data and prices…';
   DIV.loading = (async function () {
+    // after a restart: the last answer saved on disk shows at once (no network), then fresh
+    // prices replace it — the drop data and the hourly feed can take seconds to download
+    if (!have) {
+      if (box) box.textContent = 'Loading drop data and prices…';
+      var last = null;
+      try { last = await window.pywebview.api.div_cards(league, true); } catch (e) { /* none saved */ }
+      if (last && last.ok && !(DIV.data && DIV.league === league)) {
+        DIV.data = last;
+        DIV.league = league;
+        renderDivcards();
+      }
+    } else if (!DIV.data.cached && box) {
+      box.textContent = 'Loading drop data and prices…'; // ↻: start over
+    }
     var r;
     try { r = await window.pywebview.api.div_cards(league); } catch (e) { r = { ok: false, error: String(e) }; }
     DIV.loading = null;
     if (!r || !r.ok) {
-      if (box) { box.textContent = ''; box.appendChild(UI.el('div', 'finder-sub', '❌ Couldn\'t load div cards: ' + ((r && r.error) || 'no answer'))); }
+      var err = (r && r.error) || 'no answer';
+      if (DIV.data && DIV.league === league && DIV.data.cached) { // keep the saved prices on screen
+        DIV.data.refreshError = err;
+        renderDivcards();
+        return;
+      }
+      if (box) { box.textContent = ''; box.appendChild(UI.el('div', 'finder-sub', '❌ Couldn\'t load div cards: ' + err)); }
       return;
     }
     DIV.data = r;
@@ -41,6 +61,72 @@ async function loadDivcardsView(force) {
     renderDivcards();
   })();
   return DIV.loading;
+}
+
+// "prices from 14:00, 1 Nov" for a feed hour (unix seconds)
+function dcHour(hour) {
+  if (!hour) return 'an earlier session';
+  return new Date(hour * 1000).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+}
+
+// ---- div card art ------------------------------------------------------------------
+// GGG's CDN art (name checked by tools/make_divcards.py), loaded only when its row scrolls
+// into view: the global art cache (08-cards.js) swaps a cached copy in, or queues the URL —
+// 40 per call, 1.5 s apart — so a few hundred rows never fire a few hundred downloads.
+// The <img> stays invisible until it has loaded: a missing image shows nothing, never a
+// broken icon. Hover a thumbnail for the full card.
+var DC_ART = 'https://web.poecdn.com/image/divination-card/';
+
+function dcArtObserver() {
+  if (!DIV.io && window.IntersectionObserver) {
+    DIV.io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        DIV.io.unobserve(e.target);
+        var img = e.target.querySelector('img');
+        if (img && img.dataset.src) { img.setAttribute('src', img.dataset.src); img.removeAttribute('data-src'); }
+      });
+    }, { rootMargin: '200px 0px' });
+  }
+  return DIV.io;
+}
+
+function dcArtThumb(c) {
+  var box = UI.el('span', 'dc-art');
+  if (!c.i) { box.classList.add('dc-art-none'); return box; }
+  var img = document.createElement('img');
+  img.alt = '';
+  img.decoding = 'async';
+  img.dataset.src = DC_ART + encodeURIComponent(c.i) + '.png';
+  img.addEventListener('load', function () { img.classList.add('ok'); });
+  img.addEventListener('error', function () { img.classList.remove('ok'); }); // the art cache may retry the CDN
+  box.appendChild(img);
+  box.addEventListener('mouseenter', function () { if (img.classList.contains('ok')) dcArtPop(img, box); });
+  box.addEventListener('mouseleave', function () { dcArtPop(null); });
+  var io = dcArtObserver();
+  if (io) io.observe(box);
+  else img.setAttribute('src', img.dataset.src);
+  return box;
+}
+
+// one shared enlarged view, beside the thumbnail, kept on screen
+function dcArtPop(img, anchor) {
+  var pop = document.getElementById('dc-art-pop');
+  if (!img) { if (pop) pop.hidden = true; return; }
+  if (!pop) {
+    pop = UI.el('div', 'dc-art-pop');
+    pop.id = 'dc-art-pop';
+    pop.setAttribute('aria-hidden', 'true');
+    pop.appendChild(document.createElement('img'));
+    document.body.appendChild(pop);
+  }
+  pop.firstChild.src = img.currentSrc || img.src;
+  pop.hidden = false;
+  var r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  var x = r.right + 10 + w > window.innerWidth ? r.left - 10 - w : r.right + 10;
+  var y = Math.min(Math.max(8, r.top + r.height / 2 - h / 2), window.innerHeight - h - 8);
+  pop.style.left = Math.max(8, x) + 'px';
+  pop.style.top = y + 'px';
 }
 
 // maps -> priced cards that can drop there
@@ -63,14 +149,21 @@ function renderDivcards() {
   if (!sec || !DIV.data) return;
   var box = sec.querySelector('.dc-body');
   box.textContent = '';
+  if (DIV.io) { DIV.io.disconnect(); DIV.io = null; } // the old rows are gone
+  dcArtPop(null);
   var d = DIV.data, league = DIV.league;
+  if (d.cached) {
+    box.appendChild(UI.el('div', 'finder-sub dc-status', d.refreshError
+      ? '⚠ Couldn\'t refresh prices (' + d.refreshError + '): showing prices from ' + dcHour(d.priceHour) + '.'
+      : 'Showing prices from ' + dcHour(d.priceHour) + ' — refreshing…'));
+  }
   var q = DIV.q.toLowerCase();
   if (DIV.mode === 'maps') {
     var rows = divcardsByMap(d, DIV.min, DIV.mapsOnly).filter(function (m) {
       return !q || m.area.name.toLowerCase().indexOf(q) !== -1 ||
         m.worth.some(function (c) { return c.n.toLowerCase().indexOf(q) !== -1; });
     });
-    box.appendChild(UI.table([
+    var mapTable = box.appendChild(UI.table([
       { key: 'name', label: 'Area', sort: function (m) { return m.area.name; }, render: function (m) {
         var b = UI.button('ghost', { size: 'sm', label: m.area.name + (DIV.open === m.area.id ? ' ▾' : ' ▸'),
           onClick: function () { DIV.open = DIV.open === m.area.id ? null : m.area.id; renderDivcards(); } });
@@ -91,7 +184,7 @@ function renderDivcards() {
       emptyText: 'No area drops a card worth ' + DIV.min + 'c or more' + (q ? ' matching "' + DIV.q + '"' : '') + '.' }));
     var openRow = rows.filter(function (m) { return m.area.id === DIV.open; })[0];
     if (openRow) box.insertBefore(divcardList(openRow.area.name + ': cards that can drop here', openRow.worth, league),
-      box.firstChild);
+      mapTable);
     return;
   }
   var cards = d.cards.filter(function (c) {
@@ -106,7 +199,12 @@ function divcardList(title, cards, league) {
   var wrap = UI.el('div', 'dc-list');
   if (title) wrap.appendChild(UI.el('h3', 'trade-h3', title));
   wrap.appendChild(UI.table([
-    { key: 'n', label: 'Card' },
+    { key: 'n', label: 'Card', render: function (c) {
+      var cell = UI.el('span', 'dc-card');
+      cell.appendChild(dcArtThumb(c));
+      cell.appendChild(UI.el('span', null, c.n));
+      return cell;
+    } },
     { key: 'c', label: 'Each', num: true, render: function (c) { return c.c != null ? dcFmt(c.c) : '?'; } },
     { key: 's', label: 'Set', num: true },
     { key: 'set', label: 'Full set', num: true, sort: function (c) { return (c.c || 0) * c.s; },

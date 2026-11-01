@@ -2074,17 +2074,24 @@ window.__stubOverrides.div_cards = { ok: true, source: 'Path of Exile Wiki', div
     { id: 'MapWorldsColdRiver_', name: 'Cold River', lvl: 78, map: true },
     { id: 'Act3Docks', name: 'The Docks', lvl: 33, map: false }],
   cards: [
-    { n: 'The Doctor', s: 8, a: [0], c: 1500, code: 'the-doctor' },
-    { n: 'A Chilling Wind', s: 4, a: [1, 0], c: 6, code: 'a-chilling-wind' },
+    { n: 'The Doctor', s: 8, a: [0], c: 1500, code: 'the-doctor', i: 'TheDoctor' },
+    { n: 'A Chilling Wind', s: 4, a: [1, 0], c: 6, code: 'a-chilling-wind', i: 'AChillingWind' },
     { n: 'Rain of Chaos', s: 8, a: [0, 1, 2], c: 0.5, code: 'rain-of-chaos' },
     { n: 'Act Card', s: 3, a: [2], c: 40, code: 'act-card' },
     { n: 'Gone', s: 1, off: 1, c: 900 },
     { n: 'Unpriced', s: 5, a: [1] }] };
+// card art: The Doctor's is in the art cache (a data: PNG); A Chilling Wind's must come from
+// the CDN, which the e2e browser can't reach, so it fails like missing art would
+const DC = 'https://web.poecdn.com/image/divination-card/';
+const pc = document.createElement('canvas'); pc.width = 39; pc.height = 28;
+pc.getContext('2d').fillRect(0, 0, 39, 28);
+ART[DC + 'TheDoctor.png'] = pc.toDataURL('image/png');
 setView('divcards');
 const sec = document.querySelector('.tab-section[data-tab="divcards"]');
-await H.waitFor(() => sec.querySelector('.data-table tbody tr'), 4000, 'table');
+await H.waitFor(() => sec.querySelector('.data-table tbody tr') && H.calls('div_cards').length >= 2, 4000, 'table');
+await H.sleep(20);
 out.visible = sec.getBoundingClientRect().height > 100;
-out.calls = H.calls('div_cards').map(c => c.args[0]);
+out.calls = H.calls('div_cards').map(c => c.args);
 const rows = () => [...sec.querySelectorAll('.data-table tbody tr')].map(r => [...r.children].map(td => td.textContent.trim()));
 out.byMap = rows();
 sec.querySelector('.dc-controls input[type=checkbox]').click(); // include non-map areas
@@ -2097,6 +2104,21 @@ out.openCards = [...sec.querySelectorAll('.dc-list tbody tr')].map(r => r.childr
 sec.querySelector('.segmented [data-value="cards"]').click();
 await H.sleep(20);
 out.byCard = rows().map(r => [r[0], r[1], r[3], r[4]]);
+const cardRow = name => [...sec.querySelectorAll('.data-table tbody tr')].find(r => r.children[0].textContent.trim() === name);
+const docImg = cardRow('The Doctor').querySelector('.dc-art img');
+const windImg = cardRow('A Chilling Wind').querySelector('.dc-art img');
+await H.waitFor(() => docImg && docImg.classList.contains('ok'), 3000, 'cached art loaded').catch(() => {});
+await H.waitFor(() => windImg && windImg.getAttribute('src') && windImg.complete, 3000, 'CDN art failed').catch(() => {});
+out.docArt = docImg && { remote: docImg.dataset.remote, local: (docImg.getAttribute('src') || '').slice(0, 15),
+  ok: docImg.classList.contains('ok'), w: docImg.naturalWidth, vis: getComputedStyle(docImg).visibility };
+out.windArt = windImg && { src: windImg.getAttribute('src'), ok: windImg.classList.contains('ok'),
+  vis: getComputedStyle(windImg).visibility };
+out.goneArt = [cardRow('Gone').querySelectorAll('img').length, !!cardRow('Gone').querySelector('.dc-art-none')];
+docImg && docImg.parentNode.dispatchEvent(new MouseEvent('mouseenter'));
+const pop = document.getElementById('dc-art-pop');
+out.pop = pop && { shown: !pop.hidden, src: (pop.querySelector('img').getAttribute('src') || '').slice(0, 15) };
+docImg && docImg.parentNode.dispatchEvent(new MouseEvent('mouseleave'));
+out.popHidden = !pop || pop.hidden;
 const n0 = H.calls('open_url').length;
 H.button(sec.querySelector('.data-table'), '↗').click();
 await H.sleep(20);
@@ -2105,6 +2127,17 @@ const f = sec.querySelector('input[aria-label="Filter cards or areas"]');
 f.value = 'cold'; f.dispatchEvent(new Event('input'));
 await H.sleep(20);
 out.filtered = rows().map(r => r[0]);
+f.value = ''; f.dispatchEvent(new Event('input'));
+// app restart: the last answer saved on disk shows at once, marked, while prices refresh
+DIV.data = null;
+window.__stubOverrides.div_cards = Object.assign({}, window.__stubOverrides.div_cards, { cached: true, priceHour: 1767225600 });
+await loadDivcardsView();
+out.cachedNote = H.text('.dc-status', sec);
+out.cachedRows = rows().length;
+// the refresh fails: the saved prices stay on screen with a note
+window.__stubOverrides.div_cards = { ok: false, error: 'feed down' };
+await loadDivcardsView();
+out.refreshFailed = [H.text('.dc-status', sec), rows().length];
 delete window.__stubOverrides.div_cards;
 return out;
 """
@@ -2113,7 +2146,9 @@ return out;
 def scenario_divcards(s, tag):
     s.fresh()
     r = s.run(S24_DIVCARDS, timeout=60)
-    check(tag + " Div cards view visible, loads once for the league", r["visible"] and len(r["calls"]) == 1, r["calls"])
+    calls = r["calls"] or []
+    check(tag + " Div cards view visible: the saved copy first (no network), then one fresh load", r["visible"] and
+          [c[1:] for c in calls] == [[True], []], calls)
     bm = r["byMap"]
     check(tag + " by area: maps only, ranked by best card, cards >= 5c counted", len(bm) == 2 and
           bm[0][0].startswith("Burial Chambers") and "The Doctor · 7.5 div" in bm[0][3] and bm[0][2] == "2 / 3" and
@@ -2130,6 +2165,23 @@ def scenario_divcards(s, tag):
     check(tag + " card link opens the bulk exchange", "/trade/exchange/" in r["url"] and '"want":["the-doctor"]' in r["url"],
           r["url"][:160])
     check(tag + " filter by area name", r["filtered"] == ["A Chilling Wind"], r["filtered"])
+    da = r["docArt"] or {}
+    check(tag + " card art: row thumbnail from the CDN art path, served from the art cache",
+          da.get("remote") == "https://web.poecdn.com/image/divination-card/TheDoctor.png" and
+          da.get("local") == "data:image/png;" and da.get("ok") and da.get("w", 0) > 0 and da.get("vis") == "visible", da)
+    wa = r["windArt"] or {}
+    check(tag + " card art that fails to load stays invisible (no broken icon)",
+          (wa.get("src") or "").endswith("/AChillingWind.png") and not wa.get("ok") and wa.get("vis") == "hidden", wa)
+    check(tag + " a card without art has no image at all", r["goneArt"] == [0, True], r["goneArt"])
+    check(tag + " hovering a thumbnail shows the larger card, leaving hides it",
+          (r["pop"] or {}).get("shown") and (r["pop"] or {}).get("src") == "data:image/png;" and r["popHidden"],
+          (r["pop"], r["popHidden"]))
+    check(tag + " saved copy after a restart: shown at once, marked as refreshing",
+          "Showing prices from" in (r["cachedNote"] or "") and "refreshing" in (r["cachedNote"] or "") and
+          r["cachedRows"] > 0, (r["cachedNote"], r["cachedRows"]))
+    rf = r["refreshFailed"] or [None, 0]
+    check(tag + " a failed refresh keeps the saved prices on screen",
+          "Couldn't refresh prices (feed down)" in (rf[0] or "") and rf[1] == r["cachedRows"], rf)
 
 
 
@@ -2313,6 +2365,38 @@ await H.sleep(20);
 out.modeAfter = T.mode;
 out.statusBuildMode = [treeStatus(36452), treeStatus(49534)];
 delete window.__stubOverrides.get_character_passives;
+// passive icons: the stub's art cache has no sheets, so the zoomed-in draws above kept plain dots
+const D = POE_TREE_VIEW;
+out.iconData = !!(D.icons && D.icons.at.length === 2 * D.nodes.length && D.icons.size.length === 3);
+out.iconFallback = [TREE_SPRITES && TREE_SPRITES.state, cv.iconsDrawn];
+// sheets from the art cache (one flat colour each): zoomed in, allocated nodes show the active one
+function sheet(rgb) {
+  const c = document.createElement('canvas');
+  c.width = 1400; c.height = 2000;
+  const g = c.getContext('2d'); g.fillStyle = rgb; g.fillRect(0, 0, c.width, c.height);
+  return c.toDataURL('image/png');
+}
+const art = {}; art[D.icons.active] = sheet('rgb(20,200,40)'); art[D.icons.inactive] = sheet('rgb(200,20,40)');
+window.__stubOverrides.cache_art = { ok: true, art: art };
+const nCalls = H.calls('cache_art').length;
+TREE_SPRITES = null;
+const notable = T.I.byId[build.tree.nodes.find(id => T.I.byId[id] && T.I.byId[id].kind === 1 && T.I.byId[id].asc < 0)];
+out.notableIcon = notable.icon;
+out.notableId = notable.id;
+cv.cx = notable.x; cv.cy = notable.y; cv.s = 0.5; treeDraw(cv);
+await H.waitFor(() => TREE_SPRITES && TREE_SPRITES.state !== 'loading', 5000, 'icon sheets');
+out.spriteState = TREE_SPRITES.state;
+out.artCalls = H.calls('cache_art').slice(nCalls).map(c => JSON.parse(c.args[0]));
+treeDraw(cv);
+out.iconsZoomed = cv.iconsDrawn;
+const px = cv.ctx.getImageData(Math.round(cv.w / 2 * cv.dpr), Math.round(cv.h / 2 * cv.dpr), 1, 1).data;
+out.centrePixel = [px[0], px[1], px[2]];
+const t0 = performance.now();
+for (let i = 0; i < 10; i++) treeDraw(cv);
+out.drawMs = (performance.now() - t0) / 10;
+H.button(sec.querySelector('.tv-zoom'), 'Fit').click();
+out.iconsFit = cv.iconsDrawn;
+delete window.__stubOverrides.cache_art;
 return out;
 """
 
@@ -2364,6 +2448,19 @@ def scenario_tree(s, tag):
     check(tag + " compare colours + legend, 'Build only' switches back", r["statusTake"] == "take" and r["statusRefund"] == "refund" and
           "Still to take" in r["legend"] and r["modeAfter"] == "build" and r["statusBuildMode"] == ["alloc", None],
           (r["statusTake"], r["statusRefund"], r["legend"], r["statusBuildMode"]))
+    ic = tv["icons"]
+    k = [n[0] for n in tv["nodes"]].index(r["notableId"])
+    check(tag + " icons: view data has per-node icon coords, indexed onto the nodes", r["iconData"] and
+          r["notableIcon"] == ic["at"][2 * k:2 * k + 2], (r["notableIcon"], ic["at"][2 * k:2 * k + 2]))
+    check(tag + " icons: no sheets in the art cache -> plain dots, nothing drawn", r["iconFallback"] == ["failed", 0],
+          r["iconFallback"])
+    check(tag + " icons: sheets fetched through cache_art (active + inactive, one call)",
+          r["spriteState"] == "ready" and r["artCalls"] == [[ic["active"], ic["inactive"]]], (r["spriteState"], r["artCalls"]))
+    px = r["centrePixel"]
+    check(tag + " icons: zoomed in, allocated notable drawn from the active sheet", r["iconsZoomed"] > 10 and
+          px[1] > 150 and px[0] < 80 and px[2] < 90, (r["iconsZoomed"], px))
+    check(tag + " icons: none when zoomed out to fit", r["iconsFit"] == 0, r["iconsFit"])
+    check(tag + " icons: a zoomed-in redraw stays fast (< 30 ms)", r["drawMs"] < 30, r["drawMs"])
 
 
 S28_STAGES = r"""
@@ -2976,7 +3073,7 @@ SCENARIOS = [
     ("31 sheets", scenario_sheets),
     ("32 gemdiff", scenario_gemdiff),
     ("33 mechanics", scenario_mechanics),
-    ("34 uibatch", scenario_ui_batch),
+    ("35 uibatch", scenario_ui_batch),
 ]
 
 

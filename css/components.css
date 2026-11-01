@@ -588,6 +588,22 @@ body.gui .settings-section.gui-only { display: flex; }
 .dc-body { display: flex; flex-direction: column; gap: 12px; }
 .dc-body .data-table { width: 100%; }
 .dc-list { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); }
+.dc-status { margin: 0; }
+/* div card art: lazy thumbnail in the card column, enlarged on hover; invisible until loaded */
+.dc-card { display: inline-flex; align-items: center; gap: 8px; }
+.dc-art {
+  flex: none; width: 39px; height: 28px; overflow: hidden;
+  border-radius: var(--r-sm); background: var(--s2);
+}
+.dc-art.dc-art-none { background: transparent; }
+.dc-art img { display: block; width: 100%; height: 100%; object-fit: cover; visibility: hidden; }
+.dc-art img.ok { visibility: visible; cursor: zoom-in; }
+.dc-art-pop {
+  position: fixed; z-index: 50; pointer-events: none; padding: 4px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--s1);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+.dc-art-pop img { display: block; width: 312px; height: 224px; object-fit: cover; border-radius: var(--r-sm); }
 /* Skill tree (js/app/23-tree.js) */
 .tv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .tv-zoom { display: inline-flex; gap: 4px; }
