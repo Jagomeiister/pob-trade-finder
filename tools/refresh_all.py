@@ -32,6 +32,7 @@ STEPS = [
     [sys.executable, "tools/make_treeview.py"],  # Skill tree view layout (after jeweldata: needs tree)
     [sys.executable, "tools/make_cheatsheets.py"],  # leveling cheat sheets (Path of Exile Wiki)
     [sys.executable, "tools/make_dust.py"],  # dust per unique (pinned MIT dataset: bump its COMMIT for new uniques)
+    [sys.executable, "tools/make_atlasview.py", "--fetch"],  # Atlas tree view (GGG export, pinned TAG: bump it each league)
     [sys.executable, "tools/make_divweights.py"],  # div card drop weights (pinned MIT dataset: bump its COMMIT each league)
     ["node", "test/test.js"],
     [sys.executable, "test/test_currency_feed.py"],
@@ -41,6 +42,7 @@ STEPS = [
     [sys.executable, "test/test_price_hotkey.py"],
     [sys.executable, "test/test_timeless.py"],
     [sys.executable, "test/test_treeview.py"],
+    [sys.executable, "test/test_atlasview.py"],
     [sys.executable, "test/test_gui_windows.py"],
     [sys.executable, "test/test_league_check.py"],
     [sys.executable, "test/test_diagnostics.py"],

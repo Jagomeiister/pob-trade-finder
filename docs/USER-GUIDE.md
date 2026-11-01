@@ -326,6 +326,18 @@ Details:
 - PoE 1 items only. Currency stacks, maps and other non-gear items open a card but may
   not produce a useful search
 
+## 3a. 🏠 Builds page and saved builds
+
+The app opens on **Builds**: your saved builds (newest opened first, with ascendancy, level and
+their Atlas strategy) above the paste box. Click one to load it.
+
+- Importing a new build offers **☆ Save**; saving asks for a name (main skill · ascendancy).
+- **⋯** on a saved build: rename it, link an Atlas strategy, or delete it. Up to 100 builds;
+  a search box appears once you have more than 6.
+- **No build needed** for Watcher's Eye & co., Search text, Div cards, Cheat sheets, the Atlas
+  tree, Dust explorer, Market and the Trade helper: they're in the sidebar from launch. Gear,
+  the planner and the skill tree tools appear once a build is loaded.
+
 ## 5c2. 🤝 In game: overlay, hotkeys, trade helper, tray
 
 Like Awakened PoE Trade and PoE Lurker, the app shows small see-through pieces over the game
@@ -700,6 +712,19 @@ Tools → **Dust explorer** finds the uniques worth buying to break down for Tha
   [poe-disenchant-tool](https://github.com/deronek/poe-disenchant-tool) dataset (item level 84
   data, credited to a community list and PoEDB). It's pinned in the app; see
   THIRD_PARTY_NOTICES.md.
+
+## 5k0. 🗺 Atlas tree
+
+Tools → **Atlas tree** shows an Atlas passive tree (no build needed).
+
+- **Import**: paste an official Atlas tree link (pathofexile.com …atlas-skill-tree/…), a PoB code
+  or pobb.in link whose notes contain Atlas links (pick which tree if there are several), or a
+  list of node names. It's read in the app; nothing is sent to pathofexile.com. poeplanner
+  Atlas links aren't supported (their format isn't public): use the official link instead.
+- The allocated nodes are highlighted; search, zoom and hover for each node's stats.
+- **Save** it as a strategy (name and notes), rename, save as new, copy the link, or delete it.
+- **Link it to a build**: on the Builds page, ⋯ on a saved build → Atlas strategy. The build's card
+  then shows it, and the strategy lists which builds use it.
 
 ## 5j3. ⏚ Loot filter
 

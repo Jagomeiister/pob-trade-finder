@@ -68,7 +68,10 @@ document.addEventListener('DOMContentLoaded', function () {
     ta.focus();
     ta.select();
   });
-  document.getElementById('back-to-build').addEventListener('click', showBuild);
+  document.getElementById('back-to-build').addEventListener('click', function () {
+    showBuild();
+    setView(viewSection('gear') ? 'gear' : 'planner'); // the Builds page stays a view of its own
+  });
   // narrow windows: the sidebar is an icon rail and the build card opens as a flyout
   var sidebar = document.getElementById('sidebar');
   var railBtn = document.getElementById('rail-build-btn');
@@ -234,19 +237,16 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   refreshBuildSelect();
-  document.getElementById('save-build').addEventListener('click', function () {
-    if (!build) return;
-    var lib = loadBuildLib();
-    var name = (build.ascendClass || build.className || 'Build') + ' · ' +
-               Object.keys(build.items).length + ' items · ' + new Date().toLocaleDateString();
-    lib.unshift({ name: name, code: document.getElementById('pob-input').value, ts: Date.now() });
-    saveBuildLib(lib);
-    refreshBuildSelect();
-    this.textContent = '★ Saved';
-    var btn = this;
-    setTimeout(function () { btn.textContent = '☆ Save'; }, 1200);
-    UI.toast('Build saved — it\'s on the start screen for one-click reload.', 'success');
-  });
+  // the main window works without a build: sidebar + the tools that don't need one, Builds page first
+  if (!OVERLAY && !TRADES && !(typeof SHEET_OV !== 'undefined' && SHEET_OV)) {
+    document.body.classList.add('shell');
+    renderToolSections();
+    renderNav();
+    if (!build) setView('home');
+  }
+  document.getElementById('save-build').addEventListener('click', libSaveCurrent); // 04-library.js
+  var savedSearch = document.getElementById('saved-search');
+  if (savedSearch) savedSearch.addEventListener('input', function () { libQuery = this.value; refreshBuildSelect(); });
   document.getElementById('pct').addEventListener('input', function () {
     document.getElementById('pct-label').textContent = this.value + '%';
     applyPctToAll();

@@ -42,6 +42,7 @@ async function onDecode() {
     renderBuildDiff();
     refreshSlotLists();
     showBuild();
+    libAfterLoad(); // saved: mark it opened; new: offer to save it (04-library.js)
     if (buildDiff) {
       UI.toast(buildDiff.rows.length + ' slot' + (buildDiff.rows.length > 1 ? 's' : '') +
         ' changed since the last version of this build. They\'re listed above the gear.', 'info');
@@ -147,9 +148,7 @@ function renderBuild(setIndex) {
     section('finder').appendChild(makeJewelFinder(build));
     section('tree').appendChild(makeTreeView(build)); // mini PoB: the tree, jewels, points still to take
   }
-  section('uniques').appendChild(makeUniqueJewels(build)); // Watcher's Eye, Forbidden pair, Thread of Hope
-  section('search').appendChild(makeSearchText()); // in-game search text builder
-  section('divcards').appendChild(makeDivcards()); // which areas drop the valuable cards
+  renderToolSections(); // Watcher's Eye & co. with this build's auras; search text, div cards
 
   var present = VIEW_ORDER.filter(function (k) { return sections[k]; });
   present.forEach(function (k) { root.appendChild(sections[k]); });
@@ -161,7 +160,7 @@ function renderBuild(setIndex) {
   updateContextChips();
   renderNav();
   var keep = document.body.dataset.view;
-  setView(present.indexOf(keep) !== -1 || keep === 'planner' || keep === 'market' ? keep : present[0] || 'planner');
+  setView(present.indexOf(keep) !== -1 || (keep && keep !== 'home' && !BUILD_VIEWS[keep]) || keep === 'planner' ? keep : present[0] || 'planner');
   renderCostSummary(); // clears stale summary — fresh cards have no prices yet
   applyCharDiff();     // re-annotate fresh cards if a character is loaded
 }
@@ -300,10 +299,11 @@ var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'uni
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                     timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', divcards: 'Div cards', tree: 'Skill tree', pasted: 'Pasted item',
-                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets', dust: 'Dust explorer', filter: 'Loot filter' };
+                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets', dust: 'Dust explorer', filter: 'Loot filter',
+                    atlas: 'Atlas tree', home: 'Builds' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨', filter: '⏚' };
+                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨', filter: '⏚', atlas: '🗺', home: '⌂' };
 
 // views with line-art icons in css/navicons.css (tools/make_navicons.py); the rest keep VIEW_ICONS
 var NAV_ICON_NAMES = { gear: 1, jewels: 1, flasks: 1, gems: 1, pasted: 1, planner: 1, timeless: 1, finder: 1,
@@ -321,9 +321,32 @@ function navIconButton(k, label, onClick) {
   return b;
 }
 
-function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
+// a view's section: the build's (#results) or a tool that works without a build (#tool-sections)
+function viewSection(k) {
+  return document.querySelector('#results > .tab-section[data-tab="' + k + '"], #tool-sections > .tab-section[data-tab="' + k + '"]');
+}
+// views that need a loaded build; every other tool works from launch
+var BUILD_VIEWS = { gear: 1, jewels: 1, flasks: 1, gems: 1, planner: 1, tree: 1, timeless: 1, finder: 1 };
+// the tools without a build: their sections live in #tool-sections and are made once (a loaded
+// build refreshes the build-aware one, Watcher's Eye & co.)
+function renderToolSections() {
+  var box = document.getElementById('tool-sections');
+  if (!box) return;
+  box.textContent = '';
+  [['uniques', function () { return makeUniqueJewels(build); }], // Watcher's Eye, Forbidden pair, Thread of Hope
+   ['search', makeSearchText],    // in-game search text builder
+   ['divcards', makeDivcards]       // which areas drop the valuable cards
+  ].forEach(function (t) {
+    var sec = document.createElement('div');
+    sec.className = 'tab-section';
+    sec.dataset.tab = t[0];
+    sec.appendChild(t[1]());
+    box.appendChild(sec);
+  });
+}
 
 function setView(k) {
+  if (!k || (!build && BUILD_VIEWS[k])) k = 'home'; // no build: the Builds page (saved builds + paste box)
   document.body.dataset.view = k;
   if (k === 'market') renderMarketPage(); // built lazily: hundreds of rows
   if (k === 'stash') renderStashPage();
@@ -332,6 +355,7 @@ function setView(k) {
   if (k === 'trades') showTradeHelperView(); // re-reads what the overlay saved
   if (k === 'sheets') renderSheetsView(); // cheat sheets: built-in acts + your own
   if (k === 'dust') renderDustView(); // dust per chaos for every unique (26-dust.js)
+  if (k === 'atlas') showAtlasView(); // Atlas tree: built once, canvas sized once visible (28-atlas.js)
   if (k === 'filter') renderFilterView(); // loot filter tools (29-lootfilter.js)
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
@@ -367,15 +391,18 @@ function renderNav() {
     });
     nav.appendChild(b);
   }
+  item('home'); // your saved builds and the paste box, with or without a build loaded
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'sheets', 'dust', 'filter', 'market', 'stash', 'trades'].filter(function (k) {
+  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'sheets', 'atlas', 'dust', 'filter', 'market', 'stash', 'trades'].filter(function (k) {
     if (k === 'stash') return OAUTH.signedIn; // official login only
     if (k === 'trades') return isGui();
-    return k === 'planner' || k === 'market' || k === 'sheets' || k === 'dust' || k === 'filter' || viewSection(k);
+    if (k === 'atlas') return typeof atlasOpen === 'function'; // 28-atlas.js
+    if (BUILD_VIEWS[k]) return !!build && (k === 'planner' || viewSection(k));
+    return k === 'market' || k === 'sheets' || k === 'dust' || k === 'filter' || viewSection(k);
   }).forEach(item);
-  setView(document.body.dataset.view || 'gear');
+  setView(document.body.dataset.view || (build ? 'gear' : 'home'));
 }
 
 function updateNavCounts() {
@@ -487,15 +514,17 @@ function updateContextChips() {
 }
 
 // landing ⇄ build
+// The sidebar is always there (tools work without a build); has-build = a build is loaded and its
+// views exist. The Builds page ('home' view) shows the saved builds and the paste box.
 function showBuild() {
   document.body.classList.add('has-build');
-  document.getElementById('input-panel').classList.add('hidden');
+  document.getElementById('input-panel').classList.remove('hidden');
   document.getElementById('build-bar').classList.remove('hidden');
   window.scrollTo(0, 0);
 }
 function showLanding() {
-  document.body.classList.remove('has-build');
   document.getElementById('input-panel').classList.remove('hidden');
   document.getElementById('back-to-build').classList.toggle('hidden', !build);
+  setView('home');
   window.scrollTo(0, 0);
 }

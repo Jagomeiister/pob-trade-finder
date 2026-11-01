@@ -23,7 +23,7 @@
 })();
 </script>
 </head>
-<body>
+<body data-view="home">
 <div class="app-shell">
   <!-- sidebar: brand, build, views, market + settings (shown once a build is loaded) -->
   <aside id="sidebar" class="sidebar" aria-label="Build and views">
@@ -44,9 +44,10 @@
       <div id="build-cost" class="build-cost hidden"></div>
       <div id="set-picker-slot"></div>
       <div class="build-actions">
-        <button id="save-build" class="btn btn-secondary btn-sm" title="Keep this build in the library for one-click reload">☆ Save</button>
-        <button id="new-build" class="btn btn-ghost btn-sm" title="Paste or pick a different build">Switch build</button>
+        <button id="save-build" class="btn btn-secondary btn-sm" title="Keep this build in your library for one-click reload">☆ Save</button>
+        <button id="new-build" class="btn btn-ghost btn-sm" title="Your saved builds, or paste a different one">Switch build</button>
       </div>
+      <div id="build-atlas" class="build-atlas hidden"></div>
       <button id="compare-btn" class="btn btn-ghost btn-sm gui-only" title="Load your character and see what each slot is missing">⚖ Compare with character…</button>
     </div>
     <nav id="nav" class="nav" aria-label="Views"></nav>
@@ -312,6 +313,14 @@
         </div>
       </div>
 
+      <section id="saved-section" class="saved-section hidden" aria-labelledby="saved-title">
+        <div class="saved-head">
+          <h2 id="saved-title" class="landing-h2">Your builds <span id="saved-count" class="saved-count"></span></h2>
+          <input type="search" id="saved-search" class="saved-search hidden" placeholder="Search builds…" aria-label="Search saved builds">
+        </div>
+        <div id="saved-list" class="saved-list"></div>
+      </section>
+
       <section class="panel landing-paste">
         <label for="pob-input" class="landing-label">Paste a build</label>
         <textarea id="pob-input" placeholder="PoB export code, or a pobb.in / pastebin / poe.ninja link…&#10;(PoB → Import/Export Build → Generate → Copy)"></textarea>
@@ -323,10 +332,6 @@
         <div id="status" role="status"></div>
       </section>
 
-      <section id="saved-section" class="saved-section hidden" aria-labelledby="saved-title">
-        <h2 id="saved-title" class="landing-h2">Saved builds</h2>
-        <div id="saved-list" class="saved-list"></div>
-      </section>
 
       <ol class="how-steps" aria-label="How it works">
         <li><b>1 · Paste</b><span>Any PoB code or build link.</span></li>
@@ -339,6 +344,7 @@
     <div id="view-trades" class="view-panel"></div>
     <div id="view-sheets" class="view-panel"></div>
     <div id="view-dust" class="view-panel"></div>
+    <div id="view-atlas" class="view-panel"></div>
     <div id="view-filter" class="view-panel"></div>
     <div id="view-planner" class="view-panel">
       <div id="planner-empty" class="empty-state">
@@ -361,6 +367,7 @@
     </div>
 
     <div id="results"></div>
+    <div id="tool-sections"></div>
 
     <div class="footer">PoB Trade Finder · This product isn't affiliated with or endorsed by Grinding Gear Games in any way. · game data and art © GGG</div>
   </div>
@@ -439,9 +446,9 @@
   // js/app/: one program split by feature — order matters (docs/DEVELOPER.md)
   var APP = ['01-state', '02-init', '03-shell', '04-library', '05-craft', '06-jewels', '07-history-gems',
              '08-cards', '09-query', '10-character', '11-market', '12-cost', '13-builds-tracking',
-             '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade', '19-trades', '20-unique-jewels', '21-search-text', '22-divcards', '23-tree', '24-cheatsheets', '25-trade-ledger', '26-dust', '27-anoints', '29-lootfilter', '30-patchnotes'];
+             '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade', '19-trades', '20-unique-jewels', '21-search-text', '22-divcards', '23-tree', '24-cheatsheets', '25-trade-ledger', '26-dust', '27-anoints', '28-atlas', '29-lootfilter', '30-patchnotes'];
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
-   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/watcherseye.js', 'data/forbidden.js', 'data/mapmods.js', 'data/treeview.js', 'data/cheatsheets.js', 'data/gemcolours.js', 'data/dust.js', 'data/divweights.js', 'data/patchnotes.js', 'data/sample.js',
+   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/watcherseye.js', 'data/forbidden.js', 'data/mapmods.js', 'data/treeview.js', 'data/cheatsheets.js', 'data/gemcolours.js', 'data/dust.js', 'data/atlasview.js', 'data/divweights.js', 'data/patchnotes.js', 'data/sample.js',
    'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/filter.js'].concat(APP.map(function (n) {
     return 'js/app/' + n + '.js';
   })).forEach(function (src) {

@@ -740,6 +740,10 @@ for (const c of priced) await H.priceCard(c);
 const fgPayloads = H.calls('trade_search').filter(c => c.args[2] !== true).map(c => c.args[1]).sort();
 document.getElementById('save-build').click();
 await H.sleep(30);
+// ☆ Save asks for a name (prefilled): confirm it
+const saveDlg = document.querySelector('dialog[open]');
+if (saveDlg) H.button(saveDlg, 'Save').click();
+await H.sleep(30);
 const out = { saved: lib().length, savedCode: lib()[0] && lib()[0].code === document.getElementById('pob-input').value };
 document.getElementById('new-build').click();
 await H.sleep(30);
@@ -2310,7 +2314,7 @@ def scenario_trade_embed(s, tag):
     check(tag + " Trade helper opens as a view of the main window (no build needed)", r["view"] == "trades" and
           r["visible"] and r["tabs"] == ["Trades", "People", "Reports", "Setup"] and r["settingsClosed"], r)
     check(tag + " reads the log reader's state on open", r["status"] >= 1, r["status"])
-    check(tag + " Back returns to the landing without a build", r["backTo"] == "" and r["landing"], r)
+    check(tag + " Back returns to the Builds page without a build", r["backTo"] == "home" and r["landing"], r)
     check(tag + " with a build: in the sidebar, Esc returns to where you were", r["inNav"] and r["escBack"] == "gems", r)
 
 
@@ -2458,6 +2462,7 @@ delete window.__stubOverrides.get_character_passives;
 const D = POE_TREE_VIEW;
 out.iconData = !!(D.icons && D.icons.at.length === 2 * D.nodes.length && D.icons.size.length === 3);
 out.iconFallback = [TREE_SPRITES && TREE_SPRITES.state, cv.iconsDrawn];
+out.bgFallback = [TREE_BG && TREE_BG.state, cv.bgDrawn]; // the backdrop too: plain background
 // sheets from the art cache (one flat colour each): zoomed in, allocated nodes show the active one
 function sheet(rgb) {
   const c = document.createElement('canvas');
@@ -2478,6 +2483,7 @@ out.spriteState = TREE_SPRITES.state;
 out.artCalls = H.calls('cache_art').slice(nCalls).map(c => JSON.parse(c.args[0]));
 treeDraw(cv);
 out.iconsZoomed = cv.iconsDrawn;
+out.masteryNoSheets = [!!TREE_SPRITES.mastery, cv.masteryDrawn]; // mastery sheets missing: plain rings
 const px = cv.ctx.getImageData(Math.round(cv.w / 2 * cv.dpr), Math.round(cv.h / 2 * cv.dpr), 1, 1).data;
 out.centrePixel = [px[0], px[1], px[2]];
 const t0 = performance.now();
@@ -2485,6 +2491,95 @@ for (let i = 0; i < 10; i++) treeDraw(cv);
 out.drawMs = (performance.now() - t0) / 10;
 H.button(sec.querySelector('.tv-zoom'), 'Fit').click();
 out.iconsFit = cv.iconsDrawn;
+delete window.__stubOverrides.cache_art;
+// the in-game backdrop: tile + group circles + start art from the art cache, under the nodes
+const B = D.background;
+function sized(w, h, rgb) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = rgb; g.fillRect(0, 0, w, h);
+  return c.toDataURL('image/png');
+}
+const pixel = (x, y) => [...cv.ctx.getImageData(Math.round(x * cv.dpr), Math.round(y * cv.dpr), 1, 1).data].slice(0, 3);
+const plainMs = (() => { const t = performance.now(); for (let i = 0; i < 5; i++) treeDraw(cv); return (performance.now() - t) / 5; })();
+out.cornerPlain = pixel(2, 2);
+const bgArt = {};
+bgArt[B.tile.url] = sized(B.tile.rect[2], B.tile.rect[3], 'rgb(40,40,160)');
+bgArt[B.sheet.url] = sized(1312, 1100, 'rgb(200,160,60)');
+window.__stubOverrides.cache_art = { ok: true, art: bgArt };
+const nBg = H.calls('cache_art').length;
+TREE_BG = null;
+treeDraw(cv);
+await H.waitFor(() => TREE_BG && TREE_BG.state !== 'loading', 5000, 'background sheets');
+out.bgState = TREE_BG.state;
+out.bgCalls = H.calls('cache_art').slice(nBg).map(c => JSON.parse(c.args[0]));
+treeDraw(cv);
+out.bgFit = cv.bgDrawn;
+out.cornerBg = pixel(2, 2);
+const t1 = performance.now();
+for (let i = 0; i < 5; i++) treeDraw(cv);
+out.bgMs = [plainMs, (performance.now() - t1) / 5];
+out.insetBg = T.inset ? T.inset.bgDrawn : 'no inset';
+cv.cx = notable.x; cv.cy = notable.y; cv.s = 0.5; treeDraw(cv);
+out.bgZoomed = cv.bgDrawn;
+out.centreOverBg = pixel(cv.w / 2, cv.h / 2); // the allocated notable's icon still on top
+delete window.__stubOverrides.cache_art;
+// mastery art: locked (red), connected (blue) and chosen (green) sheets plus the pattern (yellow),
+// flat colours sized to cover every sprite in the data
+const MA = D.masteryArt, mErrs = [];
+const ext = (ks, sz) => [Math.max(...MA.art.flatMap(a => ks.map(k => a[k]))) + sz[0], Math.max(...MA.art.flatMap(a => ks.map(k => a[k + 1]))) + sz[1]];
+const mArt = {}, iw = ext([0, 2], MA.size), ew = ext([4], MA.effect.size);
+mArt[MA.inactive] = sized(iw[0], iw[1], 'rgb(220,30,30)');
+mArt[MA.connected] = sized(iw[0], iw[1], 'rgb(30,30,220)');
+mArt[MA.active] = sized(iw[0], iw[1], 'rgb(30,220,30)');
+mArt[MA.effect.url] = sized(ew[0], ew[1], 'rgb(230,230,20)');
+window.__stubOverrides.cache_art = { ok: true, art: mArt };
+const nM = H.calls('cache_art').length;
+TREE_SPRITES = null;
+const mDraw = () => { try { treeDraw(cv); } catch (e) { mErrs.push(String(e && e.stack || e)); } };
+const linked = n => (T.I.mnotes[n.id] || []).some(id => T.M.alloc[id]);
+const chosenM = cv.masteries.find(n => T.M.mastery[n.id] === build.tree.masteries[0][1]);
+const connM = cv.masteries.find(n => !T.M.mastery[n.id] && linked(n));
+const lockedM = cv.masteries.find(n => !T.M.mastery[n.id] && !linked(n));
+out.mStates = [chosenM, connM, lockedM].map(n => n ? treeMasteryState(T, n) : null);
+cv.cx = chosenM.x; cv.cy = chosenM.y; cv.s = 0.5; mDraw();
+await H.waitFor(() => TREE_SPRITES && TREE_SPRITES.state !== 'loading', 5000, 'mastery sheets');
+out.mSprites = [TREE_SPRITES.state, !!TREE_SPRITES.mastery, !!(TREE_SPRITES.mastery && TREE_SPRITES.mastery.effect)];
+out.mCalls = H.calls('cache_art').slice(nM).map(c => JSON.parse(c.args[0]));
+out.mCentre = {}; out.mDrawn = {};
+[['chosen', chosenM], ['connected', connM], ['locked', lockedM]].forEach(([k, n]) => {
+  cv.cx = n.x; cv.cy = n.y; cv.s = 0.5; mDraw();
+  out.mCentre[k] = pixel(cv.w / 2, cv.h / 2);
+  out.mDrawn[k] = Object.assign({}, cv.masteryDrawn);
+});
+// the pattern: behind the chosen mastery's group, past its icon (diagonal, between the orbits)
+cv.cx = chosenM.x; cv.cy = chosenM.y; cv.s = 0.5; mDraw();
+const off = 70; // px: outside the 56 px half icon, inside the 193 px half pattern
+out.mPattern = pixel(cv.w / 2 + off, cv.h / 2 + off);
+const fx = TREE_SPRITES.mastery.effect;
+TREE_SPRITES.mastery.effect = null; mDraw();
+out.mNoPattern = pixel(cv.w / 2 + off, cv.h / 2 + off);
+TREE_SPRITES.mastery.effect = fx;
+// compare colours stay as rings on top: the build's first mastery has another effect on the character
+T.mode = 'compare'; mDraw();
+const tc = document.createElement('canvas').getContext('2d'); tc.fillStyle = treeColors().take;
+const take = [1, 3, 5].map(i => parseInt(tc.fillStyle.slice(i, i + 2), 16));
+const ringPx = Math.max(treeNodeRadius(chosenM, cv.s), MA.size[0] / MA.zoom * cv.s * 0.42) + 4;
+out.mChangeRing = 0;
+for (let k = 0; k < 72; k++) {
+  const p = pixel(cv.w / 2 + ringPx * Math.cos(k * Math.PI / 36), cv.h / 2 + ringPx * Math.sin(k * Math.PI / 36));
+  if (p.every((v, i) => Math.abs(v - take[i]) < 40)) out.mChangeRing++;
+}
+T.mode = 'build';
+// a zoomed-in redraw with many masteries on screen stays fast; zoomed out to fit, no mastery art
+cv.s = 0.25; mDraw();
+out.mMany = Object.assign({}, cv.masteryDrawn);
+const t2 = performance.now();
+for (let i = 0; i < 10; i++) mDraw();
+out.mMs = (performance.now() - t2) / 10;
+H.button(sec.querySelector('.tv-zoom'), 'Fit').click();
+out.mFit = Object.assign({}, cv.masteryDrawn);
+out.mErrs = mErrs;
 delete window.__stubOverrides.cache_art;
 return out;
 """
@@ -2543,13 +2638,61 @@ def scenario_tree(s, tag):
           r["notableIcon"] == ic["at"][2 * k:2 * k + 2], (r["notableIcon"], ic["at"][2 * k:2 * k + 2]))
     check(tag + " icons: no sheets in the art cache -> plain dots, nothing drawn", r["iconFallback"] == ["failed", 0],
           r["iconFallback"])
-    check(tag + " icons: sheets fetched through cache_art (active + inactive, one call)",
-          r["spriteState"] == "ready" and r["artCalls"] == [[ic["active"], ic["inactive"]]], (r["spriteState"], r["artCalls"]))
+    ma = tv["masteryArt"]
+    m_urls = [ma["inactive"], ma["connected"], ma["active"], ma["effect"]["url"]]
+    check(tag + " icons: sheets fetched through cache_art (active + inactive + the 4 mastery sheets, one call)",
+          r["spriteState"] == "ready" and r["artCalls"] == [[ic["active"], ic["inactive"]] + m_urls], (r["spriteState"], r["artCalls"]))
     px = r["centrePixel"]
     check(tag + " icons: zoomed in, allocated notable drawn from the active sheet", r["iconsZoomed"] > 10 and
           px[1] > 150 and px[0] < 80 and px[2] < 90, (r["iconsZoomed"], px))
+    check(tag + " masteries: no mastery sheets in the art cache -> icons still drawn, masteries keep plain rings",
+          r["masteryNoSheets"] == [False, {"locked": 0, "connected": 0, "chosen": 0, "effects": 0}], r["masteryNoSheets"])
     check(tag + " icons: none when zoomed out to fit", r["iconsFit"] == 0, r["iconsFit"])
     check(tag + " icons: a zoomed-in redraw stays fast (< 30 ms)", r["drawMs"] < 30, r["drawMs"])
+    bg = tv["background"]
+    check(tag + " backdrop data: tile, group sheet, a circle per group, the 7 class start arts",
+          bg["tile"]["url"].startswith("https://web.poecdn.com/") and bg["sheet"]["url"].startswith("https://web.poecdn.com/") and
+          len(bg["groups"]) // 3 > 300 and len(bg["starts"]) == 14, (len(bg["groups"]) // 3, bg["starts"]))
+    check(tag + " backdrop: no sheets in the art cache -> plain background, nothing drawn", r["bgFallback"] == ["failed", None],
+          r["bgFallback"])
+    check(tag + " backdrop: tile + group sheets fetched through cache_art (one call)",
+          r["bgState"] == "ready" and r["bgCalls"] == [[bg["tile"]["url"], bg["sheet"]["url"]]], (r["bgState"], r["bgCalls"]))
+    fit = r["bgFit"] or {}
+    check(tag + " backdrop drawn at fit: tile, every group circle, every class start", fit.get("tile") and
+          fit.get("groups", 0) > 300 and fit.get("starts") == 7 and not fit.get("painting"), fit)
+    cp, cb = r["cornerPlain"], r["cornerBg"]
+    check(tag + " backdrop: the tile shows (dimmed) where the plain background was", cb != cp and cb[2] > cp[2] and cb[2] < 160,
+          (cp, cb))
+    check(tag + " backdrop: the ascendancy inset keeps its plain background", r["insetBg"] is None, r["insetBg"])
+    zb, c = r["bgZoomed"] or {}, r["centreOverBg"]
+    check(tag + " backdrop: zoomed in, nodes stay on top of it (allocated notable's icon at the centre)",
+          zb.get("tile") and c[1] > 150 and c[0] < 80 and c[2] < 90, (zb, c))
+    check(tag + " backdrop: a fitted redraw stays fast (< 40 ms, < plain + 15 ms)",
+          r["bgMs"][1] < 40 and r["bgMs"][1] < r["bgMs"][0] + 15, r["bgMs"])
+    check(tag + " masteries: test picks a chosen, a connected and a locked one", r["mStates"] == ["chosen", "connected", "locked"],
+          r["mStates"])
+    check(tag + " masteries: the 4 sheets fetched through cache_art (one call), cut once, pattern included",
+          r["mSprites"] == ["ready", True, True] and r["mCalls"] == [m_urls], (r["mSprites"], r["mCalls"]))
+    mc, md = r["mCentre"], r["mDrawn"]
+    check(tag + " masteries: chosen drawn from the active-selected sheet", md["chosen"]["chosen"] >= 1 and
+          mc["chosen"][1] > 150 and mc["chosen"][0] < 90 and mc["chosen"][2] < 90, (md["chosen"], mc["chosen"]))
+    check(tag + " masteries: connected drawn from the connected sheet", md["connected"]["connected"] >= 1 and
+          mc["connected"][2] > 150 and mc["connected"][0] < 90 and mc["connected"][1] < 90, (md["connected"], mc["connected"]))
+    lk = mc["locked"]
+    check(tag + " masteries: locked drawn from the inactive sheet, dimmed", md["locked"]["locked"] >= 1 and
+          lk[0] > 100 and lk[0] < 215 and lk[0] > lk[1] + 50 and lk[0] > lk[2] + 50, (md["locked"], lk))
+    pp, np_ = r["mPattern"], r["mNoPattern"]
+    check(tag + " masteries: the chosen one's pattern drawn large behind its group (past its icon)",
+          md["chosen"]["effects"] >= 1 and pp != np_ and pp[0] > 150 and pp[1] > 150 and pp[2] < 120, (pp, np_))
+    check(tag + " masteries: 'effect to change' ring (compare colour) drawn round the chosen icon", r["mChangeRing"] >= 4,
+          r["mChangeRing"])
+    many = r["mMany"]
+    check(tag + " masteries: zoomed in on a wide area, all three states drawn", many["chosen"] >= 1 and many["connected"] >= 1 and
+          many["locked"] >= 3, many)
+    check(tag + " masteries: no mastery art zoomed out to fit", r["mFit"] == {"locked": 0, "connected": 0, "chosen": 0, "effects": 0},
+          r["mFit"])
+    check(tag + " masteries: no exceptions while drawing", not r["mErrs"], r["mErrs"][:2])
+    check(tag + " masteries: a zoomed-in redraw with mastery art stays fast (< 40 ms)", r["mMs"] < 40, r["mMs"])
 
 
 S28_STAGES = r"""
@@ -3645,6 +3788,72 @@ return out;
 """
 
 
+S41_NOBUILD = r"""
+const H = window.__e2e;
+const out = {};
+const navKeys = () => [...document.querySelectorAll('#nav .nav-item')].map(b => b.dataset.view);
+out.shell = document.body.classList.contains('shell') && H.visible(document.getElementById('sidebar'));
+out.view = document.body.dataset.view;
+out.landing = H.visible(document.getElementById('input-panel'));
+out.nav = navKeys();
+// tools without a build
+const go = async k => { document.querySelector('#nav .nav-item[data-view="' + k + '"]').click(); await H.sleep(40); };
+await go('search');
+out.search = H.visible(document.querySelector('#tool-sections .tab-section[data-tab="search"]')) && !H.visible(document.getElementById('input-panel'));
+await go('divcards');
+out.divcards = H.visible(document.querySelector('#tool-sections .tab-section[data-tab="divcards"]'));
+await go('uniques');
+out.uniques = H.visible(document.querySelector('#tool-sections .tab-section[data-tab="uniques"]'));
+out.noBulk = !H.visible(document.getElementById('open-all')) && !H.visible(document.getElementById('check-all'));
+setView('gear'); // a build view without a build: the Builds page instead
+out.gearFallback = document.body.dataset.view;
+await go('home');
+out.homeAgain = H.visible(document.getElementById('input-panel'));
+return out;
+"""
+
+S41_SAVE = r"""
+const H = window.__e2e;
+const out = {};
+const lib = () => JSON.parse(localStorage.getItem('pobtf-builds') || '[]');
+await H.loadBuild();
+await H.sleep(60);
+const offer = [...document.querySelectorAll('.toast')].find(t => /Save this build/.test(t.textContent));
+out.offer = !!offer;
+H.button(offer, '☆ Save').click();
+await H.sleep(40);
+const dlg = document.querySelector('dialog[open]');
+out.prefill = dlg.querySelector('.lib-name-input').value;
+dlg.querySelector('.lib-name-input').value = 'My league starter';
+H.button(dlg, 'Save').click();
+await H.sleep(40);
+out.saved = lib().map(b => ({ name: b.name, asc: b.asc, cls: b.cls, skill: b.skill, has: !!b.code }));
+out.btn = document.getElementById('save-build').textContent;
+// the Builds page: one card, sorted, searchable
+document.querySelector('#nav .nav-item[data-view="home"]').click();
+await H.sleep(40);
+out.cards = [...document.querySelectorAll('#saved-list .saved-name')].map(e => e.textContent);
+out.count = H.text('#saved-count');
+// loading it again: no second offer, marked opened
+const toastsBefore = document.querySelectorAll('.toast').length;
+document.querySelector('#saved-list .saved-open').click();
+await H.waitFor(() => document.body.dataset.view !== 'home', 5000, 'reload');
+await H.sleep(60);
+out.noSecondOffer = ![...document.querySelectorAll('.toast')].some(t => /Save this build/.test(t.textContent));
+out.opened = !!lib()[0].opened;
+// ⋯ rename
+document.querySelector('#nav .nav-item[data-view="home"]').click();
+await H.sleep(30);
+document.querySelector('#saved-list button[aria-label^="Rename, Atlas strategy, delete"]').click();
+await H.sleep(30);
+const ed = document.querySelector('dialog[open]');
+ed.querySelector('.lib-name-input').value = 'Renamed starter';
+H.button(ed, 'Save changes').click();
+await H.sleep(40);
+out.renamed = lib()[0].name;
+return out;
+"""
+
 S44_SETTINGS = r"""
 const H = window.__e2e;
 const out = {};
@@ -3696,6 +3905,29 @@ inp.value = 'abc123'; document.getElementById('sessid-save').click(); await H.sl
 out.failed = [H.text('#sessid-status'), inp.value];
 return out;
 """
+
+
+def scenario_nobuild(s, tag):
+    s.fresh()
+    r = s.run(S41_NOBUILD, timeout=60)
+    check(tag + " launch: sidebar + Builds page without a build", r["shell"] and r["view"] == "home" and r["landing"], r)
+    check(tag + " nav: Builds + the tools that need no build, not the build ones",
+          r["nav"][:1] == ["home"] and all(k in r["nav"] for k in ("search", "divcards", "uniques", "sheets", "dust", "market"))
+          and not any(k in r["nav"] for k in ("gear", "planner", "tree", "timeless", "finder")), r["nav"])
+    check(tag + " search text, div cards, Watcher's Eye open with no build", r["search"] and r["divcards"] and r["uniques"], r)
+    check(tag + " no build: no Open all / Check all prices", r["noBulk"], r)
+    check(tag + " a build-only view falls back to the Builds page", r["gearFallback"] == "home" and r["homeAgain"], r)
+    s.fresh()
+    r = s.run(S41_SAVE, timeout=90)
+    check(tag + " importing a new build offers to save it", r["offer"], r)
+    check(tag + " save asks for a name, prefilled with skill + ascendancy", " · " in (r["prefill"] or ""), r["prefill"])
+    sv = (r["saved"] or [{}])[0]
+    check(tag + " saved with your name, class and main skill", sv.get("name") == "My league starter" and sv.get("has")
+          and (sv.get("asc") or sv.get("cls")), r["saved"])
+    check(tag + " the build card shows ★ Saved", r["btn"] == "★ Saved", r["btn"])
+    check(tag + " Builds page lists it", r["cards"] == ["My league starter"] and r["count"] == "1", (r["cards"], r["count"]))
+    check(tag + " reloading a saved build: no second offer, marked opened", r["noSecondOffer"] and r["opened"], r)
+    check(tag + " ⋯ renames it", r["renamed"] == "Renamed starter", r["renamed"])
 
 
 def scenario_settings_tabs(s, tag):
@@ -4029,6 +4261,187 @@ def scenario_sheets(s, tag):
           "Through Sacred Ground" in r["preview"], r["preview"])
 
 
+S42_ATLAS = r"""
+const H = window.__e2e;
+const out = {};
+const V = () => document.getElementById('view-atlas');
+const btn = label => H.button(V(), label);
+const dlg = () => document.querySelector('dialog.ui-dialog[open]');
+openAtlasView();
+await H.waitFor(() => ATLAS && ATLAS.main.w > 0, 3000, 'atlas canvas sized');
+await H.frame();
+out.view = [document.body.dataset.view, H.visible(V()), H.text('#view-title')];
+// colour of the pixel at a node's centre, after centring it
+const probe = document.createElement('canvas').getContext('2d');
+const hex = c => { probe.fillStyle = c; return probe.fillStyle; };
+const rgbAt = id => {
+  atlasFocusNode(id); ATLAS.flash = null; atlasDraw();
+  const cv = ATLAS.main, d = cv.ctx.getImageData(Math.round(cv.w / 2 * cv.dpr), Math.round(cv.h / 2 * cv.dpr), 1, 1).data;
+  return '#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+};
+out.accent = hex(treeColors().alloc);
+// import the official link
+const paste = t => { V().querySelector('.atlas-input').value = t; btn('Import').click(); }; // the side panel re-renders
+paste(URL_);
+await H.waitFor(() => ATLAS.M.points > 0, 3000, 'import');
+out.status = H.text('.atlas-status', V());
+out.points = [ATLAS.M.points, H.text('.atlas-points', V()), H.text('.atlas-current .tv-stat', V())];
+out.ids = Object.keys(ATLAS.M.alloc).map(Number).sort((a, b) => a - b);
+out.title = H.text('.atlas-title', V());
+out.onPx = rgbAt(SMALL);
+out.offPx = rgbAt(OFF);
+// tooltip on hover
+const cv = ATLAS.main, n = ATLAS.I.byId[SMALL], r = cv.el.getBoundingClientRect();
+atlasFocusNode(SMALL);
+cv.el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1,
+  clientX: r.left + (n.x - cv.cx) * cv.s + cv.w / 2, clientY: r.top + (n.y - cv.cy) * cv.s + cv.h / 2 }));
+out.tip = [!ATLAS.tip.hidden, H.text('.tv-tip-name', ATLAS.tip), H.text('.tv-tip-stat', ATLAS.tip), H.text('.tv-tip-meta .badge', ATLAS.tip)];
+// search
+const q = V().querySelector('.atlas-search'); q.value = SEARCH; q.dispatchEvent(new Event('input'));
+out.search = H.text('.tv-count', V());
+q.value = ''; q.dispatchEvent(new Event('input'));
+// unknown input: a clear error, the tree stays
+paste('hello world'); await H.sleep(50);
+out.junk = [H.text('.atlas-status', V()), ATLAS.M.points];
+// save under a name
+const nameEl = () => V().querySelector('.atlas-name');
+nameEl().value = 'Essence farm'; btn('Save').click(); await H.sleep(20);
+const stored = () => JSON.parse(localStorage.getItem('pobtf-atlas') || '[]');
+out.saved = stored().map(s => [s.name, s.nodes.length, s.url === URL_]);
+out.persisted = H.calls('storage_set').some(c => c.args[0] === 'pobtf-atlas');
+const id = ATLAS.savedId;
+out.savedTitle = H.text('.atlas-title', V());
+out.usedNone = H.text('.atlas-used-by', V());
+// rename + notes
+nameEl().value = 'Essence + Harvest'; btn('Rename').click(); await H.sleep(20);
+out.renamed = [stored()[0].name, atlasName(id), H.text('.atlas-title', V())];
+const notes = V().querySelector('.atlas-notes'); notes.value = 'Rusted essence scarabs'; notes.dispatchEvent(new Event('change'));
+out.notes = stored()[0].notes;
+// linked from a saved build (04-library.js entries carry atlas: id)
+localStorage.setItem('pobtf-builds', JSON.stringify([{ name: 'My Witch · Necromancer', code: 'x', atlas: id }, { name: 'Other', code: 'y' }]));
+setView('market'); await H.sleep(20); setView('atlas'); await H.sleep(20);
+out.usedBy = H.text('.atlas-used-by', V());
+out.list = atlasList();
+// another tree (node names), then reopen the saved one from the list and through atlasOpen
+paste(NAMES);
+await H.waitFor(() => ATLAS.savedId === null, 3000, 'second import');
+out.second = [ATLAS.M.points, H.text('.atlas-title', V())];
+[...V().querySelectorAll('.atlas-saved-item')].find(b => b.textContent.startsWith('Essence + Harvest')).click();
+await H.sleep(20);
+out.reopened = [ATLAS.savedId === id, ATLAS.M.points, H.text('.atlas-title', V()), V().querySelector('.atlas-notes').value];
+setView('market'); await H.sleep(20);
+out.open = [atlasOpen(id), document.body.dataset.view, ATLAS.savedId === id, atlasOpen('nope')];
+// delete: asks first, Cancel keeps it
+btn('Delete').click(); await H.waitFor(dlg, 2000, 'confirm');
+out.confirm = [H.text('.ui-dialog-title', dlg()), H.text('.ui-dialog-body', dlg())];
+H.button(dlg(), 'Cancel').click(); await H.sleep(20);
+out.afterCancel = stored().length;
+btn('Delete').click(); await H.waitFor(dlg, 2000, 'confirm again');
+H.button(dlg(), 'Delete').click(); await H.sleep(30);
+out.afterDelete = [stored().length, atlasName(id), H.text('.atlas-title', V()), ATLAS.M.points];
+// the in-game backdrop: none in the stub's art cache -> plain; with sheets -> tile, painting, circles
+const cv2 = ATLAS.main, B = ATLAS.I.D.background;
+const pixel = (x, y) => [...cv2.ctx.getImageData(Math.round(x * cv2.dpr), Math.round(y * cv2.dpr), 1, 1).data].slice(0, 3);
+treeFit(cv2); atlasDraw();
+out.bgFallback = [ATLAS_BG && ATLAS_BG.state, cv2.bgDrawn];
+const corner = p => [(p[0] + 60 - cv2.cx) * cv2.s + cv2.w / 2, (p[1] + 60 - cv2.cy) * cv2.s + cv2.h / 2];
+const pr = B.painting.rect;
+out.plain = [pixel(2, 2), pixel.apply(null, corner(pr))];
+function sized(w, h, rgb) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = rgb; g.fillRect(0, 0, w, h);
+  return c.toDataURL('image/png');
+}
+const bgArt = {};
+bgArt[B.tile.url] = sized(B.tile.rect[2], B.tile.rect[3], 'rgb(40,40,160)');
+bgArt[B.sheet.url] = sized(1400, 1200, 'rgb(200,160,60)');
+bgArt[B.painting.url] = sized(2048, 1974, 'rgb(170,30,30)');
+window.__stubOverrides.cache_art = { ok: true, art: bgArt };
+const nBg = H.calls('cache_art').length;
+ATLAS_BG = null;
+atlasDraw();
+await H.waitFor(() => ATLAS_BG && ATLAS_BG.state !== 'loading', 5000, 'atlas background');
+out.bgState = ATLAS_BG.state;
+out.bgCalls = H.calls('cache_art').slice(nBg).map(c => JSON.parse(c.args[0]));
+atlasDraw();
+out.bgFit = cv2.bgDrawn;
+out.withBg = [pixel(2, 2), pixel.apply(null, corner(pr))];
+const t0 = performance.now();
+for (let i = 0; i < 5; i++) atlasDraw();
+out.bgMs = (performance.now() - t0) / 5;
+out.onPxBg = rgbAt(SMALL); // an allocated node keeps the accent colour over the painting
+delete window.__stubOverrides.cache_art;
+// the Tools nav lists it
+await H.loadBuild();
+out.nav = !!document.querySelector('#nav .nav-item[data-view="atlas"]');
+return out;
+"""
+
+
+def scenario_atlas(s, tag):
+    with open(os.path.join(ROOT, "data", "atlasview.js"), encoding="utf-8") as f:
+        src = f.read()
+    av = json.loads(src[src.index("{"):src.rindex("}") + 1])
+    nodes = av["nodes"]
+    names = {}
+    for n in nodes:
+        names[n[4]] = names.get(n[4], 0) + 1
+    smalls = [n[0] for n in nodes if n[3] == 0]
+    notables = [n for n in nodes if n[3] == 1 and names[n[4]] == 1]
+    ids = sorted(smalls[:12] + [n[0] for n in notables[:5]] + [next(n[0] for n in nodes if n[3] == 2)])
+    body = bytes([0, 0, 0, 6, 0, 0, len(ids)]) + b"".join(bytes([i >> 8, i & 255]) for i in ids) + bytes([0, 0])
+    url = "https://www.pathofexile.com/fullscreen-atlas-skill-tree/" + base64.urlsafe_b64encode(body).decode()
+    s.fresh()
+    r = s.run(S42_ATLAS, timeout=90, URL_=url, SMALL=smalls[0], OFF=smalls[-1], SEARCH=notables[0][4],
+              NAMES="\n".join(n[4] for n in notables[5:8]))
+    check(tag + " Atlas tree view opens", r["view"] == ["atlas", True, "Atlas tree"], r["view"])
+    check(tag + " official link imported: its nodes allocated, points shown", r["ids"] == ids and
+          r["points"][0] == len(ids) and r["points"][1] == str(len(ids)) and "/ %d Atlas points" % av["totalPoints"] in r["points"][2],
+          (r["points"], len(ids)))
+    check(tag + " import message", "Imported %d points from the Atlas link" % len(ids) in (r["status"] or ""), r["status"])
+    check(tag + " allocated node drawn in the accent colour, others not", r["onPx"] == r["accent"] and r["offPx"] != r["accent"],
+          (r["onPx"], r["offPx"], r["accent"]))
+    check(tag + " tooltip: name, stat, Allocated", r["tip"][0] and r["tip"][1] and r["tip"][2] and r["tip"][3] == "Allocated", r["tip"])
+    check(tag + " search counts matches", " match" in (r["search"] or "") and r["search"].endswith(" · 1 allocated"), r["search"])
+    check(tag + " unknown input: clear error, tree kept", "isn't an Atlas tree" in (r["junk"][0] or "") and r["junk"][1] == len(ids), r["junk"])
+    check(tag + " saved under its name (pobtf-atlas, through the bridge)", r["saved"] == [["Essence farm", len(ids), True]] and
+          r["persisted"] and r["savedTitle"] == "Essence farm", (r["saved"], r["savedTitle"]))
+    check(tag + " Used by: none yet", "no saved build" in (r["usedNone"] or ""), r["usedNone"])
+    check(tag + " rename", r["renamed"] == ["Essence + Harvest"] * 3, r["renamed"])
+    check(tag + " notes kept", r["notes"] == "Rusted essence scarabs", r["notes"])
+    check(tag + " Used by: the saved build that links it", r["usedBy"] == "Used by: My Witch", r["usedBy"])
+    check(tag + " atlasList for the build library", r["list"] and r["list"][0]["name"] == "Essence + Harvest" and
+          r["list"][0]["points"] == len(ids), r["list"])
+    check(tag + " node names import as an unsaved tree", r["second"] == [3, "Imported tree (not saved)"], r["second"])
+    check(tag + " reopen from the saved list (points, name, notes)", r["reopened"] == [True, len(ids), "Essence + Harvest",
+          "Rusted essence scarabs"], r["reopened"])
+    check(tag + " atlasOpen(id) switches to the view; unknown id refused", r["open"] == [True, "atlas", True, False], r["open"])
+    check(tag + " delete asks first, naming the linked build", "Essence + Harvest" in (r["confirm"][0] or "") and
+          "1 saved build links to it" in (r["confirm"][1] or ""), r["confirm"])
+    check(tag + " Cancel keeps it", r["afterCancel"] == 1, r["afterCancel"])
+    check(tag + " Delete removes it, the tree stays on screen unsaved", r["afterDelete"] == [0, None, "Imported tree (not saved)", len(ids)],
+          r["afterDelete"])
+    bg = av["background"]
+    urls = [bg["tile"]["url"], bg["sheet"]["url"], bg["painting"]["url"]]
+    check(tag + " backdrop data: tile, group sheet, painting (GGG's CDN), a circle per group, the start art",
+          all(u.startswith("https://web.poecdn.com/") for u in urls) and len(bg["groups"]) // 3 > 100 and
+          len(bg["starts"]) == 2 and bg["starts"][0] in av["starts"], (len(bg["groups"]) // 3, bg["starts"]))
+    check(tag + " backdrop: no sheets in the art cache -> plain background, nothing drawn", r["bgFallback"] == ["failed", None],
+          r["bgFallback"])
+    check(tag + " backdrop: the three sheets fetched through cache_art (one call)",
+          r["bgState"] == "ready" and r["bgCalls"] == [urls], (r["bgState"], r["bgCalls"]))
+    fit = r["bgFit"] or {}
+    check(tag + " backdrop drawn at fit: tile, painting, every group circle, the start art", fit.get("tile") and
+          fit.get("painting") and fit.get("groups") == len(bg["groups"]) // 3 and fit.get("starts") == 1, fit)
+    (pc, pp), (bc, bp) = r["plain"], r["withBg"]
+    check(tag + " backdrop: tile outside the painting, the painting (dimmed) inside it",
+          bc != pc and bc[2] > bc[0] and bp != pp and bp[0] > bp[2] and bp[0] < 170, (r["plain"], r["withBg"]))
+    check(tag + " backdrop: allocated node still in the accent colour on top", r["onPxBg"] == r["accent"], (r["onPxBg"], r["accent"]))
+    check(tag + " backdrop: a fitted redraw stays fast (< 40 ms)", r["bgMs"] < 40, r["bgMs"])
+    check(tag + " Tools nav lists the Atlas tree", r["nav"], r["nav"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -4070,6 +4483,8 @@ SCENARIOS = [
     ("38 sheets2", scenario_sheets2),
     ("39 autocompare", scenario_autocompare),
     ("40 anoints", scenario_anoints),
+    ("41 nobuild", scenario_nobuild),
+    ("42 atlas", scenario_atlas),
     ("43 lootfilter", scenario_lootfilter),
     ("44 settingstabs", scenario_settings_tabs),
     ("45 patchnotes", scenario_patch_notes),
