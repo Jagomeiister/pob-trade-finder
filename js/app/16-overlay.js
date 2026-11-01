@@ -115,7 +115,7 @@ function refreshHotkeyStatus(promise) {
   }, function () { /* bridge gone */ });
 }
 
-// Settings → In game: the other hotkeys (gui.py HOTKEY_DEFAULTS) and close-to-tray
+// Settings → Hotkeys: the other hotkeys (gui.py HOTKEY_DEFAULTS) and close-to-tray
 var EXTRA_HOTKEYS = [['pref-hotkey-app', 'app', 'hotkeyApp', 'shift+space'],
                      ['pref-hotkey-trades', 'trades', 'hotkeyTrades', 'alt+t'],
                      ['pref-hotkey-sheet', 'sheet', 'hotkeySheet', 'alt+c']];
@@ -151,7 +151,7 @@ function wireExtraHotkeys() {
   }
 }
 
-// Settings → In game → Chat macros: one press (▶ or its hotkey) = one chat command. gui.py
+// Settings → Hotkeys → Chat macros: one press (▶ or its hotkey) = one chat command. gui.py
 // checks every command (one line starting with /) and only listens while the game is focused.
 var MACRO_DEFAULTS = [{ label: 'Kingsmarch', command: '/kingsmarch', hotkey: 'off' },
                       { label: 'Menagerie', command: '/menagerie', hotkey: 'off' },

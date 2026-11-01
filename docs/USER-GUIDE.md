@@ -320,7 +320,7 @@ Details:
 - Pressing the hotkey again on the same item within a minute reopens the existing results
   instead of searching again, to save rate limit. Price checks from the overlay share the
   main window's rate limiter
-- Change the key in **⚙ Settings → Price-check hotkey**: Ctrl+D, Ctrl+Shift+D, Alt+D or Off.
+- Change the key in **⚙ Settings → Hotkeys → Price-check hotkey**: Ctrl+D, Ctrl+Shift+D, Alt+D or Off.
   If another tool (for example Awakened PoE Trade) already uses that key, the settings
   panel says so. Pick another key, or turn one of the tools off
 - PoE 1 items only. Currency stacks, maps and other non-gear items open a card but may
@@ -343,7 +343,7 @@ Trade helper → Setup pins them):
   half of the screen, new cards stack upwards. Setup → **Trade cards** switches between stacked
   (vertical) and side by side (horizontal)
 
-**Hotkeys** (⚙ Settings → In game). Each one works only while the game is in front:
+**Hotkeys** (⚙ Settings → Hotkeys). Each one works only while the game is in front:
 
 | Default | What it does |
 |---|---|
@@ -352,7 +352,7 @@ Trade helper → Setup pins them):
 | Alt+T | Show or hide the trade cards |
 | Alt+C | Show or hide the cheat sheet (see 5i2) |
 
-**Chat macros** (⚙ Settings → In game → Chat macros): one click on **▶**, or one press of
+**Chat macros** (⚙ Settings → Hotkeys → Chat macros): one click on **▶**, or one press of
 the macro's hotkey, sends one command to the game chat. It starts with /kingsmarch,
 /menagerie, /delve and /exit (log out); change them, give each a hotkey (F2–F6, Alt+1–5,
 Ctrl+Shift+1–3) or **+ Add a macro** of your own, up to 12. A macro must be one chat command
@@ -880,13 +880,18 @@ Paste your **POESESSID** cookie into **⚙ Settings → Account** and Save — l
 searches then use the trade site's real **WebSocket**: new listings alert **the moment
 they're listed** (🟢 INSTANT), not on a 30-second poll. To find the cookie: on
 pathofexile.com while logged in, press F12 → Application → Cookies → `POESESSID`.
-It's stored only on this machine (`data/session.json`), sent only to pathofexile.com,
-and you can clear it by saving an empty field. If the session expires, live searches
-say so and fall back to polling.
+Save it once: it's kept on this machine (`data/session.json`) through restarts and updates,
+and sent only to pathofexile.com. Settings → Account says **Saved on this PC** (the box itself
+stays empty, it never shows the cookie back), and **Remove** deletes it. pathofexile.com ends a
+session when you log out there (or after a while): then Settings says so, live searches fall
+back to polling, and you save the new POESESSID from your browser.
 
 ## 7c. Settings & accessibility (⚙ Settings, bottom of the sidebar)
 
-Settings opens as a panel on the right; Esc or a click outside closes it.
+Settings opens as a panel on the right; Esc or a click outside closes it. It has tabs: **Look**,
+**Alerts**, **Hotkeys**, **In game**, **Account**, **Updates** and **Help**, and it reopens on the
+one you used last. **Find a setting** at the top searches every tab at once (a setting's name,
+help text or choices), and Esc clears it.
 
 - **Appearance** — **Theme**: Dark, Dim (a softer dark), Slate (blue-grey dark), Light, Parchment (warm, low-glare light), or Match Windows; **Accent**: gold, crimson,
   teal, violet or green. Every combination is checked for readable contrast. (Older colour
@@ -895,10 +900,14 @@ Settings opens as a panel on the right; Esc or a click outside closes it.
 - **Accessibility** — **High contrast** (brighter text and borders), **Reduce motion**
   (no flashes or animations), **Colourblind-friendly sockets** (letter labels R/G/B/W/A)
 - **Alerts** — live-search **sound** and **volume**, Windows notifications in the background
-- **In game** — the **price-check hotkey** (§5c): Ctrl+D, Ctrl+Shift+D, Alt+D or Off
-- **Account** — your POESESSID (§7b)
-- **Data and updates** — **Refresh trade data** and **Check for updates** (when there's a new
+- **Hotkeys** — the **price-check hotkey** (§5c), the app / trade cards / cheat sheet hotkeys,
+  and your **chat macros**
+- **In game** — the app over the game (see-through, a click in the game puts it away), close to
+  the tray, **Forget learned filters**, and shortcuts to the Trade helper and Cheat sheets
+- **Account** — your POESESSID (§7b) and the official login
+- **Updates** — **Refresh trade data** and **Check for updates** (when there's a new
   version, an **Update now** button appears right there)
+- **Help** — **Copy diagnostics** for a bug report, and About
 
 Everything works from the keyboard: Tab moves between controls, arrows move through the
 slot list, menus and Off / Want / Must switches, and Esc closes menus, pop-ups and panels.
@@ -931,13 +940,13 @@ league goes live, a banner offers **Switch to <league>**. It re-downloads the le
 stat database, switches every search and price to the new league, and reloads. **Not now**
 hides it for that league; you can still switch from the League menu any time.
 
-To refresh by hand, press **⚙ Settings → Refresh trade data**. From source:
+To refresh by hand, press **⚙ Settings → Updates → Refresh trade data**. From source:
 `node tools/make-data-js.js --fetch`, plus `python tools/make_ranges.py --fetch` and
 `python tools/make_baseicons.py --fetch` when patches add new mods/bases.
 
 ## 10. Troubleshooting
 
-Reporting a bug: **⚙ Settings → Copy diagnostics** copies the app version, Windows
+Reporting a bug: **⚙ Settings → Help → Copy diagnostics** copies the app version, Windows
 version, data dates, recent errors and the last log lines. Paste that into the GitHub
 issue. Your POESESSID, other tokens and your Windows user name are removed.
 
@@ -947,7 +956,7 @@ issue. Your POESESSID, other tokens and your Windows user name are removed.
 | Unique shows base art | First lookup per unique takes a few seconds (rate-limited), then it's cached forever. A lookup that fails for good (unknown name, nothing ever listed) isn't retried for a week, so it doesn't cost trade calls on every launch. `data/debug.log` records failures |
 | Link paste fails | Only pobb.in / pastebin / poe.ninja links are fetched (by design) — paste the raw code instead |
 | Browser version missing features | Live prices/whisper/etc. need the desktop app; also hard-refresh (Ctrl+F5) after updates |
-| Ctrl+D does nothing in game | Check ⚙ Settings → Price-check hotkey for a "taken by another program" warning. The game must be the focused window and in windowed / windowed-fullscreen mode. The item must be under the cursor |
+| Ctrl+D does nothing in game | Check ⚙ Settings → Hotkeys → Price-check hotkey for a "taken by another program" warning. The game must be the focused window and in windowed / windowed-fullscreen mode. The item must be under the cursor |
 | Everything says "cooldown" | GGG rate limit — wait it out; the countdown is shown. Don't hammer the trade website meanwhile (same IP budget) |
 
 PoE 1 only for now. Not affiliated with Grinding Gear Games.

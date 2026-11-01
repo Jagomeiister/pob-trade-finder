@@ -3637,6 +3637,82 @@ return out;
 """
 
 
+S44_SETTINGS = r"""
+const H = window.__e2e;
+const out = {};
+const panel = document.getElementById('settings-panel');
+const tabs = () => [...document.querySelectorAll('#settings-tabs .settings-tab')];
+const shown = () => [...panel.querySelectorAll('.settings-section')].filter(s => getComputedStyle(s).display !== 'none')
+  .map(s => s.querySelector('h3').textContent);
+const tab = label => tabs().find(b => b.textContent === label);
+document.getElementById('settings-btn').click();
+await H.sleep(30);
+out.tabs = tabs().map(b => b.textContent);
+out.first = [tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent, shown()];
+tab('Hotkeys').click(); await H.sleep(20);
+out.hotkeys = shown();
+document.getElementById('settings-close').click(); await H.sleep(20);
+document.getElementById('settings-btn').click(); await H.sleep(30);
+out.remembered = tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent;
+tab('Hotkeys').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); await H.sleep(20);
+out.arrow = [tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent, document.activeElement.textContent];
+// find: every tab at once, only what matches
+const find = document.getElementById('settings-find');
+find.value = 'tray'; find.dispatchEvent(new Event('input')); await H.sleep(20);
+const visibleItems = () => [...panel.querySelectorAll('.settings-section > :not(h3)')].filter(e => e.offsetParent !== null).map(e => e.textContent.trim().slice(0, 40));
+out.findTray = [shown(), visibleItems(), document.getElementById('settings-none').hidden];
+find.value = 'theme'; find.dispatchEvent(new Event('input')); await H.sleep(20);
+out.findTheme = shown();
+find.value = 'zzzz'; find.dispatchEvent(new Event('input')); await H.sleep(20);
+out.findNone = [shown().length, document.getElementById('settings-none').hidden];
+find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await H.sleep(20);
+out.cleared = [find.value, shown(), !panel.classList.contains('hidden')];
+document.getElementById('settings-close').click(); await H.sleep(20);
+// "Add POESESSID…" style: open on the tab holding a control, focused
+openSettings(null, 'sessid-input'); await H.sleep(30);
+out.jump = [tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent, document.activeElement.id];
+// POESESSID: kept on this PC, said so after a restart; Remove asks; a failed save says why
+window.__stubOverrides.session_status = { ok: true, set: true };
+await refreshSessionStatus(false);
+const inp = document.getElementById('sessid-input');
+out.saved = [inp.placeholder, H.text('#sessid-status'), !document.getElementById('sessid-remove').classList.contains('hidden')];
+document.getElementById('sessid-remove').click();
+await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'remove dialog');
+window.__stubOverrides.set_poesessid = { ok: true, set: false };
+window.__stubOverrides.session_status = { ok: true, set: false };
+H.button(document.querySelector('dialog[open]'), 'Remove').click(); await H.sleep(60);
+out.removed = [H.calls('set_poesessid').map(c => c.args[0]), inp.placeholder, document.getElementById('sessid-remove').classList.contains('hidden')];
+localStorage.setItem('pobtf-sessid-ack', '1');
+window.__stubOverrides.set_poesessid = { ok: false, error: 'disk is read-only' };
+inp.value = 'abc123'; document.getElementById('sessid-save').click(); await H.sleep(60);
+out.failed = [H.text('#sessid-status'), inp.value];
+return out;
+"""
+
+
+def scenario_settings_tabs(s, tag):
+    s.fresh()
+    r = s.run(S44_SETTINGS, timeout=40)
+    check(tag + " Settings has tabs", r["tabs"] == ["Look", "Alerts", "Hotkeys", "In game", "Account", "Updates", "Help"], r["tabs"])
+    check(tag + " opens on Look: Appearance + Accessibility only", r["first"] == ["Look", ["Appearance", "Accessibility"]], r["first"])
+    check(tag + " a tab shows only its sections", r["hotkeys"] == ["Hotkeys"], r["hotkeys"])
+    check(tag + " the last tab is remembered", r["remembered"] == "Hotkeys", r["remembered"])
+    check(tag + " arrow keys move between tabs", r["arrow"] == ["In game", "In game"], r["arrow"])
+    ft = r["findTray"]
+    check(tag + " Find searches every tab, shows only matches", ft[0] == ["In game"] and len(ft[1]) == 1 and
+          ft[1][0].startswith("Closing the window keeps the app in the") and ft[2], ft)
+    check(tag + " Find matches option text too", "Appearance" in r["findTheme"], r["findTheme"])
+    check(tag + " nothing found: says so", r["findNone"] == [0, False], r["findNone"])
+    check(tag + " Esc clears the search, not the panel", r["cleared"][0] == "" and r["cleared"][1] == ["In game"] and
+          r["cleared"][2], r["cleared"])
+    check(tag + " opening on a control jumps to its tab and focuses it", r["jump"] == ["Account", "sessid-input"], r["jump"])
+    check(tag + " a saved POESESSID says so after a restart, with Remove",
+          r["saved"][0].startswith("Saved on this PC") and "Saved on this PC" in (r["saved"][1] or "") and r["saved"][2], r["saved"])
+    check(tag + " Remove asks, then clears it", r["removed"] == [[""], "POESESSID", True], r["removed"])
+    check(tag + " a failed save says why and keeps what you typed", (r["failed"][0] or "").startswith("❌ Not saved: disk is read-only")
+          and r["failed"][1] == "abc123", r["failed"])
+
+
 def scenario_anoints(s, tag):
     s.fresh()
     r = s.run(S40_ANOINT_APP, timeout=60)
@@ -3795,6 +3871,7 @@ SCENARIOS = [
     ("38 sheets2", scenario_sheets2),
     ("39 autocompare", scenario_autocompare),
     ("40 anoints", scenario_anoints),
+    ("44 settingstabs", scenario_settings_tabs),
 ]
 
 

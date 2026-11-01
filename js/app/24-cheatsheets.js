@@ -700,9 +700,9 @@ function renderSheetGameControls(p) {
   var row = UI.el('div', 'trade-row');
   var hk = PREFS.hotkeySheet || 'alt+c';
   row.appendChild(UI.button('primary', { size: 'sm', label: 'Show / hide in game',
-    title: 'Same as ' + (hk === 'off' ? 'its hotkey (off: Settings → In game)' : hk.toUpperCase()) + ' in game',
+    title: 'Same as ' + (hk === 'off' ? 'its hotkey (off: Settings → Hotkeys)' : hk.toUpperCase()) + ' in game',
     onClick: function () { if (api.overlay_toggle_sheet) api.overlay_toggle_sheet(); } }));
-  row.appendChild(UI.el('span', 'finder-sub', hk === 'off' ? 'Hotkey off (Settings → In game)' : 'Hotkey: ' + hk.replace(/\b\w/g, function (c) { return c.toUpperCase(); })));
+  row.appendChild(UI.el('span', 'finder-sub', hk === 'off' ? 'Hotkey off (Settings → Hotkeys)' : 'Hotkey: ' + hk.replace(/\b\w/g, function (c) { return c.toUpperCase(); })));
   box.appendChild(row);
 
   var follow = UI.el('div', 'trade-row');

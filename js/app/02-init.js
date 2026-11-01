@@ -198,8 +198,12 @@ document.addEventListener('DOMContentLoaded', function () {
     this.disabled = true;
     try {
       var r = await window.pywebview.api.set_poesessid(inp.value);
+      if (!r || r.ok === false) { // couldn't write it: say so and keep what was typed
+        status.textContent = '❌ Not saved: ' + ((r && r.error) || 'no answer from the app');
+        this.disabled = false;
+        return;
+      }
       inp.value = '';
-      inp.placeholder = r && r.set ? 'POESESSID saved' : 'POESESSID (optional)';
       await refreshSessionStatus();
       if (r && r.set) {
         status.textContent = 'validating…';
@@ -218,6 +222,15 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     } catch (e) { /* bridge missing in browser */ }
     this.disabled = false;
+  });
+  document.getElementById('sessid-remove').addEventListener('click', async function () {
+    var ok = await UI.confirmDanger('Remove your POESESSID?', 'It\'s deleted from this PC. Instant live-search alerts and ' +
+      'bigger searches stop until you save one again.', 'Remove');
+    if (!ok) return;
+    var r = await window.pywebview.api.set_poesessid('');
+    if (!r || r.ok === false) { UI.toast('Not removed: ' + ((r && r.error) || 'no answer'), 'danger'); return; }
+    await refreshSessionStatus();
+    UI.toast('POESESSID removed.', 'success');
   });
 
   refreshBuildSelect();

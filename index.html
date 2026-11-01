@@ -78,8 +78,14 @@
       <div class="drawer-head">
         <h2 id="settings-title">Settings</h2>
         <button id="settings-close" class="btn btn-ghost btn-icon btn-sm" aria-label="Close settings">✕</button>
+        <!-- tabs + find: built by 03-shell.js from each section's data-tab (one tab can hold several sections) -->
+        <div class="settings-nav">
+          <input type="search" id="settings-find" class="settings-find" placeholder="Find a setting…" aria-label="Find a setting" autocomplete="off">
+          <div id="settings-tabs" class="settings-tabs" role="tablist" aria-label="Settings sections"></div>
+        </div>
       </div>
-      <section class="settings-section">
+      <p id="settings-none" class="settings-note settings-none" hidden>No setting matches. Try another word.</p>
+      <section class="settings-section" data-tab="look">
         <h3>Appearance</h3>
         <label class="field">
           <span class="field-label">Theme</span>
@@ -119,20 +125,21 @@
           </select>
         </label>
       </section>
-      <section class="settings-section">
+      <section class="settings-section" data-tab="look">
         <h3>Accessibility</h3>
         <label class="check"><input type="checkbox" id="pref-contrast"> High contrast text</label>
         <label class="check"><input type="checkbox" id="pref-motion"> Reduce motion (no flashes or animations)</label>
         <label class="check"><input type="checkbox" id="pref-cb"> Colourblind-friendly sockets (letter labels)</label>
       </section>
-      <section class="settings-section">
+      <section class="settings-section" data-tab="alerts">
         <h3>Alerts</h3>
         <label class="check"><input type="checkbox" id="pref-sound" checked> Sound for live-search hits</label>
         <label class="field"><span class="field-label">Volume</span> <input type="range" id="pref-volume" min="5" max="100" value="25"></label>
         <label class="check gui-only"><input type="checkbox" id="pref-notify" checked> Windows notification when the app is in the background</label>
       </section>
-      <section class="settings-section gui-only">
-        <h3>In game</h3>
+      <section class="settings-section gui-only" data-tab="hotkeys">
+        <h3>Hotkeys</h3>
+        <p class="settings-note">Each one works only while Path of Exile (or this app over it) is the window in front.</p>
         <label class="field">
           <span class="field-label">Price-check hotkey</span>
           <select id="pref-hotkey" title="Hover an item in Path of Exile and press this to price it in a small overlay. Only active while the game window is focused.">
@@ -177,6 +184,9 @@
           <div id="macro-list" class="macro-list"></div>
           <button id="macro-add" class="btn btn-ghost btn-sm" type="button">+ Add a macro</button>
         </div>
+      </section>
+      <section class="settings-section gui-only" data-tab="ingame">
+        <h3>In game</h3>
         <label class="field">
           <span class="field-label">App over the game: see-through</span>
           <select id="pref-over-opacity" title="How much of the game shows through when the app is over it (Shift+Space)">
@@ -196,13 +206,14 @@
           <button id="open-sheets" class="btn btn-secondary btn-sm" title="Leveling cheat sheets over the game: skill points, trials, bandits per act, and your own notes">📜 Cheat sheets…</button>
         </div>
       </section>
-      <section class="settings-section gui-only">
+      <section class="settings-section gui-only" data-tab="account">
         <h3>Account</h3>
-        <p class="settings-note">Optional. Your pathofexile.com POESESSID cookie unlocks instant live-search alerts and bigger searches. It is stored only on this PC and sent only to pathofexile.com. Save empty to clear.</p>
+        <p class="settings-note">Optional. Your pathofexile.com POESESSID cookie unlocks instant live-search alerts and bigger searches. Save it once: it's kept on this PC (through restarts and updates) and sent only to pathofexile.com.</p>
         <p class="settings-note">Your choice: it uses the trade site's endpoints with your login, which Grinding Gear Games doesn't officially support for third-party tools. Many trade tools work this way, at your own risk. Everything else in the app works without it.</p>
         <div class="char-sessid">
           <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID">
           <button id="sessid-save" class="btn btn-secondary">Save</button>
+          <button id="sessid-remove" class="btn btn-ghost hidden" type="button">Remove</button>
         </div>
         <div id="sessid-status"></div>
         <h4 class="settings-sub">Official Path of Exile login</h4>
@@ -213,7 +224,7 @@
         </div>
         <div id="oauth-status" class="settings-note"></div>
       </section>
-      <section class="settings-section gui-only">
+      <section class="settings-section gui-only" data-tab="updates">
         <h3>Data and updates</h3>
         <div class="settings-row">
           <button id="refresh-data" class="btn btn-secondary" title="Re-download stats + leagues from GGG (do this at league start)">Refresh trade data</button>
@@ -224,7 +235,7 @@
           <button id="update-now-settings" class="btn btn-primary btn-sm hidden" type="button">Update now</button>
         </div>
       </section>
-      <section class="settings-section">
+      <section class="settings-section" data-tab="help">
         <h3>Reporting a problem</h3>
         <div class="settings-row">
           <button id="copy-diagnostics" class="btn btn-secondary">Copy diagnostics</button>
@@ -232,7 +243,7 @@
         <div class="settings-note">Copies the app version, recent errors and log lines, ready to paste into a bug report.
           Your POESESSID and Windows user name are never included.</div>
       </section>
-      <section class="settings-section">
+      <section class="settings-section" data-tab="help">
         <h3>About</h3>
         <p class="settings-note">PoB Trade Finder is a free, open-source fan project. This product isn't affiliated with
           or endorsed by Grinding Gear Games in any way, and no community-made tool is GGG-approved.</p>
