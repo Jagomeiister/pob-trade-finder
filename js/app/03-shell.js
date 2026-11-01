@@ -190,6 +190,22 @@ var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks',
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
                    timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜' };
 
+// views with line-art icons in css/navicons.css (tools/make_navicons.py); the rest keep VIEW_ICONS
+var NAV_ICON_NAMES = { gear: 1, jewels: 1, flasks: 1, gems: 1, pasted: 1, planner: 1, timeless: 1, finder: 1,
+  uniques: 1, search: 1, divcards: 1, tree: 1, market: 1, stash: 1, trades: 1, sheets: 1, settings: 1, home: 1 };
+function navIcon(k, cls) {
+  var art = NAV_ICON_NAMES[k];
+  var ic = UI.el('span', (cls || 'nav-icon') + (art ? ' ni ni-' + k : ''), art ? '' : VIEW_ICONS[k] || '•');
+  ic.setAttribute('aria-hidden', 'true');
+  return ic;
+}
+// icon-only button with an art icon (the overlays' buttons)
+function navIconButton(k, label, onClick) {
+  var b = UI.iconButton('', label, { size: 'sm', onClick: onClick });
+  b.appendChild(navIcon(k, 'btn-ni'));
+  return b;
+}
+
 function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
 
 function setView(k) {
@@ -225,9 +241,7 @@ function renderNav() {
     b.type = 'button';
     b.dataset.view = k;
     b.title = VIEW_LABELS[k];
-    var ic = UI.el('span', 'nav-icon', VIEW_ICONS[k] || '•');
-    ic.setAttribute('aria-hidden', 'true');
-    b.appendChild(ic);
+    b.appendChild(navIcon(k));
     b.appendChild(UI.el('span', 'nav-label', VIEW_LABELS[k]));
     b.appendChild(UI.el('span', 'nav-count', navCount(k)));
     b.addEventListener('click', function () {

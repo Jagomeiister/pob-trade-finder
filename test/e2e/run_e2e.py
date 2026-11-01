@@ -1506,10 +1506,12 @@ let c = card('BuyerOne');
 out.opened = !!c && H.text('.ov-head-title') === 'Trades (1)';
 out.visibleCall = H.calls('overlay_visible').slice(-1)[0].args;
 out.newCard = { actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent), item: H.text('.tc-item', c),
-  where: H.text('.tc-where', c), note: H.text('.tc-note', c), inputs: c.querySelectorAll('input, select').length };
+  where: H.text('.tc-where', c), note: H.text('.tc-note', c), inputs: c.querySelectorAll('input, select').length,
+  dir: H.text('.tc-dir', c), status: H.text('.tc-status', c), theme: document.documentElement.dataset.theme || 'dark' };
 out.sendsAfterWhisper = sends().length;
 H.button(c, 'Invite').click();
 await H.sleep(30);
+out.invitedStatus = H.text('.tc-status', card('BuyerOne'));
 H.button(card('BuyerOne'), 'Busy').click();
 await H.sleep(30);
 out.sends1 = sends();
@@ -1530,10 +1532,13 @@ out.ignoreSent = sends().slice(n0);
 window.__tradeEvent({ type: 'joined', name: 'BuyerOne' });
 await H.sleep(20);
 c = card('BuyerOne');
-out.joined = { here: !!c.querySelector('.tc-here'), actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent),
-  outcomes: [...c.querySelectorAll('.tc-outcomes .btn')].map(b => b.textContent) };
+out.joined = { here: H.text('.tc-status', c) === 'In your hideout' && c.dataset.status === 'success',
+  actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent),
+  outcomes: [...c.querySelectorAll('.tc-outcomes .btn')].map(b => b.textContent),
+  headLines: Math.round(c.querySelector('.tc-head').getBoundingClientRect().height / 20) };
 window.__tradeEvent({ type: 'trade_accepted' });
 await H.sleep(20);
+out.acceptedStatus = H.text('.tc-status', card('BuyerOne'));
 c = card('BuyerOne');
 out.suggested = c.querySelector('.tc-outcomes .btn.suggested') ? c.querySelector('.tc-outcomes .btn.suggested').textContent : null;
 out.sendsAfterEvents = sends().length;
@@ -1690,6 +1695,11 @@ def scenario_trades(s, tag):
           "Ignore in game"], r["moreRow"])
     check(tag + " Ignore needs a second click, then sends /ignore once", r["ignoreArmedSends"] == 0 and
           r["ignoreSent"] == [["ignore", "BuyerOne", None]], (r["ignoreArmedSends"], r["ignoreSent"]))
+    check(tag + " card status in words: Waiting → Invited → In your hideout → Trade accepted",
+          [r["newCard"]["status"], r["invitedStatus"], r["acceptedStatus"]] == ["Waiting", "Invited", "Trade accepted"] and
+          r["newCard"]["dir"] == "Selling to", (r["newCard"], r["invitedStatus"], r["acceptedStatus"]))
+    check(tag + " card header stays on one line", r["joined"]["headLines"] <= 2, r["joined"])
+    check(tag + " in-game cards stay dark", r["newCard"]["theme"] == "dark", r["newCard"]["theme"])
     check(tag + " buyer joined: badge, Trade · Kick · Thanks, outcomes", r["joined"]["here"] and
           r["joined"]["actions"][:3] == ["Trade", "Kick", "Thanks"] and
           r["joined"]["outcomes"][0].startswith("✓ Completed") and "⌛ Time wasted" in r["joined"]["outcomes"], r["joined"])
@@ -1792,7 +1802,8 @@ def scenario_overlay_icon(s, tag):
           i["buttons"] == 0 and "Shift+Space" in i["title"] and "Alt+T" in i["title"], i)
     check(tag + " icon shows the open-trade count", r["count"] == "2", r["count"])
     check(tag + " icon click toggles the cards (through gui.py)", r["toggles"] == 1, r["toggles"])
-    check(tag + " extra buttons only on hover (settings, app, trade helper)", len(r["hoverButtons"]) == 3, r["hoverButtons"])
+    check(tag + " extra buttons only on hover (trade helper, cheat sheet, app, settings)", len(r["hoverButtons"]) == 4 and
+          "cheat sheet" in (r["hoverButtons"][1] or ""), r["hoverButtons"])
     check(tag + " 'only when there are trades' hides the icon with none", r["lastVisible"][:2] == ["icon", False],
           r["lastVisible"])
     check(tag + " icon window sized to the button", r["fit"][0] == "icon" and 0 < r["fit"][1] < 200, r["fit"])
