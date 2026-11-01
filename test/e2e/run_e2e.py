@@ -217,6 +217,14 @@ STUB_JS = r"""
     notify: function () { return { ok: true }; },
     open_url: function () { return { ok: true }; },
     unique_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },  // dust explorer
+    // loot filter: no filter files unless a scenario provides some
+    filter_list: function () { return { ok: true, dir: 'C:\\Users\\me\\Documents\\My Games\\Path of Exile', exists: true, filters: [] }; },
+    filter_read: function () { return { ok: false, error: 'stub: no filter' }; },
+    filter_write: function () { return { ok: true, mtime: 1, checkpoint: null }; },
+    filter_checkpoints: function () { return { ok: true, checkpoints: [] }; },
+    filter_restore: function () { return { ok: false, error: 'stub' }; },
+    filter_checkpoint: function () { return { ok: true, id: null, created: false }; },
+    filter_open_folder: function () { return { ok: true }; },
     unique_icon: function () { return NO_ART; },
     gem_icon: function () { return NO_ART; },
     art_manifest: function () { return { ok: true, art: {} }; },
@@ -3760,6 +3768,58 @@ out.renamed = lib()[0].name;
 return out;
 """
 
+S44_SETTINGS = r"""
+const H = window.__e2e;
+const out = {};
+const panel = document.getElementById('settings-panel');
+const tabs = () => [...document.querySelectorAll('#settings-tabs .settings-tab')];
+const shown = () => [...panel.querySelectorAll('.settings-section')].filter(s => getComputedStyle(s).display !== 'none')
+  .map(s => s.querySelector('h3').textContent);
+const tab = label => tabs().find(b => b.textContent === label);
+document.getElementById('settings-btn').click();
+await H.sleep(30);
+out.tabs = tabs().map(b => b.textContent);
+out.first = [tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent, shown()];
+tab('Hotkeys').click(); await H.sleep(20);
+out.hotkeys = shown();
+document.getElementById('settings-close').click(); await H.sleep(20);
+document.getElementById('settings-btn').click(); await H.sleep(30);
+out.remembered = tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent;
+tab('Hotkeys').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); await H.sleep(20);
+out.arrow = [tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent, document.activeElement.textContent];
+// find: every tab at once, only what matches
+const find = document.getElementById('settings-find');
+find.value = 'tray'; find.dispatchEvent(new Event('input')); await H.sleep(20);
+const visibleItems = () => [...panel.querySelectorAll('.settings-section > :not(h3)')].filter(e => e.offsetParent !== null).map(e => e.textContent.trim().slice(0, 40));
+out.findTray = [shown(), visibleItems(), document.getElementById('settings-none').hidden];
+find.value = 'theme'; find.dispatchEvent(new Event('input')); await H.sleep(20);
+out.findTheme = shown();
+find.value = 'zzzz'; find.dispatchEvent(new Event('input')); await H.sleep(20);
+out.findNone = [shown().length, document.getElementById('settings-none').hidden];
+find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await H.sleep(20);
+out.cleared = [find.value, shown(), !panel.classList.contains('hidden')];
+document.getElementById('settings-close').click(); await H.sleep(20);
+// "Add POESESSID…" style: open on the tab holding a control, focused
+openSettings(null, 'sessid-input'); await H.sleep(30);
+out.jump = [tabs().find(b => b.getAttribute('aria-selected') === 'true').textContent, document.activeElement.id];
+// POESESSID: kept on this PC, said so after a restart; Remove asks; a failed save says why
+window.__stubOverrides.session_status = { ok: true, set: true };
+await refreshSessionStatus(false);
+const inp = document.getElementById('sessid-input');
+out.saved = [inp.placeholder, H.text('#sessid-status'), !document.getElementById('sessid-remove').classList.contains('hidden')];
+document.getElementById('sessid-remove').click();
+await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'remove dialog');
+window.__stubOverrides.set_poesessid = { ok: true, set: false };
+window.__stubOverrides.session_status = { ok: true, set: false };
+H.button(document.querySelector('dialog[open]'), 'Remove').click(); await H.sleep(60);
+out.removed = [H.calls('set_poesessid').map(c => c.args[0]), inp.placeholder, document.getElementById('sessid-remove').classList.contains('hidden')];
+localStorage.setItem('pobtf-sessid-ack', '1');
+window.__stubOverrides.set_poesessid = { ok: false, error: 'disk is read-only' };
+inp.value = 'abc123'; document.getElementById('sessid-save').click(); await H.sleep(60);
+out.failed = [H.text('#sessid-status'), inp.value];
+return out;
+"""
+
 
 def scenario_nobuild(s, tag):
     s.fresh()
@@ -3784,6 +3844,29 @@ def scenario_nobuild(s, tag):
     check(tag + " ⋯ renames it", r["renamed"] == "Renamed starter", r["renamed"])
 
 
+def scenario_settings_tabs(s, tag):
+    s.fresh()
+    r = s.run(S44_SETTINGS, timeout=40)
+    check(tag + " Settings has tabs", r["tabs"] == ["Look", "Alerts", "Hotkeys", "In game", "Account", "Updates", "Help"], r["tabs"])
+    check(tag + " opens on Look: Appearance + Accessibility only", r["first"] == ["Look", ["Appearance", "Accessibility"]], r["first"])
+    check(tag + " a tab shows only its sections", r["hotkeys"] == ["Hotkeys"], r["hotkeys"])
+    check(tag + " the last tab is remembered", r["remembered"] == "Hotkeys", r["remembered"])
+    check(tag + " arrow keys move between tabs", r["arrow"] == ["In game", "In game"], r["arrow"])
+    ft = r["findTray"]
+    check(tag + " Find searches every tab, shows only matches", ft[0] == ["In game"] and len(ft[1]) == 1 and
+          ft[1][0].startswith("Closing the window keeps the app in the") and ft[2], ft)
+    check(tag + " Find matches option text too", "Appearance" in r["findTheme"], r["findTheme"])
+    check(tag + " nothing found: says so", r["findNone"] == [0, False], r["findNone"])
+    check(tag + " Esc clears the search, not the panel", r["cleared"][0] == "" and r["cleared"][1] == ["In game"] and
+          r["cleared"][2], r["cleared"])
+    check(tag + " opening on a control jumps to its tab and focuses it", r["jump"] == ["Account", "sessid-input"], r["jump"])
+    check(tag + " a saved POESESSID says so after a restart, with Remove",
+          r["saved"][0].startswith("Saved on this PC") and "Saved on this PC" in (r["saved"][1] or "") and r["saved"][2], r["saved"])
+    check(tag + " Remove asks, then clears it", r["removed"] == [[""], "POESESSID", True], r["removed"])
+    check(tag + " a failed save says why and keeps what you typed", (r["failed"][0] or "").startswith("❌ Not saved: disk is read-only")
+          and r["failed"][1] == "abc123", r["failed"])
+
+
 def scenario_anoints(s, tag):
     s.fresh()
     r = s.run(S40_ANOINT_APP, timeout=60)
@@ -3804,6 +3887,122 @@ def scenario_anoints(s, tag):
     s.fresh("?sheet=1")
     r = s.run(S40_ANOINT_OV, timeout=60)
     check(tag + " over the game: click oils, no typing", r["noSearch"] and r["rowsHaveBoth"] and r["fits"], r)
+
+
+S43_LOOTFILTER = r"""
+const H = window.__e2e;
+const out = {};
+await H.loadBuild();
+// a small NeverSink-style filter: tagged currency tiers (best first), a hide tier, rares
+const FILTER = ['#==========', "# NeverSink's Indepth Loot Filter", '# TYPE:     3-STRICT', '# VERSION:  8.20', '#==========', '',
+  '#----- [[0100]] Currency',
+  'Show # $type->currency $tier->t1exalted', '\tClass == "Stackable Currency"', '\tBaseType == "Mirror of Kalandra" "Divine Orb" "Chaos Orb"',
+  '\tSetFontSize 45', '\tSetTextColor 255 0 0 255', '\tPlayAlertSound 6 300', '',
+  'Show # $type->currency $tier->t2divine', '\tClass == "Stackable Currency"', '\tBaseType == "Exalted Orb" "Orb of Annulment" "Vaal Orb"',
+  '\tSetFontSize 40', '',
+  'Show # $type->currency $tier->t4chaos', '\tClass == "Stackable Currency"',
+  '\tBaseType == "Orb of Alteration" "Chromatic Orb" "Jeweller\'s Orb" "Orb of Fusing"', '\tSetFontSize 35', '',
+  'Hide # $type->currency $tier->t9hide', '\tClass == "Stackable Currency"',
+  '\tBaseType == "Scroll of Wisdom" "Portal Scroll" "Orb of Transmutation"', '',
+  'Show # $type->rares $tier->any', '\tRarity Rare', '\tSetFontSize 32', ''].join('\r\n');
+const price = (name, c) => ({ name: name, cat: 'Currency', img: '', s: [[1, c, 100]] });
+window.__stubOverrides.filter_list = { ok: true, dir: 'C:\\Users\\me\\Documents\\My Games\\Path of Exile', exists: true,
+  filters: [{ name: 'Test.filter', size: FILTER.length, mtime: 100 }] };
+window.__stubOverrides.filter_read = { ok: true, text: FILTER, bom: false, eol: '\r\n', mtime: 100, size: FILTER.length };
+window.__stubOverrides.filter_write = { ok: true, mtime: 101, checkpoint: '20261101-100000' };
+window.__stubOverrides.filter_checkpoints = { ok: true, name: 'Test.filter', checkpoints: [
+  { id: '20261101-100000', label: 'before save', size: 4096, time: 1793520000 }] };
+window.__stubOverrides.filter_restore = { ok: true, mtime: 102, checkpoint: '20261101-100100', restored: '20261101-100000' };
+window.__stubOverrides.unique_prices = { ok: true, divine: 200, items: [] };
+window.__stubOverrides.cx_overview = { ok: true, hour: 1, items: {
+  mirror: price('Mirror of Kalandra', 30000), divine: price('Divine Orb', 200), chaos: price('Chaos Orb', 1),
+  exalted: price('Exalted Orb', 15), annul: price('Orb of Annulment', 20), vaal: price('Vaal Orb', 1),
+  alt: price('Orb of Alteration', 0.1), chrome: price('Chromatic Orb', 0.1), jew: price("Jeweller's Orb", 0.1), fuse: price('Orb of Fusing', 0.3),
+  wis: price('Scroll of Wisdom', 0.01), port: price('Portal Scroll', 0.02), trans: price('Orb of Transmutation', 0.02) } };
+out.nav = [...document.querySelectorAll('#nav .nav-item')].some(b => b.dataset.view === 'filter' && b.querySelector('.ni-filter'));
+setView('filter');
+const view = document.getElementById('view-filter');
+await H.waitFor(() => view.querySelector('.filt-summary') && view.querySelector('.filt-body tbody tr'), 4000, 'filter page + re-tier');
+out.summary = H.text('.filt-summary', view);
+// price re-tier: Chaos Orb (1c) sits in t1 (median 200c) and Vaal Orb (1c) in t2: both fit t4 now
+const moveRows = () => [...view.querySelectorAll('.filt-body tbody tr')].map(r => r.children[1].textContent + ' | ' + r.children[4].textContent + ' > ' + r.children[5].textContent);
+out.moves = moveRows();
+view.querySelectorAll('.filt-body tbody input[type=checkbox]').forEach(cb => { cb.checked = true; cb.dispatchEvent(new Event('change')); });
+H.button(view, 'Use the ticked re-tiers').click(); await H.sleep(30);
+out.pending = H.text('.filt-pending', view);
+// your rules: hide Portal Scroll
+H.button(view.querySelector('.trades-tabs'), 'Your rules').click(); await H.sleep(30);
+const form = view.querySelector('.filt-form');
+const [vis, cls, bases, rar, ilvl, look, label] = form.querySelectorAll('select, input');
+vis.value = 'Hide'; bases.value = 'Portal Scroll'; label.value = 'no portals';
+H.button(form, 'Add rule').click(); await H.sleep(30);
+out.rules = [...view.querySelectorAll('.filt-rule-text')].map(e => e.textContent);
+// build items
+H.button(view.querySelector('.trades-tabs'), 'Build items').click(); await H.sleep(30);
+view.querySelector('.filt-body .toggle input').click(); await H.sleep(30);
+out.buildList = view.querySelectorAll('.filt-list li').length;
+// save: one write, after the read, with the section in it
+const w0 = H.calls('filter_write').length;
+H.button(view, 'Save to filter').click();
+await H.waitFor(() => H.calls('filter_write').length > w0, 3000, 'write');
+const wr = H.calls('filter_write')[w0].args;
+out.write = { name: wr[0], mtime: wr[2], bom: wr[3], hasMarkers: wr[1].includes(LootFilter.MARK_START) && wr[1].includes(LootFilter.MARK_END),
+  crlf: !/[^\r]\n/.test(wr[1]), tail: wr[1].endsWith(FILTER.slice(-40)), body: wr[1].includes(FILTER.split('#----- [[0100]] Currency')[1]) };
+const written = LootFilter.parse(wr[1]);
+const chaos = LootFilter.matchItem(written, { class: 'Stackable Currency', base: 'Chaos Orb', rarity: 'Normal' });
+const portal = LootFilter.matchItem(written, { class: 'Stackable Currency', base: 'Portal Scroll', rarity: 'Normal' });
+out.matched = { chaosManaged: chaos.block.managed, chaosFont: (chaos.block.actions.find(a => a.key === 'SetFontSize') || { args: [] }).args[0],
+  portal: portal.block.managed && portal.block.visibility, mirror: LootFilter.matchItem(written,
+    { class: 'Stackable Currency', base: 'Mirror of Kalandra', rarity: 'Normal' }).block.tags.tier };
+out.removed = LootFilter.applyManaged(wr[1], '') === FILTER;
+// find an item: paste the in-game text
+H.button(view.querySelector('.trades-tabs'), 'Find an item').click(); await H.sleep(30);
+view.querySelector('.filt-body textarea').value = 'Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n--------\nStack Size: 3/20';
+H.button(view, 'Find its block').click(); await H.sleep(30);
+out.find = H.text('.filt-match', view);
+// checkpoints: listed, restore asks first, then restores
+H.button(view.querySelector('.trades-tabs'), 'Checkpoints').click();
+await H.waitFor(() => view.querySelector('.filt-body tbody tr td'), 3000, 'checkpoints');
+out.cps = [...view.querySelectorAll('.filt-body tbody tr')].map(r => r.children[1].textContent);
+const r0 = H.calls('filter_restore').length;
+H.button(view.querySelector('.filt-body tbody'), 'Restore').click();
+await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'confirm');
+out.asked = H.calls('filter_restore').length === r0;
+H.button(document.querySelector('dialog[open]'), 'Restore').click();
+await H.waitFor(() => H.calls('filter_restore').length > r0, 3000, 'restore');
+out.restore = H.calls('filter_restore')[r0].args;
+out.gameInput = H.calls('trade_send').length + H.calls('game_search_paste').length;
+['filter_list', 'filter_read', 'filter_write', 'filter_checkpoints', 'filter_restore', 'unique_prices', 'cx_overview']
+  .forEach(k => delete window.__stubOverrides[k]);
+return out;
+"""
+
+
+def scenario_lootfilter(s, tag):
+    s.fresh()
+    r = s.run(S43_LOOTFILTER, timeout=90)
+    check(tag + " Tools → Loot filter with its icon", r["nav"], r["nav"])
+    check(tag + " summary: blocks, filter type, no app section yet", "5 blocks" in r["summary"] and "3-STRICT" in r["summary"]
+          and "no app section yet" in r["summary"], r["summary"])
+    check(tag + " price re-tier finds the mis-tiered items (by today's prices)", len(r["moves"]) == 2
+          and any(m.startswith("Chaos Orb") and "t1exalted" in m and "> t4chaos" in m for m in r["moves"])
+          and any(m.startswith("Vaal Orb") and "t2divine" in m and "> t4chaos" in m for m in r["moves"]), r["moves"])
+    check(tag + " ticked re-tiers wait for Save", "2 re-tiers" in (r["pending"] or ""), r["pending"])
+    check(tag + " your rule added", any("no portals" in x and "Portal Scroll" in x for x in r["rules"]), r["rules"])
+    check(tag + " build items listed from the loaded build", r["buildList"] > 0, r["buildList"])
+    w = r["write"]
+    check(tag + " save writes the section, keeps CRLF, checks the file hasn't changed since read (mtime)",
+          w["name"] == "Test.filter" and w["hasMarkers"] and w["crlf"] and w["mtime"] == 100 and w["bom"] is False, w)
+    check(tag + " the filter's own blocks are left exactly as they were", w["body"] and w["tail"], w)
+    m = r["matched"]
+    check(tag + " written filter: Chaos Orb now shown like t4 (font 35), Portal Scroll hidden, Mirror untouched",
+          m["chaosManaged"] and m["chaosFont"] == 35 and m["portal"] == "Hide" and m["mirror"] == "t1exalted", m)
+    check(tag + " removing the section gives back the original file byte for byte", r["removed"])
+    check(tag + " find an item: pasted Divine Orb → its block and tier", "Shown by block 1" in (r["find"] or "")
+          and "t1exalted" in r["find"], r["find"])
+    check(tag + " checkpoints listed; restore asks first, then restores that one", r["cps"] == ["before save"] and r["asked"]
+          and r["restore"] == ["Test.filter", "20261101-100000"], (r["cps"], r["asked"], r["restore"]))
+    check(tag + " nothing sent to the game", r["gameInput"] == 0, r["gameInput"])
 
 
 def scenario_sheets2(s, tag):
@@ -4125,6 +4324,8 @@ SCENARIOS = [
     ("40 anoints", scenario_anoints),
     ("41 nobuild", scenario_nobuild),
     ("42 atlas", scenario_atlas),
+    ("43 lootfilter", scenario_lootfilter),
+    ("44 settingstabs", scenario_settings_tabs),
 ]
 
 

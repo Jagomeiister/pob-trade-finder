@@ -30,7 +30,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.5.16"
+VERSION = "2.5.17"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -2933,6 +2933,85 @@ class Api:
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    # -- loot filter tools (js/app/29-lootfilter.js): files + checkpoints only; the filter logic is js/filter.js
+    # Files live in Documents\My Games\Path of Exile (filter_files.filter_dir()); checkpoints in
+    # data/filter_checkpoints/. Nothing here sends input to the game or reloads its filter: the
+    # user does that in game.
+    @staticmethod
+    def _filter_error(e):
+        import filter_files
+        out = {"ok": False, "error": str(e) or e.__class__.__name__}
+        if isinstance(e, filter_files.FilterConflict):
+            out["conflict"] = True
+        return out
+
+    def filter_list(self):
+        import filter_files
+        try:
+            folder = filter_files.filter_dir()
+            return {"ok": True, "dir": folder, "exists": os.path.isdir(folder),
+                    "filters": filter_files.list_filters(folder)}
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_read(self, name):
+        import filter_files
+        try:
+            r = filter_files.read_filter(name)
+            r.update(ok=True, name=name)
+            return r
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_write(self, name, text, expect_mtime=None, bom=False, label=None):
+        import filter_files
+        try:
+            r = filter_files.write_filter(name, text, expect_mtime=expect_mtime, bom=bool(bom),
+                                          label=label, data_dir=DATA_DIR)
+            _debug_log("filter: saved %s (checkpoint %s)" % (name, r.get("checkpoint")))
+            r.update(ok=True, name=name)
+            return r
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_checkpoints(self, name):
+        import filter_files
+        try:
+            return {"ok": True, "name": name, "checkpoints": filter_files.list_checkpoints(name, data_dir=DATA_DIR)}
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_restore(self, name, id):
+        import filter_files
+        try:
+            r = filter_files.restore_checkpoint(name, id, data_dir=DATA_DIR)
+            _debug_log("filter: restored %s to %s (current kept as %s)" % (name, id, r.get("checkpoint")))
+            r.update(ok=True, name=name)
+            return r
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_checkpoint(self, name, label=None):
+        import filter_files
+        try:
+            r = filter_files.checkpoint(name, label, data_dir=DATA_DIR)
+            r.update(ok=True, name=name)
+            return r
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_open_folder(self):
+        """Explorer on the game's filter folder (only that folder; no path from the page)."""
+        import filter_files
+        try:
+            folder = filter_files.filter_dir()
+            if not os.path.isdir(folder):
+                return {"ok": False, "error": "the filter folder doesn't exist yet: %s" % folder}
+            os.startfile(folder)
+            return {"ok": True, "dir": folder}
+        except Exception as e:
+            return self._filter_error(e)
 
     # -- open in system browser --------------------------------------------------
     OPEN_URL_PREFIXES = ("https://www.pathofexile.com/",

@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.5.16 released 2026-11-01** (Builds page at launch, the app without a build, Atlas tree with saved strategies, in-game tree backgrounds). Before: **v2.5.14 released 2026-11-01** (the whole div card on hover: name, picture, stack, reward, flavour). Before: **v2.5.13** (div card value per 1000 drops per area, from community drop weights). Before: **v2.5.12** (anoint helper in the Blight sheet: search, oil icons, prices). Before: **v2.5.11 released 2026-11-01** (compare again at launch; in-game settings no longer reset after a restart). Before: **v2.5.10** (one copy at a time; updates exit fully and wait for the old copy). Before: **v2.5.9** (deeper cheat sheets: act routes, quest gems, 24 mechanics; div card art; tree icons; saved characters; update banner). Before: **v2.5.8 released 2026-11-01** (trade ledger: purchases, profit, flips, People, Reports, goal, backup). Before: **v2.5.7** (dust explorer + dust on the price check). Before: **v2.5.6** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.17 released 2026-11-01** (Builds page at launch, the app without a build, Atlas tree with saved strategies, in-game tree backgrounds). Before: **v2.5.16 released 2026-11-01** (Settings in tabs with Find; saved POESESSID shown as saved). Before: **v2.5.15** (loot filter tools: price re-tier, build items, rules, find an item, checkpoints). Before: **v2.5.14** (the whole div card on hover: name, picture, stack, reward, flavour). Before: **v2.5.13** (div card value per 1000 drops per area, from community drop weights). Before: **v2.5.12** (anoint helper in the Blight sheet: search, oil icons, prices). Before: **v2.5.11 released 2026-11-01** (compare again at launch; in-game settings no longer reset after a restart). Before: **v2.5.10** (one copy at a time; updates exit fully and wait for the old copy). Before: **v2.5.9** (deeper cheat sheets: act routes, quest gems, 24 mechanics; div card art; tree icons; saved characters; update banner). Before: **v2.5.8 released 2026-11-01** (trade ledger: purchases, profit, flips, People, Reports, goal, backup). Before: **v2.5.7** (dust explorer + dust on the price check). Before: **v2.5.6** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -228,10 +228,16 @@ sources, or ask the author.
       Flasks tab (useful affixes, e.g. "of the Armadillo") and vendor presets (movement speed
       boots, chromatic r-g-b, links).
 - [x] **Socket recolour calculator**: became the socket colour helper (section 3; 3.29 changed the system).
-- [ ] **Loot filter tools** (Scalpel's biggest feature: an in-game filter editor, FilterBlade
-      online sync, "economy audit" re-tiering by poe.ninja prices, filter checkpoints). Big,
-      and needs care: it rewrites your own .filter file (that's allowed, it's your file) but
-      must never trigger reloads or game input on its own. Decide whether we want it.
+- [x] **Loot filter tools** (built 2026-11-01): Tools → Loot filter + a line on the price check.
+  - js/filter.js parses and matches; filter_files.py handles files and checkpoints; the page
+    is js/app/29-lootfilter.js.
+  - Price re-tier (economy audit), build items, your rules, find an item, checkpoints.
+  - All edits go in one managed section at the top of the file, so they survive filter
+    updates. That's our answer to Scalpel's FilterBlade sync: online filters on GGG's site
+    would need the OAuth login GGG hasn't granted.
+  - No reloads, no game input.
+  - [ ] In game: save, re-select the filter (Options → UI), and check a re-tiered item and a
+        hidden base drop as expected; Ctrl+D shows the block line.
 - [ ] Maybe later / probably not:
   - Art mode: drawing on top of the game, for content creators.
   - Plugins.

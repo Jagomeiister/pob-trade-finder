@@ -82,7 +82,7 @@ From source: `pip install pywebview`, then `python gui.py`.
 
 | Task | Command |
 |---|---|
-| New league / new stats | ⚙ Settings → **Refresh trade data**, or `python tools/refresh_all.py` (every table + tests) |
+| New league / new stats | ⚙ Settings → Updates → **Refresh trade data**, or `python tools/refresh_all.py` (every table + tests) |
 | New mods (roll ranges) | `python tools/make_ranges.py --fetch` |
 | New bases (item art) | `python tools/make_baseicons.py --fetch` |
 | Run tests | `node test/test.js` (+ `test_craft.js`, `test_jewels.js`, `test_contrast.js`, and the `test/*.py` suites) |

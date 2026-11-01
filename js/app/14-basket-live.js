@@ -196,19 +196,26 @@ async function refreshSessionStatus(deep) {
     HAS_SESSION = !!(r && r.set);
     var el = document.getElementById('sessid-status');
     if (!el) return;
+    // it's kept on this PC between starts (data/session.json): say so, the box itself is
+    // always empty (it's never shown back)
+    var inp = document.getElementById('sessid-input'), rm = document.getElementById('sessid-remove');
+    if (inp) inp.placeholder = HAS_SESSION ? 'Saved on this PC (paste a new one to replace it)' : 'POESESSID';
+    if (rm) rm.classList.toggle('hidden', !HAS_SESSION);
     if (!HAS_SESSION) { el.textContent = ''; return; }
+    el.textContent = '✓ Saved on this PC';
     if (deep && window.pywebview.api.session_validate) {
       // live check against GGG — expired sessions show up here instead of
       // failing silently when a live search tries to connect
       var v = await window.pywebview.api.session_validate();
       if (v && v.ok && v.valid) {
-        el.textContent = '🟢 session active — instant alerts on';
+        el.textContent = '🟢 Saved on this PC · session active, instant alerts on';
       } else if (v && v.ok) {
         HAS_SESSION = false;
-        el.textContent = '🔴 session expired — save a fresh POESESSID';
+        el.textContent = '🔴 Saved, but pathofexile.com has ended that session (it does when you log out there, ' +
+          'or after a while). Copy the new POESESSID from your browser and save it here.';
       } // network errors: leave the last known state alone
     } else {
-      el.textContent = '🟢 instant alerts on';
+      el.textContent = '🟢 Saved on this PC · instant alerts on';
     }
   } catch (e) { /* browser mode */ }
 }

@@ -167,12 +167,124 @@ function renderBuild(setIndex) {
 
 // ---- settings drawer: slides in from the right, focus stays inside until closed ----
 var settingsOpener = null;
-function openSettings(opener) {
-  settingsOpener = opener || null;
+// Tabs: each <section class="settings-section" data-tab="…"> belongs to one tab (a tab can hold
+// several sections); new settings just go in a section with the right data-tab. "Find a setting"
+// searches every tab at once. The last tab is remembered on this PC (a convenience only).
+var SETTINGS_TABS = [['look', 'Look'], ['alerts', 'Alerts'], ['hotkeys', 'Hotkeys'], ['ingame', 'In game'],
+                     ['account', 'Account'], ['updates', 'Updates'], ['help', 'Help']];
+var SETTINGS_TAB_KEY = 'pobtf-settings-tab';
+var settingsTab = null;
+function settingsSections() {
+  return Array.prototype.slice.call(document.querySelectorAll('#settings-panel .settings-section[data-tab]'));
+}
+// gui-only sections don't exist in the browser version: their tab isn't offered there
+function settingsSectionUsable(sec) {
+  return !sec.classList.contains('gui-only') || document.body.classList.contains('gui');
+}
+function settingsTabsUsable() {
+  var secs = settingsSections();
+  return SETTINGS_TABS.filter(function (t) {
+    return secs.some(function (s) { return s.dataset.tab === t[0] && settingsSectionUsable(s); });
+  });
+}
+function renderSettingsTabs() {
+  var bar = document.getElementById('settings-tabs');
+  if (!bar) return;
+  bar.textContent = '';
+  var tabs = settingsTabsUsable();
+  if (!tabs.some(function (t) { return t[0] === settingsTab; })) {
+    var saved = null;
+    try { saved = localStorage.getItem(SETTINGS_TAB_KEY); } catch (e) { /* fine */ }
+    settingsTab = tabs.some(function (t) { return t[0] === saved; }) ? saved : (tabs[0] || [null])[0];
+  }
+  tabs.forEach(function (t, i) {
+    var b = UI.el('button', 'settings-tab', t[1]);
+    b.type = 'button';
+    b.dataset.settingsTab = t[0];
+    b.id = 'settings-tab-' + t[0];
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', t[0] === settingsTab ? 'true' : 'false');
+    b.tabIndex = t[0] === settingsTab ? 0 : -1;
+    b.addEventListener('click', function () { showSettingsTab(t[0]); });
+    b.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      var next = tabs[(i + d + tabs.length) % tabs.length][0];
+      showSettingsTab(next);
+      var nb = document.getElementById('settings-tab-' + next);
+      if (nb) nb.focus();
+    });
+    bar.appendChild(b);
+  });
+}
+function showSettingsTab(id) {
+  settingsTab = id;
+  try { localStorage.setItem(SETTINGS_TAB_KEY, id); } catch (e) { /* fine */ }
+  var find = document.getElementById('settings-find');
+  if (find && find.value) { find.value = ''; findSetting(''); }
+  document.querySelectorAll('#settings-tabs .settings-tab').forEach(function (b) {
+    var on = b.dataset.settingsTab === id;
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+    b.tabIndex = on ? 0 : -1;
+  });
+  settingsSections().forEach(function (s) {
+    s.classList.toggle('is-away', s.dataset.tab !== id);
+    s.setAttribute('role', 'tabpanel');
+    s.setAttribute('aria-labelledby', 'settings-tab-' + s.dataset.tab);
+  });
+  var panel = document.getElementById('settings-panel');
+  if (panel) panel.scrollTop = 0;
+}
+// Find a setting: every tab's settings at once, only the ones that match every word typed
+// (their label, help text or choices); a match in a section's heading shows the whole section
+function findSetting(q) {
+  var words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
+  var panel = document.getElementById('settings-panel');
+  panel.classList.toggle('is-finding', words.length > 0);
+  var any = false;
+  settingsSections().forEach(function (s) {
+    var head = (s.querySelector('h3') || {}).textContent || '';
+    var headHit = words.length && words.every(function (w) { return head.toLowerCase().indexOf(w) !== -1; });
+    var hits = 0;
+    Array.prototype.forEach.call(s.children, function (item) {
+      if (item.tagName === 'H3') return;
+      var text = item.textContent + ' ' + (item.title || '') + ' ' +
+        Array.prototype.map.call(item.querySelectorAll('[title],[aria-label],[placeholder]'), function (e) {
+          return (e.title || '') + ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('placeholder') || '');
+        }).join(' ');
+      var hit = !words.length || headHit || words.every(function (w) { return text.toLowerCase().indexOf(w) !== -1; });
+      item.classList.toggle('set-miss', !hit);
+      if (hit) hits++;
+    });
+    var show = !words.length || (settingsSectionUsable(s) && hits > 0);
+    s.classList.toggle('set-miss', !show);
+    if (words.length && show) any = true;
+  });
+  document.getElementById('settings-none').hidden = !words.length || any;
+  if (!words.length) showSettingsTab(settingsTab);
+}
+function wireSettingsFind() {
+  var find = document.getElementById('settings-find');
+  if (!find || find.dataset.wired) return;
+  find.dataset.wired = '1';
+  find.addEventListener('input', function () { findSetting(find.value); });
+  find.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && find.value) { e.preventDefault(); e.stopPropagation(); find.value = ''; findSetting(''); }
+  });
+}
+// focusId: open on the tab holding that control and focus it (e.g. "Add POESESSID…")
+function openSettings(opener, focusId) {
+  settingsOpener = opener && opener.focus ? opener : null;
   document.getElementById('settings-backdrop').classList.remove('hidden');
   var panel = document.getElementById('settings-panel');
   panel.classList.remove('hidden');
-  document.getElementById('settings-close').focus();
+  wireSettingsFind();
+  renderSettingsTabs();
+  var target = focusId && document.getElementById(focusId);
+  var sec = target && target.closest('.settings-section[data-tab]');
+  showSettingsTab(sec ? sec.dataset.tab : settingsTab);
+  if (target) target.focus(); else document.getElementById('settings-close').focus();
 }
 function closeSettings() {
   document.getElementById('settings-backdrop').classList.add('hidden');
@@ -185,15 +297,15 @@ var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'uni
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                     timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', divcards: 'Div cards', tree: 'Skill tree', pasted: 'Pasted item',
-                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets', dust: 'Dust explorer',
+                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets', dust: 'Dust explorer', filter: 'Loot filter',
                     atlas: 'Atlas tree', home: 'Builds' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨', atlas: '🗺', home: '⌂' };
+                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜', dust: '✨', filter: '⏚', atlas: '🗺', home: '⌂' };
 
 // views with line-art icons in css/navicons.css (tools/make_navicons.py); the rest keep VIEW_ICONS
 var NAV_ICON_NAMES = { gear: 1, jewels: 1, flasks: 1, gems: 1, pasted: 1, planner: 1, timeless: 1, finder: 1,
-  uniques: 1, search: 1, divcards: 1, tree: 1, market: 1, stash: 1, trades: 1, sheets: 1, settings: 1, home: 1, dust: 1 };
+  uniques: 1, search: 1, divcards: 1, tree: 1, market: 1, stash: 1, trades: 1, sheets: 1, settings: 1, home: 1, dust: 1, filter: 1 };
 function navIcon(k, cls) {
   var art = NAV_ICON_NAMES[k];
   var ic = UI.el('span', (cls || 'nav-icon') + (art ? ' ni ni-' + k : ''), art ? '' : VIEW_ICONS[k] || '•');
@@ -242,6 +354,7 @@ function setView(k) {
   if (k === 'sheets') renderSheetsView(); // cheat sheets: built-in acts + your own
   if (k === 'dust') renderDustView(); // dust per chaos for every unique (26-dust.js)
   if (k === 'atlas') showAtlasView(); // Atlas tree: built once, canvas sized once visible (28-atlas.js)
+  if (k === 'filter') renderFilterView(); // loot filter tools (29-lootfilter.js)
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
     if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -280,12 +393,12 @@ function renderNav() {
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'sheets', 'atlas', 'dust', 'market', 'stash', 'trades'].filter(function (k) {
+  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'sheets', 'atlas', 'dust', 'filter', 'market', 'stash', 'trades'].filter(function (k) {
     if (k === 'stash') return OAUTH.signedIn; // official login only
     if (k === 'trades') return isGui();
     if (k === 'atlas') return typeof atlasOpen === 'function'; // 28-atlas.js
     if (BUILD_VIEWS[k]) return !!build && (k === 'planner' || viewSection(k));
-    return k === 'market' || k === 'sheets' || k === 'dust' || viewSection(k);
+    return k === 'market' || k === 'sheets' || k === 'dust' || k === 'filter' || viewSection(k);
   }).forEach(item);
   setView(document.body.dataset.view || (build ? 'gear' : 'home'));
 }

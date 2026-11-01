@@ -109,9 +109,7 @@ function showTooComplex(state, payloadStr, league) {
   }
   if (!HAS_SESSION) {
     acts.appendChild(UI.button('ghost', { size: 'sm', label: 'Add POESESSID…', onClick: function () {
-      openSettings(this);
-      var inp = document.getElementById('sessid-input');
-      if (inp) inp.focus();
+      openSettings(this, 'sessid-input'); // opens on the Account tab
     } }));
   }
   box.appendChild(acts);

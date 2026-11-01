@@ -56,6 +56,8 @@ STEPS = [
     [sys.executable, "test/test_trade_helper.py"],
     [sys.executable, "test/test_tray.py"],
     [sys.executable, "test/test_single_instance.py"],  # one copy at a time + the update swap
+    [sys.executable, "test/test_filter_files.py"],  # loot filter files + checkpoints (temp folders)
+    ["node", "test/test_filter.js"],  # loot filter engine (parse, match, managed section)
     [sys.executable, "test/test_divcards.py"],
     ["node", "server/test/prices.test.mjs"],  # backend (needs: cd server && npm install)
     [sys.executable, "test/e2e/run_e2e.py"],  # headless Chrome, stubbed bridge, offline

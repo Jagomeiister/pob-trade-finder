@@ -72,6 +72,7 @@ function renderPastedItem(item) {
   renderCharDiff(pastedState);
   renderUpgradeCheck(pastedState);
   renderQuickPrice(pastedState);
+  renderFilterLine(pastedState);
   if (build) { renderNav(); setView('pasted'); window.scrollTo(0, 0); }
   else card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
