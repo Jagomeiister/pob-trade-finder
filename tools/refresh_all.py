@@ -52,6 +52,7 @@ STEPS = [
     [sys.executable, "test/test_macros.py"],
     [sys.executable, "test/test_trade_helper.py"],
     [sys.executable, "test/test_tray.py"],
+    [sys.executable, "test/test_single_instance.py"],  # one copy at a time + the update swap
     [sys.executable, "test/test_divcards.py"],
     ["node", "server/test/prices.test.mjs"],  # backend (needs: cd server && npm install)
     [sys.executable, "test/e2e/run_e2e.py"],  # headless Chrome, stubbed bridge, offline
