@@ -30,7 +30,8 @@ class Feed:
 
 DROPS = {"source": "Path of Exile Wiki", "fetchedAt": "2026-11-01T00:00:00Z",
          "areas": [{"id": "MapWorldsBurialChambers", "name": "Burial Chambers", "lvl": 75, "map": True}],
-         "cards": [{"n": "The Doctor", "s": 8, "a": [0]}, {"n": "Rain of Chaos", "s": 8}, {"n": "Gone", "s": 1, "off": 1}]}
+         "cards": [{"n": "The Doctor", "s": 8, "a": [0]}, {"n": "Rain of Chaos", "s": 8}, {"n": "Gone", "s": 1, "off": 1}]
+         + [{"n": "Filler %d" % i, "s": 1} for i in range(120)]}
 
 api = gui.Api.__new__(gui.Api)
 api._currency_map = {"the-doctor": {"id": "D1", "name": "The Doctor", "cat": "Cards"},
@@ -89,11 +90,29 @@ def down(req, timeout=0):
 gui.urllib.request.urlopen = down
 api._divcards_cache = None
 r = api.div_cards("Standard")
-check("offline: last good copy, marked stale", r["ok"] and r["stale"] and len(r["cards"]) == 3, r)
+check("offline: last good copy, marked stale", r["ok"] and r["stale"] and len(r["cards"]) == 123, (r["ok"], len(r.get("cards", []))))
 os.remove(os.path.join(tmp, "divcards_cache.json"))
+with open(os.path.join(tmp, "divcards.json"), "w", encoding="utf-8") as f:
+    json.dump({"source": "shipped", "areas": [], "cards": [{"n": "The Doctor", "s": 8}]}, f)
 api._divcards_cache = None
 r = api.div_cards("Standard")
-check("offline with no copy: quiet error", r["ok"] is False and r["error"], r)
+check("offline, never downloaded: the copy shipped with the app", r["ok"] and r["source"] == "shipped", r)
+os.remove(os.path.join(tmp, "divcards.json"))
+api._divcards_cache = None
+r = api.div_cards("Standard")
+check("offline with nothing at all: quiet error", r["ok"] is False and r["error"], r)
+
+
+def tiny(req, timeout=0):
+    return Resp(json.dumps({"cards": [{"n": "x"}]}).encode())
+
+
+gui.urllib.request.urlopen = tiny
+with open(os.path.join(tmp, "divcards.json"), "w", encoding="utf-8") as f:
+    json.dump({"source": "shipped", "areas": [], "cards": [{"n": "The Doctor", "s": 8}]}, f)
+api._divcards_cache = None
+r = api.div_cards("Standard")
+check("a truncated download isn't trusted", r["ok"] and r["source"] == "shipped", r.get("source"))
 
 print("\nALL TESTS PASSED" if not failures else "\n%d FAILED" % failures)
 sys.exit(1 if failures else 0)

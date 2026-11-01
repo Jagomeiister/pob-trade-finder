@@ -50,9 +50,10 @@ TRADE_BASE = "https://www.pathofexile.com/api/trade"
 # the app's backend (server/): poe.ninja prices proxied and cached, as poe.ninja asks of desktop apps
 PRICES_API = "https://pob-trade-finder.vercel.app/api/prices"
 PRICES_TTL = 1800
-# where div cards drop (the backend reads the community wiki twice a day); prices come
-# from GGG's currency exchange feed
-DIVCARDS_API = "https://pob-trade-finder.vercel.app/api/divcards"
+# where div cards drop: tools/make_divcards.py (community wiki) writes it into the app
+# (data/divcards.json) and onto the backend as a static file, so installs pick up newer
+# drop data between releases. Prices come from GGG's currency exchange feed.
+DIVCARDS_API = "https://pob-trade-finder.vercel.app/divcards.json"
 DIVCARDS_TTL = 6 * 3600
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
@@ -778,24 +779,35 @@ class Api:
         return data
 
     def _divcard_drops(self):
-        """Drop data from the backend: memory for DIVCARDS_TTL, a disk copy for offline use."""
+        """Drop data: the backend's copy (newest), else the last one downloaded, else the one
+        shipped with the app. Kept in memory for DIVCARDS_TTL."""
         hit = getattr(self, "_divcards_cache", None)
         if hit and time.time() - hit[0] < DIVCARDS_TTL:
             return hit[1]
         disk = os.path.join(DATA_DIR, "divcards_cache.json")
+        data = None
         try:
             req = urllib.request.Request(DIVCARDS_API, headers={"User-Agent": UA, "Accept": "application/json"})
             with urllib.request.urlopen(req, timeout=40) as r:
                 data = json.loads(r.read().decode("utf-8"))
+            if len(data.get("cards") or []) < 100:
+                raise ValueError("incomplete drop data")
             try:
                 with open(disk, "w", encoding="utf-8") as f:
                     json.dump(data, f)
             except OSError:
                 pass
         except Exception:
-            with open(disk, "r", encoding="utf-8") as f:  # offline: last good copy (raises if none)
-                data = json.load(f)
-            data["stale"] = True
+            for path in (disk, os.path.join(DATA_DIR, "divcards.json")):  # offline
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    data["stale"] = True
+                    break
+                except (OSError, ValueError):
+                    continue
+            if data is None:
+                raise RuntimeError("no drop data (offline and none shipped)")
         self._divcards_cache = (time.time(), data)
         return data
 

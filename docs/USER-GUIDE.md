@@ -531,8 +531,8 @@ Tools → **Div cards** shows where each divination card drops and what it's wor
   and ↗ to the bulk exchange.
 - Filter by card or area name, and set a minimum value.
 - Prices come from GGG's currency exchange (last hour) for the selected league. Drop areas
-  come from the community Path of Exile Wiki (CC BY-NC-SA), refreshed twice a day through the
-  app's server. They keep working offline from the last copy.
+  come from the community Path of Exile Wiki (CC BY-NC-SA): they ship with the app and update
+  through the app's server between releases. They keep working offline.
 
 ## 6b. Compare with your character
 

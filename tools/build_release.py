@@ -66,6 +66,7 @@ SHIP = [
     "data/watcherseye.js",
     "data/forbidden.js",
     "data/mapmods.js",
+    "data/divcards.json",
     "data/currencymap.json",
     "data/craftdata.js",
     "data/jeweldata.js",

@@ -23,6 +23,7 @@ STEPS = [
     [sys.executable, "tools/make_watcherseye.py"],
     [sys.executable, "tools/make_forbidden.py"],
     [sys.executable, "tools/make_mapmods.py"],
+    [sys.executable, "tools/make_divcards.py"],
     [sys.executable, "tools/make_currencymap.py"],  # after make_baseicons (needs base_items)
     [sys.executable, "tools/make_craftdata.py", "--fetch"],  # after currencymap + ranges
     [sys.executable, "tools/make_jeweldata.py", "--fetch"],  # tree export + gems
@@ -45,7 +46,6 @@ STEPS = [
     [sys.executable, "test/test_tray.py"],
     [sys.executable, "test/test_divcards.py"],
     ["node", "server/test/prices.test.mjs"],  # backend (needs: cd server && npm install)
-    ["node", "server/test/divcards.test.mjs"],
     [sys.executable, "test/e2e/run_e2e.py"],  # headless Chrome, stubbed bridge, offline
 ]
 

@@ -3,8 +3,8 @@
    and share their top-level names. */
 'use strict';
 
-// Drop areas + stack sizes: the community Path of Exile Wiki, read twice a day by the app's
-// backend (server/api/divcards.js). Prices: GGG's hourly currency exchange feed
+// Drop areas + stack sizes: the community Path of Exile Wiki via tools/make_divcards.py, shipped
+// in data/divcards.json and served (newer) from the backend's static divcards.json. Prices: GGG's hourly currency exchange feed
 // (Api.div_cards). Drop *rates* aren't public, so "by map" ranks maps by the value of the
 // cards that can drop there — it is not an expected value per map.
 var DIV = { data: null, loading: null, league: null, mode: 'maps', q: '', min: 5, mapsOnly: true, open: null };
@@ -145,7 +145,7 @@ function makeDivcards() {
   wrap.appendChild(bar);
   wrap.appendChild(UI.el('div', 'finder-sub dc-note', 'Drop rates aren\'t public, so areas are ranked by the cards that ' +
     'can drop there, not by expected value. Prices: GGG\'s currency exchange (last hour). Drop areas: Path of Exile ' +
-    'Wiki (CC BY-NC-SA), refreshed twice a day.'));
+    'Wiki (CC BY-NC-SA), updated through the app\'s server between releases.'));
   var body = UI.el('div', 'dc-body');
   body.appendChild(UI.el('div', 'finder-sub', isGui() ? 'Open this view to load drop data and prices.'
     : 'The Div cards tool needs the desktop app.'));
