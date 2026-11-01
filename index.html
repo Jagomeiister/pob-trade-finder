@@ -15,7 +15,8 @@
   try {
     var p = JSON.parse(localStorage.getItem('pobtf-prefs')) || {};
     var t = p.theme === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : p.theme;
-    if (t === 'light') document.documentElement.dataset.theme = 'light';
+    if (t === 'light' || t === 'parchment') document.documentElement.dataset.theme = 'light';
+    if (t === 'dim' || t === 'slate' || t === 'parchment') document.documentElement.dataset.surface = t;
     if (p.accent && p.accent !== 'gold') document.documentElement.dataset.accent = p.accent;
     if (p.contrast) document.documentElement.dataset.contrast = 'high';
   } catch (e) { /* defaults */ }
@@ -84,7 +85,10 @@
           <span class="field-label">Theme</span>
           <select id="pref-theme">
             <option value="dark">Dark</option>
+            <option value="dim">Dim (softer dark)</option>
+            <option value="slate">Slate (blue-grey dark)</option>
             <option value="light">Light</option>
+            <option value="parchment">Parchment (warm light)</option>
             <option value="system">Match Windows</option>
           </select>
         </label>
@@ -143,7 +147,7 @@
       <section class="settings-section gui-only">
         <h3>Account</h3>
         <p class="settings-note">Optional. Your pathofexile.com POESESSID cookie unlocks instant live-search alerts and bigger searches. It is stored only on this PC and sent only to pathofexile.com. Save empty to clear.</p>
-        <p class="settings-note">Worth knowing: this uses the trade site's unofficial endpoints with your session, which Grinding Gear Games doesn't officially support for third-party tools. Many trade tools work this way, but it's at your own risk. Everything else in the app works without it.</p>
+        <p class="settings-note">Your choice: it uses the trade site's endpoints with your login, which Grinding Gear Games doesn't officially support for third-party tools. Many trade tools work this way, at your own risk. Everything else in the app works without it.</p>
         <div class="char-sessid">
           <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID">
           <button id="sessid-save" class="btn btn-secondary">Save</button>

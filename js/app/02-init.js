@@ -146,6 +146,12 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('sessid-save').addEventListener('click', async function () {
     var inp = document.getElementById('sessid-input');
     var status = document.getElementById('sessid-status');
+    // the user's choice: a one-time disclaimer before the first save (clearing never asks)
+    if (inp.value.trim() && localStorage.getItem('pobtf-sessid-ack') !== '1') {
+      var ok = await UI.dialog({ title: 'Using your POESESSID', confirmLabel: 'I understand, save it', body: sessidDisclaimer() });
+      if (!ok) { inp.focus(); return; }
+      persist('pobtf-sessid-ack', '1');
+    }
     this.disabled = true;
     try {
       var r = await window.pywebview.api.set_poesessid(inp.value);
@@ -360,6 +366,23 @@ function checkForUpdates(manual) {
       window.pywebview.api.apply_update(res.url);
     };
   }).catch(function () { /* offline — skip */ });
+}
+
+function sessidDisclaimer() {
+  var box = UI.el('div', 'sessid-disclaimer');
+  [['It\'s your logged-in pathofexile.com session. ', 'Anyone who has it can act as you on the website, so never share it. ' +
+    'The app keeps it only on this PC and sends it only to www.pathofexile.com.'],
+   ['It unlocks bigger searches and instant live alerts ', 'through the trade site\'s own endpoints with your login. Grinding ' +
+    'Gear Games doesn\'t officially support that for third-party tools. Many trade tools work this way, but you use it at ' +
+    'your own risk.'],
+   ['You can stop any time: ', 'save an empty box here, or log out on pathofexile.com, which ends that session.']
+  ].forEach(function (p) {
+    var para = UI.el('p');
+    para.appendChild(UI.el('b', null, p[0]));
+    para.appendChild(document.createTextNode(p[1]));
+    box.appendChild(para);
+  });
+  return box;
 }
 
 // ---- Settings → Copy diagnostics ---------------------------------------------------

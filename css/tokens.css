@@ -93,6 +93,34 @@
 :root[data-accent="violet"]  { --accent: #b59cf5; --accent-hover: #c8b4f8; --on-accent: #150d26; }
 :root[data-accent="green"]   { --accent: #74c784; --accent-hover: #8fd59c; --on-accent: #0a1a0d; }
 
+/* ---- surface variants: gentler backgrounds over a base theme -----------------------
+   data-surface on <html>. Dim and Slate sit on the dark base (no data-theme), Parchment on
+   the light base. They come before the high-contrast blocks so high contrast still wins. */
+/* Dim: dark, but not too dark: warm charcoal instead of near-black */
+:root[data-surface="dim"] {
+  --bg: #26231f; --s1: #2e2a25; --s2: #36322c; --s3: #403b34;
+  --border: #4b453c; --border-strong: #645b4e; --shadow: rgba(0, 0, 0, .35);
+  --text-3: #a59b88;
+  --danger: #f49494; --unique: #ec9d63;
+  --chip-tint: 7%; /* lighter surfaces: a softer tint keeps chip text AA */
+}
+/* Slate: cool blue-grey dark */
+:root[data-surface="slate"] {
+  --bg: #1b2028; --s1: #222832; --s2: #2a313c; --s3: #333b48;
+  --border: #3b4452; --border-strong: #556173; --shadow: rgba(0, 0, 0, .4);
+  --text: #e8ecf2; --text-2: #b9c1cd; --text-3: #9ea8b7; --normal: #d3d7dd;
+  --danger: #f49494; --unique: #ec9d63;
+  --chip-tint: 7%;
+}
+:root[data-surface="dim"][data-accent="crimson"]   { --accent: #f69389; --accent-hover: #f8a79f; }
+:root[data-surface="slate"][data-accent="crimson"] { --accent: #f69389; --accent-hover: #f8a79f; }
+/* Parchment: warm, low-glare light */
+:root[data-theme="light"][data-surface="parchment"] {
+  --bg: #ece3d0; --s1: #f8f2e6; --s2: #f1e9da; --s3: #e4d9c3;
+  --border: #d6c9b0; --border-strong: #bfae8e; --shadow: rgba(70, 45, 10, .14);
+  --chip-tint: 7%;
+}
+
 /* ---- high contrast (dark) ---- */
 :root[data-contrast="high"] {
   --text: #fffaf0; --text-2: #e6dfd2; --text-3: #d0c8b8;

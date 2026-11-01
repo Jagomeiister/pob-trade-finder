@@ -206,14 +206,22 @@
     if (l.trigger) l.trigger.setAttribute('aria-expanded', 'false');
     if (l.onClose) l.onClose();
   }
+  // The Text size setting zooms <body>: getBoundingClientRect and the viewport are in screen
+  // pixels, but top/left on a layer inside <body> are in zoomed pixels, so divide by the zoom.
+  function bodyZoom() {
+    var z = parseFloat(getComputedStyle(document.body).zoom);
+    return z > 0 ? z : 1;
+  }
   function place(layer, trigger) {
     layer.hidden = false;
+    var z = bodyZoom();
     var r = trigger.getBoundingClientRect();
-    layer.style.top = (r.bottom + window.scrollY + 4) + 'px';
+    layer.style.top = ((r.bottom + 4 + window.scrollY) / z) + 'px';
     document.body.appendChild(layer);
-    var w = layer.offsetWidth;
-    var left = layer.dataset.align === 'start' ? r.left + window.scrollX : r.right + window.scrollX - w;
-    layer.style.left = Math.max(8, Math.min(left, window.scrollX + document.documentElement.clientWidth - w - 8)) + 'px';
+    var w = layer.offsetWidth; // zoomed px
+    var left = layer.dataset.align === 'start' ? r.left / z : r.right / z - w;
+    var maxLeft = document.documentElement.clientWidth / z - w - 8;
+    layer.style.left = (Math.max(8, Math.min(left, maxLeft)) + window.scrollX / z) + 'px';
   }
   function openFloating(layer, trigger, onClose, keep) {
     closeLayer();

@@ -66,12 +66,16 @@ const SURFACES = ['--bg', '--s1', '--s2'];
 const CHIP = ['--accent', '--magic', '--crafted', '--fractured', '--exarch', '--eater', '--gem', '--divine',
   '--success', '--warn', '--danger', '--info', '--text-2', '--unique'];
 
+// themes = base (data-theme) + optional surface variant (data-surface), as js/app/01-state.js THEMES
+const THEMES = { dark: [null, null], dim: [null, 'dim'], slate: [null, 'slate'],
+                 light: ['light', null], parchment: ['light', 'parchment'] };
 const STATES = [];
-['dark', 'light'].forEach(function (theme) {
+Object.keys(THEMES).forEach(function (theme) {
   ['gold', 'crimson', 'teal', 'violet', 'green'].forEach(function (accent) {
     ['normal', 'high'].forEach(function (contrast) {
       const s = {};
-      if (theme === 'light') s.theme = 'light';
+      if (THEMES[theme][0]) s.theme = THEMES[theme][0];
+      if (THEMES[theme][1]) s.surface = THEMES[theme][1];
       if (accent !== 'gold') s.accent = accent;
       if (contrast === 'high') s.contrast = 'high';
       STATES.push({ label: theme + '/' + accent + '/' + contrast, state: s });

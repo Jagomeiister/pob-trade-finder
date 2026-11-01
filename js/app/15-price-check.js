@@ -23,11 +23,9 @@ async function checkPrice(state, quiet) {
     if (seq !== state.priceSeq) return; // superseded by a newer search
     if (!res.ok) {
       if (showCooldown(box, res.error, function () { checkPrice(state, quiet); })) { state.priceState = null; return; }
-      box.textContent = '❌ ' + res.error +
-        (/complex/i.test(res.error || '') && !HAS_SESSION
-          ? ' — weighted and flexible-resistance searches need a saved POESESSID (higher query budget); the trade-site link works while logged in there.'
-          : '');
       state.priceState = null; // stop the sold watcher polling a dead panel
+      if (/too complex/i.test(res.error || '')) { showTooComplex(state, payloadStr, league); return; }
+      box.textContent = '❌ ' + res.error;
       return;
     }
     state.priceState = {
@@ -56,6 +54,46 @@ async function checkPrice(state, quiet) {
   } finally {
     state.priceBtn.disabled = false;
   }
+}
+
+// GGG caps how complex a logged-out search can be; weighted and flexible-resistance
+// searches hit it quickly. Say so plainly and offer what works instead of a raw HTTP 400.
+function showTooComplex(state, payloadStr, league) {
+  var box = state.priceBox;
+  box.textContent = '';
+  var weighted = state.modeSel && state.modeSel.value === 'w';
+  var flex = state.flexToggle && state.flexToggle.checkbox.checked;
+  var msg = UI.el('div', 'complex-note');
+  msg.appendChild(UI.el('b', null, 'GGG says this search is too complex for the app to run without being logged in. '));
+  msg.appendChild(document.createTextNode(HAS_SESSION
+    ? 'Your saved POESESSID may have expired: save a fresh one in ⚙ Settings → Account, or untick a few mods.'
+    : (weighted ? 'Weighted' : flex ? 'Flexible-resistance' : 'Big') + ' searches get a higher limit when logged in. ' +
+      'The trade site runs it fine while you\'re logged in there, or save a POESESSID in ⚙ Settings → Account.'));
+  box.appendChild(msg);
+  var acts = UI.el('div', 'complex-acts');
+  acts.appendChild(UI.button('primary', { size: 'sm', label: 'Open on trade site ↗',
+    onClick: function () { openUrl(tradeUrlFor(league, payloadStr)); } }));
+  if (weighted) {
+    acts.appendChild(UI.button('secondary', { size: 'sm', label: 'Search "all but one" instead', onClick: function () {
+      state.modeSel.value = '1';
+      state.modeSel.dispatchEvent(new Event('change'));
+      checkPrice(state);
+    } }));
+  } else if (flex) {
+    acts.appendChild(UI.button('secondary', { size: 'sm', label: 'Turn off flexible resistances', onClick: function () {
+      state.flexToggle.checkbox.checked = false;
+      state.flexToggle.checkbox.dispatchEvent(new Event('change'));
+      checkPrice(state);
+    } }));
+  }
+  if (!HAS_SESSION) {
+    acts.appendChild(UI.button('ghost', { size: 'sm', label: 'Add POESESSID…', onClick: function () {
+      openSettings(this);
+      var inp = document.getElementById('sessid-input');
+      if (inp) inp.focus();
+    } }));
+  }
+  box.appendChild(acts);
 }
 
 async function gotoPage(state, page) {

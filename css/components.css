@@ -107,6 +107,11 @@ body:not(.gui) .btn.act-search { background: var(--accent); border-color: var(--
 .stash-total { font-size: var(--fs-xl); font-weight: 700; color: var(--price); font-variant-numeric: tabular-nums; }
 .stash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
 .settings-sub { margin: 14px 0 4px; font-size: var(--fs-sm); color: var(--text); }
+.sessid-disclaimer p { margin: 0 0 10px; line-height: 1.5; color: var(--text-2); }
+.sessid-disclaimer b { color: var(--text); }
+.complex-note { color: var(--text-2); line-height: 1.5; }
+.complex-note b { color: var(--text); }
+.complex-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .cost-trend { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
 .cost-trend-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin-bottom: 4px; }
 .sell-hint {

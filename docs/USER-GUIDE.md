@@ -469,7 +469,7 @@ say so and fall back to polling.
 
 Settings opens as a panel on the right; Esc or a click outside closes it.
 
-- **Appearance** — **Theme**: Dark, Light, or Match Windows; **Accent**: gold, crimson,
+- **Appearance** — **Theme**: Dark, Dim (a softer dark), Slate (blue-grey dark), Light, Parchment (warm, low-glare light), or Match Windows; **Accent**: gold, crimson,
   teal, violet or green. Every combination is checked for readable contrast. (Older colour
   schemes carry over: Blood → Dark + crimson, etc.) **Text size** (90–125%) and
   **density** (comfortable/compact)

@@ -24,6 +24,8 @@ Scenarios (each on a fresh page load with empty localStorage):
   12 batch     — Check all prices becomes a stop button, a gap between searches, stopping works
   13 weighted  — weighted-total search (weight group, 90% target), own item scores 100%, value sort
   14 stash     — official login off by default; signed in: nav entry, Stash value page, one run per click
+  15 zoom      — menus line up at every Text size; 'query too complex' explained with ways forward
+  16 sessid    — POESESSID: one-time disclaimer, Cancel saves nothing, never asks again or on clear
 
 Run a subset by number or name: python test/e2e/run_e2e.py 3 diff
 
@@ -1162,6 +1164,111 @@ def scenario_stash(s, tag):
     check(tag + " run saved for the chart", r["history"] == 1, r["history"])
 
 
+S15_ZOOM_COMPLEX = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = { menus: [] };
+// menus and popovers line up with their button at every Text size (body zoom)
+for (const z of [1, 1.12, 1.25, 1.5]) {
+  document.body.style.zoom = z;
+  document.documentElement.style.setProperty('--zoom', z);
+  for (const y of [0, 150]) {
+    window.scrollTo(0, y);
+    await H.sleep(30);
+    const card = document.querySelector('.tab-section[data-tab="gear"] .card.is-active');
+    const trig = card.querySelector('.menu-trigger');
+    trig.click();
+    await H.sleep(30);
+    const m = document.querySelector('.menu').getBoundingClientRect(), t = trig.getBoundingClientRect();
+    out.menus.push({ z: z, y: y, dRight: Math.round(m.right - t.right), dTop: Math.round(m.top - t.bottom),
+                     inside: m.right <= document.documentElement.clientWidth + 1 });
+    trig.click();
+  }
+}
+document.body.style.zoom = 1;
+document.documentElement.style.setProperty('--zoom', 1);
+window.scrollTo(0, 0);
+// "query too complex" (logged out, weighted search): plain words + ways forward
+const card = H.gearCards().find(c => [...c.querySelectorAll('select')].some(s => [...s.options].some(o => o.value === 'w')));
+const st = cards.find(s => s.card === card);
+[...document.querySelectorAll('.tab-section[data-tab="gear"] .slot-row')].find(r => r.slotCard === card).click();
+st.modeSel.value = 'w';
+st.modeSel.dispatchEvent(new Event('change'));
+window.__stubOverrides.trade_search = { ok: false, error: 'HTTP 400: {"error":{"code":2,"message":"Query is too complex. Please reduce the amount of filters used.\\nLogging in will increase this limit."}}' };
+H.button(card, 'Check price').click();
+await H.waitFor(() => card.querySelector('.complex-note'), 5000, 'the too-complex note');
+out.note = H.text('.complex-note', card);
+out.rawJson = /"code":2/.test(card.querySelector('.card-side').textContent);
+out.buttons = [...card.querySelectorAll('.complex-acts button')].map(b => b.textContent);
+delete window.__stubOverrides.trade_search;
+const before = H.calls('trade_search').length;
+H.button(card, 'Search "all but one" instead').click();
+await H.waitFor(() => card.querySelectorAll('.card-side .listing').length, 5000, 'the fallback search');
+out.mode = st.modeSel.value;
+const q = JSON.parse(H.calls('trade_search')[before].args[1]).query;
+out.fallbackHasWeight = (q.stats || []).some(g => g.type === 'weight');
+return out;
+"""
+
+
+def scenario_zoom_complex(s, tag):
+    s.fresh()
+    r = s.run(S15_ZOOM_COMPLEX, timeout=60)
+    bad = [m for m in r["menus"] if abs(m["dRight"]) > 1 or not (2 <= m["dTop"] <= 6) or not m["inside"]]
+    check(tag + " ⋯ menu lines up with its button at 100/112/125/150% text, scrolled or not", not bad, bad or r["menus"])
+    check(tag + " too-complex error explained in words", "too complex" in (r["note"] or "") and not r["rawJson"],
+          r["note"])
+    check(tag + " offers trade site, 'all but one' and POESESSID", r["buttons"] == [
+        "Open on trade site ↗", 'Search "all but one" instead', "Add POESESSID…"], r["buttons"])
+    check(tag + " 'all but one' re-searches without the weight group", r["mode"] == "1" and not r["fallbackHasWeight"], r)
+
+
+S16_SESSID = r"""
+const H = window.__e2e;
+const out = {};
+document.getElementById('settings-btn-side').click();
+await H.sleep(50);
+const inp = document.getElementById('sessid-input'), save = document.getElementById('sessid-save');
+const dlg = () => document.querySelector('dialog.ui-dialog[open]');
+const saves = () => H.calls('set_poesessid').length;
+inp.value = 'abc123';
+save.click();
+await H.waitFor(dlg, 3000, 'the disclaimer');
+out.title = H.text('.ui-dialog-title', dlg());
+out.body = H.text('.ui-dialog-body', dlg());
+H.button(dlg(), 'Cancel').click();
+await H.sleep(50);
+out.afterCancel = { saves: saves(), open: !!dlg(), ack: localStorage.getItem('pobtf-sessid-ack') };
+save.click();
+await H.waitFor(dlg, 3000, 'the disclaimer again');
+H.button(dlg(), 'I understand, save it').click();
+await H.waitFor(() => saves() === 1, 3000, 'the save');
+out.afterConfirm = { saves: saves(), value: H.calls('set_poesessid')[0].args[0], ack: localStorage.getItem('pobtf-sessid-ack') };
+await H.sleep(100);
+inp.value = 'def456';
+save.click();
+await H.sleep(150);
+out.second = { dialog: !!dlg(), saves: saves() };
+inp.value = '';
+save.click();
+await H.sleep(150);
+out.clear = { dialog: !!dlg(), saves: saves() };
+return out;
+"""
+
+
+def scenario_sessid(s, tag):
+    s.fresh()
+    r = s.run(S16_SESSID, timeout=30)
+    check(tag + " first save shows the disclaimer", r["title"] == "Using your POESESSID" and "own risk" in r["body"]
+          and "never share it" in r["body"], r["body"])
+    check(tag + " Cancel saves nothing", r["afterCancel"] == {"saves": 0, "open": False, "ack": None}, r["afterCancel"])
+    check(tag + " confirming saves it once and remembers", r["afterConfirm"]["saves"] == 1 and
+          r["afterConfirm"]["value"] == "abc123" and r["afterConfirm"]["ack"] == "1", r["afterConfirm"])
+    check(tag + " never asks again", r["second"] == {"dialog": False, "saves": 2}, r["second"])
+    check(tag + " clearing never asks", r["clear"] == {"dialog": False, "saves": 3}, r["clear"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -1177,6 +1284,8 @@ SCENARIOS = [
     ("12 batch", scenario_batch),
     ("13 weighted", scenario_weighted),
     ("14 stash", scenario_stash),
+    ("15 zoom", scenario_zoom_complex),
+    ("16 sessid", scenario_sessid),
 ]
 
 

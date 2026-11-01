@@ -76,10 +76,14 @@ var PREFS = { fontsize: '100', density: 'comfortable', sound: true, notify: true
 var LEGACY_THEMES = { classic: ['dark', 'gold'], obsidian: ['dark', 'teal'], midnight: ['dark', 'violet'],
                       blood: ['dark', 'crimson'], forest: ['dark', 'green'] };
 
+// theme -> [data-theme base, data-surface variant] on <html> (css/tokens.css; test_contrast.js THEMES)
+var THEMES = { dark: [null, null], dim: [null, 'dim'], slate: [null, 'slate'],
+               light: ['light', null], parchment: ['light', 'parchment'] };
+
 function migratePrefs() {
   var old = LEGACY_THEMES[PREFS.theme];
   if (old) { PREFS.theme = old[0]; PREFS.accent = old[1]; }
-  if (['dark', 'light', 'system'].indexOf(PREFS.theme) < 0) PREFS.theme = 'dark';
+  if (PREFS.theme !== 'system' && !THEMES[PREFS.theme]) PREFS.theme = 'dark';
 }
 
 function loadPrefs() {
@@ -95,8 +99,10 @@ var LIGHT_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: 
 function applyPrefs() {
   migratePrefs(); // prefs hydrated from the desktop store can still carry old names
   var root = document.documentElement;
-  var light = PREFS.theme === 'light' || (PREFS.theme === 'system' && LIGHT_QUERY && LIGHT_QUERY.matches);
-  if (light) root.dataset.theme = 'light'; else delete root.dataset.theme;
+  var t = THEMES[PREFS.theme === 'system' ? (LIGHT_QUERY && LIGHT_QUERY.matches ? 'light' : 'dark') : PREFS.theme] ||
+          THEMES.dark;
+  if (t[0]) root.dataset.theme = t[0]; else delete root.dataset.theme;
+  if (t[1]) root.dataset.surface = t[1]; else delete root.dataset.surface;
   if (PREFS.accent && PREFS.accent !== 'gold') root.dataset.accent = PREFS.accent; else delete root.dataset.accent;
   if (PREFS.contrast) root.dataset.contrast = 'high'; else delete root.dataset.contrast;
   var zoom = (parseInt(PREFS.fontsize, 10) || 100) / 100;
