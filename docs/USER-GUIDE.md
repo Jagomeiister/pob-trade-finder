@@ -725,8 +725,14 @@ character against the stage you're at.
 Click **⚖ Compare with character…** in the sidebar, enter your account name
 (**Name#1234**), load your characters, pick one, and **Compare gear** (public profiles, no
 login). **☆ Save** keeps that character (yours or a friend's) at the top of the pop-up: next
-time one click compares it, no typing; ✕ forgets it. With a POESESSID saved (§7b) your characters load automatically. Every card gains
-a strip:
+time one click compares it, no typing; ✕ forgets it. With a POESESSID saved (§7b) your characters load automatically.
+
+The compare lives in memory, so a restart (an update installs with one) clears it. With
+**Compare again when the app starts** ticked (the default, in the same pop-up), the app runs
+your last compare once at launch: the same requests as pressing Compare gear, never repeated
+on its own. Untick it to compare only when you press the button.
+
+Every card gains a strip:
 
 > **You:** My Old Dome — 2/4 target mods · missing: +58 to maximum Life · +35% to Cold Resistance
 

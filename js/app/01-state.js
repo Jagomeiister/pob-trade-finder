@@ -88,8 +88,11 @@ function migratePrefs() {
 
 function loadPrefs() {
   try {
+    // every saved key, not only the ones with a default here: the in-game ones (hotkeyApp,
+    // closeToTray, overGameOpacity, macros, autoCompare…) were dropped on load, then the next
+    // savePrefs() wrote them away, so they quietly went back to their defaults
     var p = JSON.parse(localStorage.getItem('pobtf-prefs'));
-    if (p) Object.keys(PREFS).forEach(function (k) { if (k in p) PREFS[k] = p[k]; });
+    if (p && typeof p === 'object') Object.keys(p).forEach(function (k) { PREFS[k] = p[k]; });
   } catch (e) { /* defaults */ }
   migratePrefs();
 }

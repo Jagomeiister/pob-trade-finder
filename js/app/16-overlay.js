@@ -245,8 +245,23 @@ function wireMacros() {
     var last = inputs[inputs.length - 1];
     if (last) { last.focus(); last.select(); }
   });
-  // first run: gui.py reads PREFS.macros at start; tell it about the defaults too
-  if (!Array.isArray(PREFS.macros) && isGui() && window.pywebview.api.set_macros) saveMacros(loadMacros());
+  // no save on first run: the defaults have no hotkeys, so gui.py has nothing to listen for, and
+  // saving here (before the settings are read back from the app) would write over yours
+}
+
+// the settings were read back from the app (hydrateFromBridge): show them in the In game controls,
+// which were filled from what the page had before that
+function syncInGameSettings() {
+  EXTRA_HOTKEYS.forEach(function (h) {
+    var sel = document.getElementById(h[0]);
+    if (sel) sel.value = PREFS[h[2]] || h[3];
+  });
+  var hk = document.getElementById('pref-hotkey'); if (hk) hk.value = PREFS.hotkey || 'ctrl+d';
+  var op = document.getElementById('pref-over-opacity'); if (op) op.value = String(PREFS.overGameOpacity || 100);
+  var cog = document.getElementById('pref-close-on-game'); if (cog) cog.checked = PREFS.closeOnGameClick !== false;
+  var tray = document.getElementById('pref-close-tray'); if (tray) tray.checked = PREFS.closeToTray !== false;
+  var auto = document.getElementById('char-auto'); if (auto) auto.checked = PREFS.autoCompare !== false;
+  renderMacros();
 }
 
 // App hotkey (default Shift+Space): gui.py brings this window over the game and calls this.
