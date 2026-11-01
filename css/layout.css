@@ -402,6 +402,7 @@ body.trades .trades-root { display: block; }
 .sales-chart { width: 100%; height: auto; display: block; }
 .sales-chart rect { fill: var(--accent); }
 .sales-chart text { fill: var(--text-3); font-size: 12px; }
+.trades-body .data-table { display: block; max-width: 100%; overflow-x: auto; }
 .trade-setup { display: flex; flex-direction: column; gap: 8px; }
 .trade-setup .field-wide { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
 .trade-h3 { font-size: var(--fs-md); margin: 8px 0 0; }
