@@ -172,7 +172,7 @@ var settingsOpener = null;
 // several sections); new settings just go in a section with the right data-tab. "Find a setting"
 // searches every tab at once. The last tab is remembered on this PC (a convenience only).
 var SETTINGS_TABS = [['look', 'Look'], ['alerts', 'Alerts'], ['hotkeys', 'Hotkeys'], ['ingame', 'In game'],
-                     ['account', 'Account'], ['updates', 'Updates'], ['help', 'Help']];
+                     ['account', 'Account'], ['updates', 'Updates'], ['notes', 'Patch notes'], ['help', 'Help']];
 var SETTINGS_TAB_KEY = 'pobtf-settings-tab';
 var settingsTab = null;
 function settingsSections() {
@@ -238,13 +238,15 @@ function showSettingsTab(id) {
   if (panel) panel.scrollTop = 0;
 }
 // Find a setting: every tab's settings at once, only the ones that match every word typed
-// (their label, help text or choices); a match in a section's heading shows the whole section
+// (their label, help text or choices); a match in a section's heading shows the whole section.
+// Sections marked data-no-find (the patch notes) hold no settings: hidden while finding.
 function findSetting(q) {
   var words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
   var panel = document.getElementById('settings-panel');
   panel.classList.toggle('is-finding', words.length > 0);
   var any = false;
   settingsSections().forEach(function (s) {
+    if (s.hasAttribute('data-no-find')) { s.classList.toggle('set-miss', words.length > 0); return; }
     var head = (s.querySelector('h3') || {}).textContent || '';
     var headHit = words.length && words.every(function (w) { return head.toLowerCase().indexOf(w) !== -1; });
     var hits = 0;

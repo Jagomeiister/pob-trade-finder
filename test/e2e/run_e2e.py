@@ -3701,7 +3701,7 @@ return out;
 def scenario_settings_tabs(s, tag):
     s.fresh()
     r = s.run(S44_SETTINGS, timeout=40)
-    check(tag + " Settings has tabs", r["tabs"] == ["Look", "Alerts", "Hotkeys", "In game", "Account", "Updates", "Help"], r["tabs"])
+    check(tag + " Settings has tabs", r["tabs"] == ["Look", "Alerts", "Hotkeys", "In game", "Account", "Updates", "Patch notes", "Help"], r["tabs"])
     check(tag + " opens on Look: Appearance + Accessibility only", r["first"] == ["Look", ["Appearance", "Accessibility"]], r["first"])
     check(tag + " a tab shows only its sections", r["hotkeys"] == ["Hotkeys"], r["hotkeys"])
     check(tag + " the last tab is remembered", r["remembered"] == "Hotkeys", r["remembered"])
@@ -3719,6 +3719,81 @@ def scenario_settings_tabs(s, tag):
     check(tag + " Remove asks, then clears it", r["removed"] == [[""], "POESESSID", True], r["removed"])
     check(tag + " a failed save says why and keeps what you typed", (r["failed"][0] or "").startswith("❌ Not saved: disk is read-only")
           and r["failed"][1] == "abc123", r["failed"])
+
+
+S45_PATCHNOTES = r"""
+const H = window.__e2e;
+const out = {};
+const panel = document.getElementById('settings-panel');
+const box = document.getElementById('patch-notes');
+const tabs = () => [...document.querySelectorAll('#settings-tabs .settings-tab')];
+const shown = () => [...panel.querySelectorAll('.settings-section')].filter(s => getComputedStyle(s).display !== 'none')
+  .map(s => s.querySelector('h3').textContent);
+const notes = window.POE_PATCH_NOTES;
+document.getElementById('settings-btn').click(); await H.sleep(30);
+tabs().find(b => b.textContent === 'Patch notes').click(); await H.sleep(20);
+out.shown = shown();
+const rel = () => [...box.querySelectorAll('details.pn-release')];
+out.count = [rel().length, notes.length];
+const first = rel()[0];
+out.first = [first.dataset.version, notes[0].v, first.open, rel().slice(1).some(d => d.open),
+  first.querySelector('.pn-version').textContent, (first.querySelector('.pn-title') || {}).textContent, (first.querySelector('.pn-date') || {}).textContent];
+out.firstBody = first.querySelector('.pn-body').textContent.trim().length;
+[...box.querySelectorAll('button')].find(b => b.textContent.startsWith('Show older releases')).click(); await H.sleep(20);
+out.all = rel().length;
+out.nested = !!box.querySelector('.pn-list .pn-list li');
+out.bold = box.querySelectorAll('.pn-body b').length;
+out.code = box.querySelectorAll('.pn-body code').length;
+out.rawMarks = /\*\*|`/.test(box.textContent);
+out.oldest = rel()[rel().length - 1].dataset.version;
+// the installed version is marked (the e2e build's own version is not a release)
+out.noMarkDev = box.querySelectorAll('.pn-installed').length;
+window.APP_VERSION = notes[1].v.slice(1); renderPatchNotes();
+out.marked = [...box.querySelectorAll('.pn-installed')].map(c => c.closest('details').dataset.version);
+// a newer release out: says so above the notes
+markPatchNotes({ ok: true, current: notes[1].v.slice(1), latest: 'v9.9.9', newer: true });
+const upd = document.getElementById('patch-notes-update');
+out.update = [upd.hidden, upd.textContent];
+markPatchNotes({ ok: true, current: notes[1].v.slice(1), latest: notes[1].v, newer: false });
+out.updateGone = upd.hidden;
+// notes are data: markup in a note stays text; links open through the app
+window.POE_PATCH_NOTES = [{ v: 'v9.9.9', date: '2099-01-01', title: '<img src=x onerror="window.__pnHacked=1">',
+  blocks: [{ p: [['t', '<b>not bold</b> '], ['a', 'the wiki', 'https://www.poewiki.net/wiki/Test']] }] }];
+renderPatchNotes(); await H.sleep(20);
+out.inject = [box.querySelectorAll('img').length, box.querySelectorAll('.pn-body b').length, box.textContent.indexOf('<img') !== -1, !!window.__pnHacked];
+const n0 = H.calls('open_url').length;
+box.querySelector('.pn-body a').click(); await H.sleep(20);
+out.link = (H.calls('open_url')[n0] || { args: [''] }).args[0];
+window.POE_PATCH_NOTES = notes; window.APP_VERSION = null; renderPatchNotes();
+// Find searches settings, not the notes
+const find = document.getElementById('settings-find');
+find.value = 'diagnostics'; find.dispatchEvent(new Event('input')); await H.sleep(20);
+out.find = shown();
+find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await H.sleep(20);
+out.back = shown();
+document.getElementById('settings-close').click(); await H.sleep(20);
+return out;
+"""
+
+
+def scenario_patch_notes(s, tag):
+    s.fresh()
+    r = s.run(S45_PATCHNOTES, timeout=40)
+    check(tag + " Patch notes tab shows only the notes", r["shown"] == ["Patch notes"], r["shown"])
+    check(tag + " newest 6 releases first, the rest behind Show older", r["count"][0] == 6 and r["count"][1] > 6 and
+          r["all"] == r["count"][1] and r["oldest"] == "v2.0.0", (r["count"], r["all"], r["oldest"]))
+    f = r["first"]
+    check(tag + " the newest release is open with version, title and date", f[0] == f[1] and f[2] and not f[3] and
+          f[4] == f[1] and f[5] and len(f[6] or "") == 10 and r["firstBody"] > 20, f)
+    check(tag + " markdown drawn: nested lists, bold, code; no raw ** or `", r["nested"] and r["bold"] > 5 and
+          r["code"] > 0 and not r["rawMarks"], (r["nested"], r["bold"], r["code"], r["rawMarks"]))
+    check(tag + " the installed version is marked (not on a dev build)", r["noMarkDev"] == 0 and len(r["marked"]) == 1,
+          (r["noMarkDev"], r["marked"]))
+    check(tag + " a newer release out: says so, gone when up to date", r["update"][0] is False and
+          r["update"][1].startswith("v9.9.9 is out") and r["updateGone"] is True, (r["update"], r["updateGone"]))
+    check(tag + " markup in a note stays text", r["inject"] == [0, 0, True, False], r["inject"])
+    check(tag + " links open in the browser through the app", r["link"] == "https://www.poewiki.net/wiki/Test", r["link"])
+    check(tag + " Find skips the notes", "Patch notes" not in r["find"] and r["back"] == ["Patch notes"], (r["find"], r["back"]))
 
 
 def scenario_anoints(s, tag):
@@ -3997,6 +4072,7 @@ SCENARIOS = [
     ("40 anoints", scenario_anoints),
     ("43 lootfilter", scenario_lootfilter),
     ("44 settingstabs", scenario_settings_tabs),
+    ("45 patchnotes", scenario_patch_notes),
 ]
 
 

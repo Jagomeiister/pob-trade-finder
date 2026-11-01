@@ -608,6 +608,28 @@ body.cb-sockets .sock-A::after { content: 'A'; }
 body.gui .settings-section.gui-only { display: flex; }
 .settings-section .char-sessid { border-top: 0; padding-top: 0; }
 .finder-step + .finder-step { margin-top: 12px; }
+/* Settings → Patch notes (js/app/30-patchnotes.js) */
+.pn-notes { display: flex; flex-direction: column; gap: 6px; }
+.pn-update { color: var(--accent); }
+.pn-release { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); }
+.pn-release[open] { border-color: var(--border-strong); }
+.pn-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 10px; cursor: pointer;
+  color: var(--text); font-size: var(--fs-sm); }
+.pn-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-md); }
+.pn-version { color: var(--accent); }
+.pn-title { flex: 1 1 12em; min-width: 0; }
+.pn-date { color: var(--text-3); font-size: var(--fs-xs); white-space: nowrap; }
+.pn-installed { align-self: center; }
+.pn-body { padding: 0 12px 10px; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5; }
+.pn-body p { margin: 6px 0; }
+.pn-sub { margin: 10px 0 2px; color: var(--text); font-size: var(--fs-sm); }
+.pn-list { margin: 4px 0; padding-left: 18px; }
+.pn-list .pn-list { margin: 2px 0; }
+.pn-list li + li { margin-top: 3px; }
+.pn-body b { color: var(--text); }
+.pn-body code { padding: 0 4px; border-radius: var(--r-sm); background: var(--s2); font-size: .92em; }
+.pn-body a { color: var(--accent); }
+.pn-notes > .btn { align-self: flex-start; }
 /* Div cards (js/app/22-divcards.js) */
 .dc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .dc-body { display: flex; flex-direction: column; gap: 12px; }

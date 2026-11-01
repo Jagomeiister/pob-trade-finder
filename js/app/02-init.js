@@ -415,7 +415,9 @@ function checkForUpdates(manual) {
     if (res.current) {
       var foot = document.querySelector('.footer');
       if (foot && foot.textContent.indexOf('· v') === -1) foot.textContent += ' · v' + res.current;
+      window.APP_VERSION = String(res.current).replace(/^v/i, '');
     }
+    if (typeof markPatchNotes === 'function') markPatchNotes(res); // Settings → Patch notes (30-patchnotes.js)
     var latest = 'v' + String(res.latest || '').replace(/^v/i, ''), current = 'v' + String(res.current || '').replace(/^v/i, '');
     var settingsBtn = document.getElementById('update-now-settings');
     if (manual && statusEl) {

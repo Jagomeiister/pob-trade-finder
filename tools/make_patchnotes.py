@@ -1,0 +1,142 @@
+"""Generate data/patchnotes.js: every release's notes (docs/release-notes-v*.md) for Settings →
+Patch notes, newest first.
+
+The markdown is turned into plain data here (no HTML), so the app draws it with text nodes and
+nothing in a note can inject markup. Supported (what the notes use): "## vX.Y.Z: title" or
+"## vX.Y.Z — title", paragraphs, "**Bold line**" subheadings, "- " lists nested by indent,
+inline **bold**, *italic*, `code` and [text](https://link).
+
+Dates come from the git tag of each version (the release date); a version without a tag yet
+(the one being built) gets today's date. build_release.py runs this, so each release ships
+its own notes.
+
+Run: python tools/make_patchnotes.py
+"""
+import json
+import os
+import re
+import subprocess
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DOCS = os.path.join(ROOT, "docs")
+INLINE = re.compile(r"\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\((https?://[^)\s]+)\)|(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])")
+
+
+def inline(text):
+    """'a **b** c' -> [['t','a '],['b','b'],['t',' c']]; kinds: t text, b bold, i italic, c code, a link."""
+    out, pos = [], 0
+    for m in INLINE.finditer(text):
+        if m.start() > pos:
+            out.append(["t", text[pos:m.start()]])
+        if m.group(1) is not None:
+            out.append(["b", m.group(1)])
+        elif m.group(2) is not None:
+            out.append(["c", m.group(2)])
+        elif m.group(3) is not None:
+            out.append(["a", m.group(3), m.group(4)])
+        else:
+            out.append(["i", m.group(5)])
+        pos = m.end()
+    if pos < len(text):
+        out.append(["t", text[pos:]])
+    return out
+
+
+def parse(md):
+    """One release's markdown -> {title, blocks}. Blocks: {"p": inl} | {"h": inl} | {"ul": [item]},
+    item = {"li": inl, "ul": [item]}."""
+    title, blocks, para, stack = "", [], [], None
+    lines = md.replace("\r\n", "\n").split("\n")
+
+    def flush_para():
+        if para:
+            blocks.append({"p": inline(" ".join(para))})
+            del para[:]
+
+    for raw in lines:
+        line = raw.rstrip()
+        if not line.strip():
+            flush_para()
+            stack = None
+            continue
+        m = re.match(r"^##\s+v[\d.]+\s*(?:[:—-]\s*)?(.*)$", line)
+        if m and not title:
+            title = m.group(1).strip()
+            continue
+        m = re.match(r"^(\s*)[-*]\s+(.*)$", line)
+        if m:
+            flush_para()
+            depth = len(m.group(1).replace("\t", "  ")) // 2
+            item = {"li": m.group(2).strip()}  # text for now: wrapped lines are joined first
+            if stack is None:
+                top = {"ul": []}
+                blocks.append(top)
+                stack = [top["ul"]]
+            while depth >= len(stack) and stack[-1]:
+                parent = stack[-1][-1]
+                parent.setdefault("ul", [])
+                stack.append(parent["ul"])
+            del stack[depth + 1:]
+            stack[min(depth, len(stack) - 1)].append(item)
+            continue
+        if stack is not None and raw.startswith("  ") and stack[-1]:
+            last = stack[-1][-1]  # a list item wrapped onto the next line: the deepest open item
+            while last.get("ul"):
+                last = last["ul"][-1]
+            last["li"] += " " + line.strip()
+            continue
+        m = re.match(r"^\*\*(.+)\*\*:?$", line.strip())
+        if m:
+            flush_para()
+            stack = None
+            blocks.append({"h": inline(m.group(1))})
+            continue
+        stack = None
+        para.append(line.strip())
+    flush_para()
+
+    def finish(items):  # list items' joined text -> inline runs
+        for it in items:
+            it["li"] = inline(it["li"])
+            finish(it.get("ul", []))
+    for b in blocks:
+        if "ul" in b:
+            finish(b["ul"])
+    return {"title": title, "blocks": blocks}
+
+
+def tag_dates():
+    try:
+        out = subprocess.run(["git", "for-each-ref", "refs/tags/v*", "--format=%(refname:short) %(creatordate:short)"],
+                             cwd=ROOT, capture_output=True, text=True, timeout=30).stdout
+    except Exception:
+        return {}
+    return dict(l.split(" ", 1) for l in out.splitlines() if " " in l)
+
+
+def version_key(v):
+    return tuple(int(x) for x in v.lstrip("v").split("."))
+
+
+def main():
+    dates, today = tag_dates(), time.strftime("%Y-%m-%d")
+    notes = []
+    for fn in os.listdir(DOCS):
+        m = re.match(r"^release-notes-(v\d+\.\d+\.\d+)\.md$", fn)
+        if not m:
+            continue
+        with open(os.path.join(DOCS, fn), encoding="utf-8") as f:
+            n = parse(f.read())
+        n["v"] = m.group(1)
+        n["date"] = dates.get(m.group(1), today)
+        notes.append(n)
+    notes.sort(key=lambda n: version_key(n["v"]), reverse=True)
+    with open(os.path.join(ROOT, "data", "patchnotes.js"), "w", encoding="utf-8") as f:
+        f.write("// generated by tools/make_patchnotes.py from docs/release-notes-*.md\n")
+        f.write("window.POE_PATCH_NOTES = " + json.dumps(notes, ensure_ascii=False, separators=(",", ":")) + ";\n")
+    print("Wrote data/patchnotes.js: %d releases (%s ... %s)" % (len(notes), notes[-1]["v"], notes[0]["v"]))
+
+
+if __name__ == "__main__":
+    main()

@@ -379,10 +379,17 @@ file:// scripts between launches, which used to make updates invisible. Keep it.
 ## Build & release
 
 ```
-# bump VERSION in gui.py, then:
+# bump VERSION in gui.py, write docs/release-notes-v{V}.md, then:
 python tools/build_release.py     # PyInstaller onefile (--collect-all webview) + staged zip
-gh release create v{V} "dist/PoBTradeFinder-v{V}.zip" --title "v{V}" --notes "..."
+gh release create v{V} "dist/PoBTradeFinder-v{V}.zip" --title "v{V}" --notes-file docs/release-notes-v{V}.md
 ```
+
+`build_release.py` refuses to build without `docs/release-notes-v{V}.md` and runs
+`tools/make_patchnotes.py` first, which turns every `docs/release-notes-v*.md` into
+`data/patchnotes.js` (Settings → Patch notes, drawn by `js/app/30-patchnotes.js`). The notes
+become plain data, never HTML: write them in the usual subset (`## vX.Y.Z: title`, `- ` lists
+nested by two spaces, `**Bold line**` subheadings, inline `**bold**`, `*italic*`, `` `code` ``
+and `[text](https://…)`). Commit the regenerated `data/patchnotes.js` with the release.
 
 The zip layout must stay `exe + index.html + js/ + data/` — the updater and the frozen
 `APP_DIR` (`dirname(sys.executable)`) both assume it.

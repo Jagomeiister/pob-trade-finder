@@ -62,6 +62,8 @@ SHIP = [
     "js/app/26-dust.js",
     "js/app/27-anoints.js",
     "js/app/29-lootfilter.js",
+    "js/app/30-patchnotes.js",
+    "data/patchnotes.js",
     "data/stats.js",
     "data/leagues.js",
     "data/ranges.js",
@@ -98,6 +100,10 @@ def version():
 def main():
     v = version()
     print("Building PoB Trade Finder v%s" % v)
+    # Settings → Patch notes: re-made from docs/release-notes-v*.md so this release ships its own notes
+    if not os.path.exists(os.path.join(ROOT, "docs", "release-notes-v%s.md" % v)):
+        sys.exit("docs/release-notes-v%s.md is missing: write the release notes first" % v)
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "make_patchnotes.py")], check=True, cwd=ROOT)
 
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyinstaller", "pywebview", "websocket-client"], check=True)
     # onedir, NOT onefile: onefile self-extracts to %TEMP%\_MEI... on every

@@ -926,9 +926,9 @@ back to polling, and you save the new POESESSID from your browser.
 ## 7c. Settings & accessibility (⚙ Settings, bottom of the sidebar)
 
 Settings opens as a panel on the right; Esc or a click outside closes it. It has tabs: **Look**,
-**Alerts**, **Hotkeys**, **In game**, **Account**, **Updates** and **Help**, and it reopens on the
-one you used last. **Find a setting** at the top searches every tab at once (a setting's name,
-help text or choices), and Esc clears it.
+**Alerts**, **Hotkeys**, **In game**, **Account**, **Updates**, **Patch notes** and **Help**, and it
+reopens on the one you used last. **Find a setting** at the top searches every tab at once (a
+setting's name, help text or choices; not the patch notes), and Esc clears it.
 
 - **Appearance** — **Theme**: Dark, Dim (a softer dark), Slate (blue-grey dark), Light, Parchment (warm, low-glare light), or Match Windows; **Accent**: gold, crimson,
   teal, violet or green. Every combination is checked for readable contrast. (Older colour
@@ -944,6 +944,9 @@ help text or choices), and Esc clears it.
 - **Account** — your POESESSID (§7b) and the official login
 - **Updates** — **Refresh trade data** and **Check for updates** (when there's a new
   version, an **Update now** button appears right there)
+- **Patch notes** — what every release brought, newest first. The newest is open; click any
+  release to open or close it, and **Show older releases** lists the rest. The version you have
+  is marked **installed**, and when a newer one is out it says so at the top
 - **Help** — **Copy diagnostics** for a bug report, and About
 
 Everything works from the keyboard: Tab moves between controls, arrows move through the
