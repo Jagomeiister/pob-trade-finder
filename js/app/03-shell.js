@@ -28,6 +28,7 @@ async function onDecode() {
     var xml = await PoB.decodePobCode(code);
     if (xml.indexOf('<PathOfBuilding') === -1) throw new Error('Decoded data is not a PoB build.');
     build = PoB.parseBuild(xml);
+    if (typeof sheetRememberBuild === 'function') sheetRememberBuild(build); // cheat sheet gems (24-cheatsheets.js)
     status.textContent = '';
     saveSettings();
     document.getElementById('build-label').textContent =

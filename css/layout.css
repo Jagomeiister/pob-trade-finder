@@ -586,6 +586,30 @@ body.trade-cards .sheet-head .btn-icon { width: 30px; height: 30px; font-size: v
   border: 1px solid var(--accent); border-radius: 999px; white-space: nowrap;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 8px 22px rgba(0, 0, 0, .5); } /* the in-game panel ring (see above) */
 .sheet-hint-text { color: var(--text); font-size: var(--fs-sm); font-weight: 600; padding: 0 4px; }
+/* act route (zones in order) and quest gems */
+.sheet-route { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px;
+  counter-reset: zone; }
+.sheet-zone { display: flex; flex-direction: column; padding: 3px 6px 3px 26px; position: relative;
+  border-radius: var(--r-sm); counter-increment: zone; }
+.sheet-zone::before { content: counter(zone); position: absolute; left: 4px; top: 4px; width: 16px; text-align: right;
+  color: var(--text-3); font-size: var(--fs-xs); }
+.sheet-zone.is-town .sheet-zone-name { color: var(--text-2); font-style: italic; }
+.sheet-zone.is-here { background: color-mix(in srgb, var(--success) 16%, transparent); }
+.sheet-zone.is-here .sheet-zone-name { color: var(--success); font-weight: 700; }
+.sheet-zone-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sheet-zone-name { color: var(--text); font-size: var(--fs-sm); }
+.sheet-zone-lvl { color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.sheet-zone-wp { padding: 0 4px; border-radius: var(--r-sm); font-size: var(--fs-xs); font-weight: 700;
+  color: var(--info); background: color-mix(in srgb, var(--info) 16%, transparent); }
+.sheet-gemq { display: flex; flex-direction: column; gap: 3px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.sheet-gemq:last-child { border-bottom: 0; }
+.sheet-gemq-name { color: var(--text-2); font-size: var(--fs-xs); font-weight: 600; }
+.sheet-gems { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.sheet-gem { padding: 1px 6px; border-radius: var(--r-sm); background: var(--s2); color: var(--gem, var(--text));
+  font-size: var(--fs-xs); }
+.sheet-gem.is-mine { background: color-mix(in srgb, var(--success) 22%, var(--s2)); color: var(--text); font-weight: 700;
+  outline: 1px solid var(--success); }
+.sheet-filter { width: 100%; max-width: 420px; }
 .zone-notes { display: flex; flex-direction: column; gap: 4px; }
 .zone-row { display: flex; align-items: center; gap: 8px; }
 .zone-area { min-width: 190px; font-size: var(--fs-sm); }

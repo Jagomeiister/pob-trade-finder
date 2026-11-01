@@ -22,6 +22,7 @@ var SHEET_PREFS_KEY = 'pobtf-sheet-prefs', SHEETS_KEY = 'pobtf-sheets';
 var SHEET_IMG_PREFIX = 'data/cheatsheets/';
 var sheetOpen = false;     // overlay: showing
 var sheetArea = null;      // overlay: the area you're in (from "You have entered ...")
+var sheetAreaId = null;    // overlay: its id (from "Generating level N area ...": matches the route)
 var sheetViewAct = null;   // main view: the act being previewed
 var sheetViewMech = null;  // main view: the mechanic being previewed (instead of an act)
 var sheetEditing = null;   // main view: id of the sheet open in the editor ('new' for a new one)
@@ -37,9 +38,37 @@ function sheetPrefs() {
   if (p.suggest === undefined) p.suggest = true;
   if (!Array.isArray(p.muted)) p.muted = []; // mechanics you said not to suggest
   if (p.sheet && !mechanicById(p.sheet)) p.sheet = null; // null: the act sheet; else a mechanic id
-  p.show = Object.assign({ points: true, trials: true, notes: true, mine: true }, p.show || {});
+  p.show = Object.assign({ points: true, trials: true, notes: true, mine: true, route: true, gems: true }, p.show || {});
+  if (!p.gemClass) p.gemClass = 'build'; // 'build': your loaded build's class, or one of SHEET_CLASSES
   return p;
 }
+
+// ---- your build, for the gem rewards (saved when a build loads, so the overlay sees it too) ----
+var SHEET_BUILD_KEY = 'pobtf-sheet-build';
+var SHEET_CLASSES = ['Marauder', 'Duelist', 'Ranger', 'Shadow', 'Witch', 'Templar', 'Scion'];
+function sheetRememberBuild(b) {
+  if (!b) return;
+  var names = {};
+  (b.gems || []).forEach(function (g) { if (g && g.name) names[g.name] = 1; });
+  (b.gemGroups || []).forEach(function (gr) { (gr.offGems || []).forEach(function (g) { if (g && g.name) names[g.name] = 1; }); });
+  try { persist(SHEET_BUILD_KEY, JSON.stringify({ cls: b.className || '', gems: Object.keys(names) })); } catch (e) { /* storage full */ }
+}
+function sheetBuild() {
+  try { return JSON.parse(localStorage.getItem(SHEET_BUILD_KEY)) || {}; } catch (e) { return {}; }
+}
+function sheetGemClass(p) {
+  if (p.gemClass && p.gemClass !== 'build') return SHEET_CLASSES.indexOf(p.gemClass) !== -1 ? p.gemClass : null;
+  var c = sheetBuild().cls;
+  return SHEET_CLASSES.indexOf(c) !== -1 ? c : null;
+}
+// PoB names supports without " Support"; the wiki keeps it: compare without it
+function sheetGemKey(n) { return String(n || '').toLowerCase().replace(/ support$/, '').trim(); }
+function sheetBuildGems() {
+  var m = {};
+  (sheetBuild().gems || []).forEach(function (n) { m[sheetGemKey(n)] = 1; });
+  return m;
+}
+function sheetGemMine(mine, gem) { return mine[sheetGemKey(gem)] ? 1 : 0; }
 function saveSheetPrefs(p) { saveShared(SHEET_PREFS_KEY, JSON.stringify(p)); }
 // the cards window asks this when deciding whether the log reader should run (19-trades.js)
 function sheetWantsLog() { return !!sheetPrefs().follow; }
@@ -187,6 +216,57 @@ function sheetContent(act, opts) {
       n.lines.forEach(function (l) { nl.appendChild(UI.el('li', 'sheet-li', l)); });
       section(n.title).appendChild(nl);
     });
+  }
+  // the act's zones in order; the one you're in is marked (Client.txt area id, or its name)
+  if (d && p.show.route && (a.route || []).length) {
+    var rl = UI.el('ol', 'sheet-route');
+    a.route.forEach(function (z) {
+      var here = (sheetAreaId && z.id === sheetAreaId) || (!sheetAreaId && sheetArea && z.area === sheetArea);
+      var li = UI.el('li', 'sheet-zone' + (here ? ' is-here' : '') + (z.town ? ' is-town' : ''));
+      var top = UI.el('span', 'sheet-zone-top');
+      top.appendChild(UI.el('span', 'sheet-zone-name', z.area));
+      if (z.level) top.appendChild(UI.el('span', 'sheet-zone-lvl', 'lvl ' + z.level));
+      if (z.wp) { var wp = UI.el('span', 'sheet-zone-wp', 'WP'); wp.title = 'Waypoint'; top.appendChild(wp); }
+      if (here) top.appendChild(UI.chip('you\'re here', 'success'));
+      li.appendChild(top);
+      (z.notes || []).forEach(function (n) { li.appendChild(UI.el('span', 'sheet-li-sub', n)); });
+      rl.appendChild(li);
+    });
+    section('Route').appendChild(rl);
+  }
+  // quest gem rewards and what the vendor sells after, for your class; your build's gems marked
+  if (d && p.show.gems && (a.gems || []).length) {
+    var cls = sheetGemClass(p);
+    var gsec = section('Gems' + (cls ? ' · ' + cls : ''));
+    if (!cls) {
+      gsec.appendChild(UI.el('div', 'sheet-empty', 'Load a build, or pick a class in Tools → Cheat sheets, to see your gems.'));
+    } else {
+      var mine = sheetBuildGems();
+      var gl = UI.el('ul', 'sheet-list');
+      a.gems.forEach(function (q) {
+        var rew = (q.reward || []).filter(function (g) { return (g.classes || []).indexOf(cls) !== -1; });
+        var ven = (q.vendor || []).filter(function (g) { return (g.classes || []).indexOf(cls) !== -1; });
+        if (!rew.length && !ven.length) return;
+        var li = UI.el('li', 'sheet-gemq');
+        li.appendChild(UI.el('span', 'sheet-gemq-name', q.quest + (q.npc ? ' · ' + q.npc : '')));
+        [[rew, 'reward', 'Reward (pick one)'], [ven, 'vendor', 'Then buy']].forEach(function (k) {
+          if (!k[0].length) return;
+          var row = UI.el('span', 'sheet-gems');
+          row.appendChild(UI.el('span', 'sheet-tag ' + (k[1] === 'reward' ? 'is-point' : 'is-respec'), k[2]));
+          // your build's gems first, the rest after
+          k[0].slice().sort(function (x, y) { return sheetGemMine(mine, y.gem) - sheetGemMine(mine, x.gem); }).forEach(function (g) {
+            var own = sheetGemMine(mine, g.gem);
+            var gem = UI.el('span', 'sheet-gem' + (own ? ' is-mine' : ''), g.gem);
+            if (own) gem.title = 'In your build';
+            row.appendChild(gem);
+          });
+          li.appendChild(row);
+        });
+        gl.appendChild(li);
+      });
+      if (!gl.childNodes.length) gsec.appendChild(UI.el('div', 'sheet-empty', 'No gem rewards for ' + cls + ' in this act.'));
+      else gsec.appendChild(gl);
+    }
   }
   if (p.show.mine) {
     sheetsForAct(act).forEach(function (s) {
@@ -405,7 +485,9 @@ window.__sheetEvent = function (ev) {
   if (!ev.test && !p.follow) return false;
   if (ev.type === 'zone') {
     sheetArea = ev.area;
-  } else if (ev.type === 'area' && ev.act) {
+  } else if (ev.type === 'area') {
+    sheetAreaId = ev.id || null; // marks the zone on the route (maps and hideouts mark nothing)
+    if (!ev.act) { renderSheetOverlay(); return true; }
     var changed = ev.act !== p.act;
     p.act = ev.act;
     if (changed && (p.autoOpen || ev.test)) { sheetOpen = true; p.sheet = null; } // a new act: its sheet
@@ -501,6 +583,13 @@ function renderSheetsView() {
     mprev.appendChild(mh);
     var mcard = UI.el('div', 'sheet-panel is-preview is-mech');
     mcard.appendChild(mechanicContent(vm));
+    // long sheets (e.g. every amulet anoint): a filter box narrows the rows (app only, not in game)
+    var nrows = mcard.querySelectorAll('.sheet-table tbody tr, .sheet-list .sheet-li').length;
+    if (nrows > 25) {
+      var filt = UI.input({ type: 'search', placeholder: 'Filter ' + nrows + ' rows…', ariaLabel: 'Filter this sheet', cls: 'sheet-filter' });
+      filt.addEventListener('input', function () { sheetFilterRows(mcard, filt.value); });
+      mprev.appendChild(filt);
+    }
     mprev.appendChild(mcard);
     page.appendChild(mprev);
     view.appendChild(page);
@@ -528,12 +617,20 @@ function renderSheetsView() {
   card.appendChild(sheetContent(sheetViewAct));
   prev.appendChild(card);
   var shows = UI.el('div', 'trade-row');
-  [['points', 'Quests'], ['trials', 'Trials'], ['notes', 'Bandits & penalties'], ['mine', 'Your sheets']].forEach(function (s) {
+  [['points', 'Quests'], ['trials', 'Trials'], ['notes', 'Bandits & penalties'], ['route', 'Route'], ['gems', 'Gems'],
+   ['mine', 'Your sheets']].forEach(function (s) {
     shows.appendChild(sheetToggle(s[1], p.show[s[0]], function (on) {
       var q = sheetPrefs(); q.show[s[0]] = on; saveSheetPrefs(q); renderSheetsView();
     }));
   });
   prev.appendChild(shows);
+  // whose gem rewards: your build's class, or any class
+  var bcls = sheetBuild().cls;
+  var clsSel = UI.select([['build', 'Your build' + (SHEET_CLASSES.indexOf(bcls) !== -1 ? ' (' + bcls + ')' : ' (none loaded)')]]
+    .concat(SHEET_CLASSES.map(function (c) { return [c, c]; })), p.gemClass, { ariaLabel: 'Gems for class', onChange: function () {
+      var q = sheetPrefs(); q.gemClass = clsSel.value; saveSheetPrefs(q); renderSheetsView();
+    } });
+  prev.appendChild(UI.field('Gems for', clsSel, { title: 'Quest rewards and vendor gems for this class; your build\'s gems are marked' }));
 
   var mine = UI.el('div', 'sheets-col');
   mine.appendChild(UI.el('h3', 'trade-h3', 'Your sheets'));
@@ -544,6 +641,23 @@ function renderSheetsView() {
   cols.appendChild(mine);
   page.appendChild(cols);
   view.appendChild(page);
+}
+
+// hide table rows / list lines that don't contain every word typed; sections left empty hide too
+function sheetFilterRows(box, text) {
+  var words = String(text || '').toLowerCase().split(/\s+/).filter(Boolean);
+  box.querySelectorAll('.sheet-sec').forEach(function (sec) {
+    var shown = 0;
+    sec.querySelectorAll('.sheet-table tbody tr, .sheet-list .sheet-li').forEach(function (r) {
+      var t = r.textContent.toLowerCase();
+      var ok = words.every(function (w) { return t.indexOf(w) !== -1; });
+      r.style.display = ok ? '' : 'none';
+      shown += ok ? 1 : 0;
+    });
+    var title = (sec.querySelector('.sheet-sec-title') || {}).textContent || '';
+    var titleHit = words.length && words.every(function (w) { return title.toLowerCase().indexOf(w) !== -1; });
+    sec.style.display = !words.length || shown || titleHit ? '' : 'none';
+  });
 }
 
 function sheetToggle(label, on, onChange) {
