@@ -318,6 +318,52 @@ Details:
 - PoE 1 items only. Currency stacks, maps and other non-gear items open a card but may
   not produce a useful search
 
+## 5c2. 🤝 Trade helper (selling)
+
+Cards for every trade whisper, like PoE Lurker. Open it from **Tools → Trade helper** in the
+sidebar or **⚙ Settings → In game → Trade helper…**. It's a small window that stays on top of
+the game.
+
+**Switch it on** in its **Setup** tab. The app then reads Path of Exile's chat log
+(`Client.txt` in the game folder → `logs`) while it runs. If it can't find the file, start the
+game or press **Choose Client.txt…**. Everything stays on your PC: sales, buyer notes, flags
+and hidden buyers are never uploaded or shared.
+
+**One button = one chat command.** The app never types in the game on its own. Nothing is sent
+on a timer or because something appeared in the log. GGG's rules require that, and it's why
+**Invite** and **Trade** are separate buttons.
+
+An incoming trade card shows the item, price, league, stash tab and position, and the buyer's
+note:
+
+1. **Invite**, **Busy**, **Sold**, **Still interested?**, or ✕ to dismiss. **▣ Show in stash**
+   outlines the item's cell over your open stash tab for 20 seconds (quad tabs too)
+2. When the buyer enters your area the card shows **In your hideout** and switches to
+   **Trade**, **Kick**, **Thanks**
+3. Then record what happened: **✓ Completed** (confirm or edit the price you got), **✗ Not
+   completed**, **⌛ Time wasted** or **Other…** (with a note). If the game logged "Trade
+   accepted", Completed is highlighted for you. If you invited someone and they didn't come
+   within 5 minutes (change it in Setup), **Mark as no-show** appears
+
+⋯ on a card: **Whois**, **Flag buyer**, **Hide this buyer** (no more popups or sounds from
+them; their whispers go to the **Hidden** list) and **Ignore in game…** (sends `/ignore` once,
+after you confirm).
+
+Outgoing whispers (you buying) get a card too: **Visit hideout**, **Trade**, **Re-whisper**.
+
+**Sales** tab: every completed sale with its price in chaos and divines, buyer, league, time
+and stash position. It also shows totals, the average, a chart per day, best sellers and a
+per-league breakdown. Filter by league, period, outcome or text, and **Export CSV**.
+
+**Buyers** tab: each buyer's completed trades, total spent, time wasted and no-shows (a badge
+on their next whisper shows this), a private note, flag, hide, ignore in game, and **Clear
+history**.
+
+**Setup**: on/off, the log file, the chat key read from your game settings, sounds, the
+no-show time and your Busy / Sold / Still interested / Thanks messages (`{item}` and
+`{price}` are filled in). If Path of Exile runs as administrator and the app doesn't, Windows
+blocks the buttons from typing; Setup warns you. Run both the same way.
+
 ## 5d. ⏳ Timeless jewels
 
 Finds the timeless jewel seed that does the most for the notables around one of

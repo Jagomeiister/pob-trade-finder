@@ -181,10 +181,10 @@ var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'pas
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                     timeless: 'Timeless jewels', finder: 'Jewel finder', pasted: 'Pasted item',
-                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value' };
+                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', market: '📈', stash: '💰' };
+                   timeless: '⏳', finder: '🔍', market: '📈', stash: '💰', trades: '🤝' };
 
 function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
 
@@ -222,14 +222,18 @@ function renderNav() {
     b.appendChild(ic);
     b.appendChild(UI.el('span', 'nav-label', VIEW_LABELS[k]));
     b.appendChild(UI.el('span', 'nav-count', navCount(k)));
-    b.addEventListener('click', function () { setView(k); window.scrollTo(0, 0); });
+    b.addEventListener('click', function () {
+      if (k === 'trades') { openTradesWindow(); return; } // its own always-on-top window
+      setView(k); window.scrollTo(0, 0);
+    });
     nav.appendChild(b);
   }
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'timeless', 'finder', 'market', 'stash'].filter(function (k) {
+  ['planner', 'timeless', 'finder', 'market', 'stash', 'trades'].filter(function (k) {
     if (k === 'stash') return OAUTH.signedIn; // official login only
+    if (k === 'trades') return isGui();
     return k === 'planner' || k === 'market' || viewSection(k);
   }).forEach(item);
   setView(document.body.dataset.view || 'gear');

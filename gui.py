@@ -22,12 +22,13 @@ import zipfile
 import webview
 
 import price_hotkey
+import trade_helper
 from currency_feed import CurrencyFeed
 from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -56,6 +57,11 @@ MIN_INTERVAL = 2.5
 # in-game price-check overlay: a second window on index.html?overlay=1
 OVERLAY_TITLE = "PoB Trade Finder - Price check"
 OVERLAY_SIZE = (560, 700)
+
+# trade helper: a third window on index.html?trades=1 (js/app/19-trades.js)
+TRADES_TITLE = "PoB Trade Finder - Trades"
+TRADES_SIZE = (440, 680)
+CHAT_KEY_NAMES = {13: "Enter", 9: "Tab", 32: "Space", 192: "` (backtick)", 222: "' (quote)", 191: "/ (slash)"}
 
 
 DEBUG_LOG_MAX = 256 * 1024
@@ -131,6 +137,12 @@ class Api:
         self._quitting = False
         self._destroyed = set()  # window uids already closed (see _destroy_once)
         self._destroy_lock = threading.Lock()
+        # trade helper (wired up by main()): Client.txt tail, chat sender, stash outline
+        self._trades = None
+        self._tail = None
+        self._sender = None
+        self._highlight = None
+        self._trade_lock = threading.Lock()
         try:
             spec = json.loads(self._storage.get("pobtf-prefs") or "{}").get("hotkey", "ctrl+d")
             price_hotkey.parse_hotkey(spec)
@@ -997,6 +1009,24 @@ class Api:
         main_window.events.closed += main_closed
         overlay.events.closing += overlay_closing
 
+    def _attach_trades(self, main_window, trades):
+        self._trades = trades
+
+        def main_closed():
+            self._quitting = True
+            if self._tail:
+                self._tail.stop()
+            self._destroy_once(trades)
+
+        def trades_closing():
+            if self._quitting:
+                return True
+            threading.Thread(target=trades.hide, daemon=True).start()  # ✕ hides; reopened from the app
+            return False
+
+        main_window.events.closed += main_closed
+        trades.events.closing += trades_closing
+
     def _start_hotkey(self):
         if sys.platform != "win32" or self._hotkey:
             return
@@ -1055,6 +1085,146 @@ class Api:
         try:
             self._hide_overlay()
             return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # -- trade helper (js/app/19-trades.js) -------------------------------------------
+    # Reads Client.txt once the user switches it on; log events become cards in the
+    # trades window. GGG's rules: game commands go out only from a button press
+    # (trade_send, one command per call), never from a log event or a timer.
+    def _trades_eval(self, js):
+        win = self._trades
+        if not win:
+            return
+        try:
+            win.evaluate_js(js)
+        except Exception as e:
+            _debug_log("trades window: %s" % e)
+
+    def _on_trade_event(self, ev):
+        self._trades_eval("window.__tradeEvent && window.__tradeEvent(%s)" % json.dumps(ev))
+        # a new incoming trade brings the (always-on-top) window up without taking focus
+        # from the game: display only, nothing is sent
+        if ev.get("type") == "whisper" and ev.get("dir") == "in" and ev.get("trade"):
+            self._show_trades(activate=False)
+
+    def _show_trades(self, activate=True):
+        win = self._trades
+        if not win:
+            return False
+        hwnd = price_hotkey.find_window(TRADES_TITLE)
+        if hwnd and not activate and sys.platform == "win32":
+            import ctypes
+            ctypes.windll.user32.ShowWindow(hwnd, 4)  # SW_SHOWNOACTIVATE
+            return True
+        win.show()
+        if hwnd:
+            price_hotkey.focus_window(hwnd)
+        return True
+
+    def _trade_status(self, path=None, error=None):
+        st = {"ok": True, "watching": bool(self._tail and self._tail.running), "logPath": path,
+              "logName": os.path.basename(path) if path else None, "error": error}
+        try:
+            vk = trade_helper.read_chat_key()
+            st["chatKey"] = vk
+            st["chatKeyName"] = CHAT_KEY_NAMES.get(vk, "key code %d" % vk)
+        except Exception:
+            pass
+        game = self._find_poe_window() if sys.platform == "win32" else None
+        st["gameRunning"] = bool(game)
+        st["elevationMismatch"] = bool(game and trade_helper.elevation_mismatch(game))
+        return st
+
+    def trade_enable(self, on, path=None):
+        """Start (on) or stop reading Client.txt. path: the user's chosen file, else found
+        from the running game / usual install folders."""
+        try:
+            with self._trade_lock:
+                if self._tail:
+                    self._tail.stop()
+                    self._tail = None
+                if not on:
+                    return self._trade_status()
+                if not (path and os.path.isfile(path)):
+                    game = self._find_poe_window() if sys.platform == "win32" else None
+                    path = trade_helper.find_client_log(game)
+                if not path:
+                    return self._trade_status(error="Client.txt not found yet. Start Path of Exile, or choose the "
+                                                    "file in Setup (Path of Exile folder → logs).")
+
+                def on_error(msg):
+                    _debug_log("trade log: %s" % msg)
+
+                self._tail = trade_helper.LogTail(path, self._on_trade_event, on_error=on_error)
+                self._tail.start()
+                return self._trade_status(path)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def trade_send(self, action, name, text=None):
+        """One chat command for one button press (invite, trade, kick, whisper, ...)."""
+        try:
+            cmd = trade_helper.command_for(action, name, text)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        try:
+            if not self._sender:
+                self._sender = trade_helper.ChatSender(find_game=self._find_poe_window)
+            return self._sender.send(cmd)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def trade_highlight(self, left, top, tab=""):
+        """Outline a stash cell over the game for a few seconds (display only)."""
+        try:
+            game = self._find_poe_window()
+            rect = trade_helper.game_client_rect(game) if game else None
+            if not rect:
+                return {"ok": False, "error": "Path of Exile isn't running"}
+            if not self._highlight:
+                self._highlight = trade_helper.StashHighlight()
+            cell = trade_helper.stash_cell_rect(rect, int(left), int(top))
+            return {"ok": bool(self._highlight.show(cell))}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def trades_show(self):
+        try:
+            return {"ok": self._show_trades(activate=True)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def trades_hide(self):
+        try:
+            if self._trades:
+                self._trades.hide()
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def trade_pick_log(self):
+        try:
+            win = self._trades or webview.windows[0]
+            res = win.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=False,
+                                         file_types=("Path of Exile log (*.txt)", "All files (*.*)"))
+            path = res[0] if res else None
+            return {"ok": True, "path": path}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def save_text_file(self, name, text):
+        """Save dialog for an export (CSV); UTF-8 with BOM so Excel reads it right."""
+        try:
+            win = self._trades or webview.windows[0]
+            safe = re.sub(r"[^\w.\- ]", "_", str(name or "export.txt"))
+            res = win.create_file_dialog(webview.SAVE_DIALOG, save_filename=safe)
+            path = res[0] if isinstance(res, (list, tuple)) else res
+            if not path:
+                return {"ok": False, "error": None}
+            with open(path, "w", encoding="utf-8-sig", newline="") as f:
+                f.write(str(text))
+            return {"ok": True, "path": path}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -1523,7 +1693,20 @@ def main():
         on_top=True,
         background_color="#0f0e0c",
     )
+    # trade helper: same page in trades mode, hidden until opened or a trade whisper arrives
+    trades = webview.create_window(
+        TRADES_TITLE,
+        index + "?trades=1",
+        js_api=api,
+        width=TRADES_SIZE[0],
+        height=TRADES_SIZE[1],
+        min_size=(360, 320),
+        hidden=True,
+        on_top=True,
+        background_color="#0f0e0c",
+    )
     api._attach_windows(main_window, overlay)
+    api._attach_trades(main_window, trades)
     api._start_hotkey()
     try:
         webview.start()

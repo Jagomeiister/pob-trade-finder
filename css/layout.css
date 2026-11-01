@@ -352,6 +352,61 @@ body.overlay .card.pasted { margin-bottom: 0; }
 body.overlay .btns { margin-left: 0; width: 100%; flex-wrap: wrap; }
 body.overlay .btns > * { white-space: nowrap; }
 
+/* ---- trade helper window (index.html?trades=1, js/app/19-trades.js) ---- */
+.trades-root { display: none; }
+body.trades { min-height: 0; }
+body.trades .app-main { padding: 8px 10px 12px; max-width: none; }
+body.trades .sidebar, body.trades .topbar, body.trades #settings-panel, body.trades #update-banner,
+body.trades #league-banner, body.trades #input-panel, body.trades .view-panel, body.trades .footer,
+body.trades #results { display: none !important; }
+body.trades .trades-root { display: block; }
+.trades-bar {
+  display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 6; padding: 6px 10px;
+  background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 4px 14px var(--shadow);
+}
+.trades-status { flex: 1; min-width: 0; color: var(--text-2); font-size: var(--fs-xs);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trades-status.ok { color: var(--success); }
+.trades-status.warn { color: var(--warn); }
+.trades-tabs { display: flex; gap: 2px; margin: 8px 0; border-bottom: 1px solid var(--border); }
+.trades-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 12px; color: var(--text-2);
+  font: inherit; cursor: pointer; }
+.trades-tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.trades-body { display: flex; flex-direction: column; gap: 8px; }
+.trade-card { padding: 8px 10px; background: var(--s1); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--r-md); display: flex; flex-direction: column; gap: 4px; }
+.trade-card.out { border-left-color: var(--info); }
+.trade-card.joined { border-left-color: var(--success); }
+.tc-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tc-dir { color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
+.tc-age { margin-left: auto; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.tc-item { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.tc-item-name { font-weight: 600; }
+.tc-price { color: var(--price); font-variant-numeric: tabular-nums; }
+.tc-where, .tc-last { color: var(--text-2); font-size: var(--fs-sm); }
+.tc-note { color: var(--text-2); font-size: var(--fs-sm); font-style: italic; }
+.tc-actions, .tc-other, .tc-done { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tc-actions .was-sent::after { content: ' ✓'; color: var(--success); }
+.tc-outcomes:empty { display: none; }
+.tc-outcomes { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.tc-hidden-row, .buyer-head, .buyer-actions, .trade-log-row, .sales-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tc-hidden-row span { flex: 1; min-width: 0; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buyer-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; gap: 6px; }
+.buyer-row.is-hidden { opacity: .75; }
+.buyer-stats { color: var(--text-2); font-size: var(--fs-sm); }
+.sales-tiles { display: flex; gap: 8px; flex-wrap: wrap; }
+.sales-tile { flex: 1; min-width: 110px; padding: 8px 10px; background: var(--s1); border: 1px solid var(--border);
+  border-radius: var(--r-md); display: flex; flex-direction: column; }
+.st-label { color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
+.st-value { font-variant-numeric: tabular-nums; }
+.sales-chart { width: 100%; height: auto; display: block; }
+.sales-chart rect { fill: var(--accent); }
+.sales-chart text { fill: var(--text-3); font-size: 12px; }
+.trade-setup { display: flex; flex-direction: column; gap: 8px; }
+.trade-setup .field-wide { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+.trade-h3 { font-size: var(--fs-md); margin: 8px 0 0; }
+.trade-warn { color: var(--warn); }
+
 /* ---- medium windows (the app opens 1280 wide; users shrink it): icon rail ---- */
 .nav-icon { display: none; width: 18px; text-align: center; flex: none; }
 .nav-item .nav-label { flex: 1; }

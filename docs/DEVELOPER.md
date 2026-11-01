@@ -104,6 +104,37 @@ index.html + js/*  ──────────────►  any browser   
   never touches the clipboard or sends keys. The real keypress → game → clipboard path
   can only be tested by hand in the game
 
+## Trade helper (trade_helper.py + js/app/19-trades.js)
+
+A third window, `index.html?trades=1` (`TRADES_TITLE`, on top, created hidden), shares the
+Api. `trade_enable(on, path)` starts `trade_helper.LogTail` on Client.txt (found from the
+game process's exe folder, else common install folders, else the user's pick). It starts at
+the end of the file and tails it by byte offset. Each parsed event (whisper with a parsed
+`trade`, joined/left, trade accepted/cancelled, AFK/DND, zone) goes to
+`window.__tradeEvent(ev)`. An incoming trade whisper also shows the window with
+`SW_SHOWNOACTIVATE` (display only).
+
+GGG rules, enforced by the shape of the code. Keep them:
+
+- Game input happens only in `trade_send(action, name, text)`: one call → `command_for` → one
+  `ChatSender.send` (focus game, chat key from production_Config.ini, Ctrl+A, paste, Enter,
+  clipboard restored; serialized). The only callers are button handlers in 19-trades.js.
+  Log events never send anything.
+- No cycling: Invite and Trade are separate buttons. Nothing auto-thanks, auto-kicks or
+  auto-ignores.
+- Reputation, flags and hidden buyers live in storage.json (`pobtf-buyers`,
+  `pobtf-sales`, `pobtf-trade-prefs`) and are never shared.
+- `trade_highlight` only draws a click-through outline (`StashHighlight`); it never moves
+  the cursor.
+
+| Bridge | |
+|---|---|
+| `trade_enable(on, path)` | start/stop the log tail → status (`watching`, `logPath`, `chatKeyName`, `elevationMismatch`, `error`) |
+| `trade_send(action, name, text)` | one chat command (`invite`, `trade`, `kick`, `hideout`, `whois`, `ignore`, `whisper`) |
+| `trade_highlight(left, top, tab)` | outline that stash cell over the game for 20 s |
+| `trades_show()` / `trades_hide()` | the trades window |
+| `trade_pick_log()` / `save_text_file(name, text)` | file dialogs (Client.txt pick, CSV export) |
+
 ## Rate limiting (do not weaken this)
 
 All GGG calls go through `Api._http`:

@@ -224,6 +224,13 @@ STUB_JS = r"""
     // quick price: the backend (poe.ninja proxy) has no data in tests unless a scenario overrides it
     quick_price: function () { return { ok: false, error: 'no quick price for this item' }; },
     bulk_exchange: function () { return { ok: true, total: 0, offers: [] }; },
+    trade_enable: function (on) { return on ? { ok: true, watching: true, logPath: 'C:/PoE/logs/Client.txt', logName: 'Client.txt',
+      chatKeyName: 'Enter', elevationMismatch: false } : { ok: true, watching: false }; },
+    trade_send: function () { return { ok: true }; },
+    trade_highlight: function () { return { ok: true }; },
+    trades_show: function () { return { ok: true }; },
+    trades_hide: function () { return { ok: true }; },
+    save_text_file: function () { return { ok: true, path: 'C:/x/sales.csv' }; },
     session_status: function () { return { ok: true, set: false }; },
     timeless_sockets: function () { return { ok: true, sockets: [] }; },
     hotkey_status: function () { return { ok: true, hotkey: 'ctrl+d', label: 'Ctrl+D', running: false, active: false, error: null }; },
@@ -860,11 +867,11 @@ class Session:
         self.server = server
         self.url = server.origin + "/index.html"
 
-    def fresh(self):
-        """New page load, empty localStorage, no leftover events."""
+    def fresh(self, query=""):
+        """New page load, empty localStorage, no leftover events. query: e.g. "?trades=1"."""
         self.b.send("Storage.clearDataForOrigin", {"origin": self.server.origin, "storageTypes": "local_storage"})
         self.b.take_events()
-        self.b.navigate(self.url, READY_JS, timeout=30)
+        self.b.navigate(self.url + query, READY_JS, timeout=30)
 
     def run(self, body, timeout=40, **consts):
         decl = "".join("const %s = %s;\n" % (k, json.dumps(v)) for k, v in consts.items())
@@ -1442,6 +1449,158 @@ def scenario_v21b(s, tag):
         "https://www.pathofexile.com/trade/exchange/") and "%22want%22%3A%5B%22chaos%22%5D" in r["exUrl"], r["exUrl"])
 
 
+S19_TRADES = r"""
+const H = window.__e2e;
+const out = {};
+const sends = () => H.calls('trade_send').map(c => c.args);
+const card = name => [...document.querySelectorAll('.trade-card')].find(c => c.querySelector('.tc-name').textContent === name);
+const clickDialog = async label => { await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'dialog');
+  H.button(document.querySelector('dialog[open]'), label).click(); await H.sleep(30); };
+out.layout = { trades: document.body.classList.contains('trades'),
+  rootShown: getComputedStyle(document.getElementById('trades-root')).display !== 'none',
+  resultsHidden: getComputedStyle(document.getElementById('results')).display === 'none' };
+out.offText = H.text('.trades-body');
+// switch on: privacy notice first, then the log is read
+H.button(document, 'Open Setup').click();
+await H.sleep(30);
+out.enableBefore = H.calls('trade_enable').map(c => c.args[0]);
+document.getElementById('trade-enabled').click();
+await H.sleep(30);
+out.enableBefore = out.enableBefore.concat(H.calls('trade_enable').map(c => c.args[0])); // dialog still open
+await clickDialog('Switch on');
+await H.waitFor(() => H.calls('trade_enable').some(c => c.args[0] === true), 3000, 'enable');
+out.enableArgs = H.calls('trade_enable').slice(-1)[0].args;
+await H.sleep(30);
+out.status = H.text('#trades-status');
+H.button(document.querySelector('.trades-tabs'), 'Trades').click();
+// incoming trade whisper (guild tag) → a card; nothing is sent by the event itself
+const T = { kind: 'item', item: 'Doom Loop Two-Stone Ring', price: 2, currency: 'divine', league: 'Standard',
+  tab: '~price 2 div', left: 5, top: 3, note: 'offer 1.5?' };
+window.__tradeEvent({ type: 'whisper', dir: 'in', guild: '<ART>™', name: 'BuyerOne', text: 'Hi, I would like to buy…', trade: T });
+await H.sleep(20);
+let c = card('BuyerOne');
+out.newCard = { actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent), item: H.text('.tc-item', c),
+  where: H.text('.tc-where', c), note: H.text('.tc-note', c) };
+out.sendsAfterWhisper = sends().length;
+H.button(c, 'Invite').click();
+await H.sleep(30);
+H.button(card('BuyerOne'), 'Busy').click();
+await H.sleep(30);
+out.sends1 = sends();
+H.button(card('BuyerOne'), '▣ Show in stash').click();
+await H.sleep(30);
+out.highlight = H.calls('trade_highlight')[0].args;
+// buyer joins: badge + stage 2, still nothing sent on its own
+window.__tradeEvent({ type: 'joined', name: 'BuyerOne' });
+await H.sleep(20);
+c = card('BuyerOne');
+out.joined = { here: !!c.querySelector('.tc-here'), actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent),
+  outcomes: [...c.querySelectorAll('.tc-outcomes .btn')].map(b => b.textContent) };
+window.__tradeEvent({ type: 'trade_accepted' });
+await H.sleep(20);
+c = card('BuyerOne');
+out.suggested = H.button(c, '✓ Completed').classList.contains('suggested');
+out.sendsAfterEvents = sends().length;
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
+c.querySelector('.tc-price-in').value = '1.5';
+H.button(c, '✓ Completed').click();
+await H.waitFor(() => !card('BuyerOne'), 3000, 'card closed');
+out.sales = JSON.parse(localStorage.getItem('pobtf-sales'));
+out.buyers = JSON.parse(localStorage.getItem('pobtf-buyers'));
+// same buyer again: reputation badge
+window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'BuyerOne', text: 'hi', trade: Object.assign({}, T, { item: 'Other Ring' }) });
+await H.sleep(20);
+out.badge = H.text('.buyer-badge', card('BuyerOne'));
+H.button(card('BuyerOne'), 'Invite').click();
+await H.sleep(30);
+// no-show offered after the set minutes
+tradeCards.find(x => x.name === 'BuyerOne').invitedAt = Date.now() - 6 * 60000;
+renderTrades();
+H.button(card('BuyerOne'), '⌛ Mark as no-show').click();
+await H.sleep(30);
+out.noShow = JSON.parse(localStorage.getItem('pobtf-buyers')).buyerone.noShow;
+// outgoing whisper: visit / trade / re-whisper
+window.__tradeEvent({ type: 'whisper', dir: 'out', name: 'SellerTwo', text: 'Hi, I would like to buy your X listed for 5 chaos in Standard',
+  trade: { kind: 'item', item: 'X', price: 5, currency: 'chaos', league: 'Standard' } });
+await H.sleep(20);
+c = card('SellerTwo');
+out.outActions = [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent);
+const n0 = sends().length;
+H.button(c, 'Re-whisper').click();
+await H.sleep(30);
+out.rewhisper = sends().slice(n0);
+// hide a buyer: their cards go to Hidden, no popup
+window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'Spammer', text: 'hi', trade: Object.assign({}, T, { item: 'Junk' }) });
+await H.sleep(20);
+await hideBuyer(tradeCards.find(x => x.name === 'Spammer'));
+window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'Spammer', text: 'hi', trade: Object.assign({}, T, { item: 'Junk 2' }) });
+await H.sleep(20);
+out.hidden = { visible: !!card('Spammer'), summary: H.text('.disclosure summary') };
+// Sales page + CSV (formula-safe)
+const L = JSON.parse(localStorage.getItem('pobtf-sales'));
+L.push({ id: 'x', time: Date.now(), outcome: 'completed', league: 'Standard', item: '=HYPERLINK("x")', price: 10, currency: 'chaos',
+  chaos: 10, div: 0.05, buyer: 'Z' });
+localStorage.setItem('pobtf-sales', JSON.stringify(L));
+H.button(document.querySelector('.trades-tabs'), 'Sales').click();
+await H.sleep(30);
+out.tiles = [...document.querySelectorAll('.sales-tile')].map(t => t.textContent);
+out.chart = !!document.querySelector('.sales-chart rect');
+H.button(document, 'Export CSV').click();
+await H.sleep(50);
+out.csv = H.calls('save_text_file')[0].args[1];
+// Buyers page: ignore in game sends /ignore once, after a confirm
+H.button(document.querySelector('.trades-tabs'), 'Buyers').click();
+await H.sleep(30);
+out.buyerRows = document.querySelectorAll('.buyer-row').length;
+const n1 = sends().length;
+H.button(document.querySelector('.buyer-row'), 'Ignore in game…').click();
+await clickDialog('Send /ignore');
+await H.sleep(30);
+out.ignore = sends().slice(n1);
+return out;
+"""
+
+
+def scenario_trades(s, tag):
+    s.fresh("?trades=1")
+    r = s.run(S19_TRADES, timeout=60)
+    check(tag + " trades window shows only the trade helper", all(r["layout"].values()), r["layout"])
+    check(tag + " off until switched on", "Trade helper is off" in (r["offText"] or ""), r["offText"])
+    check(tag + " switching on asks first, then reads the log", True not in r["enableBefore"] and
+          r["enableArgs"][0] is True and "Reading" in r["status"], (r["enableBefore"], r["enableArgs"], r["status"]))
+    check(tag + " incoming card: Invite · Busy · Sold · Still interested?",
+          r["newCard"]["actions"][:4] == ["Invite", "Busy", "Sold", "Still interested?"], r["newCard"])
+    check(tag + " card shows item, price, tab position and note", "2 div" in r["newCard"]["item"] and
+          "left 5, top 3" in r["newCard"]["where"] and "offer 1.5?" in r["newCard"]["note"], r["newCard"])
+    check(tag + " a whisper sends nothing by itself", r["sendsAfterWhisper"] == 0, r["sendsAfterWhisper"])
+    check(tag + " one press = one command", r["sends1"] == [["invite", "BuyerOne", None],
+          ["whisper", "BuyerOne", "I'm busy right now, I'll invite you shortly"]], r["sends1"])
+    check(tag + " stash highlight gets the position", r["highlight"][:2] == [5, 3], r["highlight"])
+    check(tag + " buyer joined: badge, Trade · Kick · Thanks, outcomes", r["joined"]["here"] and
+          r["joined"]["actions"][:3] == ["Trade", "Kick", "Thanks"] and
+          r["joined"]["outcomes"][:1] == ["✓ Completed"] and "⌛ Time wasted" in r["joined"]["outcomes"], r["joined"])
+    check(tag + " Trade accepted pre-selects Completed, sends nothing", r["suggested"] and r["sendsAfterEvents"] == 2, r)
+    sale = (r["sales"] or [{}])[0]
+    check(tag + " sale recorded at the confirmed price", sale.get("outcome") == "completed" and sale.get("price") == 1.5 and
+          sale.get("currency") == "divine" and sale.get("chaos") == 300 and sale.get("buyer") == "BuyerOne", sale)
+    b = (r["buyers"] or {}).get("buyerone") or {}
+    check(tag + " buyer reputation counts the sale", b.get("completed") == 1 and b.get("spent") == 300, b)
+    check(tag + " repeat buyer gets a badge", "1 bought" in (r["badge"] or ""), r["badge"])
+    check(tag + " no-show after the set minutes", r["noShow"] == 1, r["noShow"])
+    check(tag + " outgoing card: Visit hideout · Trade · Re-whisper",
+          r["outActions"] == ["Visit hideout", "Trade", "Re-whisper"], r["outActions"])
+    check(tag + " re-whisper sends the original text once", len(r["rewhisper"]) == 1 and r["rewhisper"][0][0] == "whisper"
+          and r["rewhisper"][0][2].startswith("Hi, I would like"), r["rewhisper"])
+    check(tag + " hidden buyer: no card, listed under Hidden", not r["hidden"]["visible"] and
+          "Hidden (2)" in (r["hidden"]["summary"] or ""), r["hidden"])
+    check(tag + " sales totals + chart", any("Sales2" in t.replace(" ", "") for t in r["tiles"]) and r["chart"], r["tiles"])
+    check(tag + " CSV export: header + formula-safe cells", (r["csv"] or "").startswith("time,outcome,league,item") and
+          "'=HYPERLINK" in r["csv"], (r["csv"] or "")[:200])
+    check(tag + " Buyers page lists them", r["buyerRows"] >= 2, r["buyerRows"])
+    check(tag + " Ignore in game: one /ignore after confirming", len(r["ignore"]) == 1 and r["ignore"][0][0] == "ignore",
+          r["ignore"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -1461,6 +1620,7 @@ SCENARIOS = [
     ("16 sessid", scenario_sessid),
     ("17 v21", scenario_v21),
     ("18 v21b", scenario_v21b),
+    ("19 trades", scenario_trades),
 ]
 
 
