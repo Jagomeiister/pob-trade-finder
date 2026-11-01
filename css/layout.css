@@ -244,7 +244,11 @@ body[data-view="jewels"] .tab-section.master-detail[data-tab="jewels"],
 body[data-view="flasks"] .tab-section.master-detail[data-tab="flasks"] { display: grid; }
 body[data-view="planner"] #view-planner,
 body[data-view="market"] #view-market,
-body[data-view="stash"] #view-stash { display: block; }
+body[data-view="stash"] #view-stash,
+body[data-view="trades"] #view-trades { display: block; }
+/* the Trade helper works without a build: it takes the landing's place */
+body:not(.has-build)[data-view="trades"] #input-panel { display: none; }
+#view-trades .trades-root { display: block; }
 /* a pasted item without a loaded build still shows under the landing */
 body:not(.has-build) .tab-section[data-tab="pasted"] { display: block; margin-top: 16px; }
 #view-planner:has(> #gear-value:not(.hidden)) #planner-empty,
@@ -417,7 +421,7 @@ body.trades .trades-root { display: block; }
 html:has(body.trade-cards), body.trade-cards { background: transparent !important; overflow: hidden; }
 body.trade-cards .app-shell, body.trade-cards .app-main { display: block; padding: 0; margin: 0; max-width: none; min-height: 0; }
 body.trade-cards .trades-root { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 6px;
-  width: max-content; max-width: 376px; padding: 2px; opacity: var(--ov-opacity, .92); transition: opacity .15s; }
+  width: max-content; padding: 2px; opacity: var(--ov-opacity, .92); transition: opacity .15s; }
 body.trade-cards .trades-root:hover { opacity: 1; }
 .trade-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .trade-slider { width: 140px; accent-color: var(--accent); }
@@ -441,6 +445,11 @@ body.trade-cards .trades-root:hover { opacity: 1; }
   background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: 0 2px 8px var(--shadow); }
 .ov-head-title { flex: 1; color: var(--accent); font-weight: 600; font-size: var(--fs-sm); }
 .ov-cards .trade-card { box-shadow: 0 4px 14px var(--shadow); background: var(--s1); }
+.ov-cards.is-row { flex-direction: row; align-items: flex-end; width: max-content; }
+.ov-cards.is-row .trade-card { width: 340px; flex: none; }
+.custom-buttons { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.custom-buttons .zone-row { width: 100%; }
+.ov-grip.is-dragging { color: var(--accent); }
 .ov-note { padding: 8px 10px; background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-md);
   color: var(--text-2); font-size: var(--fs-sm); }
 .tc-more { display: flex; gap: 6px; flex-wrap: wrap; }

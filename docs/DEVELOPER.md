@@ -144,8 +144,10 @@ GGG rules, enforced by the shape of the code. Keep them:
   windows by itself on load.
 - Placement is relative to the game's client rect and redone whenever that rect changes, so
   overlays follow the game across screens.
-- A drag is the mouse held down on the overlay; on release the spot is saved
-  (`pobtf-ov-<name>-pos`, with `bottom` for the ones that grow upwards from the lower half).
+- Drag: the ⠿ grip uses pointer events and calls `overlay_drag(name, start|move|end, dx, dy)`.
+  Python moves the window and saves the spot (`pobtf-ov-<name>-pos`, with `bottom` for the ones
+  that grow upwards from the lower half). pywebview's `.pywebview-drag-region` isn't used: it
+  leaves a white patch on transparent windows.
 - Pages size their own window with `overlay_fit(name, w, h)` and report
   `overlay_visible(name, on, count)`. The icon ↔ cards messages go through Python
   (`overlay_toggle_cards`, `__ovCount`).
@@ -153,7 +155,11 @@ GGG rules, enforced by the shape of the code. Keep them:
   the game, one of our overlays, or the app-over-game window is in front. `set_hotkey`,
   `hotkeys_status`.
 - App hotkey: `_set_app_overlay` makes the main window `on_top` and focused with a banner
-  (`__appOverlay`); Esc or the hotkey returns to the game.
+  (`__appOverlay`). `_overlay_frame` removes the caption and borders, sizes the window to the
+  game's client rect minus 3%, and makes it layered (`overGameOpacity`). It restores the saved
+  style and rect on the way back. Esc or the hotkey returns to the game.
+- The Trade helper is the main window's `#view-trades` (`mountTradeHelper(…, embedded)`).
+  `trades_show` and the tray open it there; there's no separate window.
 - Tray (`tray.py`, ctypes Shell_NotifyIcon): the main window's ✕ hides to the tray
   (`closeToTray` pref). Menu: Open, Trade helper, Settings, Quit (`_quit` sets `_quitting`
   and destroys the main window).

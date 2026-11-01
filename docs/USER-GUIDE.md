@@ -325,20 +325,22 @@ while Path of Exile is focused. They never take focus from the game, they hide w
 to another program, and they stay stuck to the game window, even on another screen. The game
 must run in **Windowed** or **Windowed Fullscreen** (true fullscreen hides every overlay).
 
-**The pieces**, each dragged by its ⠿ grip to wherever you want it, on its own:
+**The pieces**, each dragged by its ⠿ grip to wherever you want it, on its own (📌 Lock in
+Trade helper → Setup pins them):
 
 - **PoB icon**: a green dot means it's running (hover it to see your hotkeys) and a number
   counts open trades. Click it to show or hide the trade cards. With your mouse over it you
   also get ⚙ Settings, ⌂ the app and $ Trade helper
 - **Trade cards**: put them where you like, e.g. just above the XP bar. Placed in the lower
-  half of the screen, new cards stack upwards
+  half of the screen, new cards stack upwards. Setup → **Trade cards** switches between stacked
+  (vertical) and side by side (horizontal)
 
 **Hotkeys** (⚙ Settings → In game). Each one works only while the game is in front:
 
 | Default | What it does |
 |---|---|
 | Ctrl+D | Price the item under your cursor |
-| Shift+Space | Brings this whole app over the game: builds, gear, trades and settings without alt-tabbing. Press it again, Esc or **Back to the game** to return |
+| Shift+Space | Brings this whole app over the game as an overlay (no title bar, covering the game, slightly see-through: Settings → In game → *App over the game: see-through*): builds, gear, the Trade helper and settings without alt-tabbing. Press it again, Esc or **Back to the game** to return |
 | Alt+T | Show or hide the trade cards |
 
 **Tray**: closing the window keeps the app running in the tray (bottom right of the taskbar).
@@ -375,7 +377,9 @@ the **Hidden** list) and **Ignore in game** (click twice: sends `/ignore` once).
 
 Outgoing whispers (you buying) get a card too: **Visit hideout**, **Trade**, **Re-whisper**.
 
-The **Trade helper** window (sidebar → Tools, the $ on the icon, or the tray menu):
+The **Trade helper** is a page of the app (sidebar → Tools, ⚙ Settings → In game, the $ on the
+icon, or the tray menu), not another window. Over the game it opens with the app overlay.
+**← Back** or Esc returns to where you were:
 
 - **Sales**: every completed sale with its price in chaos and divines, buyer, league, time and
   stash position, plus totals, average, a chart per day, best sellers and a per-league
@@ -391,6 +395,9 @@ The **Trade helper** window (sidebar → Tools, the $ on the icon, or the tray m
     **📌 Lock position** and **Reset position**
   - the no-show time and your Busy / Sold / Still interested / Thanks messages (`{item}` and
     `{price}` are filled in)
+  - **Your buttons**: add your own card buttons (a label and a message, e.g. "1 min" → "one
+    minute, finishing a map"). Choose whether each shows before the buyer arrives, once
+    they're here, always, or on your own buying cards. Each press whispers the message once
 
 If Path of Exile runs as administrator and the app doesn't, Windows blocks the buttons from
 typing; Setup warns you. Run both the same way.

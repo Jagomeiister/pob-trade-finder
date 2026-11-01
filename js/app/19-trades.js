@@ -54,6 +54,8 @@ function tradePrefs() {
   if (!p.scale) p.scale = 100;
   if (!p.iconMode) p.iconMode = 'always';  // 'always' | 'trades': only while there are trades
   if (p.autoOpen === undefined) p.autoOpen = true;
+  if (!p.cardLayout) p.cardLayout = 'stack';   // 'stack' (vertical) | 'row' (side by side)
+  if (!Array.isArray(p.customButtons)) p.customButtons = []; // [{ label, text, when: new|here|always|buying }]
   if (!p.noShowMin) p.noShowMin = 5;
   p.msgs = Object.assign({}, TRADE_MSGS, p.msgs || {});
   return p;
@@ -366,6 +368,9 @@ function renderTradeCard(card) {
       act('Kick', 'kick', null, null, 'Send /kick ' + card.name + ' (removes them from your party)');
       act('Thanks', 'whisper', fillMsg(p.msgs.thanks, card), null, 'Whisper: ' + fillMsg(p.msgs.thanks, card));
     }
+    customButtonsFor(p, card.joined ? 'here' : 'new').forEach(function (b) {
+      act(b.label, 'whisper', fillMsg(b.text, card), null, 'Your button. Whisper: ' + fillMsg(b.text, card));
+    });
     if (t.left && isGui() && window.pywebview.api.trade_highlight) {
       acts.appendChild(UI.button('ghost', { size: 'sm', label: '▣ Show in stash',
         title: 'Outline the item\'s cell over your open stash tab for 20 seconds',
@@ -378,12 +383,23 @@ function renderTradeCard(card) {
     act('Visit hideout', 'hideout', null, 'primary', 'Send /hideout ' + card.name);
     act('Trade', 'trade', null, null, 'Send /tradewith ' + card.name);
     act('Re-whisper', 'whisper', card.text, null, 'Send your original whisper again');
+    customButtonsFor(p, 'buying').forEach(function (b) {
+      act(b.label, 'whisper', fillMsg(b.text, card), null, 'Your button. Whisper: ' + fillMsg(b.text, card));
+    });
   }
   el.appendChild(acts);
   if (card.dir === 'in' && card.more) el.appendChild(renderMoreRow(card));
 
   if (card.dir === 'in') el.appendChild(renderOutcomes(card, p));
   return el;
+}
+
+// your own whisper buttons (Setup → Your buttons): new = before the buyer arrives, here = once
+// they're in your hideout, always = both, buying = on cards for whispers you sent
+function customButtonsFor(p, stage) {
+  return (p.customButtons || []).filter(function (b) {
+    return b.label && b.text && (b.when === stage || (b.when === 'always' && stage !== 'buying'));
+  });
 }
 
 function renderMoreRow(card) {
@@ -454,6 +470,7 @@ async function ignoreInGame(card) {
 function renderTrades() {
   var root = document.getElementById('trades-root');
   if (!root) return;
+  if (ovDrag) { setTimeout(renderTrades, 300); return; } // never rebuild the grip mid-drag
   if (TRADE_CARDS) { renderCardsOverlay(root); return; }
   if (TRADE_ICON) { renderIconOverlay(root); return; }
   root.querySelectorAll('.trades-tab').forEach(function (b) {
@@ -479,10 +496,47 @@ function overlayLook(root, p) {
   root.style.setProperty('--ov-opacity', String(Math.max(30, Math.min(100, p.opacity)) / 100));
   root.style.zoom = String((p.scale || 100) / 100);
 }
+// Drag: the grip reports how far the mouse moved and gui.py moves the window (pywebview's own
+// drag region leaves a white patch on see-through windows). Re-renders wait until it's dropped.
+var ovDrag = null;
 function overlayGrip(p, what) {
   if (p.locked) return null; // 📌 Lock in Setup pins it where it is
-  var grip = UI.el('span', 'ov-grip pywebview-drag-region', '⠿');
+  var name = TRADE_ICON ? 'icon' : 'cards';
+  var grip = UI.el('span', 'ov-grip', '⠿');
   grip.title = 'Drag to move ' + what + ' (lock it in Trade helper → Setup)';
+  var pending = null, sending = false;
+  function send() {
+    if (sending || !pending) return;
+    sending = true;
+    var d = pending;
+    pending = null;
+    Promise.resolve(window.pywebview.api.overlay_drag(name, 'move', d[0], d[1])).then(function () {
+      sending = false; send();
+    }, function () { sending = false; });
+  }
+  grip.addEventListener('pointerdown', function (e) {
+    if (!isGui() || !window.pywebview.api.overlay_drag) return;
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    ovDrag = { x: e.screenX, y: e.screenY };
+    grip.classList.add('is-dragging');
+    window.pywebview.api.overlay_drag(name, 'start', 0, 0);
+  });
+  grip.addEventListener('pointermove', function (e) {
+    if (!ovDrag) return;
+    pending = [e.screenX - ovDrag.x, e.screenY - ovDrag.y];
+    send();
+  });
+  function drop(e) {
+    if (!ovDrag) return;
+    var dx = e.screenX - ovDrag.x, dy = e.screenY - ovDrag.y;
+    ovDrag = null;
+    pending = null;
+    window.pywebview.api.overlay_drag(name, 'end', dx, dy);
+    renderTrades();
+  }
+  grip.addEventListener('pointerup', drop);
+  grip.addEventListener('pointercancel', drop);
   return grip;
 }
 function reportOverlay(name, wanted, count) {
@@ -551,7 +605,7 @@ function renderCardsOverlay(root) {
   head.appendChild(UI.iconButton('–', 'Hide the trade cards (the icon or ' + ((overlayState.hotkeys || {}).trades || 'its hotkey') +
     ' brings them back)', { size: 'sm', onClick: function () { overlayOpen = false; overlayOpenedByHand = false; renderTrades(); } }));
   root.appendChild(head);
-  var list = UI.el('div', 'ov-cards');
+  var list = UI.el('div', 'ov-cards' + (p.cardLayout === 'row' ? ' is-row' : ''));
   if (!p.enabled && !shown.length) {
     list.appendChild(UI.el('div', 'ov-note', 'Trade helper is off. Trade helper → Setup to switch it on.'));
   } else if (!shown.length) {
@@ -935,6 +989,8 @@ function renderTradeSetup(body) {
   var ovRow = UI.el('div', 'trade-row');
   UI.field('Show it', UI.select([['always', 'Always'], ['trades', 'Only when there are trades']], p.iconMode,
     { onChange: function () { setPref('iconMode', this.value); } }), { parent: ovRow });
+  UI.field('Trade cards', UI.select([['stack', 'Stacked (vertical)'], ['row', 'Side by side (horizontal)']], p.cardLayout,
+    { onChange: function () { setPref('cardLayout', this.value); } }), { parent: ovRow });
   UI.field('Size', UI.select([['85', 'Small'], ['100', 'Normal'], ['120', 'Large']], String(p.scale),
     { onChange: function () { setPref('scale', parseInt(this.value, 10)); } }), { parent: ovRow });
   slider('Opacity', p.opacity, 30, 100, 5, '%', function (v) { setPref('opacity', v); }, ovRow);
@@ -989,6 +1045,41 @@ function renderTradeSetup(body) {
   drawZones();
   sec.appendChild(zl);
 
+  sec.appendChild(UI.el('h3', 'trade-h3', 'Your buttons'));
+  sec.appendChild(UI.el('p', 'finder-sub', 'Extra buttons on trade cards. Each press whispers the buyer (or seller) ' +
+    'your message once. {item} and {price} are filled in.'));
+  var cbBox = UI.el('div', 'custom-buttons');
+  var WHEN = [['new', 'Before they arrive'], ['here', 'Once they\'re here'], ['always', 'Always (selling)'], ['buying', 'When I\'m buying']];
+  function drawCustom() {
+    cbBox.textContent = '';
+    var list = tradePrefs().customButtons;
+    function save(l) { var q = tradePrefs(); q.customButtons = l; saveTradePrefs(q); }
+    list.forEach(function (b, i) {
+      var row = UI.el('div', 'zone-row');
+      var lab = UI.input({ value: b.label, width: '120px', ariaLabel: 'Button label' });
+      var txt = UI.input({ value: b.text, width: '100%', ariaLabel: 'Button message' });
+      var when = UI.select(WHEN, b.when || 'always', { ariaLabel: 'When the button shows' });
+      function upd() { var l = tradePrefs().customButtons; l[i] = { label: lab.value.trim(), text: txt.value.trim(), when: when.value }; save(l); }
+      lab.addEventListener('change', upd);
+      txt.addEventListener('change', upd);
+      when.addEventListener('change', upd);
+      row.appendChild(lab);
+      row.appendChild(txt);
+      row.appendChild(when);
+      row.appendChild(UI.iconButton('✕', 'Delete button ' + b.label, { size: 'sm', onClick: function () {
+        var l = tradePrefs().customButtons; l.splice(i, 1); save(l); drawCustom();
+      } }));
+      cbBox.appendChild(row);
+    });
+    cbBox.appendChild(UI.button('ghost', { size: 'sm', label: '+ Add a button', onClick: function () {
+      var l = tradePrefs().customButtons;
+      l.push({ label: '1 min', text: 'one minute, finishing a map', when: 'new' });
+      save(l); drawCustom();
+    } }));
+  }
+  drawCustom();
+  sec.appendChild(cbBox);
+
   sec.appendChild(UI.el('h3', 'trade-h3', 'Messages'));
   sec.appendChild(UI.el('p', 'finder-sub', '{item} and {price} are filled in from the trade.'));
   [['busy', 'Busy'], ['sold', 'Sold'], ['still', 'Still interested?'], ['thanks', 'Thanks']].forEach(function (m) {
@@ -1032,17 +1123,37 @@ async function refreshTradeStatus() {
   renderTrades();
 }
 
-// main window: Settings → In game → Trade helper…, and Tools → Trade helper in the sidebar
+// main window: Tools → Trade helper, Settings → In game → Trade helper…, the overlay's $ button
+// and the tray menu all open the Trade helper as a view here (no extra window)
+var tradeViewBack = null;
 function openTradesWindow() {
-  if (isGui() && window.pywebview.api.trades_show) window.pywebview.api.trades_show();
-  else UI.toast('The trade helper needs the desktop app.', 'warn');
+  if (!document.getElementById('view-trades')) {
+    if (isGui() && window.pywebview.api.trades_show) window.pywebview.api.trades_show();
+    return;
+  }
+  var cur = document.body.dataset.view;
+  if (cur && cur !== 'trades') tradeViewBack = cur;
+  setView('trades');
+  window.scrollTo(0, 0);
+}
+window.__openTradeHelper = function () { openTradesWindow(); return true; };
+
+// shown: re-read what the overlay saved (sales, buyers) and the log reader's state
+async function showTradeHelperView() {
+  if (!document.getElementById('trades-root')) return;
+  if (window.hydrateFromBridge) { try { await window.hydrateFromBridge(); } catch (e) { /* keep */ } }
+  await refreshTradeStatus();
 }
 
 function tradesClose() {
-  if (isGui() && window.pywebview.api.trades_hide) window.pywebview.api.trades_hide();
+  if (TRADES) {
+    if (isGui() && window.pywebview.api.trades_hide) window.pywebview.api.trades_hide();
+    return;
+  }
+  setView(build ? (tradeViewBack || 'gear') : ''); // no build: back to the landing
 }
 
-// called from markGui() in the overlay and the Trade helper window
+// called from markGui() in the overlays (and a standalone ?trades=1 window)
 var tradeHydrate = null;
 function tradesReady(hydrate) {
   document.body.classList.add('gui');
@@ -1050,7 +1161,7 @@ function tradesReady(hydrate) {
   if (TRADE_CARDS) {
     // the cards overlay owns the log reader: it is created at startup and lives as long as the app
     Promise.resolve(hydrate()).then(startTradeHelper, startTradeHelper);
-    setInterval(function () { if (tradeCards.length) renderTrades(); }, 30000); // ages, no-show
+    setInterval(function () { if (tradeCards.length && !ovDrag) renderTrades(); }, 30000); // ages, no-show
     setInterval(refreshOverlayStatus, 10000);
     return;
   }
@@ -1060,34 +1171,21 @@ function tradesReady(hydrate) {
     return;
   }
   Promise.resolve(hydrate()).then(refreshTradeStatus, refreshTradeStatus);
-  // sales and buyers are written by the overlay: re-read whenever this window comes forward
-  window.addEventListener('focus', function () {
-    Promise.resolve(hydrate()).then(refreshTradeStatus, refreshTradeStatus);
-  });
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  var opener = document.getElementById('open-trades');
-  if (opener) opener.addEventListener('click', openTradesWindow);
-  if (!TRADES) return;
+function mountTradeHelper(container, embedded) {
   var root = UI.el('div', 'trades-root');
   root.id = 'trades-root';
-  var container = document.querySelector('.container');
-  if (TRADE_OVERLAY) {
-    container.insertBefore(root, container.firstChild);
-    if (TRADE_ICON) { // the extra buttons show only while the mouse is over the icon
-      root.addEventListener('mouseenter', function () { iconHover = true; renderTrades(); });
-      root.addEventListener('mouseleave', function () { iconHover = false; renderTrades(); });
-    }
-    renderTrades();
-    return;
-  }
   var bar = UI.el('div', 'trades-bar');
+  if (embedded) {
+    bar.appendChild(UI.button('ghost', { size: 'sm', label: '← Back', onClick: tradesClose,
+      title: 'Back to where you were (Esc)' }));
+  }
   bar.appendChild(UI.el('span', 'ov-title', 'Trade helper'));
   var st = UI.el('span', 'trades-status');
   st.id = 'trades-status';
   bar.appendChild(st);
-  bar.appendChild(UI.iconButton('✕', 'Hide the trade window', { size: 'sm', onClick: tradesClose }));
+  if (!embedded) bar.appendChild(UI.iconButton('✕', 'Hide the trade window', { size: 'sm', onClick: tradesClose }));
   root.appendChild(bar);
   var tabs = UI.el('div', 'trades-tabs');
   tabs.setAttribute('role', 'tablist');
@@ -1105,8 +1203,33 @@ document.addEventListener('DOMContentLoaded', function () {
   root.appendChild(body);
   container.insertBefore(root, container.firstChild);
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('dialog[open]')) tradesClose();
+    if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('dialog[open]')) return;
+    if (embedded && (document.body.dataset.view !== 'trades' || document.body.classList.contains('over-game'))) return;
+    tradesClose();
   });
   renderTrades();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  var opener = document.getElementById('open-trades');
+  if (opener) opener.addEventListener('click', function () { closeSettings(); openTradesWindow(); });
+  if (!TRADES) { // the main window: the Trade helper is one of its views
+    var view = document.getElementById('view-trades');
+    if (view) mountTradeHelper(view, true);
+    return;
+  }
+  var container = document.querySelector('.container');
+  if (TRADE_OVERLAY) {
+    var root = UI.el('div', 'trades-root');
+    root.id = 'trades-root';
+    container.insertBefore(root, container.firstChild);
+    if (TRADE_ICON) { // the extra buttons show only while the mouse is over the icon
+      root.addEventListener('mouseenter', function () { iconHover = true; if (!ovDrag) renderTrades(); });
+      root.addEventListener('mouseleave', function () { iconHover = false; if (!ovDrag) renderTrades(); });
+    }
+    renderTrades();
+    return;
+  }
+  mountTradeHelper(container, false);
 });
 // ==== end trade helper ==============================================================

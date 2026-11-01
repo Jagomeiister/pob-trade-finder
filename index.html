@@ -162,6 +162,15 @@
           </select>
         </label>
         <div id="hotkey-status" class="hotkey-status"></div>
+        <label class="field">
+          <span class="field-label">App over the game: see-through</span>
+          <select id="pref-over-opacity" title="How much of the game shows through when the app is over it (Shift+Space)">
+            <option value="100">Solid</option>
+            <option value="96">A little (96%)</option>
+            <option value="90">Some (90%)</option>
+            <option value="80">More (80%)</option>
+          </select>
+        </label>
         <label class="toggle"><input type="checkbox" id="pref-close-tray" checked> Closing the window keeps the app in the tray (right-click the tray icon to quit)</label>
         <div class="input-row">
           <button id="forget-habits" class="btn btn-ghost btn-sm" title="Pasted and Ctrl+D items learn which mods you usually switch on or off. This starts over.">Forget learned filters</button>
@@ -282,6 +291,7 @@
     </div>
 
     <!-- views (body[data-view]) -->
+    <div id="view-trades" class="view-panel"></div>
     <div id="view-planner" class="view-panel">
       <div id="planner-empty" class="empty-state">
         <div class="empty-title">Nothing priced yet</div>

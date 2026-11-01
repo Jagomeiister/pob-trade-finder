@@ -63,11 +63,9 @@ MIN_INTERVAL = 2.5
 OVERLAY_TITLE = "PoB Trade Finder - Price check"
 OVERLAY_SIZE = (560, 700)
 
-# trade helper: a third window on index.html?trades=1 (js/app/19-trades.js)
-TRADES_TITLE = "PoB Trade Finder - Trades"
-TRADES_SIZE = (720, 680)
-# in-game overlay (Awakened Trade / Lurker style): a small PoB icon over the game while it's
-# focused, with trade cards under it. Frameless, see-through, never takes focus.
+# in-game overlays (Awakened Trade / Lurker style): a small PoB icon over the game while it's
+# focused, and trade cards. Frameless, see-through, never take focus (js/app/19-trades.js).
+# The Trade helper itself (sales, buyers, setup) is a view of the main window.
 MAIN_TITLE = "PoB Trade Finder"
 # Separate pieces, each draggable on its own (Lurker / Awakened style). default = where the
 # top-left (or, for one in the lower half, the bottom edge) sits as a fraction of the game.
@@ -1122,7 +1120,6 @@ class Api:
                 self._tail.stop()
             if self._tray:
                 self._tray.stop()
-            self._destroy_once(trades)
             for w in overlays.values():
                 self._destroy_once(w)
 
@@ -1130,16 +1127,8 @@ class Api:
             _debug_log("overlay: close requested (app quitting=%s)" % self._quitting)
             return bool(self._quitting)  # Alt+F4 on an overlay must not end the app
 
-        def trades_closing():
-            _debug_log("trade helper window: close requested (app quitting=%s)" % self._quitting)
-            if self._quitting:
-                return True
-            threading.Thread(target=trades.hide, daemon=True).start()  # ✕ hides; reopened from the app
-            return False
-
         main_window.events.closing += main_closing
         main_window.events.closed += main_closed
-        trades.events.closing += trades_closing
         for w in overlays.values():
             w.events.closing += overlay_closing
         threading.Thread(target=self._follow_game, daemon=True, name="overlay-follow").start()
@@ -1223,7 +1212,9 @@ class Api:
         self._eval_in(self._main, "window.__appOverlay && window.__appOverlay(%s)" % ("true" if on else "false"))
         if on:
             self._show_main(over_game=True)
+            self._overlay_frame(True)
             return
+        self._overlay_frame(False)
         if self._main:
             self._main.on_top = False
         if self._close_to_tray() and self._main_was_hidden:
@@ -1231,6 +1222,49 @@ class Api:
         game = self._find_poe_window()
         if refocus and game:
             price_hotkey.focus_window(game)
+
+    def _overlay_frame(self, on):
+        """Over the game the main window drops its title bar and borders, covers the game
+        (a small margin all round) and lets the game show through slightly — an overlay, not
+        a desktop window. Off puts back the window exactly as it was."""
+        if sys.platform != "win32":
+            return
+        import ctypes
+        u = ctypes.windll.user32
+        hwnd = price_hotkey.find_window(MAIN_TITLE)
+        if not hwnd:
+            return
+        GWL_STYLE, GWL_EXSTYLE = -16, -20
+        FRAME = 0x00C00000 | 0x00040000 | 0x00020000 | 0x00010000 | 0x00080000  # caption, sizing, min/max, sysmenu
+        WS_EX_LAYERED, LWA_ALPHA = 0x80000, 0x2
+        SWP = 0x0004 | 0x0020 | 0x0040  # NOZORDER | FRAMECHANGED | SHOWWINDOW
+        saved = getattr(self, "_frame_saved", None)
+        if on:
+            game = self._find_poe_window()
+            g = trade_helper.game_client_rect(game) if game else None
+            if not g:
+                return
+            if not saved:
+                if u.IsZoomed(hwnd):
+                    u.ShowWindow(hwnd, 9)  # SW_RESTORE: put back un-maximised, then restyle
+                self._frame_saved = (u.GetWindowLongW(hwnd, GWL_STYLE), u.GetWindowLongW(hwnd, GWL_EXSTYLE),
+                                     price_hotkey.window_rect(hwnd))
+            style, ex = self._frame_saved[0], self._frame_saved[1]
+            u.SetWindowLongW(hwnd, GWL_STYLE, style & ~FRAME)
+            u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED)
+            pct = self._prefs().get("overGameOpacity", 96)
+            u.SetLayeredWindowAttributes(hwnd, 0, int(255 * max(60, min(100, int(pct))) / 100), LWA_ALPHA)
+            mx, my = int(g[2] * 0.03), int(g[3] * 0.03)
+            u.SetWindowPos(hwnd, 0, g[0] + mx, g[1] + my, g[2] - 2 * mx, g[3] - 2 * my, SWP)
+            return
+        if not saved:
+            return
+        style, ex, r = saved
+        self._frame_saved = None
+        u.SetWindowLongW(hwnd, GWL_STYLE, style)
+        u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex)
+        if r:
+            u.SetWindowPos(hwnd, 0, r[0], r[1], r[2] - r[0], r[3] - r[1], SWP)
 
     def app_overlay(self, on):
         """Esc / ✕ in the in-game app banner."""
@@ -1496,7 +1530,7 @@ class Api:
             if not hwnd or not r:
                 return {"ok": False}
             scale = u.GetDpiForWindow(hwnd) / 96.0 if hasattr(u, "GetDpiForWindow") else 1.0
-            w = int(max(24, min(600, float(width))) * scale)
+            w = int(max(24, min(2400, float(width))) * scale)
             h = int(max(24, min(1200, float(height))) * scale)
             game = self._find_poe_window()
             g = trade_helper.game_client_rect(game) if game else None
@@ -1531,6 +1565,42 @@ class Api:
             self._eval_in(self._overlay_windows.get("icon"), "window.__ovCount && window.__ovCount(%d, %s)"
                           % (int(count), "true" if on else "false"))
         return {"ok": True}
+
+    def overlay_drag(self, name, phase, dx, dy):
+        """The overlay's ⠿ grip: start / move by (dx, dy) CSS px from where the drag began /
+        end (saves the spot relative to the game)."""
+        try:
+            if name not in OVERLAYS or sys.platform != "win32":
+                return {"ok": False}
+            import ctypes
+            u = ctypes.windll.user32
+            st = self._ov[name]
+            hwnd = price_hotkey.find_window(OVERLAYS[name]["title"])
+            r = price_hotkey.window_rect(hwnd)
+            if not hwnd or not r:
+                return {"ok": False}
+            if phase == "start" or "drag_from" not in st:
+                st["drag_from"], st["dragging"] = (r[0], r[1]), True
+                if phase == "start":
+                    return {"ok": True}
+            scale = u.GetDpiForWindow(hwnd) / 96.0 if hasattr(u, "GetDpiForWindow") else 1.0
+            x = int(st["drag_from"][0] + float(dx) * scale)
+            y = int(st["drag_from"][1] + float(dy) * scale)
+            u.SetWindowPos(hwnd, 0, x, y, 0, 0, 0x0001 | 0x0004 | 0x0010)  # NOSIZE | NOZORDER | NOACTIVATE
+            st["placed"] = (x, y)
+            if phase == "end":
+                st.pop("drag_from", None)
+                st["dragging"] = False
+                game = self._find_poe_window()
+                g = trade_helper.game_client_rect(game) if game else None
+                if g:
+                    h = r[3] - r[1]
+                    self.storage_set(OVERLAYS[name]["pos"], json.dumps({"dx": x - g[0], "dy": y - g[1],
+                                                                         "bottom": y + h - g[1]}))
+                    st["game"] = g
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def overlay_toggle_cards(self):
         """Icon click (or the trade cards hotkey): show / hide the trade cards."""
@@ -1568,17 +1638,17 @@ class Api:
             return {"ok": False, "error": str(e)}
 
     def _show_trades(self, activate=True):
-        win = self._trades
-        if not win:
+        """The Trade helper is a view of the main window: over the game when the game is up."""
+        if not self._main:
             return False
-        hwnd = price_hotkey.find_window(TRADES_TITLE)
-        if hwnd and not activate and sys.platform == "win32":
+        if self._find_poe_window() and not self._app_overlay:
             import ctypes
-            ctypes.windll.user32.ShowWindow(hwnd, 4)  # SW_SHOWNOACTIVATE
-            return True
-        win.show()
-        if hwnd:
-            price_hotkey.focus_window(hwnd)
+            main = price_hotkey.find_window(MAIN_TITLE)
+            self._main_was_hidden = not (main and ctypes.windll.user32.IsWindowVisible(main))
+            self._set_app_overlay(True)
+        elif not self._app_overlay:
+            self._show_main()
+        self._eval_in(self._main, "window.__openTradeHelper && window.__openTradeHelper()")
         return True
 
     def _trade_status(self, path=None, error=None):
@@ -1682,7 +1752,7 @@ class Api:
 
     def trade_pick_log(self):
         try:
-            win = self._trades or webview.windows[0]
+            win = self._main or webview.windows[0]
             res = win.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=False,
                                          file_types=("Path of Exile log (*.txt)", "All files (*.*)"))
             path = res[0] if res else None
@@ -1693,7 +1763,7 @@ class Api:
     def save_text_file(self, name, text):
         """Save dialog for an export (CSV); UTF-8 with BOM so Excel reads it right."""
         try:
-            win = self._trades or webview.windows[0]
+            win = self._main or webview.windows[0]
             safe = re.sub(r"[^\w.\- ]", "_", str(name or "export.txt"))
             res = win.create_file_dialog(webview.SAVE_DIALOG, save_filename=safe)
             path = res[0] if isinstance(res, (list, tuple)) else res
@@ -2189,17 +2259,8 @@ def main():
         on_top=True,
         background_color="#0f0e0c",
     )
-    # trade helper: same page in trades mode, hidden until opened or a trade whisper arrives
-    trades = webview.create_window(
-        TRADES_TITLE,
-        index + "?trades=1",
-        js_api=api,
-        width=TRADES_SIZE[0],
-        height=TRADES_SIZE[1],
-        min_size=(420, 360),
-        hidden=True,
-        background_color="#0f0e0c",
-    )
+    # the Trade helper (sales, buyers, setup) is a view of the main window: no extra window
+    trades = None
     # in-game overlays (icon, trade cards): see-through, never take focus from the game,
     # each dragged and placed on its own
     overlays = {}

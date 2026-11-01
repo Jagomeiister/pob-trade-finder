@@ -196,6 +196,7 @@ function setView(k) {
   if (k === 'market') renderMarketPage(); // built lazily: hundreds of rows
   if (k === 'stash') renderStashPage();
   if (k === 'divcards') loadDivcardsView(); // drop data + prices load on first open
+  if (k === 'trades') showTradeHelperView(); // re-reads what the overlay saved
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
     if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');

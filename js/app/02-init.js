@@ -260,7 +260,8 @@ document.addEventListener('DOMContentLoaded', function () {
   function markGui() {
     startArtCache(); // both windows load art from the on-disk cache
     if (OVERLAY) { overlayReady(hydrateFromBridge); return; } // price-check overlay: see block at the end
-    if (TRADES) { tradesReady(hydrateFromBridge); return; } // trade helper + in-game overlays (19-trades.js)
+    if (TRADES) { tradesReady(hydrateFromBridge); return; } // in-game overlays (19-trades.js)
+    window.hydrateFromBridge = hydrateFromBridge; // the Trade helper view re-reads what the overlay saved
     document.body.classList.add('gui');
     checkForUpdates();
     setInterval(checkForUpdates, 4 * 3600 * 1000); // not just at launch

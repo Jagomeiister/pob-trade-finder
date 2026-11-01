@@ -239,6 +239,7 @@ STUB_JS = r"""
     trade_status: function () { return { ok: true, watching: true, logName: 'Client.txt' }; },
     trade_prefs_changed: function () { return { ok: true }; },
     open_main: function () { return { ok: true }; },
+    overlay_drag: function () { return { ok: true }; },
     game_search_paste: function () { return { ok: true }; },
     overlay_toggle_cards: function () { return { ok: true }; },
     set_hotkey: function (n, spec) { return { ok: true, hotkeys: {} }; },
@@ -1476,7 +1477,7 @@ out.fitCalls = H.calls('overlay_fit').length;
 window.__ovToggle(); // the icon click / hotkey, relayed by gui.py
 await H.sleep(30);
 out.offNote = H.text('.ov-note');
-out.grip = !!document.querySelector('.ov-head .ov-grip.pywebview-drag-region');
+out.grip = !!document.querySelector('.ov-head .ov-grip') && !document.querySelector('.pywebview-drag-region');
 localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ enabled: true, ack: true, sound: false }));
 await window.__tradePrefsChanged();
 window.__ovToggle(); // hide again: a new trade must open it
@@ -1553,6 +1554,17 @@ await H.sleep(20);
 out.hidden = { visible: !!card('Spammer'), summary: H.text('.disclosure summary') };
 out.fit = H.calls('overlay_fit').slice(-1)[0].args;
 out.noDialogs = !document.querySelector('dialog');
+localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ enabled: true, ack: true, sound: 'off', cardLayout: 'row',
+  customButtons: [{ label: '1 min', text: 'one minute for {item}', when: 'new' }, { label: 'gg', text: 'gg', when: 'here' }] }));
+window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'Custom', text: 'hi', trade: Object.assign({}, T, { item: 'Belt' }) });
+await H.sleep(20);
+const cc = card('Custom');
+out.customActions = [...cc.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent);
+const n9 = sends().length;
+H.button(cc, '1 min').click();
+await H.sleep(30);
+out.customSend = sends().slice(n9);
+out.rowLayout = !!document.querySelector('.ov-cards.is-row');
 localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ enabled: true, ack: true, sound: 'off', opacity: 50, locked: true }));
 window.__ovToggle(); if (!document.querySelector('.ov-head')) window.__ovToggle();
 renderTrades();
@@ -1682,6 +1694,10 @@ def scenario_trades(s, tag):
     check(tag + " hidden buyer: no card, listed under Hidden", not r["hidden"]["visible"] and
           "Hidden (2)" in (r["hidden"]["summary"] or ""), r["hidden"])
     check(tag + " overlay never opens a dialog", r["noDialogs"], r["noDialogs"])
+    check(tag + " your own buttons on the card, one whisper per press", "1 min" in r["customActions"] and
+          "gg" not in r["customActions"] and r["customSend"] == [["whisper", "Custom", "one minute for Belt"]],
+          (r["customActions"], r["customSend"]))
+    check(tag + " side-by-side card layout", r["rowLayout"], r["rowLayout"])
     check(tag + " zone note shows on entering an area with a note, not elsewhere",
           "The Lower Prison" in (r["zone"] or "") and "Trial of Ascendancy" in r["zone"] and r["zoneGone"], r["zone"])
     check(tag + " overlay opacity setting applied, Lock hides the drag grip", r["opacity"] == "0.5" and
@@ -1734,6 +1750,17 @@ window.__ovCount(0, false);
 await H.sleep(30);
 out.lastVisible = H.calls('overlay_visible').slice(-1)[0].args;
 out.fit = H.calls('overlay_fit').slice(-1)[0].args;
+localStorage.setItem('pobtf-trade-prefs', '{}');
+window.__ovCount(1, true);
+await H.sleep(20);
+const g = document.querySelector('.ov-grip');
+g.setPointerCapture = () => {};
+g.dispatchEvent(new PointerEvent('pointerdown', { screenX: 100, screenY: 100, pointerId: 1, bubbles: true }));
+g.dispatchEvent(new PointerEvent('pointermove', { screenX: 140, screenY: 90, pointerId: 1, bubbles: true }));
+await H.sleep(30);
+g.dispatchEvent(new PointerEvent('pointerup', { screenX: 150, screenY: 80, pointerId: 1, bubbles: true }));
+await H.sleep(30);
+out.drag = H.calls('overlay_drag').map(c => c.args);
 return out;
 """
 
@@ -1750,6 +1777,8 @@ def scenario_overlay_icon(s, tag):
     check(tag + " 'only when there are trades' hides the icon with none", r["lastVisible"][:2] == ["icon", False],
           r["lastVisible"])
     check(tag + " icon window sized to the button", r["fit"][0] == "icon" and 0 < r["fit"][1] < 200, r["fit"])
+    check(tag + " dragging the grip moves the window through gui.py", r["drag"][:1] == [["icon", "start", 0, 0]] and
+          ["icon", "move", 40, -10] in r["drag"] and r["drag"][-1] == ["icon", "end", 50, -20], r["drag"])
 
 
 S21_UNIQUES = r"""
@@ -2043,6 +2072,47 @@ def scenario_divcards(s, tag):
     check(tag + " filter by area name", r["filtered"] == ["A Chilling Wind"], r["filtered"])
 
 
+
+S25_EMBED = r"""
+const H = window.__e2e;
+const out = {};
+document.getElementById('settings-btn').click();
+await H.sleep(30);
+document.getElementById('open-trades').click();
+await H.sleep(50);
+const v = document.getElementById('view-trades');
+out.view = document.body.dataset.view;
+out.visible = v.getBoundingClientRect().height > 100 && getComputedStyle(document.getElementById('input-panel')).display === 'none';
+out.tabs = [...v.querySelectorAll('.trades-tab')].map(b => b.textContent);
+out.settingsClosed = document.getElementById('settings-panel').classList.contains('hidden');
+out.status = H.calls('trade_status').length;
+H.button(v, '← Back').click();
+await H.sleep(30);
+out.backTo = document.body.dataset.view;
+out.landing = getComputedStyle(document.getElementById('input-panel')).display !== 'none';
+await H.loadBuild();
+setView('gems');
+openTradesWindow();
+await H.sleep(30);
+out.inNav = [...document.querySelectorAll('#nav .nav-item')].some(b => b.dataset.view === 'trades');
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+await H.sleep(30);
+out.escBack = document.body.dataset.view;
+out.extraWindows = typeof TRADES !== 'undefined' && TRADES;
+return out;
+"""
+
+
+def scenario_trade_embed(s, tag):
+    s.fresh()
+    r = s.run(S25_EMBED, timeout=60)
+    check(tag + " Trade helper opens as a view of the main window (no build needed)", r["view"] == "trades" and
+          r["visible"] and r["tabs"] == ["Sales", "Buyers", "Setup"] and r["settingsClosed"], r)
+    check(tag + " reads the log reader's state on open", r["status"] >= 1, r["status"])
+    check(tag + " Back returns to the landing without a build", r["backTo"] == "" and r["landing"], r)
+    check(tag + " with a build: in the sidebar, Esc returns to where you were", r["inNav"] and r["escBack"] == "gems", r)
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -2068,6 +2138,7 @@ SCENARIOS = [
     ("22 search", scenario_search),
     ("23 habits", scenario_habits),
     ("24 divcards", scenario_divcards),
+    ("25 tradeview", scenario_trade_embed),
 ]
 
 
