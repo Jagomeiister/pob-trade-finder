@@ -10,8 +10,9 @@ in-game whisper/hideout actions, all without touching the trade website's filter
 
 1. Download the latest zip from [Releases](https://github.com/Jagomeiister/pob-trade-finder/releases)
 2. Extract anywhere, run **`PoB Trade Finder.exe`**
-3. The app checks for updates on launch — when a new version exists, a green banner
-   offers **Install & restart** (one click, fully automatic)
+3. The app checks for updates on launch. When a new version exists, a green banner says which
+   one and what's new, with **What's new**, **Later** and **Update now** (one click, fully
+   automatic; the app restarts itself)
 
 > **Browser fallback:** opening `index.html` in a browser gives the same search-building
 > UI, but the desktop-only features (live price checks, link fetching, in-game chat,
@@ -606,17 +607,22 @@ Tools → **Div cards** shows where each divination card drops and what it's wor
   one of each. Click an area for its card list. Drop rates aren't public, so this ranks
   areas by the cards that *can* drop there; it isn't an expected value per map.
 - Prices of 1 divine or more show in divines, smaller ones in chaos.
-- **By card**: price each, set size, full set value, where it drops (or "no longer drops")
-  and ↗ to the bulk exchange.
+- **By card**: the card's picture (hover it for a bigger one), price each, set size, full set
+  value, where it drops (or "no longer drops") and ↗ to the bulk exchange.
 - Filter by card or area name, and set a minimum value.
 - Prices come from GGG's currency exchange (last hour) for the selected league. Drop areas
   come from the community Path of Exile Wiki (CC BY-NC-SA): they ship with the app and update
   through the app's server between releases. They keep working offline.
+- The page loads once per session. After a restart it shows your last result straight away
+  ("Showing prices from …") and refreshes the prices in the background.
 
 ## 5k. 🌳 Skill tree
 
 Tools → **Skill tree** is a small Path of Building: the build's passive tree, so you can see
 where your points go in game and where the jewels sit.
+
+**Icons**: zoom in and every passive shows its real in-game icon (in colour when it's in your
+build, grey otherwise); keystones first, then notables, then small passives as you zoom closer.
 
 **Tree stages**: if your PoB build has several trees (e.g. "Level 30", "Level 70",
 "Endgame"), a menu at the top left picks which one to show; the one active in PoB is marked
@@ -650,7 +656,8 @@ character against the stage you're at.
 
 Click **⚖ Compare with character…** in the sidebar, enter your account name
 (**Name#1234**), load your characters, pick one, and **Compare gear** (public profiles, no
-login). With a POESESSID saved (§7b) your characters load automatically. Every card gains
+login). **☆ Save** keeps that character (yours or a friend's) at the top of the pop-up: next
+time one click compares it, no typing; ✕ forgets it. With a POESESSID saved (§7b) your characters load automatically. Every card gains
 a strip:
 
 > **You:** My Old Dome — 2/4 target mods · missing: +58 to maximum Life · +35% to Cold Resistance
@@ -799,7 +806,8 @@ Settings opens as a panel on the right; Esc or a click outside closes it.
 - **Alerts** — live-search **sound** and **volume**, Windows notifications in the background
 - **In game** — the **price-check hotkey** (§5c): Ctrl+D, Ctrl+Shift+D, Alt+D or Off
 - **Account** — your POESESSID (§7b)
-- **Data and updates** — **Refresh trade data** and **Check for updates**
+- **Data and updates** — **Refresh trade data** and **Check for updates** (when there's a new
+  version, an **Update now** button appears right there)
 
 Everything works from the keyboard: Tab moves between controls, arrows move through the
 slot list, menus and Off / Want / Must switches, and Esc closes menus, pop-ups and panels.
