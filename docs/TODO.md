@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.4.0 released 2026-11-01** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.4.1 released 2026-11-01** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -114,7 +114,7 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
       `get-passive-skills` wasn't checked live). It shows: the build's tree
       (pan / zoom / search), jewel sockets with their jewels, mastery picks, and "points still
       to take" vs your imported character (`get-passive-skills`), in a BFS order.
-- [x] Skill tree stages (PoB's several specs, e.g. Level 30 / 70 / Endgame): stage menu, compare carries over (v2.4.1, built; release pending your OK)
+- [x] Skill tree stages (PoB's several specs, e.g. Level 30 / 70 / Endgame): stage menu, compare carries over (v2.4.1, released)
 - [x] Div cards: 1+ divine shows as divines, under that as chaos (done 2026-11-01)
 - [x] Custom trade sounds: your own mp3/wav/ogg/m4a for new trade / buyer arrived (done)
 
