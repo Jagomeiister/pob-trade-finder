@@ -1666,10 +1666,33 @@ class Api:
         return {"ok": False, "error": "refusing to open that URL"}
 
 
+def _unblock_app_files():
+    """Drop Windows' "downloaded from the internet" mark (the Zone.Identifier stream) from
+    the app's own files. A zip unzipped from a browser download passes the mark to every
+    file, and .NET then refuses to load pythonnet's Python.Runtime.dll ("Failed to resolve
+    Python.Runtime.Loader.Initialize"). Must run before webview.start() imports clr."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return 0
+    n = 0
+    for base, _dirs, files in os.walk(APP_DIR):
+        if os.path.abspath(base).startswith(os.path.abspath(DATA_DIR)):
+            continue
+        for name in files:
+            try:
+                os.remove(os.path.join(base, name) + ":Zone.Identifier")
+                n += 1
+            except OSError:
+                pass  # not marked (the usual case) or not NTFS
+    if n:
+        _debug_log("removed the download mark from %d app files" % n)
+    return n
+
+
 def main():
     index = os.path.join(APP_DIR, "index.html")
     if not os.path.exists(index):
         sys.exit("index.html not found next to gui.py")
+    _unblock_app_files()
     api = Api()
     main_window = webview.create_window(
         "PoB Trade Finder",
