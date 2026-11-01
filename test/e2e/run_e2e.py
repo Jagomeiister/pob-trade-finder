@@ -2523,6 +2523,16 @@ out.off = { rows: offCard.querySelectorAll('.gem-row').length, offRows: offCard.
   priced: gemGroupViews[0].gemRows.length, want: g0.gems.length };
 const swapped = groupFit(g0.gems, { links: g0.gems.length, gems: g0.gems.slice(0, -1).concat([{ name: 'Faster Casting Support', level: 20, quality: 20 }]) }, [off]);
 out.offFit = [swapped.missing.length, swapped.options.join()];
+// socket colour helper (3.29): facts + bench / chromatic / omen options, never odds
+const sh = c => { const el = socketColourHelp(c); return el ? { head: H.text('.sock-help-head', el),
+  tips: [...el.querySelectorAll('li')].map(l => l.textContent), done: el.classList.contains('is-done') } : null; };
+const mk = (socks, extra) => Object.assign({ sockets: socks, itemSockets: socks, reqs: { str: 155, dex: 0, int: 0 },
+  quality: 20, corrupted: false }, extra || {});
+out.sock = { colours: [gemColour('Cleave'), gemColour('Added Fire Damage Support'), gemColour('Fireball'), gemColour('Portal')],
+  done: sh(mk([{ c: 'R', gem: 'Cleave' }, { c: 'R', gem: 'Added Fire Damage Support' }])),
+  mixed: sh(mk([{ c: 'W', gem: 'Cleave' }, { c: 'W', gem: 'Fireball' }, { c: 'W', gem: 'Blink Arrow' }, { c: 'W', gem: '' }])),
+  corrupt: sh(mk([{ c: 'W', gem: 'Cleave' }, { c: 'W', gem: 'Added Fire Damage Support' }], { corrupted: true })),
+  white: sh(mk([{ c: 'W', gem: 'Portal' }])) };
 delete window.__stubOverrides.get_character_items;
 delete window.__stubOverrides.get_character_passives;
 return out;
@@ -2562,6 +2572,20 @@ def scenario_gemdiff(s, tag):
           and "Unticked in PoB" in (o["head"] or "") and "+ 1 unticked" in (o["tag"] or ""), o)
     check(tag + " unticked gem left out of group pricing and compare", o["priced"] == o["want"], o)
     check(tag + " running an unticked option is named", r["offFit"] == [1, "Faster Casting Support"], r["offFit"])
+    k = r["sock"]
+    check(tag + " gem colours from RePoE (red / blue / white)", k["colours"] == ["r", "r", "b", "w"], k["colours"])
+    check(tag + " socket colours: all in their colour = done, no tips", k["done"] and k["done"]["done"]
+          and "2 / 2 gems in their colour" in k["done"]["head"] and not k["done"]["tips"], k["done"])
+    tips = " | ".join((k["mixed"] or {}).get("tips") or [])
+    check(tag + " socket colours: wants, base lean, bench 3 non-white, chromatic, omen",
+          "0 / 3" in (k["mixed"] or {}).get("head", "") and "1 red, 1 green, 1 blue" in tips and "roll red" in tips
+          and "green and blue sockets are unlikely" in tips and '"At Least 3 Non-White Sockets" for 20' in tips
+          and "quality (this one: 20%)" in tips and "Omen of Trichromatism" in tips
+          and "%" not in tips.replace("+10% gem quality", "").replace("20%", ""), tips)  # no made-up odds
+    ctips = " | ".join((k["corrupt"] or {}).get("tips") or [])
+    check(tag + " socket colours: corrupted = Vaal Orbs on the bench, Tainted Chromatics, no omen",
+          "plus 5 Vaal Orbs" in ctips and "Tainted Chromatic" in ctips and "Omen" not in ctips, ctips)
+    check(tag + " socket colours: only white gems = no helper", k["white"] is None, k["white"])
 
 
 S30_TESTCARDS = r"""

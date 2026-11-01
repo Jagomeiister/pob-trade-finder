@@ -455,6 +455,8 @@ class Api:
                     "ilvl": it.get("ilvl", 0),
                     "corrupted": bool(it.get("corrupted")),
                     "linkGroups": self._char_links(it),
+                    "reqs": self._char_reqs(it),  # socket colours lean on these (gem compare)
+                    "quality": self._gem_prop(it, "Quality"),
                     **self._char_mods(it),
                 })
             return {"ok": True, "items": items}
@@ -506,6 +508,18 @@ class Api:
                 m = re.search(r"\d+", str(p["values"][0][0]))
                 return int(m.group()) if m else 0
         return 0
+
+    @staticmethod
+    def _char_reqs(it):
+        """An item's attribute requirements {"str", "dex", "int"}: its non-white sockets roll
+        red / green / blue in proportion to them."""
+        out = {"str": 0, "dex": 0, "int": 0}
+        for r in it.get("requirements") or []:
+            key = str(r.get("name") or "").lower()[:3]
+            if key in out and r.get("values"):
+                m = re.search(r"\d+", str(r["values"][0][0]))
+                out[key] = int(m.group()) if m else 0
+        return out
 
     @staticmethod
     def _char_links(it):

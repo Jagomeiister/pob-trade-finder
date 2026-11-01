@@ -677,6 +677,17 @@ link groups fills only one PoB group:
   the gem tags use the same letters (*linked · Boots A*, *not linked · Boots B*), and the
   group matched to this setup is outlined and tagged *this setup*. The setup's gems are
   bright, other gems dimmed, empty sockets say *empty*.
+- **Socket colours**, under the picture: since 3.29 any gem works in any socket, and a gem in a
+  socket of its own colour gets +10% quality. The box counts how many of the setup's gems sit
+  in their colour (e.g. *1 / 4 gems in their colour*). When some don't, it lists:
+  - which colours the link group wants;
+  - which colours this base rolls (non-white sockets follow its attribute requirements);
+  - the crafting bench's *At Least 2/3/4 Non-White Sockets* (5/20/75 Chromatic Orbs, plus
+    Vaal Orbs on a corrupted item);
+  - what a Chromatic Orb does on this item (Tainted on a corrupted one);
+  - the Omen of Trichromatism when the group wants all three colours.
+
+  It gives no odds: GGG hasn't published the 3.29 socket colour chances.
 - A link group only counts as the setup when at least two of its gems are linked together
   (one for a single-gem group), so a lone socket with one shared support doesn't.
 - Gems below the build's level or quality are listed as *lower* but don't change the status.

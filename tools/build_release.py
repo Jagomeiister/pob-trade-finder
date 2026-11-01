@@ -71,6 +71,7 @@ SHIP = [
     "data/mapmods.js",
     "data/treeview.js",
     "data/cheatsheets.js",
+    "data/gemcolours.js",
     "data/divcards.json",
     "data/currencymap.json",
     "data/craftdata.js",

@@ -20,6 +20,7 @@ STEPS = [
     [sys.executable, "tools/make_uniquenames.py"],
     [sys.executable, "tools/make_uniqueranges.py"],
     [sys.executable, "tools/make_gemtypes.py"],
+    [sys.executable, "tools/make_gemcolours.py", "--fetch"],  # gem colours for the socket colour helper (RePoE)
     [sys.executable, "tools/make_watcherseye.py"],
     [sys.executable, "tools/make_forbidden.py"],
     [sys.executable, "tools/make_mapmods.py"],
