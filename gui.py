@@ -161,6 +161,7 @@ class Api:
                     for n in OVERLAYS}
         self._app_overlay = False   # main window brought over the game by the app hotkey
         self._main_was_hidden = False
+        self._app_overlay_at = 0.0
         self._main = None
         self._tray = None
         self._hotkeys = {}
@@ -1209,6 +1210,7 @@ class Api:
         """App hotkey: the main window over the game (trades, gear, settings without alt-tab);
         again, or Esc, puts it back and returns to the game."""
         self._app_overlay = bool(on)
+        self._app_overlay_at = time.time()
         self._eval_in(self._main, "window.__appOverlay && window.__appOverlay(%s)" % ("true" if on else "false"))
         if on:
             self._show_main(over_game=True)
@@ -1223,10 +1225,33 @@ class Api:
         if refocus and game:
             price_hotkey.focus_window(game)
 
+    OVER_GAME_POS = "pobtf-overgame-rect"  # where the app sits over the game, as fractions of it
+    OVER_GAME_DEFAULT = (0.11, 0.07, 0.78, 0.86)
+
+    def _over_game_rect(self, g):
+        """Screen rect for the app over the game: your last size/spot (fractions of the game
+        window, so it follows resolution and screens), else centred at 78% x 86%."""
+        try:
+            fx, fy, fw, fh = json.loads(self._storage.get(self.OVER_GAME_POS) or "null") or self.OVER_GAME_DEFAULT
+        except Exception:
+            fx, fy, fw, fh = self.OVER_GAME_DEFAULT
+        fw, fh = max(0.3, min(1.0, fw)), max(0.3, min(1.0, fh))
+        fx, fy = max(0.0, min(1.0 - fw, fx)), max(0.0, min(1.0 - fh, fy))
+        return int(g[0] + fx * g[2]), int(g[1] + fy * g[3]), int(fw * g[2]), int(fh * g[3])
+
+    def _remember_over_game_rect(self, hwnd=None):
+        game = self._find_poe_window()
+        g = trade_helper.game_client_rect(game) if game else None
+        r = price_hotkey.window_rect(hwnd or price_hotkey.find_window(MAIN_TITLE))
+        if not g or not r or not g[2] or not g[3]:
+            return
+        frac = [(r[0] - g[0]) / g[2], (r[1] - g[1]) / g[3], (r[2] - r[0]) / g[2], (r[3] - r[1]) / g[3]]
+        self.storage_set(self.OVER_GAME_POS, json.dumps([round(v, 4) for v in frac]))
+
     def _overlay_frame(self, on):
-        """Over the game the main window drops its title bar and borders, covers the game
-        (a small margin all round) and lets the game show through slightly — an overlay, not
-        a desktop window. Off puts back the window exactly as it was."""
+        """Over the game the main window drops its title bar (an overlay, not a desktop window)
+        but keeps resizable edges; drag the banner to move it, − / + to resize. Its size and
+        spot are remembered relative to the game. Off puts the window back exactly as it was."""
         if sys.platform != "win32":
             return
         import ctypes
@@ -1235,7 +1260,7 @@ class Api:
         if not hwnd:
             return
         GWL_STYLE, GWL_EXSTYLE = -16, -20
-        FRAME = 0x00C00000 | 0x00040000 | 0x00020000 | 0x00010000 | 0x00080000  # caption, sizing, min/max, sysmenu
+        FRAME = 0x00C00000 | 0x00020000 | 0x00010000 | 0x00080000  # caption, min/max, sysmenu (sizing edges stay)
         WS_EX_LAYERED, LWA_ALPHA = 0x80000, 0x2
         SWP = 0x0004 | 0x0020 | 0x0040  # NOZORDER | FRAMECHANGED | SHOWWINDOW
         saved = getattr(self, "_frame_saved", None)
@@ -1250,22 +1275,70 @@ class Api:
                 self._frame_saved = (u.GetWindowLongW(hwnd, GWL_STYLE), u.GetWindowLongW(hwnd, GWL_EXSTYLE),
                                      price_hotkey.window_rect(hwnd))
             style, ex = self._frame_saved[0], self._frame_saved[1]
-            u.SetWindowLongW(hwnd, GWL_STYLE, style & ~FRAME)
+            u.SetWindowLongW(hwnd, GWL_STYLE, (style & ~FRAME) | 0x00040000)  # + WS_THICKFRAME
             pct = int(self._prefs().get("overGameOpacity", 100))
             if pct < 100:  # see-through only when asked for (WebView2 + layered windows varies by GPU/driver)
                 u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED)
                 u.SetLayeredWindowAttributes(hwnd, 0, int(255 * max(60, pct) / 100), LWA_ALPHA)
-            mx, my = int(g[2] * 0.03), int(g[3] * 0.03)
-            u.SetWindowPos(hwnd, 0, g[0] + mx, g[1] + my, g[2] - 2 * mx, g[3] - 2 * my, SWP)
+            x, y, w, h = self._over_game_rect(g)
+            u.SetWindowPos(hwnd, 0, x, y, w, h, SWP)
             return
         if not saved:
             return
+        self._remember_over_game_rect(hwnd)  # keeps a resize done with the window edges
         style, ex, r = saved
         self._frame_saved = None
         u.SetWindowLongW(hwnd, GWL_STYLE, style)
         u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex)
         if r:
             u.SetWindowPos(hwnd, 0, r[0], r[1], r[2] - r[0], r[3] - r[1], SWP)
+
+    def app_overlay_move(self, phase, dx=0, dy=0):
+        """Banner drag over the game: start / move by (dx, dy) CSS px / end (remembered)."""
+        try:
+            import ctypes
+            u = ctypes.windll.user32
+            hwnd = price_hotkey.find_window(MAIN_TITLE)
+            r = price_hotkey.window_rect(hwnd)
+            if not self._app_overlay or not r:
+                return {"ok": False}
+            if phase == "start" or not getattr(self, "_app_drag_from", None):
+                self._app_drag_from = (r[0], r[1])
+                if phase == "start":
+                    return {"ok": True}
+            scale = u.GetDpiForWindow(hwnd) / 96.0 if hasattr(u, "GetDpiForWindow") else 1.0
+            x = int(self._app_drag_from[0] + float(dx) * scale)
+            y = int(self._app_drag_from[1] + float(dy) * scale)
+            u.SetWindowPos(hwnd, 0, x, y, 0, 0, 0x0001 | 0x0004 | 0x0010)  # NOSIZE | NOZORDER | NOACTIVATE
+            if phase == "end":
+                self._app_drag_from = None
+                self._remember_over_game_rect(hwnd)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def app_overlay_size(self, step):
+        """Banner − / +: 10% of the game smaller / larger, kept centred where it is."""
+        try:
+            import ctypes
+            u = ctypes.windll.user32
+            hwnd = price_hotkey.find_window(MAIN_TITLE)
+            game = self._find_poe_window()
+            g = trade_helper.game_client_rect(game) if game else None
+            r = price_hotkey.window_rect(hwnd)
+            if not self._app_overlay or not g or not r:
+                return {"ok": False}
+            d = 0.1 if float(step) > 0 else -0.1
+            w = int(max(0.3, min(1.0, (r[2] - r[0]) / g[2] + d)) * g[2])
+            h = int(max(0.3, min(1.0, (r[3] - r[1]) / g[3] + d)) * g[3])
+            cx, cy = (r[0] + r[2]) // 2, (r[1] + r[3]) // 2
+            x = max(g[0], min(g[0] + g[2] - w, cx - w // 2))
+            y = max(g[1], min(g[1] + g[3] - h, cy - h // 2))
+            u.SetWindowPos(hwnd, 0, x, y, w, h, 0x0004 | 0x0010)
+            self._remember_over_game_rect(hwnd)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def app_overlay(self, on):
         """Esc / ✕ in the in-game app banner."""
@@ -1430,6 +1503,10 @@ class Api:
                 if now - found_at > 2 or (game and not u.IsWindow(game)):
                     game, found_at = self._find_poe_window() or 0, now
                 fg = u.GetForegroundWindow()
+                # app over the game + a click back in the game: put it away (Settings can turn this off)
+                if (self._app_overlay and game and fg == game and now - self._app_overlay_at > 1.0
+                        and self._prefs().get("closeOnGameClick", True) is not False):
+                    self._set_app_overlay(False, refocus=False)
                 hwnds = {n: price_hotkey.find_window(o["title"]) for n, o in OVERLAYS.items()}
                 ours = set(hwnds.values()) | {price_hotkey.find_window(OVERLAY_TITLE)}
                 if self._app_overlay:

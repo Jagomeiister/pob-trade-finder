@@ -340,7 +340,7 @@ Trade helper → Setup pins them):
 | Default | What it does |
 |---|---|
 | Ctrl+D | Price the item under your cursor |
-| Shift+Space | Brings this whole app over the game as an overlay (no title bar, covering the game; it can be made see-through in Settings → In game → *App over the game: see-through*): builds, gear, the Trade helper and settings without alt-tabbing. Press it again, Esc or **Back to the game** to return |
+| Shift+Space | Brings this whole app over the game as an overlay (no title bar): builds, gear, the Trade helper and settings without alt-tabbing. Resize it from its edges or with − / + on the banner, and drag the banner to move it; it remembers both. Press the key again, Esc, **Back to the game** or click in the game to put it away. Settings → In game can make it see-through or keep it open when you click the game |
 | Alt+T | Show or hide the trade cards |
 
 **Tray**: closing the window keeps the app running in the tray (bottom right of the taskbar).

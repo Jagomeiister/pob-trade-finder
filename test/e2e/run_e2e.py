@@ -239,6 +239,8 @@ STUB_JS = r"""
     trade_status: function () { return { ok: true, watching: true, logName: 'Client.txt' }; },
     trade_prefs_changed: function () { return { ok: true }; },
     open_main: function () { return { ok: true }; },
+    app_overlay_size: function () { return { ok: true }; },
+    app_overlay_move: function () { return { ok: true }; },
     overlay_shape: function () { return { ok: true }; },
     overlay_drag: function () { return { ok: true }; },
     game_search_paste: function () { return { ok: true }; },
@@ -2122,6 +2124,51 @@ def scenario_trade_embed(s, tag):
     check(tag + " with a build: in the sidebar, Esc returns to where you were", r["inNav"] and r["escBack"] == "gems", r)
 
 
+
+S26_OVERGAME = r"""
+const H = window.__e2e;
+const out = {};
+window.__appOverlay(true);
+await H.sleep(20);
+const bar = document.getElementById('over-game-bar');
+out.bar = !!bar && document.body.classList.contains('over-game');
+out.text = H.text('.over-game-grip');
+H.button(bar, '+').click();
+H.button(bar, '−').click();
+await H.sleep(20);
+out.size = H.calls('app_overlay_size').map(c => c.args[0]);
+const g = bar.querySelector('.over-game-grip');
+g.setPointerCapture = () => {};
+g.dispatchEvent(new PointerEvent('pointerdown', { screenX: 10, screenY: 10, pointerId: 2, button: 0, bubbles: true }));
+g.dispatchEvent(new PointerEvent('pointermove', { screenX: 60, screenY: 30, pointerId: 2, bubbles: true }));
+await H.sleep(20);
+g.dispatchEvent(new PointerEvent('pointerup', { screenX: 70, screenY: 40, pointerId: 2, bubbles: true }));
+await H.sleep(20);
+out.move = H.calls('app_overlay_move').map(c => c.args);
+const cog = document.getElementById('pref-close-on-game');
+out.cogDefault = cog.checked;
+cog.click();
+out.cogSaved = JSON.parse(localStorage.getItem('pobtf-prefs')).closeOnGameClick;
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+await H.sleep(20);
+out.esc = H.calls('app_overlay').map(c => c.args[0]);
+window.__appOverlay(false);
+out.barGone = !document.getElementById('over-game-bar');
+return out;
+"""
+
+
+def scenario_overgame(s, tag):
+    s.fresh()
+    r = s.run(S26_OVERGAME, timeout=30)
+    check(tag + " banner over the game says how to go back (incl. a click in the game)", r["bar"] and
+          "click in the game" in (r["text"] or ""), r["text"])
+    check(tag + " − / + resize through gui.py", r["size"] == [1, -1], r["size"])
+    check(tag + " drag the banner to move", r["move"][:1] == [["start", 0, 0]] and r["move"][-1] == ["end", 60, 30], r["move"])
+    check(tag + " 'click in the game puts it away' on by default and saved", r["cogDefault"] and r["cogSaved"] is False, r)
+    check(tag + " Esc goes back, banner removed", r["esc"] == [False] and r["barGone"], r)
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -2148,6 +2195,7 @@ SCENARIOS = [
     ("23 habits", scenario_habits),
     ("24 divcards", scenario_divcards),
     ("25 tradeview", scenario_trade_embed),
+    ("26 overgame", scenario_overgame),
 ]
 
 

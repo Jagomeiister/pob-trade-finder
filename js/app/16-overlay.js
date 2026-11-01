@@ -105,6 +105,11 @@ function wireExtraHotkeys() {
     op.value = String(PREFS.overGameOpacity || 100);
     op.addEventListener('change', function () { PREFS.overGameOpacity = parseInt(this.value, 10); savePrefs(); });
   }
+  var cog = document.getElementById('pref-close-on-game');
+  if (cog) {
+    cog.checked = PREFS.closeOnGameClick !== false;
+    cog.addEventListener('change', function () { PREFS.closeOnGameClick = this.checked; savePrefs(); });
+  }
   var tray = document.getElementById('pref-close-tray');
   if (tray) {
     tray.checked = PREFS.closeToTray !== false;
@@ -115,6 +120,38 @@ function wireExtraHotkeys() {
 // App hotkey (default Shift+Space): gui.py brings this window over the game and calls this.
 // Esc, ✕ on the banner, or the hotkey again puts it back and returns to the game.
 var appOverGame = false;
+// drag the banner to move the app over the game (gui.py moves the window and remembers it)
+function wireAppOverlayDrag(el) {
+  var from = null, pending = null, sending = false;
+  function send() {
+    if (sending || !pending) return;
+    sending = true;
+    var d = pending; pending = null;
+    Promise.resolve(window.pywebview.api.app_overlay_move('move', d[0], d[1])).then(function () { sending = false; send(); },
+      function () { sending = false; });
+  }
+  el.addEventListener('pointerdown', function (e) {
+    if (!isGui() || !window.pywebview.api.app_overlay_move || e.button !== 0) return;
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    from = { x: e.screenX, y: e.screenY };
+    window.pywebview.api.app_overlay_move('start', 0, 0);
+  });
+  el.addEventListener('pointermove', function (e) {
+    if (!from) return;
+    pending = [e.screenX - from.x, e.screenY - from.y];
+    send();
+  });
+  function drop(e) {
+    if (!from) return;
+    var dx = e.screenX - from.x, dy = e.screenY - from.y;
+    from = null; pending = null;
+    window.pywebview.api.app_overlay_move('end', dx, dy);
+  }
+  el.addEventListener('pointerup', drop);
+  el.addEventListener('pointercancel', drop);
+}
+
 window.__appOverlay = function (on) {
   appOverGame = !!on;
   document.body.classList.toggle('over-game', appOverGame);
@@ -123,8 +160,13 @@ window.__appOverlay = function (on) {
     bar = UI.el('div', 'over-game-bar');
     bar.id = 'over-game-bar';
     var keyName = (document.getElementById('pref-hotkey-app') || {}).selectedOptions;
-    bar.appendChild(UI.el('span', null, '🎮 Over the game · Esc or ' + (keyName && keyName[0] ? keyName[0].textContent : 'the hotkey') +
-      ' to go back'));
+    var grip = UI.el('span', 'over-game-grip', '⠿ 🎮 Over the game · Esc, ' +
+      (keyName && keyName[0] ? keyName[0].textContent : 'the hotkey') + ' or a click in the game to go back');
+    grip.title = 'Drag to move. Resize from the window\'s edges, or with − / +.';
+    wireAppOverlayDrag(grip);
+    bar.appendChild(grip);
+    bar.appendChild(UI.iconButton('−', 'Smaller', { size: 'sm', onClick: function () { window.pywebview.api.app_overlay_size(-1); } }));
+    bar.appendChild(UI.iconButton('+', 'Larger', { size: 'sm', onClick: function () { window.pywebview.api.app_overlay_size(1); } }));
     bar.appendChild(UI.button('secondary', { size: 'sm', label: 'Back to the game',
       onClick: function () { window.pywebview.api.app_overlay(false); } }));
     document.body.insertBefore(bar, document.body.firstChild);

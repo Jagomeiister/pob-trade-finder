@@ -416,6 +416,8 @@ body.trades .trades-root { display: block; }
 /* main window brought over the game by the app hotkey (16-overlay.js __appOverlay) */
 .over-game-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: center; gap: 12px;
   padding: 6px 12px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: var(--fs-sm); }
+.over-game-grip { flex: 1; cursor: move; user-select: none; text-align: center; }
+.over-game-bar .btn-icon { color: var(--on-accent); }
 
 /* in-game overlay (index.html?cards=1): see-through window, sized to this content by gui.py */
 html:has(body.trade-cards), body.trade-cards { background: transparent !important; overflow: hidden; }

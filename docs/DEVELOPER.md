@@ -160,9 +160,12 @@ GGG rules, enforced by the shape of the code. Keep them:
   the game, one of our overlays, or the app-over-game window is in front. `set_hotkey`,
   `hotkeys_status`.
 - App hotkey: `_set_app_overlay` makes the main window `on_top` and focused with a banner
-  (`__appOverlay`). `_overlay_frame` removes the caption and borders, sizes the window to the
-  game's client rect minus 3%, and makes it layered (`overGameOpacity`). It restores the saved
-  style and rect on the way back. Esc or the hotkey returns to the game.
+  (`__appOverlay`). `_overlay_frame` removes the caption (it keeps the sizing edges) and places the window
+  at `pobtf-overgame-rect`, stored as fractions of the game's client rect (default centred,
+  78%×86%). It's layered only if `overGameOpacity` < 100. Banner drag goes through
+  `app_overlay_move`, − / + through `app_overlay_size`, and the rect is remembered on exit.
+  `_follow_game` puts the app away when the game becomes the foreground window
+  (`closeOnGameClick`). Esc or the hotkey returns to the game.
 - The Trade helper is the main window's `#view-trades` (`mountTradeHelper(…, embedded)`).
   `trades_show` and the tray open it there; there's no separate window.
 - Tray (`tray.py`, ctypes Shell_NotifyIcon): the main window's ✕ hides to the tray
