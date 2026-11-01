@@ -25,6 +25,11 @@ COMMON = ("map tier: item quantity: item rarity: monster pack size: more currenc
           "maps can only be used once. rarity: normal magic rare unique map item class: maps area level "
           "delirium blighted uber elder shaper conqueror influenced originator memory nightmare")
 MAX_TOKEN = 24
+# mods no plain piece of text can single out: a small regex instead (checked by hand against
+# every other map mod line and the map names)
+OVERRIDES = {
+    "Monsters have #% increased Area of Effect": r"s have \d+% increased ar",
+}
 
 
 def mod_lines(text):
@@ -96,8 +101,8 @@ def main():
                 ok.sort(key=lambda t: (" " in t, t))  # same length: one without spaces reads better
                 if not best or len(ok[0]) < len(best) or (len(ok[0]) == len(best) and " " in best and " " not in ok[0]):
                     best = ok[0]
-        g["token"] = best
-        if not best:
+        g["token"] = best or OVERRIDES.get(g["text"])
+        if not g["token"]:
             missing.append(g["text"])
     out = [{"text": g["text"], "token": g["token"], "kind": g["kind"], "t17": g["uber"]}
            for g in sorted(pool, key=lambda g: g["text"].lower())]

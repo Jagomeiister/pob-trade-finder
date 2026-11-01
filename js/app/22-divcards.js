@@ -9,6 +9,17 @@
 // cards that can drop there — it is not an expected value per map.
 var DIV = { data: null, loading: null, league: null, mode: 'maps', q: '', min: 5, mapsOnly: true, open: null };
 
+// 1 divine or more reads as divines (e.g. "3.4 div"), under that as chaos — whatever the
+// app-wide "Show prices in" setting says; card prices span 1c to hundreds of divines
+function dcFmt(chaos) {
+  var div = DIV.data && DIV.data.divine;
+  if (div && chaos >= div) {
+    var d = chaos / div;
+    return (d >= 100 ? Math.round(d) : Math.round(d * 10) / 10) + ' div';
+  }
+  return fmtChaos(chaos);
+}
+
 async function loadDivcardsView(force) {
   var sec = viewSection('divcards');
   if (!sec || !isGui() || !window.pywebview.api.div_cards) return;
@@ -70,12 +81,12 @@ function renderDivcards() {
       { key: 'n', label: 'Cards ≥ ' + DIV.min + 'c', num: true, sort: function (m) { return m.worth.length; },
         render: function (m) { return m.worth.length + ' / ' + m.all; } },
       { key: 'best', label: 'Best card', sort: function (m) { return m.best ? m.best.c : 0; }, render: function (m) {
-        return m.best ? m.best.n + ' · ' + fmtEq(m.best.c, league) : '';
+        return m.best ? m.best.n + ' · ' + dcFmt(m.best.c) : '';
       } },
       { key: 'stack', label: 'Its full set', num: true, sort: function (m) { return m.bestStack; },
-        render: function (m) { return m.best ? fmtEq(m.bestStack, league) + ' (' + m.best.s + ')' : ''; } },
+        render: function (m) { return m.best ? dcFmt(m.bestStack) + ' (' + m.best.s + ')' : ''; } },
       { key: 'total', label: 'Sum of one each', num: true, sort: function (m) { return m.total; },
-        render: function (m) { return fmtEq(m.total, league); } }
+        render: function (m) { return dcFmt(m.total); } }
     ], rows.sort(function (a, b) { return b.best.c - a.best.c; }), { sortable: true,
       emptyText: 'No area drops a card worth ' + DIV.min + 'c or more' + (q ? ' matching "' + DIV.q + '"' : '') + '.' }));
     var openRow = rows.filter(function (m) { return m.area.id === DIV.open; })[0];
@@ -96,10 +107,10 @@ function divcardList(title, cards, league) {
   if (title) wrap.appendChild(UI.el('h3', 'trade-h3', title));
   wrap.appendChild(UI.table([
     { key: 'n', label: 'Card' },
-    { key: 'c', label: 'Each', num: true, render: function (c) { return c.c != null ? fmtEq(c.c, league) : '?'; } },
+    { key: 'c', label: 'Each', num: true, render: function (c) { return c.c != null ? dcFmt(c.c) : '?'; } },
     { key: 's', label: 'Set', num: true },
     { key: 'set', label: 'Full set', num: true, sort: function (c) { return (c.c || 0) * c.s; },
-      render: function (c) { return c.c != null ? fmtEq(c.c * c.s, league) : ''; } },
+      render: function (c) { return c.c != null ? dcFmt(c.c * c.s) : ''; } },
     { key: 'a', label: 'Drops in', sort: function (c) { return (c.a || []).length; }, render: function (c) {
       if (c.off) return 'no longer drops';
       var names = (c.a || []).map(function (i) { return d.areas[i].name; });

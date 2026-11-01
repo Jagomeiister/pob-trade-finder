@@ -235,6 +235,7 @@ STUB_JS = r"""
     timeless_sockets: function () { return { ok: true, sockets: [] }; },
     hotkey_status: function () { return { ok: true, hotkey: 'ctrl+d', label: 'Ctrl+D', running: false, active: false, error: null }; },
     overlay_fit: function () { return { ok: true }; },
+    get_character_passives: function () { return { ok: true, hashes: [], hashesEx: [], masteries: {}, jewels: [] }; },
     overlay_status: function () { return { ok: true, hotkey: 'Ctrl+D', hotkeys: { price: 'Ctrl+D', app: 'Shift+Space', trades: 'Alt+T' }, logWatching: true }; },
     trade_status: function () { return { ok: true, watching: true, logName: 'Client.txt' }; },
     trade_prefs_changed: function () { return { ok: true }; },
@@ -1804,10 +1805,23 @@ out.nav = [...document.querySelectorAll('#nav .nav-item')].some(b => b.dataset.v
 out.visible = sec.getBoundingClientRect().height > 100;
 out.auras = [...sec.querySelectorAll('.uj-aura')].map(b => [b.textContent, b.classList.contains('is-on')]);
 out.buildAuras = buildAuras(build);
+out.modsBefore = sec.querySelectorAll('.uj-mod').length;
+const lt = [...sec.querySelectorAll('.toggle')].find(t => /legacy/.test(t.textContent));
+out.legacyHasToggle = !!lt;
 // make sure Anger + Determination are picked, then tick two mods
 ['Anger', 'Determination'].forEach(a => { const c = [...sec.querySelectorAll('.uj-aura')].find(b => b.textContent === a);
   if (!c.classList.contains('is-on')) c.click(); });
 await H.sleep(20);
+['Clarity'].forEach(a => { const c = [...sec.querySelectorAll('.uj-aura')].find(b => b.textContent === a);
+  if (!c.classList.contains('is-on')) c.click(); });
+await H.sleep(10);
+const clarityCurrent = sec.querySelectorAll('.uj-mod').length;
+lt.querySelector('input').click();
+await H.sleep(10);
+out.legacyAdded = sec.querySelectorAll('.uj-mod').length - clarityCurrent;
+out.legacyChips = [...sec.querySelectorAll('.uj-mod .badge')].filter(b => b.textContent === 'legacy').length;
+lt.querySelector('input').click();
+await H.sleep(10);
 const modRow = t => [...sec.querySelectorAll('.uj-mod')].find(r => r.textContent.includes(t));
 const extra = modRow('Gain #% of Physical Damage as Extra Fire Damage');
 extra.querySelector('input[type=checkbox]').click();
@@ -1836,6 +1850,11 @@ await H.waitFor(() => H.calls('trade_search').length - b2 >= 3 && H.button(sec, 
 await H.sleep(50);
 out.pairPayloads = H.calls('trade_search').slice(b2).map(c => JSON.parse(c.args[1]).query.stats[0]);
 out.pairRows = sec.querySelectorAll('.uj-pair').length;
+const b3t = H.calls('trade_search').length;
+H.button(sec, 'Price each triple').click();
+await H.waitFor(() => H.calls('trade_search').length - b3t >= 1 && H.button(sec, 'Price each triple'), 8000, 'triples');
+await H.sleep(50);
+out.triplePayloads = H.calls('trade_search').slice(b3t).map(c => JSON.parse(c.args[1]).query.stats[0]);
 // Forbidden: your ascendancy's notables, a pair = Flame + Flesh with the same node
 sec.querySelector('.segmented [data-value="forbidden"]').click();
 await H.sleep(20);
@@ -1863,6 +1882,8 @@ return out;
 def scenario_uniques(s, tag):
     s.fresh()
     r = s.run(S21_UNIQUES, timeout=60)
+    check(tag + " legacy Watcher's Eye mods only on request, marked legacy", r["legacyHasToggle"] and
+          r["legacyAdded"] > 0 and r["legacyChips"] == r["legacyAdded"], (r["legacyAdded"], r["legacyChips"]))
     check(tag + " Watcher's Eye & co. in the sidebar and visible", r["nav"] and r["visible"], (r["nav"], r["visible"]))
     check(tag + " all 17 auras offered, build's auras pre-picked", len(r["auras"]) == 17 and
           all(on == (name in r["buildAuras"]) for name, on in r["auras"]), (r["buildAuras"], r["auras"]))
@@ -1876,6 +1897,9 @@ def scenario_uniques(s, tag):
     pp = r["pairPayloads"]
     check(tag + " price each pair: 3 searches, each AND of two mods", len(pp) == 3 and
           all(g["type"] == "and" and len(g["filters"]) == 2 for g in pp) and r["pairRows"] == 3, (pp, r["pairRows"]))
+    tp = r["triplePayloads"]
+    check(tag + " price each triple: 3 ticked = 1 search, AND of all three", len(tp) == 1 and tp[0]["type"] == "and" and
+          len(tp[0]["filters"]) == 3, tp)
     check(tag + " Forbidden: build's ascendancy and its notables", r["asc"] == "Elementalist" and r["notables"] >= 5,
           (r["asc"], r["notables"]))
     fb = r["fb"]
@@ -2068,9 +2092,10 @@ def scenario_divcards(s, tag):
     check(tag + " Div cards view visible, loads once for the league", r["visible"] and len(r["calls"]) == 1, r["calls"])
     bm = r["byMap"]
     check(tag + " by area: maps only, ranked by best card, cards >= 5c counted", len(bm) == 2 and
-          bm[0][0].startswith("Burial Chambers") and "The Doctor" in bm[0][3] and bm[0][2] == "2 / 3" and
+          bm[0][0].startswith("Burial Chambers") and "The Doctor · 7.5 div" in bm[0][3] and bm[0][2] == "2 / 3" and
           bm[1][0].startswith("Cold River") and bm[1][2] == "1 / 2", bm)
-    check(tag + " full set value = price x stack", "12000" in bm[0][4] or "60 div" in bm[0][4], bm[0][4])
+    check(tag + " full set value = price x stack, in divines when 1+ div", bm[0][4] == "60 div (8)" and
+          "6c" in bm[1][3], (bm[0][4], bm[1][3]))
     check(tag + " 'Maps only' off adds other areas", any(x.startswith("The Docks") for x in r["withActs"]), r["withActs"])
     check(tag + " opening an area lists its cards, best first", "Burial Chambers" in (r["openTitle"] or "") and
           r["openCards"] == ["The Doctor", "A Chilling Wind"], r["openCards"])
@@ -2169,6 +2194,154 @@ def scenario_overgame(s, tag):
     check(tag + " Esc goes back, banner removed", r["esc"] == [False] and r["barGone"], r)
 
 
+S27_TREE = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+out.inNav = !!document.querySelector('#nav .nav-item[data-view="tree"]');
+document.querySelector('#nav .nav-item[data-view="tree"]').click();
+await H.sleep(50);
+const sec = document.querySelector('.tab-section[data-tab="tree"]');
+const T = TREEVIEW;
+out.view = document.body.dataset.view;
+out.visible = H.visible(sec) && sec.getBoundingClientRect().height > 300;
+out.nodes = build.tree.nodes.slice();
+out.cls = build.className;
+out.asc = build.ascendClass;
+out.points = T.M.points;
+out.ascPoints = T.M.ascPts[T.M.ascIdx];
+out.pointsText = H.text('.tv-points', sec);
+out.ascText = H.text('.tv-asc-points', sec);
+out.insetName = T.I.D.ascendancies[T.insetAsc].name;
+// canvases drawn: many distinct colours in a pixel sample
+function colours(cv) {
+  const c = cv.el, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, seen = new Set();
+  for (let y = 0; y < c.height; y += 5) for (let x = 0; x < c.width; x += 5) {
+    const i = (y * c.width + x) * 4; seen.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]);
+  }
+  return seen.size;
+}
+out.mainSize = [T.main.el.width, T.main.el.height];
+out.mainColours = colours(T.main);
+out.insetColours = T.inset ? colours(T.inset) : 0;
+out.keystones = [...sec.querySelectorAll('.tv-keystones .tv-item-name')].map(e => e.textContent);
+out.sockets = [...sec.querySelectorAll('.tv-sockets .tv-item-name')].map(e => e.textContent);
+out.masteryRows = sec.querySelectorAll('.tv-masteries .tv-item').length;
+// hover the Red Nightmare's socket: the tooltip names the jewel
+const cv = T.main, sn = T.I.byId[26196];
+cv.cx = sn.x; cv.cy = sn.y; cv.s = 0.3; treeDraw(cv);
+const r = cv.el.getBoundingClientRect();
+cv.el.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + cv.w / 2, clientY: r.top + cv.h / 2, pointerId: 1, bubbles: true }));
+await H.sleep(20);
+out.tip = T.tip.hidden ? '' : T.tip.textContent;
+cv.el.dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1, bubbles: true }));
+// wheel zooms in, Fit shows everything again
+const s0 = cv.s;
+cv.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -300, clientX: r.left + 50, clientY: r.top + 50, bubbles: true, cancelable: true }));
+out.wheelZoomed = cv.s > s0;
+H.button(sec.querySelector('.tv-zoom'), 'Fit').click();
+out.fitScale = cv.s;
+// search: highlights matches, count shown; Enter centres the first (allocated first)
+const q = sec.querySelector('.tv-search');
+q.value = 'golem'; q.dispatchEvent(new Event('input'));
+await H.sleep(20);
+out.hitCount = T.hitCount;
+out.hitIds = T.hitList.slice();
+out.countText = H.text('.tv-count', sec);
+q.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+out.centred = [cv.cx, cv.cy, T.I.byId[T.hitList[0]].x, T.I.byId[T.hitList[0]].y];
+out.hitsAfterDraw = colours(T.main);
+q.value = ''; q.dispatchEvent(new Event('input'));
+out.clearedHits = T.hits === null && H.text('.tv-count', sec) === '';
+// compare with a character: 4 build nodes missing (two chains of two), 2 extra, one other mastery effect
+document.getElementById('acct-input').value = 'E2E#1234';
+charName_ = 'TreeChar';
+setView('tree'); // coming back to the view picks up the character chosen meanwhile
+const drop = [36452, 46842, 13232, 9567];
+const mm = build.tree.masteries[0];
+const otherEffect = POE_TREE_VIEW.masteries[mm[0]].find(e => e !== mm[1]);
+const masteries = {};
+build.tree.masteries.forEach(m => { masteries[m[0]] = m[0] === mm[0] ? otherEffect : m[1]; });
+window.__stubOverrides.get_character_passives = { ok: true,
+  hashes: build.tree.nodes.filter(id => id < 65536 && drop.indexOf(id) < 0 && id !== 54447).concat([49534, 32075]),
+  hashesEx: build.tree.nodes.filter(id => id >= 65536).slice(0, 5), masteries: masteries,
+  jewels: [{ x: POE_TREE_VIEW.jewelSlots.indexOf(26196), name: 'My Jewel', base: 'Crimson Jewel', frameType: 2 }] };
+out.btnLabel = H.text('.tv-compare-btn', sec);
+sec.querySelector('.tv-compare-btn').click();
+await H.waitFor(() => sec.querySelector('.tv-take-count'), 4000, 'comparison');
+out.calls = H.calls('get_character_passives').map(c => c.args);
+out.take = T.cmp.take;
+out.refund = T.cmp.refund;
+out.both = T.cmp.both;
+out.chips = [H.text('.tv-take-count', sec), H.text('.tv-refund-count', sec), H.text('.tv-both-count', sec)];
+out.steps = [...sec.querySelectorAll('.tv-take-list .tv-step')].map(e => e.textContent);
+out.nowCount = sec.querySelectorAll('.tv-take-list .tv-step.now').length;
+out.refundRows = [...sec.querySelectorAll('.tv-refund-list .tv-item-name')].map(e => e.textContent);
+out.masteryChanges = T.cmp.masteryChanges.map(m => [m.node, m.from, m.to]);
+out.expectChange = [mm[0], otherEffect, mm[1]];
+out.charJewel = (T.cmp.jewels[26196] || {}).name;
+out.clusterNote = /build 11, you 5/.test(sec.querySelector('.tv-compare').textContent);
+out.legend = H.text('.tv-legend', sec);
+out.statusTake = treeStatus(36452);
+out.statusRefund = treeStatus(49534);
+sec.querySelector('.tv-compare .segmented [data-value="build"]').click();
+await H.sleep(20);
+out.modeAfter = T.mode;
+out.statusBuildMode = [treeStatus(36452), treeStatus(49534)];
+delete window.__stubOverrides.get_character_passives;
+return out;
+"""
+
+
+def scenario_tree(s, tag):
+    s.fresh()
+    r = s.run(S27_TREE, timeout=60)
+    src = read("data/treeview.js")
+    tv = json.loads(src[src.index("{"):src.rindex("}") + 1])
+    kinds = {n[0]: (n[3], n[6] if len(n) > 6 else -1) for n in tv["nodes"]}
+    asc_idx = next(i for i, a in enumerate(tv["ascendancies"]) if a["id"] == r["asc"])
+    exp_points = sum(1 for i in r["nodes"] if i >= 65536 or (i in kinds and kinds[i][1] < 0 and kinds[i][0] != 5))
+    exp_asc = sum(1 for i in r["nodes"] if i in kinds and kinds[i][1] == asc_idx and kinds[i][0] != 6)
+    check(tag + " Skill tree in the Tools nav, view visible", r["inNav"] and r["view"] == "tree" and r["visible"], r["view"])
+    check(tag + " passive points = build nodes minus class start and ascendancy", r["points"] == exp_points and
+          r["pointsText"] == str(exp_points) and exp_points == 120, (r["points"], r["pointsText"], exp_points))
+    check(tag + " ascendancy points (Elementalist, start node free)", r["ascPoints"] == exp_asc == 8 and r["ascText"] == "8" and
+          r["insetName"] == "Elementalist", (r["ascPoints"], exp_asc, r["insetName"]))
+    check(tag + " tree canvas drawn at device size (many colours)", r["mainSize"][0] > 300 and r["mainColours"] > 20,
+          (r["mainSize"], r["mainColours"]))
+    check(tag + " ascendancy inset drawn", r["insetColours"] > 5, r["insetColours"])
+    check(tag + " side panel: keystones, sockets with jewels, masteries", sorted(r["keystones"]) == ["Bitter Frost", "Zealot's Oath"] and
+          "Foulborn The Red Nightmare" in r["sockets"] and r["masteryRows"] == 12, (r["keystones"], r["sockets"], r["masteryRows"]))
+    check(tag + " hover a socket: tooltip names the jewel", "Jewel socket" in r["tip"] and "Red Nightmare" in r["tip"], r["tip"][:120])
+    check(tag + " wheel zooms, Fit zooms back out", r["wheelZoomed"] and r["fitScale"] < 0.1, r["fitScale"])
+    exp_hits = [n[0] for n in tv["nodes"] if "golem" in (n[4] + "\n" + n[5]).lower() and
+                (len(n) < 7 or n[6] < 0 or n[6] in (asc_idx,)) and not (len(n) > 7 and n[7] & 1)]
+    check(tag + " search highlights every matching node, count shown", r["hitCount"] > 0 and
+          sorted(r["hitIds"]) == sorted(set(r["hitIds"])) and set(exp_hits) <= set(r["hitIds"]) and
+          r["countText"].startswith("%d match" % r["hitCount"]) and "allocated" in r["countText"],
+          (r["hitCount"], len(exp_hits), r["countText"]))
+    check(tag + " search: allocated matches first, Enter centres it", r["hitIds"][0] in r["nodes"] and
+          r["centred"][0] == r["centred"][2] and r["centred"][1] == r["centred"][3], r["centred"])
+    check(tag + " clearing the search removes the highlights", r["clearedHits"])
+    check(tag + " compare: one bridge call with account + character", r["calls"] == [["E2E#1234", "TreeChar"]] and
+          r["btnLabel"] == "Compare with TreeChar", (r["calls"], r["btnLabel"]))
+    tk = r["take"]
+    check(tag + " still to take: 4, refund: 2, in common: rest", len(tk) == 4 and sorted(r["refund"]) == [32075, 49534] and
+          r["chips"] == ["4 still to take", "2 to refund", "%d in common" % r["both"]] and r["both"] == exp_points - 11 + exp_asc - 4,
+          (tk, r["refund"], r["chips"], r["both"]))
+    check(tag + " take order: reachable now first (step 1), then the notables behind them (step 2)",
+          {t["id"] for t in tk[:2]} == {36452, 13232} and [t["step"] for t in tk] == [1, 1, 2, 2] and
+          {t["id"] for t in tk[2:]} == {46842, 9567} and r["steps"] == ["1", "1", "2", "2"] and r["nowCount"] == 2, tk)
+    check(tag + " refund list names the extra nodes", len(r["refundRows"]) == 2 and
+          "Curse Cast Speed" in r["refundRows"], r["refundRows"])
+    check(tag + " mastery with another effect listed as a change", r["masteryChanges"] == [r["expectChange"]], r["masteryChanges"])
+    check(tag + " character jewels mapped to sockets; cluster passives counted", r["charJewel"] == "My Jewel" and r["clusterNote"],
+          (r["charJewel"], r["clusterNote"]))
+    check(tag + " compare colours + legend, 'Build only' switches back", r["statusTake"] == "take" and r["statusRefund"] == "refund" and
+          "Still to take" in r["legend"] and r["modeAfter"] == "build" and r["statusBuildMode"] == ["alloc", None],
+          (r["statusTake"], r["statusRefund"], r["legend"], r["statusBuildMode"]))
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -2196,6 +2369,7 @@ SCENARIOS = [
     ("24 divcards", scenario_divcards),
     ("25 tradeview", scenario_trade_embed),
     ("26 overgame", scenario_overgame),
+    ("27 tree", scenario_tree),
 ]
 
 

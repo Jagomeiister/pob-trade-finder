@@ -79,7 +79,38 @@ function loadBuyers() {
 function saveBuyers(b) { saveShared(BUYERS_KEY, JSON.stringify(b)); }
 
 // buyers are tracked by account name when known, else by character name
-function buyerKey(card) { return (card.account || card.name || '').toLowerCase(); }
+// one person, several characters: Buyers → Merge links a character to another buyer
+// (whispers don't carry account names, so the link is yours to make)
+var BUYER_ALIASES_KEY = 'pobtf-buyer-aliases';
+function loadBuyerAliases() {
+  try { return JSON.parse(localStorage.getItem(BUYER_ALIASES_KEY)) || {}; } catch (e) { return {}; }
+}
+function buyerKey(card) {
+  var k = (card.account || card.name || '').toLowerCase();
+  return loadBuyerAliases()[k] || k;
+}
+function mergeBuyers(fromKey, intoKey) {
+  if (!fromKey || !intoKey || fromKey === intoKey) return false;
+  var all = loadBuyers(), a = all[fromKey], b = all[intoKey];
+  if (!a || !b) return false;
+  ['completed', 'wasted', 'noShow', 'notCompleted', 'other'].forEach(function (f) { b[f] = (b[f] || 0) + (a[f] || 0); });
+  b.spent = Math.round(((b.spent || 0) + (a.spent || 0)) * 100) / 100;
+  b.names = (b.names || []).concat((a.names || []).filter(function (n) { return (b.names || []).indexOf(n) === -1; }));
+  b.flag = b.flag || a.flag;
+  b.hidden = b.hidden || a.hidden;
+  b.note = [b.note, a.note].filter(Boolean).join(' · ');
+  b.first = Math.min(b.first || Date.now(), a.first || Date.now());
+  b.last = Math.max(b.last || 0, a.last || 0);
+  delete all[fromKey];
+  var aliases = loadBuyerAliases();
+  aliases[fromKey] = intoKey;
+  (a.names || []).forEach(function (n) { aliases[n.toLowerCase()] = intoKey; });
+  Object.keys(aliases).forEach(function (k) { if (aliases[k] === fromKey) aliases[k] = intoKey; });
+  delete aliases[intoKey];
+  saveBuyers(all);
+  saveShared(BUYER_ALIASES_KEY, JSON.stringify(aliases));
+  return true;
+}
 function buyerFor(card) {
   var all = loadBuyers();
   return all[buyerKey(card)] || null;
@@ -238,8 +269,9 @@ var TRADE_SOUNDS = {
 };
 function tradeChime(kind, override) {
   var p = Object.assign(tradePrefs(), override || {});
-  var snd = TRADE_SOUNDS[p.sound];
   var vol = Math.max(0, Math.min(100, parseInt(p.volume, 10) || 0)) / 100;
+  if (p.sound === 'custom') { playCustomSound(kind, p, vol); return; }
+  var snd = TRADE_SOUNDS[p.sound];
   if (!snd || !vol) return;
   try {
     if (!tradeAudio) tradeAudio = new (window.AudioContext || window.webkitAudioContext)();
@@ -256,6 +288,22 @@ function tradeChime(kind, override) {
       o.connect(g); g.connect(tradeAudio.destination);
       o.start(at); o.stop(at + snd.len + 0.05);
     });
+  } catch (e) { /* no sound */ }
+}
+
+// your own sound files (Setup → Sound → Your own): copied into data/sounds/ by pick_sound;
+// "buyer arrived" falls back to the new-trade sound when you only picked one
+var customAudio = {};
+function playCustomSound(kind, p, vol) {
+  var files = p.customSound || {};
+  var file = files[kind] || files.new;
+  if (!file || !vol) return;
+  try {
+    var a = customAudio[file] = customAudio[file] || new Audio(file);
+    a.volume = Math.min(1, vol);
+    a.currentTime = 0;
+    var pr = a.play();
+    if (pr && pr.catch) pr.catch(function () { /* missing or unplayable file: stay quiet */ });
   } catch (e) { /* no sound */ }
 }
 
@@ -373,7 +421,8 @@ function renderTradeCard(card) {
     });
     if (t.left && isGui() && window.pywebview.api.trade_highlight) {
       acts.appendChild(UI.button('ghost', { size: 'sm', label: '▣ Show in stash',
-        title: 'Outline the item\'s cell over your open stash tab for 20 seconds',
+        title: 'Outline the item\'s cell over your open stash tab for 20 seconds. Amber = normal tab, ' +
+          'blue = quad tab (the whisper doesn\'t say which, so both show when it could be either).',
         onClick: function () { window.pywebview.api.trade_highlight(t.left, t.top, t.tab || ''); } }));
     }
     // inline, not a pop-up menu: the overlay window is only as big as its content
@@ -913,6 +962,19 @@ function renderBuyersPage(body) {
     }
     toggle('flag', '⚑ Flag', 'Unflag');
     toggle('hidden', 'Hide popups', 'Show popups');
+    var others = keys.filter(function (o) { return o !== k; });
+    if (others.length) {
+      var into = UI.select([['', 'Same person as…']].concat(others.map(function (o) { return [o, all[o].name]; })), '',
+        { ariaLabel: 'Merge ' + b.name + ' into another buyer', onChange: function () {
+          if (!this.value) return;
+          var target = all[this.value];
+          if (mergeBuyers(k, this.value)) UI.toast(b.name + ' now counts as ' + target.name + '.', 'success');
+          renderTrades();
+        } });
+      into.title = 'One player on several characters: their history adds up, and future whispers from ' + b.name +
+        ' count for the buyer you pick';
+      acts.appendChild(into);
+    }
     acts.appendChild(UI.button('ghost', { size: 'sm', label: 'Ignore in game…',
       onClick: function () { ignoreInGame({ name: b.name, sent: {} }); } }));
     acts.appendChild(UI.button('danger', { size: 'sm', label: 'Clear history', onClick: function () {
@@ -984,8 +1046,13 @@ function renderTradeSetup(body) {
   // Sound: style, volume slider (0 = silent), test
   sec.appendChild(UI.el('h3', 'trade-h3', 'Sound'));
   var soundRow = UI.el('div', 'trade-row');
-  var soundSel = UI.select([['off', 'Off']].concat(Object.keys(TRADE_SOUNDS).map(function (k) { return [k, TRADE_SOUNDS[k].label]; })),
-    p.sound, { ariaLabel: 'Sound', onChange: function () { setPref('sound', this.value); tradeChime('new', { sound: this.value }); } });
+  var soundSel = UI.select([['off', 'Off']].concat(Object.keys(TRADE_SOUNDS).map(function (k) { return [k, TRADE_SOUNDS[k].label]; }))
+    .concat([['custom', 'Your own sound…']]),
+    p.sound, { ariaLabel: 'Sound', onChange: function () {
+      setPref('sound', this.value);
+      customRow.hidden = this.value !== 'custom';
+      tradeChime('new', { sound: this.value });
+    } });
   UI.field('Sound', soundSel, { parent: soundRow });
   var volRange = slider('Volume', p.volume, 0, 100, 5, '%', function (v) { setPref('volume', v); tradeChime('new', { volume: v }); }, soundRow);
   soundRow.appendChild(UI.button('ghost', { size: 'sm', label: '▶ Test', onClick: function () {
@@ -993,8 +1060,37 @@ function renderTradeSetup(body) {
     setTimeout(function () { tradeChime('joined', { sound: soundSel.value, volume: parseInt(volRange.value, 10) }); }, 900);
   } }));
   sec.appendChild(soundRow);
+  // your own files: one for a new trade, one (optional) for the buyer arriving
+  var customRow = UI.el('div', 'trade-row');
+  customRow.hidden = p.sound !== 'custom';
+  [['new', 'New trade'], ['joined', 'Buyer arrived']].forEach(function (k) {
+    var cur = (p.customSound || {})[k[0]];
+    var label = UI.el('span', 'finder-sub', cur ? (p.customSoundName || {})[k[0]] || 'your file' : (k[0] === 'joined' ? 'same as new trade' : 'none yet'));
+    customRow.appendChild(UI.el('b', null, k[1] + ':'));
+    customRow.appendChild(label);
+    customRow.appendChild(UI.button('ghost', { size: 'sm', cls: 'gui-only', label: 'Choose file…', onClick: async function () {
+      var r = await window.pywebview.api.pick_sound(k[0]);
+      if (!r || !r.ok) { UI.toast('Not added: ' + ((r && r.error) || 'no answer'), 'danger'); return; }
+      if (!r.file) return; // cancelled
+      var q = tradePrefs();
+      q.customSound = Object.assign({}, q.customSound, (function (o) { o[k[0]] = r.file; return o; })({}));
+      q.customSoundName = Object.assign({}, q.customSoundName, (function (o) { o[k[0]] = r.name; return o; })({}));
+      saveTradePrefs(q);
+      label.textContent = r.name;
+      tradeChime(k[0], { sound: 'custom', customSound: q.customSound });
+    } }));
+    if (cur) {
+      customRow.appendChild(UI.iconButton('✕', 'Remove ' + k[1] + ' sound', { size: 'sm', onClick: function () {
+        var q = tradePrefs();
+        q.customSound = Object.assign({}, q.customSound); delete q.customSound[k[0]];
+        saveTradePrefs(q);
+        label.textContent = k[0] === 'joined' ? 'same as new trade' : 'none yet';
+      } }));
+    }
+  });
+  sec.appendChild(customRow);
   sec.appendChild(UI.el('p', 'finder-sub', 'Plays for a new trade whisper, and a shorter one when the buyer enters your area. ' +
-    'Hidden buyers never make a sound.'));
+    'Your own sound: an mp3, wav, ogg or m4a up to 3 MB. Hidden buyers never make a sound.'));
 
   // Overlay over the game (Awakened Trade / Lurker style)
   sec.appendChild(UI.el('h3', 'trade-h3', 'Overlay in game'));

@@ -28,6 +28,7 @@ STEPS = [
     [sys.executable, "tools/make_craftdata.py", "--fetch"],  # after currencymap + ranges
     [sys.executable, "tools/make_jeweldata.py", "--fetch"],  # tree export + gems
     [sys.executable, "tools/make_timeless.py", "--update"],  # re-pin PoB timeless data (after jeweldata: needs tree)
+    [sys.executable, "tools/make_treeview.py"],  # Skill tree view layout (after jeweldata: needs tree)
     ["node", "test/test.js"],
     [sys.executable, "test/test_currency_feed.py"],
     ["node", "test/test_craft.js"],
@@ -35,6 +36,7 @@ STEPS = [
     ["node", "test/test_contrast.js"],
     [sys.executable, "test/test_price_hotkey.py"],
     [sys.executable, "test/test_timeless.py"],
+    [sys.executable, "test/test_treeview.py"],
     [sys.executable, "test/test_gui_windows.py"],
     [sys.executable, "test/test_league_check.py"],
     [sys.executable, "test/test_diagnostics.py"],

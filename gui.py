@@ -28,7 +28,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -444,6 +444,40 @@ class Api:
                     **self._char_mods(it),
                 })
             return {"ok": True, "items": items}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def get_character_passives(self, account, character):
+        """Allocated passives of a public character, for the Skill tree view's
+        "Compare with my character" (one call, the user's button). hashes = tree node ids,
+        hashesEx = cluster jewel passives, masteries = mastery node -> effect, jewels =
+        socketed tree jewels (x = index into the tree's jewelSlots)."""
+        try:
+            d = self._char_get("get-passive-skills", {"accountName": account,
+                                                      "character": character, "realm": "pc"})
+            if not isinstance(d, dict):
+                raise RuntimeError("unexpected response")
+
+            def ints(xs):
+                return [int(x) for x in (xs or []) if isinstance(x, (int, float, str)) and str(x).isdigit()]
+
+            masteries = d.get("mastery_effects") or {}
+            if isinstance(masteries, list):  # [[node, effect], ...] or packed numbers
+                masteries = {str(m[0]): m[1] for m in masteries if isinstance(m, (list, tuple)) and len(m) == 2}
+            jewels = []
+            for it in d.get("items", []) or []:
+                if not isinstance(it, dict):
+                    continue
+                jewels.append({
+                    "x": it.get("x", -1),
+                    "name": (it.get("name") or "").strip(),
+                    "base": it.get("typeLine", ""),
+                    "frameType": it.get("frameType", 2),
+                    **self._char_mods(it),
+                })
+            return {"ok": True, "hashes": ints(d.get("hashes")), "hashesEx": ints(d.get("hashes_ex")),
+                    "masteries": {str(k): v for k, v in masteries.items()} if isinstance(masteries, dict) else {},
+                    "jewels": jewels}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -1838,8 +1872,15 @@ class Api:
                 return {"ok": False, "error": "Path of Exile isn't running"}
             if not self._highlight:
                 self._highlight = trade_helper.StashHighlight()
-            cell = trade_helper.stash_cell_rect(rect, int(left), int(top))
-            return {"ok": bool(self._highlight.show(cell))}
+            left, top = int(left), int(top)
+            ok = self._highlight.show(trade_helper.stash_cell_rect(rect, left, top))  # amber
+            # the whisper can't say whether it's a quad tab: up to 12,12 outline the quad-tab
+            # cell too, in blue (beyond 12 it can only be a quad tab, outlined above)
+            if left <= 12 and top <= 12:
+                if not getattr(self, "_highlight_quad", None):
+                    self._highlight_quad = trade_helper.StashHighlight()
+                self._highlight_quad.show(trade_helper.stash_cell_rect(rect, left, top, quad=True), color=0xFFA040)
+            return {"ok": bool(ok), "both": left <= 12 and top <= 12}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -1864,6 +1905,39 @@ class Api:
                                          file_types=("Path of Exile log (*.txt)", "All files (*.*)"))
             path = res[0] if res else None
             return {"ok": True, "path": path}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    SOUND_KINDS = ("new", "joined")
+    SOUND_TYPES = (".mp3", ".wav", ".ogg", ".m4a")
+    SOUND_MAX = 3 * 1024 * 1024
+
+    def pick_sound(self, kind):
+        """Trade helper → Setup → Sound → your own: pick an audio file for a new trade or for
+        the buyer arriving. It's copied into data/sounds/ so the overlay page can play it."""
+        try:
+            if kind not in self.SOUND_KINDS:
+                return {"ok": False, "error": "unknown sound"}
+            win = self._main or webview.windows[0]
+            res = win.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=False,
+                                         file_types=("Sounds (*.mp3;*.wav;*.ogg;*.m4a)",))
+            src = res[0] if res else None
+            if not src:
+                return {"ok": True, "file": None}
+            ext = os.path.splitext(src)[1].lower()
+            if ext not in self.SOUND_TYPES:
+                return {"ok": False, "error": "use an mp3, wav, ogg or m4a file"}
+            if os.path.getsize(src) > self.SOUND_MAX:
+                return {"ok": False, "error": "that file is over 3 MB: pick a short sound"}
+            folder = os.path.join(DATA_DIR, "sounds")
+            os.makedirs(folder, exist_ok=True)
+            for old in os.listdir(folder):  # one file per kind
+                if old.startswith(kind + "."):
+                    os.remove(os.path.join(folder, old))
+            shutil.copyfile(src, os.path.join(folder, kind + ext))
+            # relative to index.html (data/ sits next to it); ?v= so a replaced file isn't cached
+            return {"ok": True, "file": "data/sounds/%s%s?v=%d" % (kind, ext, int(time.time())),
+                    "name": os.path.basename(src)}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

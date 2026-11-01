@@ -144,6 +144,7 @@ function renderBuild(setIndex) {
   if (build.tree && build.tree.nodes && build.tree.nodes.length) {
     section('timeless').appendChild(makeTimelessFinder(build));
     section('finder').appendChild(makeJewelFinder(build));
+    section('tree').appendChild(makeTreeView(build)); // mini PoB: the tree, jewels, points still to take
   }
   section('uniques').appendChild(makeUniqueJewels(build)); // Watcher's Eye, Forbidden pair, Thread of Hope
   section('search').appendChild(makeSearchText()); // in-game search text builder
@@ -180,14 +181,14 @@ function closeSettings() {
 }
 
 // ---- app shell: views, sidebar nav, slot lists, search context ---------------
-var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'pasted'];
+var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'tree', 'pasted'];
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
-                    timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', divcards: 'Div cards', pasted: 'Pasted item',
+                    timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', divcards: 'Div cards', tree: 'Skill tree', pasted: 'Pasted item',
                     planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', market: '📈', stash: '💰', trades: '🤝' };
+                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝' };
 
 function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
 
@@ -196,6 +197,7 @@ function setView(k) {
   if (k === 'market') renderMarketPage(); // built lazily: hundreds of rows
   if (k === 'stash') renderStashPage();
   if (k === 'divcards') loadDivcardsView(); // drop data + prices load on first open
+  if (k === 'tree') showTreeView(); // the canvas is sized and drawn once it's visible
   if (k === 'trades') showTradeHelperView(); // re-reads what the overlay saved
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
@@ -236,7 +238,7 @@ function renderNav() {
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'market', 'stash', 'trades'].filter(function (k) {
+  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'market', 'stash', 'trades'].filter(function (k) {
     if (k === 'stash') return OAUTH.signedIn; // official login only
     if (k === 'trades') return isGui();
     return k === 'planner' || k === 'market' || viewSection(k);

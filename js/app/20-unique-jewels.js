@@ -10,6 +10,7 @@
 // with a Stop button (runBatch), never on their own.
 
 var UJ_MAX_PAIRS = 21;   // 7 ticked mods; more would be a long batch at the trade site's pace
+var UJ_MAX_TRIPLES = 10; // 5 ticked mods
 
 function wePool() { return window.POE_WATCHERS_EYE || []; }
 function weAuras() {
@@ -145,6 +146,13 @@ function renderWatchersEye(body, b) {
   step1.appendChild(chips);
 
   var step2 = finderStep(body, 2, 'Mods you want', 'Tick the mods worth having. A minimum is optional (blank = any roll).');
+  var legacyWrap = UI.el('label', 'toggle');
+  var showLegacy = document.createElement('input');
+  showLegacy.type = 'checkbox';
+  showLegacy.addEventListener('change', function () { renderMods(); });
+  legacyWrap.appendChild(showLegacy);
+  legacyWrap.appendChild(UI.el('span', null, 'Include legacy mods (old jewels: they no longer roll but still trade)'));
+  step2.appendChild(legacyWrap);
   var modsBox = UI.el('div', 'uj-mods-list');
   step2.appendChild(modsBox);
   function renderMods() {
@@ -152,7 +160,7 @@ function renderWatchersEye(body, b) {
     if (!picked.length) { modsBox.appendChild(UI.el('div', 'finder-sub', 'Pick at least one aura above.')); }
     picked.forEach(function (aura) {
       modsBox.appendChild(UI.el('div', 'uj-aura-head', aura));
-      wePool().filter(function (m) { return m.aura === aura; }).forEach(function (m) {
+      wePool().filter(function (m) { return m.aura === aura && (!m.legacy || showLegacy.checked); }).forEach(function (m) {
         var row = UI.el('label', 'uj-mod');
         var cb = document.createElement('input');
         cb.type = 'checkbox';
@@ -169,13 +177,20 @@ function renderWatchersEye(body, b) {
         if (ticked[key]) ticked[key].minInput = min;
         row.appendChild(cb);
         row.appendChild(UI.el('span', 'uj-mod-text', m.text.replace(' while affected by ' + aura, '')));
+        if (m.legacy) {
+          var lg = UI.chip('legacy', 'warn');
+          lg.title = 'No longer rolls on new Watcher\'s Eyes; old jewels with it still trade';
+          row.appendChild(lg);
+        }
         row.appendChild(UI.el('span', 'finder-sub', m.min != null ? '(' + m.min + '–' + m.max + ')' : ''));
         row.appendChild(min);
         modsBox.appendChild(row);
       });
     });
     // forget ticks for auras that were removed
-    Object.keys(ticked).forEach(function (k) { if (picked.indexOf(ticked[k].mod.aura) === -1) delete ticked[k]; });
+    Object.keys(ticked).forEach(function (k) {
+      if (picked.indexOf(ticked[k].mod.aura) === -1 || (ticked[k].mod.legacy && !showLegacy.checked)) delete ticked[k];
+    });
     updateMatch();
   }
 
@@ -196,9 +211,13 @@ function renderWatchersEye(body, b) {
     finally { checkBtn.disabled = false; }
   } });
   controls.appendChild(checkBtn);
-  var pairBtn = UI.button('secondary', { size: 'sm', cls: 'gui-only', label: 'Price each pair', onClick: function () { pricePairs(); },
+  var pairBtn = UI.button('secondary', { size: 'sm', cls: 'gui-only', label: 'Price each pair',
+    onClick: function () { priceCombos(2, pairBtn, 'Price each pair'); },
     title: 'One search per pair of ticked mods, paced for the trade site. Click again to stop.' });
   controls.appendChild(pairBtn);
+  var tripleBtn = UI.button('secondary', { size: 'sm', cls: 'gui-only', label: 'Price each triple',
+    onClick: function () { priceCombos(3, tripleBtn, 'Price each triple'); } });
+  controls.appendChild(tripleBtn);
   step3.appendChild(controls);
   step3.appendChild(out);
 
@@ -222,17 +241,33 @@ function renderWatchersEye(body, b) {
     pairBtn.disabled = n < 2;
     pairBtn.title = n > 7 ? 'Tick 7 or fewer mods to price every pair (' + UJ_MAX_PAIRS + ' searches max)'
       : 'One search per pair of ticked mods (' + (n * (n - 1) / 2) + '), paced for the trade site. Click again to stop.';
+    tripleBtn.disabled = n < 3;
+    tripleBtn.title = n > 5 ? 'Tick 5 or fewer mods to price every triple (' + UJ_MAX_TRIPLES + ' searches max)'
+      : 'One search per 3 ticked mods together (' + (n * (n - 1) * (n - 2) / 6) + '): the jewels with all three. ' +
+        'Paced for the trade site. Click again to stop.';
   }
 
-  async function pricePairs() {
-    var list = tickedList();
-    var pairs = [];
-    for (var i = 0; i < list.length; i++) for (var j = i + 1; j < list.length; j++) pairs.push([list[i], list[j]]);
-    if (pairs.length > UJ_MAX_PAIRS) { UI.toast('Tick 7 or fewer mods to price every pair.', 'warn'); return; }
+  // every combination of `size` ticked mods (pairs: up to 7 ticked = 21 searches; triples:
+  // up to 5 ticked = 10), one paced search each, cheapest first
+  function combos(list, size) {
+    var out = [];
+    (function pick(start, acc) {
+      if (acc.length === size) { out.push(acc.slice()); return; }
+      for (var i = start; i < list.length; i++) { acc.push(list[i]); pick(i + 1, acc); acc.pop(); }
+    })(0, []);
+    return out;
+  }
+  async function priceCombos(size, btn, label) {
+    var sets = combos(tickedList(), size);
+    var cap = size === 2 ? UJ_MAX_PAIRS : UJ_MAX_TRIPLES;
+    if (sets.length > cap) {
+      UI.toast('Tick ' + (size === 2 ? 7 : 5) + ' or fewer mods to price every ' + (size === 2 ? 'pair' : 'triple') + '.', 'warn');
+      return;
+    }
     out.textContent = '';
-    var rows = pairs.map(function (pr) {
-      return { a: pr[0].mod, b: pr[1].mod, payload: ujPayload('Watcher\'s Eye', 'Prismatic Jewel',
-        [{ type: 'and', filters: [filterOf(pr[0]), filterOf(pr[1])] }]), total: null, cheapest: null, state: 'waiting' };
+    var rows = sets.map(function (set) {
+      return { mods: set.map(function (t) { return t.mod; }), payload: ujPayload('Watcher\'s Eye', 'Prismatic Jewel',
+        [{ type: 'and', filters: set.map(filterOf) }]), total: null, cheapest: null, state: 'waiting' };
     });
     var table = UI.el('div', 'uj-pairs');
     out.appendChild(table);
@@ -242,8 +277,9 @@ function renderWatchersEye(body, b) {
         return (x.cheapest == null) - (y.cheapest == null) || (y.cheapest || 0) - (x.cheapest || 0);
       }).forEach(function (r) {
         var row = UI.el('div', 'uj-pair');
-        row.appendChild(UI.el('span', 'uj-pair-mods', r.a.aura + ': ' + r.a.text.replace(' while affected by ' + r.a.aura, '') +
-          '  +  ' + r.b.aura + ': ' + r.b.text.replace(' while affected by ' + r.b.aura, '')));
+        row.appendChild(UI.el('span', 'uj-pair-mods', r.mods.map(function (m) {
+          return m.aura + ': ' + m.text.replace(' while affected by ' + m.aura, '');
+        }).join('  +  ')));
         row.appendChild(UI.el('b', 'uj-price', r.state === 'done' ? (r.cheapest != null
           ? fmtEq(r.cheapest, document.getElementById('league').value) : '—') : r.state === 'error' ? '✕' : '…'));
         row.appendChild(UI.el('span', 'finder-sub', r.state === 'done' ? r.total + ' listed' : ''));
@@ -252,7 +288,7 @@ function renderWatchersEye(body, b) {
       });
     }
     draw();
-    await runBatch(pairBtn, 'Price each pair', rows.length, async function (k) {
+    await runBatch(btn, label, rows.length, async function (k) {
       try {
         var res = await ujSearch(rows[k].payload);
         rows[k].total = res.total; rows[k].cheapest = res.cheapest; rows[k].state = 'done';

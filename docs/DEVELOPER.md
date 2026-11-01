@@ -196,6 +196,28 @@ GGG rules, enforced by the shape of the code. Keep them:
   - A score of ±2 sets the default, shown with a "learned" chip.
 - Zone notes (19-trades): a `zone` event looks up `pobtf-zone-notes` (starters:
   Act 1–3 trials). The note shows in the cards overlay; display only.
+- `js/app/23-tree.js` (view `tree`, the Skill tree):
+  - Layout: `data/treeview.js` (`tools/make_treeview.py`, from the cached `data/tree.min.json`).
+    Node positions use the same PoB orbit maths as `make_timeless.geometry()`. Links between
+    two nodes on the same group + orbit are stored as arcs (`[a, b, cx, cy, r]`) and drawn
+    the short way round the group centre. Masteries get no drawn links; `masteryLinks` lets
+    the walk below reach them. Proxy nodes and groups are dropped. Cluster-jewel sockets
+    (flag 1) are drawn only when the build allocates them.
+  - Ascendancy groups sit far outside the main tree in GGG's export, so each ascendancy is
+    drawn on its own in an inset canvas, fitted to that ascendancy's bounds. The build's
+    ascendancy is shown first, then any other one it allocates in (bloodlines).
+  - Rendering is one 2D canvas per view (devicePixelRatio-scaled). Colours are read from
+    the CSS tokens at every draw, and a MutationObserver on `<html>` redraws on theme or
+    accent changes. Labels never go below 12px, and colliding labels are skipped by priority.
+  - Compare: `get_character_passives(account, character)` →
+    `character-window/get-passive-skills` → `{hashes, hashesEx, masteries, jewels}`.
+    Character jewels map to sockets through `jewelSlots[x]`. `treeCompare` does a BFS from
+    everything the character has, plus the build's class and ascendancy starts, through
+    build-only nodes. Masteries are dead ends. Distance is the "step" in **Next points to
+    take**. Mastery effect ids are validated against the tree (the API's encoding has
+    changed over time).
+  - Tests: `python test/test_treeview.py` (positions vs `timeless.json` geometry, link
+    sanity, freshness against the cache, the bridge) and e2e scenario `27 tree`.
 
 ## Rate limiting (do not weaken this)
 

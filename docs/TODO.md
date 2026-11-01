@@ -3,7 +3,8 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
+Status: **v2.4.0 released 2026-11-01** (skill tree, custom sounds, quad outline, WE triples / legacy,
+buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
 
@@ -72,15 +73,17 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 
 ## 3a. Gaps found in the 2026-11-01 review (agreed earlier, built only partly)
 
-- [ ] **Stash outline on quad tabs**: the original spec said to draw *both* the normal-tab and
+- [x] **Stash outline on quad tabs** (done: both cells shown, amber normal / blue quad): the original spec said to draw *both* the normal-tab and
       the quad-tab cell when the position is 12 or under (a quad tab can't be told from the
       whisper). Right now it outlines the normal cell only, unless left/top > 12.
-- [ ] **Track buyers by account name** (spec: account name, else character name). Only
+- [x] **Track buyers by account name** (done differently: Buyers → *Same person as…* merges
+      characters; the `/whois` idea is parked: no whois reply in your log to confirm its format) (spec: account name, else character name). Only
       character names are used, so one buyer on two characters counts as two. Idea: read the
       `/whois` reply from Client.txt (display only) to link a character to its account.
-- [ ] **Watcher's Eye: price 3-mod combinations** too (spec said 2- and 3-mod). Only pairs
+- [x] **Watcher's Eye: price 3-mod combinations** (done: Price each triple, up to 5 mods) too (spec said 2- and 3-mod). Only pairs
       exist; triples would need a cap (e.g. 5 ticked mods = 10 searches).
-- [ ] **Watcher's Eye mod count**: research said 87 current mods; Path of Building's data gives
+- [x] **Watcher's Eye mod count** (resolved: 80 current is right; the extra ones are legacy mods,
+      now available with *Include legacy mods*): research said 87 current mods; Path of Building's data gives
       80 after dropping legacy ones. Check which 7 differ (maybe Sublime Vision lines or new
       ones PoB hasn't added).
 - [ ] **Zone cheat sheets**: shipped as zone notes you write yourself, plus the 6 Act 1–3
@@ -93,17 +96,26 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [ ] **Overlays on screens with different scaling** (e.g. 100% and 150%): the app is
       "system DPI aware", so positions may be off on the second screen. Check when moving
       the game between such screens.
-- [ ] **README**: doesn't mention anything from v2.1–v2.3 (trade helper, overlays, hotkeys,
+- [x] **README** (updated): doesn't mention anything from v2.1–v2.3 (trade helper, overlays, hotkeys,
       tray, Watcher's Eye & co., search text, div cards, quick price / upgrade check).
-- [ ] **GitHub roadmap issue #1** is stale: it lists Shipped only up to v1.12 and still has
+- [x] **GitHub roadmap issue #1** (updated 2026-11-01) is stale: it lists Shipped only up to v1.12 and still has
       Glorious Vanity as "planned" (supported now). Needs your OK to edit (it's public).
-- [ ] **Real-window tests in the repo**: the overlay / tray / focus tests run so far live only
+- [x] **Real-window tests in the repo** (`test/manual/overlay_windows.py`: refuses if the game is
+      running, asks first, only sends keys to the fake game): the overlay / tray / focus tests run so far live only
       in a scratch folder. Add them as an opt-in manual script (never run while you're in
       the game).
-- [ ] **Search text**: one map mod ("Monsters have #% increased Area of Effect") has no
+- [x] **Search text**: one map mod (done: regex `s have \d+% increased ar`) ("Monsters have #% increased Area of Effect") has no
       unique plain-text token. It could use a small regex.
 
 ## 3. To do (agreed, not started)
+
+- [x] **🌳 Skill tree view (mini Path of Building)**, shipped in v2.4.0. Still to confirm in game:
+      the character compare against a real profile (the `mastery_effects` format in
+      `get-passive-skills` wasn't checked live). It shows: the build's tree
+      (pan / zoom / search), jewel sockets with their jewels, mastery picks, and "points still
+      to take" vs your imported character (`get-passive-skills`), in a BFS order.
+- [x] Div cards: 1+ divine shows as divines, under that as chaos (done 2026-11-01)
+- [x] Custom trade sounds: your own mp3/wav/ogg/m4a for new trade / buyer arrived (done)
 
 - [ ] **Socket recolour calculator** (chromatic / Vorici). The formula is verified from
       Siveran's calculator:

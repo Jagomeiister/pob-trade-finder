@@ -362,7 +362,8 @@ An incoming trade card shows the item, price, league, stash tab and position, an
 note:
 
 1. **Invite**, **Busy**, **Sold**, **Still interested?**, or ✕ to dismiss. **▣ Show in stash**
-   outlines the item's cell over your open stash tab for 20 seconds (quad tabs too)
+   outlines the item's cell over your open stash tab for 20 seconds: amber for a normal tab,
+   blue for a quad tab (the whisper doesn't say which, so both show when it could be either)
 2. When the buyer enters your area the card shows **In your hideout** and switches to
    **Trade**, **Kick**, **Thanks**
 3. Then record what happened: **✓ Completed** (records the listed price), **✗ Not completed**,
@@ -385,11 +386,14 @@ icon, or the tray menu), not another window. Over the game it opens with the app
   stash position, plus totals, average, a chart per day, best sellers and a per-league
   breakdown. Filter by league, period, outcome or text, **Edit** a row, **Export CSV**
 - **Buyers**: each buyer's completed trades, total spent, time wasted and no-shows (a badge on
-  their next whisper shows this), a private note, flag, hide, ignore in game, **Clear history**
+  their next whisper shows this), a private note, flag, hide, ignore in game, **Clear history**.
+  **Same person as…** merges one player's characters: their history adds up and future
+  whispers from either character count for that person (whispers don't show account names)
 - **Setup**:
   - on/off, the log file and the chat key read from your game settings
-  - **Sound**: Off, Chime, Bell, Soft, Ping or Coins, a **volume slider** (0 = silent) and
-    **▶ Test**
+  - **Sound**: Off, Chime, Bell, Soft, Ping, Coins or **your own sound** (an mp3, wav, ogg
+    or m4a up to 3 MB; one for a new trade and, optionally, one for the buyer arriving), a
+    **volume slider** (0 = silent) and **▶ Test**
   - **Overlay**: show the icon always or only when there are trades, size, an **opacity**
     slider (solid while your mouse is over it), whether a new trade opens the cards,
     **📌 Lock position** and **Reset position**
@@ -488,8 +492,10 @@ Tools → **Watcher's Eye & co.** Three jewels that the normal item cards can't 
     today are listed; old legacy mods are left out.
   - **Match** any 1 / any 2 / any 3 / all of them. **Search on trade ↗** opens it for the
     selected league, and **Check price** shows listings here.
-  - **Price each pair** runs one search per pair of ticked mods (up to 7 mods), paced for the
-    trade site, and lists the cheapest of each. Click it again to stop.
+  - **Price each pair** runs one search per pair of ticked mods (up to 7 mods), and **Price
+    each triple** one per three together (up to 5 mods). Both are paced for the trade site
+    and list the cheapest of each. Click again to stop.
+  - **Include legacy mods** adds mods that no longer roll but still exist on old jewels.
 - **Forbidden Flame & Flesh**:
   - Pick your ascendancy (your build's is pre-selected) to see the notables a pair can give
     you, marked when you already have them.
@@ -534,12 +540,41 @@ Tools → **Div cards** shows where each divination card drops and what it's wor
   are worth at least your minimum, its best card (price each and full set) and the sum of
   one of each. Click an area for its card list. Drop rates aren't public, so this ranks
   areas by the cards that *can* drop there; it isn't an expected value per map.
+- Prices of 1 divine or more show in divines, smaller ones in chaos.
 - **By card**: price each, set size, full set value, where it drops (or "no longer drops")
   and ↗ to the bulk exchange.
 - Filter by card or area name, and set a minimum value.
 - Prices come from GGG's currency exchange (last hour) for the selected league. Drop areas
   come from the community Path of Exile Wiki (CC BY-NC-SA): they ship with the app and update
   through the app's server between releases. They keep working offline.
+
+## 5k. 🌳 Skill tree
+
+Tools → **Skill tree** is a small Path of Building: the build's passive tree, so you can see
+where your points go in game and where the jewels sit.
+
+- **Move and zoom**: drag to move, mouse wheel or **−** / **+** to zoom, **Fit** for the
+  whole tree. With the tree focused, the arrow keys move it and **0** fits it.
+- The build's nodes and links are in your accent colour; everything else is dimmed.
+  Keystones are hexagons, notables have a dark core, masteries and jewel sockets are rings.
+  A socket holding a jewel has a dot in the jewel's rarity colour.
+- **Hover** a node for its stats. Masteries show the effect the build picked (or the
+  choices), sockets show the jewel and its mods.
+- The **ascendancy** sits in the box at the bottom left (▾ hides it). If the build also
+  takes a bloodline, pick it there.
+- **Search** by name or stat ("life", "golem"): matches get a blue ring and the count shows
+  next to the box. Enter jumps to the next match, allocated ones first.
+- The side panel lists points used (cluster jewel passives included), ascendancy points,
+  keystones, notables, jewel sockets with their jewels, and mastery effects. Click any entry
+  to centre the tree on it.
+- **Compare with my character** (desktop app): pick your account and character under
+  **⚖ Compare with character…** first. The app then reads that character's passives (one
+  request, public profile) and colours the tree: green = **still to take**, red = **to
+  refund**. **Next points to take** lists them in an order you can follow: step 1 nodes
+  touch what you already have (they also get a green ring on the tree), step 2 comes after
+  those, and so on. Masteries with a different effect from the build are listed too.
+  **Build only** switches the colours back. Cluster jewel passives are counted, not
+  compared one by one.
 
 ## 6b. Compare with your character
 
