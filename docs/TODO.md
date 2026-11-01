@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.4 released 2026-11-01** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -122,15 +122,18 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [x] Div cards: 1+ divine shows as divines, under that as chaos (done 2026-11-01)
 - [x] Custom trade sounds: your own mp3/wav/ogg/m4a for new trade / buyer arrived (done)
 
-- [ ] **Socket recolour calculator** (chromatic / Vorici). The formula is verified from
-      Siveran's calculator:
-  - one requirement: on-colour = 0.9·(10+r)/(r+20), off-colour = 0.05 + 0.9·5/(r+20);
-  - two requirements: 0.9·r/total, the other colour 0.1;
-  - three requirements: proportional.
+- [x] **Socket colour helper** (2026-11-01, replaces the recolour calculator). 3.29.0 reworked
+      socket colours for every league:
+  - sockets are white by default, and each has a small chance to roll red / green / blue,
+    weighted by the item's attribute requirements and raised by item level;
+  - any gem fits any socket, and a matching colour only adds +10% gem quality;
+  - a Chromatic Orb forces one socket non-white, with more from higher item quality;
+  - the bench has "At Least 2/3/4 Non-White Sockets" (5/20/75 chromatics), and the per-colour
+    crafts and the Vorici method are gone.
 
-  Blocked on one decision: which bench colour crafts are live. Allflame has white sockets
-  and "2/3/4 non-white" crafts; Standard has the per-colour crafts. Ask which league
-  matters, or support both with a toggle.
+  GGG hasn't published the chances (a datamine tracker confirmed this on 3.29.3.3), so Siveran's
+  odds formula no longer applies. The gem compare shows facts and options instead (USER-GUIDE).
+  If real numbers come out, add odds to `socketColourHelp` in js/app/10-character.js.
 - [x] **Overlay for the price-check pop-up (Ctrl+D)** (done 2026-11-01: no title bar, drag the banner, edges resize): it's still a normal window. Consider
       the same borderless, clipped style as the other overlays.
 - [x] **Gem setups: compare with your character** (released in v2.5.2) (asked 2026-11-01). The Gems view gets the
@@ -160,7 +163,14 @@ sources, or ask the author.
   - Your own sheets: text + pictures, for one act or every act.
   - "Follow my act" (asks first): reads Client.txt's `Generating level N area "2_6_town"` lines
     and turns the sheet to that act; marks the trial you're standing in.
-  - Still to do: league mechanic sheets; layout tips per zone (needs a source we may use).
+  - Mechanic sheets (v2.5.3): 15 from the wiki (Betrayal, Blight, Delve, Incursion, Expedition,
+    Sanctum, Kingsmarch, Ultimatum, Eldritch, Pantheon, Corruption, Bestiary, Harvest, vendor
+    recipes, essences), served from the app's server so they update between releases, plus a
+    small "Open the X cheat sheet?" pop-up on entering a mechanic's area (own movable overlay).
+    Re-run `tools/make_cheatsheets.py` after the 3.30 patch notes (13 Nov) and redeploy.
+  - Still to do: layout tips per zone (needs a source we may use).
+  - [ ] In game: the suggestion pop-up appears in a mechanic's area, Open shows the sheet,
+        it can be dragged and goes away by itself.
   - [ ] In game: Alt+C shows / hides it; it follows the game window; drag, lock, opacity,
         size and width work; "Follow my act" turns it when you change act.
 - [x] **Trade helper test mode** (released in v2.5.0): Setup → Test mode makes up
@@ -188,7 +198,7 @@ sources, or ask the author.
 - [x] **More search text presets** (done 2026-11-01: Flasks and Vendor tabs, tokens checked by test/test_search_presets.py): Scalpel / poe.re do flask and vendor regex too. Add a
       Flasks tab (useful affixes, e.g. "of the Armadillo") and vendor presets (movement speed
       boots, chromatic r-g-b, links).
-- [ ] **Socket recolour calculator**: already in section 3 (waiting on Allflame vs Standard).
+- [x] **Socket recolour calculator**: became the socket colour helper (section 3; 3.29 changed the system).
 - [ ] **Loot filter tools** (Scalpel's biggest feature: an in-game filter editor, FilterBlade
       online sync, "economy audit" re-tiering by poe.ninja prices, filter checkpoints). Big,
       and needs care: it rewrites your own .filter file (that's allowed, it's your file) but

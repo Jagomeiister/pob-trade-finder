@@ -56,5 +56,13 @@ check("no sockets, no groups", gui.Api._char_links({"inventoryId": "Amulet"}) ==
 check("empty link group kept for the socket picture", gui.Api._char_links({"inventoryId": "Boots", "sockets": [{"group": 0}],
       "socketedItems": []}) == [{"links": 1, "gems": [], "sockets": [{"c": "W", "gem": ""}]}])
 
+# attribute requirements: the socket colour helper says which colours a base leans to
+reqs = gui.Api._char_reqs({"requirements": [{"name": "Level", "values": [["68", 0]]}, {"name": "Str", "values": [["155", 0]]},
+                                            {"name": "Int", "values": [["98", 1]]}]})
+check("requirements read (Str / Int, no Dex)", reqs == {"str": 155, "dex": 0, "int": 98}, reqs)
+check("long attribute names read too", gui.Api._char_reqs({"requirements": [{"name": "Dexterity", "values": [["212", 0]]}]})
+      == {"str": 0, "dex": 212, "int": 0})
+check("no requirements = all zero", gui.Api._char_reqs({}) == {"str": 0, "dex": 0, "int": 0})
+
 print("ALL TESTS PASSED" if not failures else "%d FAILED" % failures)
 sys.exit(1 if failures else 0)

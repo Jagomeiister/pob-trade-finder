@@ -513,7 +513,7 @@ body.trade-cards .sheet-head .btn-icon { width: 30px; height: 30px; font-size: v
 .sheet-title { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600;
   font-size: var(--fs-sm); }
 .sheet-follow-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
-.sheet-body { padding: 8px 10px; }
+.sheet-body { padding: 8px 10px; overflow-y: auto; overscroll-behavior: contain; }
 .sheet-content { display: flex; flex-direction: column; gap: 8px; }
 .sheet-sec-title { color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase;
   letter-spacing: .06em; margin-bottom: 2px; }
@@ -556,6 +556,27 @@ body.trade-cards .sheet-head .btn-icon { width: 30px; height: 30px; font-size: v
 .sheet-pic { position: relative; }
 .sheet-pic .sheet-img { height: 72px; width: auto; margin: 0; border: 1px solid var(--border); }
 .sheet-pic .btn-icon { position: absolute; top: 2px; right: 2px; background: var(--s2); }
+/* mechanic sheets: tables, the sheet list (☰), the suggestion pill (?sheethint=1) */
+.sheet-table { width: max-content; max-width: 100%; border-collapse: collapse; font-size: var(--fs-xs); line-height: 1.35; }
+.sheet-table th { position: sticky; top: -8px; background: var(--s2); color: var(--text-2); text-align: left;
+  font-weight: 600; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+.sheet-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top;
+  min-width: 7em; max-width: 220px; }
+.sheet-table td:first-child { color: var(--accent); font-weight: 600; }
+.sheet-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--s2) 45%, transparent); }
+.sheet-picker { display: flex; flex-direction: column; gap: 6px; }
+.sheet-pick-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.sheet-pick { padding: 4px 9px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--s2);
+  color: var(--text); font: inherit; font-size: var(--fs-sm); cursor: pointer; text-align: left; }
+.sheet-pick:hover { border-color: var(--accent); }
+.sheet-pick.is-current { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.sheet-head .btn-icon.is-on { color: var(--accent); }
+.sheets-mech { display: flex; flex-direction: column; gap: 6px; }
+.sheet-panel.is-mech { max-width: 760px; }
+.sheet-hint { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 6px; background: var(--s1);
+  border: 1px solid var(--accent); border-radius: 999px; white-space: nowrap;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 8px 22px rgba(0, 0, 0, .5); } /* the in-game panel ring (see above) */
+.sheet-hint-text { color: var(--text); font-size: var(--fs-sm); font-weight: 600; padding: 0 4px; }
 .zone-notes { display: flex; flex-direction: column; gap: 4px; }
 .zone-row { display: flex; align-items: center; gap: 8px; }
 .zone-area { min-width: 190px; font-size: var(--fs-sm); }

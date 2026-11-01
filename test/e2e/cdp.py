@@ -28,6 +28,10 @@ _ALLOWED_DIRS = ("js/", "css/")
 
 
 class _Handler(http.server.SimpleHTTPRequestHandler):
+    # keep-alive: a page load reuses a few connections instead of opening ~45 at once, which
+    # on Windows now and then reset one and left a random script unloaded ("X is not defined")
+    protocol_version = "HTTP/1.1"
+
     def _allowed(self):
         path = self.path.split("?", 1)[0].split("#", 1)[0].lstrip("/")
         if ".." in path:

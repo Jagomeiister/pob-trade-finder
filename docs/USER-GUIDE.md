@@ -575,8 +575,22 @@ and **Alt+C** shows it over the game. Use ‹ › to change act; drag it by ⠿.
 - **Follow my act** (asks first) reads the game's log file to see which act you're in and turns
   the sheet to it. It also marks the trial you're standing in. **Open it when a new act
   starts** pops it up for you.
-- Width, size, opacity, 📌 Lock and Reset position are on the same page. **Pretend I entered
-  it** tries an act change without playing.
+- **Mechanics**: ☰ on the sheet (or the Mechanics list on the Cheat sheets page) opens a sheet
+  for Betrayal (Syndicate rewards per member and division), Blight oils and anoints, Delve
+  fossils, Incursion temple rooms, Expedition vendors, Sanctum afflictions, Kingsmarch shipping,
+  Ultimatum modifiers, Eldritch altars, the Pantheon (and which map boss holds each soul),
+  Corruption (Vaal Orb outcomes), Bestiary recipes, Harvest crafts, vendor recipes and essences.
+  They come from the Path of Exile Wiki, checked against the current league's changes, and
+  update from the app's server between releases.
+- **Suggestions**: entering a mechanic's area (a Syndicate safehouse, the Azurite Mine, the
+  Temple, a Sanctum floor, a map whose boss holds a Pantheon soul, …) shows a small pop-up at
+  the top of the game for 20 seconds: **Open** shows that sheet, 🔕 stops suggestions for that
+  mechanic, ✕ dismisses it. It never opens anything big on its own. Drag it by ⠿ to put it
+  elsewhere. It needs **Follow my act** or the trade helper on (both read the game log), and can
+  be turned off on the Cheat sheets page.
+- Width, max height, size, opacity, 📌 Lock and Reset position are on the same page.
+  **Pretend I entered it** tries an act change, and **Pretend I entered its area** a
+  mechanic's suggestion, without playing.
 
 ## 5j. 🃏 Div cards
 
@@ -679,6 +693,17 @@ link groups fills only one PoB group:
   the gem tags use the same letters (*linked · Boots A*, *not linked · Boots B*), and the
   group matched to this setup is outlined and tagged *this setup*. The setup's gems are
   bright, other gems dimmed, empty sockets say *empty*.
+- **Socket colours**, under the picture: since 3.29 any gem works in any socket, and a gem in a
+  socket of its own colour gets +10% quality. The box counts how many of the setup's gems sit
+  in their colour (e.g. *1 / 4 gems in their colour*). When some don't, it lists:
+  - which colours the link group wants;
+  - which colours this base rolls (non-white sockets follow its attribute requirements);
+  - the crafting bench's *At Least 2/3/4 Non-White Sockets* (5/20/75 Chromatic Orbs, plus
+    Vaal Orbs on a corrupted item);
+  - what a Chromatic Orb does on this item (Tainted on a corrupted one);
+  - the Omen of Trichromatism when the group wants all three colours.
+
+  It gives no odds: GGG hasn't published the 3.29 socket colour chances.
 - A link group only counts as the setup when at least two of its gems are linked together
   (one for a single-gem group), so a lone socket with one shared support doesn't.
 - Gems below the build's level or quality are listed as *lower* but don't change the status.

@@ -258,7 +258,10 @@ function setCharLinks(items) {
     if (!where) return;
     groups.forEach(function (g, k) {
       charLinks.push({ item: n, where: where, links: g.links, gems: g.gems || [], sockets: g.sockets || [],
-                       label: where + (groups.length > 1 ? ' ' + String.fromCharCode(65 + k) : '') });
+                       label: where + (groups.length > 1 ? ' ' + String.fromCharCode(65 + k) : ''),
+                       // for the socket colour helper
+                       reqs: it.reqs || {}, quality: it.quality || 0, corrupted: !!it.corrupted,
+                       itemSockets: groups.reduce(function (s, x) { return s.concat(x.sockets || []); }, []) });
     });
   });
 }
@@ -385,6 +388,85 @@ function gemLinksViz(v, best, links) {
   return wrap;
 }
 
+// ---- socket colours (3.29+): any gem fits any socket; a gem in a socket of its own colour
+// gets +10% quality. Sockets are white unless they roll red / green / blue (in proportion to
+// the item's attribute requirements). GGG hasn't published the chances, so this says what you
+// have and what the game offers, never odds.
+var GEM_COLOUR = null; // gem name -> 'r' | 'g' | 'b' | 'w' (data/gemcolours.js)
+function gemColour(name) {
+  if (!GEM_COLOUR) {
+    GEM_COLOUR = {};
+    var src = window.POE_GEM_COLOURS || {};
+    Object.keys(src).forEach(function (c) { src[c].split('|').forEach(function (n) { GEM_COLOUR[n.toLowerCase()] = c; }); });
+  }
+  return GEM_COLOUR[String(name || '').toLowerCase()] || null;
+}
+var SOCK_WORD = { r: 'red', g: 'green', b: 'blue' };
+var BENCH_NON_WHITE = { 2: 5, 3: 20, 4: 75 }; // "At Least N Non-White Sockets": Chromatic Orbs (3.29 bench)
+
+// one of your link groups: { gems, matched, want: {r,g,b}, have: {r,g,b,w} } — gems are the
+// coloured ones (white gems never get the bonus)
+function socketColourFit(c) {
+  var want = { r: 0, g: 0, b: 0 }, have = { r: 0, g: 0, b: 0, w: 0 }, gems = 0, matched = 0;
+  c.sockets.forEach(function (s) {
+    var sc = String(s.c || 'W').toLowerCase();
+    if (sc in have) have[sc]++;
+    var gc = s.gem ? gemColour(s.gem) : null;
+    if (!gc || gc === 'w') return;
+    gems++;
+    want[gc]++;
+    if (gc === sc) matched++;
+  });
+  return { gems: gems, matched: matched, want: want, have: have };
+}
+
+function socketColourHelp(c) {
+  var fit = socketColourFit(c);
+  if (!fit.gems) return null;
+  var box = UI.el('div', 'sock-help' + (fit.matched === fit.gems ? ' is-done' : ''));
+  var head = UI.el('div', 'sock-help-head');
+  head.appendChild(UI.el('b', null, 'Socket colours'));
+  head.appendChild(UI.chip(fit.matched + ' / ' + fit.gems + ' gems in their colour',
+    fit.matched === fit.gems ? 'success' : 'neutral'));
+  head.title = 'Since 3.29 any gem works in any socket; one in a socket of its own colour gets +10% quality.';
+  box.appendChild(head);
+  if (fit.matched === fit.gems) return box;
+  var tips = UI.el('ul', 'sock-help-list');
+  function tip(text) { tips.appendChild(UI.el('li', null, text)); }
+  // what you'd want vs what the link group has
+  var need = Object.keys(fit.want).filter(function (k) { return fit.want[k]; }).map(function (k) {
+    return fit.want[k] + ' ' + SOCK_WORD[k];
+  });
+  tip('This link group wants ' + need.join(', ') + '. Only +10% gem quality is at stake: the gems work as they are.');
+  // where the colours come from on this item
+  var r = c.reqs || {}, total = (r.str || 0) + (r.dex || 0) + (r.int || 0);
+  if (total) {
+    var lean = [['str', 'red'], ['dex', 'green'], ['int', 'blue']].filter(function (a) { return r[a[0]]; })
+      .map(function (a) { return a[1]; });
+    var lacking = Object.keys(fit.want).filter(function (k) { return fit.want[k] && lean.indexOf(SOCK_WORD[k]) === -1; });
+    tip('Non-white sockets on this base roll ' + lean.join(' / ') + ' (its attribute requirements)' +
+      (lacking.length ? '; ' + lacking.map(function (k) { return SOCK_WORD[k]; }).join(' and ') +
+        ' sockets are unlikely here' : '') + '.');
+  }
+  var coloured = c.itemSockets.filter(function (s) { return /^[RGB]$/i.test(s.c); }).length;
+  var wantTotal = fit.want.r + fit.want.g + fit.want.b;
+  var k = Math.max(2, Math.min(4, wantTotal));
+  if (wantTotal > coloured && BENCH_NON_WHITE[k]) {
+    tip('Crafting bench: "At Least ' + k + ' Non-White Sockets" for ' + BENCH_NON_WHITE[k] + ' Chromatic Orbs' +
+      (c.corrupted ? ' (plus ' + BENCH_NON_WHITE[k] + ' Vaal Orbs: the item is corrupted)' : '') +
+      '. It sets how many sockets get a colour, not which colour.');
+  }
+  tip(c.corrupted
+    ? 'Corrupted: normal Chromatic Orbs can\'t be used; Tainted Chromatic Orbs can.'
+    : 'Chromatic Orb: at least one socket always comes out non-white; higher item quality (this one: ' +
+      (c.quality || 0) + '%) gives more.');
+  if (fit.want.r && fit.want.g && fit.want.b && !c.corrupted) {
+    tip('Omen of Trichromatism: your next Chromatic Orb gives at least one red, one green and one blue socket.');
+  }
+  box.appendChild(tips);
+  return box;
+}
+
 function renderGemDiff(v, best) {
   var strip = UI.el('div', 'char-diff');
   var status, html = '<b>You:</b> ';
@@ -424,6 +506,8 @@ function renderGemDiff(v, best) {
   v.row.classList.add(status);
   var viz = gemLinksViz(v, best, states.map(function (s) { return s.link; }).filter(Boolean));
   if (viz) strip.appendChild(viz);
+  var colours = best ? socketColourHelp(best.c) : null;
+  if (colours) strip.appendChild(colours);
   v.card.insertBefore(strip, v.card.children[1]);
   v.gemRows.forEach(function (gr, gi) {
     var s = states[gi], spec = GEM_LINK_CHIP[s.state];

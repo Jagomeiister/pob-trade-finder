@@ -387,6 +387,11 @@ body.cb-sockets .sock-A::after { content: 'A'; }
 .gem-row.gem-off .gem-name { color: var(--text-2); }
 /* your sockets under a gem group's compare strip: one box per item, a chain per link group */
 .gem-links-viz { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 8px; }
+/* socket colour helper (10-character.js socketColourHelp): facts and options, no odds */
+.sock-help { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--s2); }
+.sock-help-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.sock-help-list { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5; }
+.sock-help.is-done { background: transparent; border-style: dashed; }
 .glv-item-name { color: var(--text-3); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; margin-bottom: 4px; }
 .glv-groups { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }

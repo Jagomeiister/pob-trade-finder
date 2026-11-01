@@ -196,12 +196,13 @@ def parse_line(line):
 # "test": True so the overlay never sends a command for it.
 TEST_BUYER = "PoBTF_TestBuyer"
 TEST_SELLER = "PoBTF_TestSeller"
-TEST_SCENARIOS = ("whisper", "bulk", "joined", "accepted", "left", "buying", "zone", "act")
+TEST_SCENARIOS = ("whisper", "bulk", "joined", "accepted", "left", "buying", "zone", "act", "enter")
 
 
-def test_lines(kind, league="Standard", act=1):
+def test_lines(kind, league="Standard", act=1, area=None):
     """kind (TEST_SCENARIOS) -> raw Client.txt lines, stamped now. 'whisper' and 'buying'
-    point at stash tab cells, so the outline can be tried too."""
+    point at stash tab cells, so the outline can be tried too. 'enter' is a mechanic's area
+    (a cheat sheet suggestion): an area name, or an area id like "Delve_Main"."""
     stamp = time.strftime("%Y/%m/%d %H:%M:%S") + " 1 abc [INFO Client 1] "
     if kind == "whisper":
         msg = ['@From %s: Hi, I would like to buy your Tabula Rasa Simple Robe listed for 10 chaos in %s '
@@ -223,9 +224,18 @@ def test_lines(kind, league="Standard", act=1):
         a = max(1, min(10, int(act or 1)))
         area = "1_%d_town" % a if a <= 5 else "2_%d_town" % a
         msg = ['Generating level %d area "%s" with seed 1' % (a * 7, area)]
+    elif kind == "enter":
+        a = " ".join(str(area or "").split())[:80]
+        if not a or '"' in a:
+            raise ValueError("no area to enter")
+        if " " in a or "'" in a:  # a name: "You have entered ...", else an id: "Generating ... area"
+            msg = [": You have entered %s." % a]
+        else:
+            msg = ['Generating level 68 area "%s" with seed 1' % a]
     else:
         raise ValueError("unknown test")
-    return [stamp.replace("[INFO", "[DEBUG") + m if kind == "act" else stamp + m for m in msg]
+    debug = kind == "act" or (kind == "enter" and msg[0].startswith("Generating"))
+    return [stamp.replace("[INFO", "[DEBUG") + m if debug else stamp + m for m in msg]
 
 
 # -- log tailing ----------------------------------------------------------------

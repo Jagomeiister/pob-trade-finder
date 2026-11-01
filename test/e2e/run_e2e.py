@@ -259,6 +259,8 @@ STUB_JS = r"""
     overlay_toggle_sheet: function () { return { ok: true }; },
     pick_sheet_image: function () { return { ok: true, file: 'data/cheatsheets/e2e.png', name: 'route.png' }; },
     delete_sheet_image: function () { return { ok: true }; },
+    cheatsheets_data: function () { return { ok: false, error: 'offline (e2e)' }; },
+    overlay_sheet_open: function () { return { ok: true }; },
     set_price_hotkey: function (spec) { return { ok: true, hotkey: spec, label: spec, running: false, active: false, error: null }; }
   };
   // every bridge method exists; unknown ones resolve to a soft failure and are recorded.
@@ -2524,13 +2526,23 @@ out.off = { rows: offCard.querySelectorAll('.gem-row').length, offRows: offCard.
   priced: gemGroupViews[0].gemRows.length, want: g0.gems.length };
 const swapped = groupFit(g0.gems, { links: g0.gems.length, gems: g0.gems.slice(0, -1).concat([{ name: 'Faster Casting Support', level: 20, quality: 20 }]) }, [off]);
 out.offFit = [swapped.missing.length, swapped.options.join()];
+// socket colour helper (3.29): facts + bench / chromatic / omen options, never odds
+const sh = c => { const el = socketColourHelp(c); return el ? { head: H.text('.sock-help-head', el),
+  tips: [...el.querySelectorAll('li')].map(l => l.textContent), done: el.classList.contains('is-done') } : null; };
+const mk = (socks, extra) => Object.assign({ sockets: socks, itemSockets: socks, reqs: { str: 155, dex: 0, int: 0 },
+  quality: 20, corrupted: false }, extra || {});
+out.sock = { colours: [gemColour('Cleave'), gemColour('Added Fire Damage Support'), gemColour('Fireball'), gemColour('Portal')],
+  done: sh(mk([{ c: 'R', gem: 'Cleave' }, { c: 'R', gem: 'Added Fire Damage Support' }])),
+  mixed: sh(mk([{ c: 'W', gem: 'Cleave' }, { c: 'W', gem: 'Fireball' }, { c: 'W', gem: 'Blink Arrow' }, { c: 'W', gem: '' }])),
+  corrupt: sh(mk([{ c: 'W', gem: 'Cleave' }, { c: 'W', gem: 'Added Fire Damage Support' }], { corrupted: true })),
+  white: sh(mk([{ c: 'W', gem: 'Portal' }])) };
 delete window.__stubOverrides.get_character_items;
 delete window.__stubOverrides.get_character_passives;
 return out;
 """
 
 
-S33_QUICKWINS = r"""
+S34_QUICKWINS = r"""
 const H = window.__e2e;
 await H.loadBuild();
 const out = {};
@@ -2607,7 +2619,7 @@ out.prefs = JSON.parse(localStorage.getItem('pobtf-prefs')).macros.map(m => m.co
 return out;
 """
 
-S33_PRICE_OVERLAY = r"""
+S34_PRICE_OVERLAY = r"""
 const H = window.__e2e;
 const out = {};
 const bar = document.getElementById('overlay-bar');
@@ -2630,7 +2642,7 @@ return out;
 
 def scenario_quickwins(s, tag):
     s.fresh()
-    r = s.run(S33_QUICKWINS, timeout=60)
+    r = s.run(S34_QUICKWINS, timeout=60)
     check(tag + " poe.ninja league slugs", r["slugs"] == ["allflame", "allflamehc", "allflame", "allflamehc", "standard", "hardcore"],
           r["slugs"])
     check(tag + " unique card menu opens poe.ninja", "Open on poe.ninja ↗" in r["uniqMenu"] and (r["uniqUrl"] or "").startswith(
@@ -2658,7 +2670,7 @@ def scenario_quickwins(s, tag):
     check(tag + " remove asks first, then removes", r["afterRemove"] == ["/kingsmarch", "/delve", "/exit", ""], r["afterRemove"])
     check(tag + " macros kept in prefs", "/delve:f2" in r["prefs"] and "/menagerie:off" not in r["prefs"], r["prefs"])
     s.fresh("?overlay=1")
-    r = s.run(S33_PRICE_OVERLAY)
+    r = s.run(S34_PRICE_OVERLAY)
     check(tag + " price check banner is the drag handle", r["bar"] == "move", r["bar"])
     check(tag + " dragging moves the window", [m[0] for m in r["move"]] == ["start", "move", "end"]
           and r["move"][1][1:] == [30, 15], r["move"])
@@ -2698,6 +2710,20 @@ def scenario_gemdiff(s, tag):
           and "Unticked in PoB" in (o["head"] or "") and "+ 1 unticked" in (o["tag"] or ""), o)
     check(tag + " unticked gem left out of group pricing and compare", o["priced"] == o["want"], o)
     check(tag + " running an unticked option is named", r["offFit"] == [1, "Faster Casting Support"], r["offFit"])
+    k = r["sock"]
+    check(tag + " gem colours from RePoE (red / blue / white)", k["colours"] == ["r", "r", "b", "w"], k["colours"])
+    check(tag + " socket colours: all in their colour = done, no tips", k["done"] and k["done"]["done"]
+          and "2 / 2 gems in their colour" in k["done"]["head"] and not k["done"]["tips"], k["done"])
+    tips = " | ".join((k["mixed"] or {}).get("tips") or [])
+    check(tag + " socket colours: wants, base lean, bench 3 non-white, chromatic, omen",
+          "0 / 3" in (k["mixed"] or {}).get("head", "") and "1 red, 1 green, 1 blue" in tips and "roll red" in tips
+          and "green and blue sockets are unlikely" in tips and '"At Least 3 Non-White Sockets" for 20' in tips
+          and "quality (this one: 20%)" in tips and "Omen of Trichromatism" in tips
+          and "%" not in tips.replace("+10% gem quality", "").replace("20%", ""), tips)  # no made-up odds
+    ctips = " | ".join((k["corrupt"] or {}).get("tips") or [])
+    check(tag + " socket colours: corrupted = Vaal Orbs on the bench, Tainted Chromatics, no omen",
+          "plus 5 Vaal Orbs" in ctips and "Tainted Chromatic" in ctips and "Omen" not in ctips, ctips)
+    check(tag + " socket colours: only white gems = no helper", k["white"] is None, k["white"])
 
 
 S30_TESTCARDS = r"""
@@ -2820,6 +2846,125 @@ def scenario_testmode(s, tag):
           r["sends"] == 0, r)
 
 
+S32_MECH_SHEET = r"""
+const H = window.__e2e;
+const out = {};
+const D = window.POE_CHEATSHEETS || {};
+const mechs = D.mechanics || [];
+out.count = mechs.length;
+out.ids = mechs.map(m => m.id);
+window.__sheetToggle();
+await H.sleep(30);
+document.querySelector('.sheet-head [aria-label^="Other sheets"]').click();
+await H.sleep(30);
+out.picks = [...document.querySelectorAll('.sheet-picker .sheet-pick')].map(b => b.textContent);
+const first = mechs[0];
+[...document.querySelectorAll('.sheet-picker .sheet-pick')].find(b => b.textContent === first.title).click();
+await H.sleep(30);
+out.title = H.text('.sheet-title');
+out.rows = document.querySelectorAll('.sheet-body .sheet-table tbody tr, .sheet-body .sheet-list .sheet-li').length;
+out.foot = (document.querySelector('.sheet-head .sheet-title') || {}).title || ''; // credit: title tooltip (full line in the app)
+out.inputs = document.querySelectorAll('.sheet-panel input, .sheet-panel select, .sheet-panel textarea').length;
+document.querySelector('.sheet-head [aria-label="Back to the act sheet"]').click();
+await H.sleep(30);
+out.backTitle = H.text('.sheet-title');
+const last = mechs[mechs.length - 1];
+window.__sheetOpen(last.id);
+await H.sleep(30);
+out.openTitle = H.text('.sheet-title');
+out.lastTitle = last.title;
+return out;
+"""
+
+S32_HINT = r"""
+const H = window.__e2e;
+const out = {};
+const mechs = (window.POE_CHEATSHEETS || {}).mechanics || [];
+const m = mechs.find(x => ((x.match || {}).areaIds || []).length) || mechs.find(x => ((x.match || {}).areaNames || []).length);
+out.has = !!m;
+if (!m) return out;
+const ev = (m.match.areaIds || []).length ? { type: 'area', id: m.match.areaIds[0] + 'E2E', level: 68, act: null }
+                                           : { type: 'zone', area: m.match.areaNames[0] };
+out.firstVisible = (H.calls('overlay_visible')[0] || { args: [] }).args.slice(0, 2);
+// not following the game and trade helper off: a real line suggests nothing
+out.realIgnored = window.__sheetEvent(Object.assign({}, ev)) === false && !document.querySelector('.sheet-hint');
+localStorage.setItem('pobtf-sheet-prefs', JSON.stringify({ follow: true, ack: true }));
+out.shown = window.__sheetEvent(Object.assign({}, ev)) === true;
+await H.sleep(30);
+out.text = H.text('.sheet-hint-text');
+out.visible = H.calls('overlay_visible').slice(-1)[0].args.slice(0, 2);
+out.notAgain = window.__sheetEvent(Object.assign({}, ev)) === false; // same mechanic, still there
+H.button(document.querySelector('.sheet-hint'), 'Open').click();
+await H.sleep(30);
+out.opened = (H.calls('overlay_sheet_open').slice(-1)[0] || { args: [] }).args;
+out.gone = !document.querySelector('.sheet-hint');
+out.small = document.getElementById('sheet-root').getBoundingClientRect().height;
+// muted: never suggested again
+window.__sheetEvent({ type: 'area', id: 'HideoutE2E', level: 1, act: null }); // left
+window.__sheetEvent(Object.assign({}, ev));
+await H.sleep(30);
+document.querySelector('.sheet-hint [aria-label^="Don\'t suggest"]').click();
+await H.sleep(30);
+window.__sheetEvent({ type: 'area', id: 'HideoutE2E', level: 1, act: null });
+out.mutedIgnored = window.__sheetEvent(Object.assign({}, ev)) === false;
+out.muted = JSON.parse(localStorage.getItem('pobtf-sheet-prefs')).muted;
+out.id = m.id;
+return out;
+"""
+
+S32_SYNC = r"""
+const H = window.__e2e;
+const out = {};
+const D = JSON.parse(JSON.stringify(window.POE_CHEATSHEETS));
+D.version = (D.version || 0) + 1;
+D.mechanics = (D.mechanics || []).concat([{ id: 'e2enew', title: 'E2E new sheet', group: 'Endgame', source: 'e2e',
+  url: '', patch: '3.29', match: { areaIds: [], areaNames: [] }, sections: [{ title: 'Rows', lines: ['from the server'] }] }]);
+window.__stubOverrides.cheatsheets_data = { ok: true, data: D };
+document.getElementById('open-sheets').click();
+await H.sleep(80);
+out.synced = (window.POE_CHEATSHEETS.version === D.version);
+out.listed = [...document.querySelectorAll('#view-sheets .sheet-pick')].some(b => b.textContent === 'E2E new sheet');
+[...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => b.textContent === 'E2E new sheet').click();
+await H.sleep(30);
+out.preview = H.text('#view-sheets .sheet-panel.is-mech');
+H.button(document, 'Show in game').click();
+await H.sleep(30);
+out.shown = (H.calls('overlay_sheet_open').slice(-1)[0] || { args: [] }).args;
+// an older server copy never replaces the shipped one
+delete window.__stubOverrides.cheatsheets_data;
+return out;
+"""
+
+
+def scenario_mechanics(s, tag):
+    s.fresh("?sheet=1")
+    r = s.run(S32_MECH_SHEET, timeout=60)
+    check(tag + " mechanic sheets shipped (8+)", r["count"] >= 8, r["ids"])
+    check(tag + " ☰ lists the act sheet and every mechanic", len(r["picks"]) == r["count"] + 1 and
+          r["picks"][0].startswith("📜"), r["picks"])
+    check(tag + " a mechanic sheet shows its rows and credits the wiki", r["rows"] > 0 and r["title"] == r["picks"][1]
+          and "CC BY-NC-SA" in (r["foot"] or ""), (r["title"], r["rows"], r["foot"]))
+    check(tag + " overlay sheet takes no typing", r["inputs"] == 0, r["inputs"])
+    check(tag + " ‹ goes back to the act sheet", (r["backTitle"] or "").startswith("Act "), r["backTitle"])
+    check(tag + " Open from the hint shows that sheet", r["openTitle"] == r["lastTitle"], r)
+    s.fresh("?sheethint=1")
+    r = s.run(S32_HINT, timeout=60)
+    check(tag + " some mechanic has area triggers", r["has"], r)
+    if r["has"]:
+        check(tag + " hint window hidden until a suggestion", r["firstVisible"] == ["hint", False], r["firstVisible"])
+        check(tag + " no suggestions without reading the log", r["realIgnored"], r)
+        check(tag + " entering the area pops a small suggestion", r["shown"] and (r["text"] or "").endswith("cheat sheet")
+              and r["visible"] == ["hint", True] and r["small"] < 80, r)
+        check(tag + " not suggested twice while you stay", r["notAgain"], r)
+        check(tag + " Open asks for that sheet and the pill goes", r["opened"] == [r["id"]] and r["gone"], r)
+        check(tag + " 🔕 stops suggestions for that mechanic", r["mutedIgnored"] and r["muted"] == [r["id"]], r)
+    s.fresh()
+    r = s.run(S32_SYNC, timeout=60)
+    check(tag + " newer sheets from the server replace the shipped ones", r["synced"] and r["listed"], r)
+    check(tag + " app page previews it and Show in game opens it", "from the server" in (r["preview"] or "") and
+          r["shown"] == ["e2enew"], r)
+
+
 def scenario_sheets(s, tag):
     s.fresh("?sheet=1")
     r = s.run(S30_SHEET, timeout=60)
@@ -2876,7 +3021,8 @@ SCENARIOS = [
     ("30 testmode", scenario_testmode),
     ("31 sheets", scenario_sheets),
     ("32 gemdiff", scenario_gemdiff),
-    ("33 quickwins", scenario_quickwins),
+    ("33 mechanics", scenario_mechanics),
+    ("34 quickwins", scenario_quickwins),
 ]
 
 

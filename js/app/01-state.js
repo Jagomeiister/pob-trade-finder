@@ -97,7 +97,7 @@ function loadPrefs() {
 var LIGHT_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
 // the windows drawn over the game (price check, icon, trade cards, cheat sheet) stay dark
 // whatever the app theme: a light panel glares over a dark game, like a torch in the face
-var IN_GAME_PAGE = /[?&](overlay|ovicon|cards|sheet)=1(&|$)/.test(location.search);
+var IN_GAME_PAGE = /[?&](overlay|ovicon|cards|sheet|sheethint)=1(&|$)/.test(location.search);
 
 function applyPrefs() {
   migratePrefs(); // prefs hydrated from the desktop store can still carry old names

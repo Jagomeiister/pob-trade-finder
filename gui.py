@@ -29,7 +29,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.5.2"
+VERSION = "2.5.4"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -56,6 +56,9 @@ PRICES_TTL = 1800
 # drop data between releases. Prices come from GGG's currency exchange feed.
 DIVCARDS_API = "https://pob-trade-finder.vercel.app/divcards.json"
 DIVCARDS_TTL = 6 * 3600
+# cheat sheets (tools/make_cheatsheets.py): the server's copy lets fixes reach the app between releases
+CHEATSHEETS_API = "https://pob-trade-finder.vercel.app/cheatsheets.json"
+CHEATSHEETS_TTL = 6 * 3600
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
 MIN_INTERVAL = 2.5
@@ -78,7 +81,12 @@ OVERLAYS = {
     # leveling cheat sheet (js/app/24-cheatsheets.js): shown / hidden by its hotkey
     "sheet": {"title": "PoB Trade Finder - Cheat sheet", "query": "?sheet=1", "pos": "pobtf-ov-sheet-pos",
               "default": (0.74, 0.12), "size": (320, 120)},
+    # "Sanctum cheat sheet? Open" when you enter a mechanic's area: a small pill, top centre
+    "hint": {"title": "PoB Trade Finder - Sheet hint", "query": "?sheethint=1", "pos": "pobtf-ov-hint-pos",
+             "default": (0.5, 0.015), "size": (300, 40)},
 }
+CENTRED_OVERLAYS = ("cards", "hint")  # their default x is the centre, not the left edge
+HIDDEN_AT_START = ("sheet", "hint")   # shown only when their page asks (hotkey, a suggestion)
 # Hotkeys (Settings → In game): each held only while the game (or our overlay) is focused.
 HOTKEY_DEFAULTS = {"price": "ctrl+d", "app": "shift+space", "trades": "alt+t", "sheet": "alt+c"}
 HOTKEY_PREFS = {"price": "hotkey", "app": "hotkeyApp", "trades": "hotkeyTrades", "sheet": "hotkeySheet"}
@@ -162,7 +170,7 @@ class Api:
         self._trades = None
         self._overlay_windows = {}  # name -> pywebview window (OVERLAYS)
         # the cheat sheet starts hidden (its hotkey shows it); the others report once their page loads
-        self._ov = {n: {"content": n != "sheet", "placed": None, "placed_at": 0.0, "dragging": False, "replace": False}
+        self._ov = {n: {"content": n not in HIDDEN_AT_START, "placed": None, "placed_at": 0.0, "dragging": False, "replace": False}
                     for n in OVERLAYS}
         self._app_overlay = False   # main window brought over the game by the app hotkey
         self._main_was_hidden = False
@@ -452,6 +460,8 @@ class Api:
                     "ilvl": it.get("ilvl", 0),
                     "corrupted": bool(it.get("corrupted")),
                     "linkGroups": self._char_links(it),
+                    "reqs": self._char_reqs(it),  # socket colours lean on these (gem compare)
+                    "quality": self._gem_prop(it, "Quality"),
                     **self._char_mods(it),
                 })
             return {"ok": True, "items": items}
@@ -503,6 +513,18 @@ class Api:
                 m = re.search(r"\d+", str(p["values"][0][0]))
                 return int(m.group()) if m else 0
         return 0
+
+    @staticmethod
+    def _char_reqs(it):
+        """An item's attribute requirements {"str", "dex", "int"}: its non-white sockets roll
+        red / green / blue in proportion to them."""
+        out = {"str": 0, "dex": 0, "int": 0}
+        for r in it.get("requirements") or []:
+            key = str(r.get("name") or "").lower()[:3]
+            if key in out and r.get("values"):
+                m = re.search(r"\d+", str(r["values"][0][0]))
+                out[key] = int(m.group()) if m else 0
+        return out
 
     @staticmethod
     def _char_links(it):
@@ -898,6 +920,49 @@ class Api:
                 raise RuntimeError("no drop data (offline and none shipped)")
         self._divcards_cache = (time.time(), data)
         return data
+
+    @staticmethod
+    def _cheatsheets_ok(data):
+        """The app shows whatever this returns: only a complete, well-formed copy counts."""
+        try:
+            acts, mech = data.get("acts") or {}, data.get("mechanics") or []
+            return (isinstance(data.get("version"), int) and len(acts) >= 10 and isinstance(mech, list)
+                    and all(isinstance(m.get("id"), str) and isinstance(m.get("sections"), list) for m in mech))
+        except AttributeError:
+            return False
+
+    def cheatsheets_data(self):
+        """Cheat sheets: the server's copy (newest), else the last one downloaded. The page
+        compares its version with the copy shipped in data/cheatsheets.js and keeps the newer."""
+        try:
+            hit = getattr(self, "_cheatsheets_cache", None)
+            if hit and time.time() - hit[0] < CHEATSHEETS_TTL:
+                return {"ok": True, "data": hit[1]}
+            disk = os.path.join(DATA_DIR, "cheatsheets_cache.json")
+            data = None
+            try:
+                req = urllib.request.Request(CHEATSHEETS_API, headers={"User-Agent": UA, "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    data = json.loads(r.read().decode("utf-8"))
+                if not self._cheatsheets_ok(data):
+                    raise ValueError("incomplete cheat sheets")
+                try:
+                    with open(disk, "w", encoding="utf-8") as f:
+                        json.dump(data, f)
+                except OSError:
+                    pass
+            except Exception:
+                try:
+                    with open(disk, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except (OSError, ValueError):
+                    data = None
+                if not (data and self._cheatsheets_ok(data)):
+                    return {"ok": False, "error": "offline: using the sheets shipped with the app"}
+            self._cheatsheets_cache = (time.time(), data)
+            return {"ok": True, "data": data}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def div_cards(self, league):
         """Div cards tool: every card with where it drops (wiki, via the backend), its stack
@@ -1750,9 +1815,10 @@ class Api:
         # cheat sheet follows the act from the area / zone lines
         self._eval_in(self._overlay_windows.get("cards"), "window.__tradeEvent && window.__tradeEvent(%s)" % json.dumps(ev))
         if ev.get("type") in ("area", "zone"):
-            self._eval_in(self._overlay_windows.get("sheet"), "window.__sheetEvent && window.__sheetEvent(%s)" % json.dumps(ev))
+            for name in ("sheet", "hint"):  # the hint suggests a mechanic's sheet for the area
+                self._eval_in(self._overlay_windows.get(name), "window.__sheetEvent && window.__sheetEvent(%s)" % json.dumps(ev))
 
-    def trade_test(self, kind, league=None, act=None):
+    def trade_test(self, kind, league=None, act=None, area=None):
         """Trade helper → Setup → Test mode: made-up log lines through the real parser, shown
         in the overlays as test events (their buttons send nothing, nothing is saved).
         'full' plays a whole trade over ~12 s; 'clear' removes the test cards."""
@@ -1770,7 +1836,7 @@ class Api:
                 start = time.time()
                 for at, k in steps:
                     time.sleep(max(0, at - (time.time() - start)))
-                    for line in trade_helper.test_lines(k, league, act):
+                    for line in trade_helper.test_lines(k, league, act, area):
                         ev = trade_helper.parse_line(line)
                         if ev:
                             ev["test"] = True
@@ -1923,7 +1989,7 @@ class Api:
         w, h = r[2] - r[0], r[3] - r[1]
         pos = self._overlay_saved(name)
         fx, fy = OVERLAYS[name]["default"]  # fraction of the game window (top-left of the overlay)
-        dx = pos.get("dx", int(g[2] * fx - (w / 2 if name == "cards" else 0)))
+        dx = pos.get("dx", int(g[2] * fx - (w / 2 if name in CENTRED_OVERLAYS else 0)))
         if self._grows_up(name, g):
             bottom = pos.get("bottom", int(g[3] * fy))
             dy = bottom - h
@@ -2062,6 +2128,15 @@ class Api:
     def overlay_toggle_sheet(self):
         """The cheat sheet hotkey (or "Show in game" in the Cheat sheets view): show / hide it."""
         self._eval_in(self._overlay_windows.get("sheet"), "window.__sheetToggle && window.__sheetToggle()")
+        return {"ok": True}
+
+    def overlay_sheet_open(self, sheet_id):
+        """The hint's Open (or a sheet picked in the app): show that sheet (an act number or a
+        mechanic id) in the cheat sheet overlay."""
+        sid = str(sheet_id or "")[:40]
+        if not re.fullmatch(r"[\w-]+", sid):
+            return {"ok": False, "error": "bad sheet id"}
+        self._eval_in(self._overlay_windows.get("sheet"), "window.__sheetOpen && window.__sheetOpen(%s)" % json.dumps(sid))
         return {"ok": True}
 
     def overlay_reset_pos(self, name=None):
