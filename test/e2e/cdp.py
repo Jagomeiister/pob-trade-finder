@@ -56,10 +56,16 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+class _Server(http.server.ThreadingHTTPServer):
+    # the page asks for ~45 files at once; the default listen backlog (5) made Windows refuse
+    # the odd connection, so one random script never loaded ("X is not defined" flakes)
+    request_queue_size = 128
+
+
 class StaticServer:
     def __init__(self, root):
         handler = functools.partial(_Handler, directory=root)
-        self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.httpd = _Server(("127.0.0.1", 0), handler)
         self.httpd.daemon_threads = True
         self.port = self.httpd.server_address[1]
         self.origin = "http://127.0.0.1:%d" % self.port
