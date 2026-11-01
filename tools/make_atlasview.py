@@ -21,6 +21,11 @@ Output: window.POE_ATLAS_VIEW = {
   starts: [node ids]            where every path starts (the root's neighbours)
   icons: {zoom, active, inactive, size: [[w, h] per kind 0..4], at: [x, y, ...] aligned with
           nodes, -1, -1 = no icon; mastery: {sheet, size, at: {node id: [x, y]}}}
+  background: as data/treeview.js's (tools/make_treeview.py background(): tile, sheet, art,
+          groups with their offsetX / offsetY already added, starts = the start art, always drawn),
+          plus painting: {url, rect: [x0, y0, x1, y1]}: the painted Atlas, stretched over the
+          export's min_x..max_x, min_y..max_y (where it lines up: the Searing Exarch's and the
+          Eater of Worlds' league areas sit on their heads in the painting)
 }
 Run: python tools/make_atlasview.py [--fetch]
 """
@@ -34,13 +39,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 DATA = os.path.join(ROOT, "data")
 sys.path.insert(0, HERE)
-from make_treeview import orbit_angles, position  # noqa: E402  (same orbit maths)
+from make_treeview import BG_ZOOM, background, bg_sheet, orbit_angles, position  # noqa: E402  (same maths)
 
 TAG = "3.29.1"  # bump for a new league (the repo tags each patch)
 URL = "https://raw.githubusercontent.com/grindinggear/atlastree-export/%s/data.json" % TAG
 CACHE = os.path.join(tempfile.gettempdir(), "pobtf-atlastree-%s.json" % TAG)  # 1.4 MB, kept out of the repo
 UA = "Mozilla/5.0 PoB-Trade-Finder/1.0"
 MAX_STATS = 600
+# the group circles come from the 0.3835 sheet: the 0.5 one (2.5 MB) is over the art cache's
+# 2 MB download cap (art_cache.MAX_BYTES). Drawn at w / zoom tree units, so the size is the same.
+GROUP_BG_ZOOM = "0.3835"
+START_ART = "AtlasPassiveSkillScreenStart"
 
 SMALL, NOTABLE, KEYSTONE, MASTERY, WORMHOLE, START = range(6)
 ICON_SHEETS = {SMALL: "normal", NOTABLE: "notable", KEYSTONE: "keystone", WORMHOLE: "wormhole"}
@@ -162,10 +171,22 @@ def build(tree):
 
     bounds = [min(r[1] for r in out_nodes), min(r[2] for r in out_nodes),
               max(r[1] for r in out_nodes), max(r[2] for r in out_nodes)]
+
+    used = {str(n.get("group")) for n in keep.values()}
+    bg_groups = []
+    for gid, g in sorted(groups.items(), key=lambda kv: int(kv[0])):
+        b = g.get("background")
+        if b and gid in used:  # offsets (tree units) nudge the odd-shaped league art into place
+            bg_groups.append((g["x"] + b.get("offsetX", 0), g["y"] + b.get("offsetY", 0), b["image"],
+                              bool(b.get("isHalfImage"))))
+    bg = background(tree, bg_groups, [(i, START_ART) for i in starts], group_zoom=GROUP_BG_ZOOM)
+    paint = bg_sheet(tree, "atlasBackground", BG_ZOOM)
+    bg["painting"] = {"url": paint["filename"],
+                      "rect": [tree["min_x"], tree["min_y"], tree["max_x"], tree["max_y"]]}
     return {
         "tree": tree.get("tree", ""), "version": TAG, "orbitRadii": radii,
         "totalPoints": (tree.get("points") or {}).get("totalPoints"),
-        "icons": icons(tree, out_nodes), "bounds": bounds, "nodes": out_nodes,
+        "icons": icons(tree, out_nodes), "background": bg, "bounds": bounds, "nodes": out_nodes,
         "edges": edges, "arcs": arcs, "wormholes": worm, "starts": starts,
     }
 

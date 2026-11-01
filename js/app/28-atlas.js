@@ -18,6 +18,7 @@ var ATLAS_ICON_MIN_PX = 7;
 var ATLAS_IDX = null;     // index over POE_ATLAS_VIEW, built once
 var ATLAS = null;         // the view's state (built on first open)
 var ATLAS_SPRITES = null; // { state, active, inactive, mastery }
+var ATLAS_BG = null;      // the backdrop: treeBgLoad() state (23-tree.js)
 var atlasViewBack = null;
 
 // ---- data -----------------------------------------------------------------------------
@@ -301,6 +302,11 @@ function atlasDraw() {
   ctx.globalAlpha = 1;
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, w, h);
+  // the in-game backdrop (23-tree.js treeBgLoad / treeBgDraw): tile, painted Atlas, group art
+  var bgD = I.D.background;
+  cv.bgDrawn = null;
+  if (bgD && !ATLAS_BG) ATLAS_BG = treeBgLoad(bgD, atlasRedraw);
+  if (bgD && ATLAS_BG.state === 'ready') cv.bgDrawn = treeBgDraw(cv, ATLAS_BG, bgD, C, ox, oy, { nodes: I.byId });
 
   // links: dim ones, then the allocated path on top
   [false, true].forEach(function (on) {
@@ -876,6 +882,7 @@ function atlasClose() { setView(build ? (atlasViewBack || 'gear') : ''); }
 function showAtlasView() {
   var A = ATLAS || atlasBuildView();
   if (!A) return;
+  if (ATLAS_BG && ATLAS_BG.state === 'failed') ATLAS_BG = null; // the backdrop: try again
   if (A.savedId) renderAtlasSide(); // "Used by" may have changed in the build library
   if (A.side && !A.side.childNodes.length) renderAtlasSide();
   function draw() {

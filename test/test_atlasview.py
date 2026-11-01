@@ -72,11 +72,47 @@ check("most nodes have an icon", with_icon > 0.8 * (kinds[0] + kinds[1] + kinds[
 check("league areas use the mastery sheet", ic.get("mastery") and len(ic["mastery"]["at"]) == kinds[3] and
       all(nodes[int(k)][3] == 3 for k in ic["mastery"]["at"]), len((ic.get("mastery") or {}).get("at", {})))
 
+# the in-game backdrop: tile, painted Atlas, group circles, start art (make_treeview.background())
+bg = AV.get("background") or {}
+art = bg.get("art") or []
+CDN = "https://web.poecdn.com/"
+check("backdrop: tile, group sheet and painting on GGG's CDN (the art cache allowlist)",
+      all(bg[k]["url"].startswith(CDN) for k in ("tile", "sheet", "painting")), [bg.get(k, {}).get("url") for k in ("tile", "sheet", "painting")])
+check("backdrop: tile from the icons' zoom; circles from 0.3835 (the 0.5 sheet is over the art cache's 2 MB cap)",
+      bg["tile"]["zoom"] == ic["zoom"] and bg["sheet"]["zoom"] == float(make_atlasview.GROUP_BG_ZOOM), (bg["tile"], bg["sheet"]))
+bgg = [bg["groups"][i:i + 3] for i in range(0, len(bg["groups"]), 3)]
+check("backdrop: a circle per group with art, each a known whole piece", 100 < len(bgg) < 400 and
+      all(0 <= g[2] >> 1 < len(art) and not g[2] & 1 for g in bgg), len(bgg))
+keys = {art[g[2] >> 1][0] for g in bgg}
+check("backdrop: the league art pieces are there (Cleansing Fire, Tangle)",
+      {"GroupBackgroundCleansingFire", "GroupBackgroundTangle", "PSGroupBackground1"} <= keys, keys)
+far = [g for g in bgg if min((g[0] - n[1]) ** 2 + (g[1] - n[2]) ** 2 for n in AV["nodes"]) > 400 ** 2]
+check("backdrop: every circle sits on a cluster", not far, far[:3])
+check("backdrop: the start art on the start node", bg["starts"][0::2] == AV["starts"] and
+      all(art[a][0] == make_atlasview.START_ART for a in bg["starts"][1::2]), bg["starts"])
+pr = bg["painting"]["rect"]
+check("backdrop: the painting spans the tree (every node inside it, give or take a node)",
+      pr[0] < pr[2] and pr[1] < pr[3] and all(pr[0] - 400 <= n[1] <= pr[2] + 400 and pr[1] - 100 <= n[2] <= pr[3] + 100 for n in AV["nodes"]),
+      pr)
+check("backdrop: small (< 4 KB of the file)", len(json.dumps(bg, separators=(",", ":"))) < 4 * 1024,
+      len(json.dumps(bg, separators=(",", ":"))))
+
 # fresh: the shipped file is what the generator makes from the cached export
 if os.path.exists(make_atlasview.CACHE):
     with open(make_atlasview.CACHE, encoding="utf-8") as f:
-        rebuilt = make_atlasview.build(json.load(f))
+        export = json.load(f)
+    rebuilt = make_atlasview.build(export)
     check("atlasview.js matches a rebuild from the cached export", json.loads(json.dumps(rebuilt)) == AV)
+    check("backdrop: painting stretched over the export's min/max, from its largest sheet",
+          pr == [export["min_x"], export["min_y"], export["max_x"], export["max_y"]] and
+          bg["painting"]["url"] == export["sprites"]["atlasBackground"]["0.5"]["filename"], pr)
+    gs = export["sprites"]["groupBackground"][make_atlasview.GROUP_BG_ZOOM]
+    check("backdrop: pieces inside the export's group sheet",
+          gs["filename"] == bg["sheet"]["url"] and all(a[1] + a[3] <= gs["w"] and a[2] + a[4] <= gs["h"] for a in art), gs["filename"])
+    offs = [g for g in export["groups"].values() if (g.get("background") or {}).get("offsetY")]
+    check("backdrop: art offsets applied (the odd-shaped league pieces)", offs and all(
+        [round(g["x"] + g["background"].get("offsetX", 0)), round(g["y"] + g["background"]["offsetY"])] in [x[:2] for x in bgg]
+        for g in offs), len(offs))
 else:
     print("skip freshness check (no export cache; run tools/make_atlasview.py --fetch)")
 

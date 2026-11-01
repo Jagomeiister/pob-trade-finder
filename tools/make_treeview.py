@@ -23,6 +23,15 @@ Output: window.POE_TREE_VIEW = {
   jewelSlots: [socket node ids]            character-window jewels give x = an index here
   icons: {zoom, active, inactive, size, at} passive icon sprite sheets (GGG CDN URLs) and each
                                            node's x, y in them (see icons())
+  background: the in-game backdrop (see background()): {
+      tile:   {url, zoom, rect: [x, y, w, h]}  the dark tile, repeated; one tile = w / zoom tree units
+      sheet:  {url, zoom}                      the group-background sheet
+      art:    [[key, x, y, w, h], ...]         the pieces of that sheet in use
+      groups: [x, y, a, ...]                   a group's circle centred at x, y: art index a >> 1,
+                                               a & 1 = half image (the top half, mirrored below)
+      starts: [node id, a, ...]                class start art (the build's class), centred on the node
+      startInactive: a                         the other classes' start art
+  }
 }
 Run: python tools/make_treeview.py
 """
@@ -113,6 +122,55 @@ def icons(tree, out_nodes):
         at.extend([c["x"], c["y"]])
     return {"zoom": float(zoom), "active": active["filename"], "inactive": inactive["filename"],
             "size": size, "at": at}
+
+
+BG_ZOOM = "0.5"  # the icons' zoom level (the largest sheets)
+CDN = "https://web.poecdn.com/"  # the only host the art cache (art_cache.py) fetches from
+
+
+def bg_sheet(tree, kind, zoom):
+    sheet = ((tree.get("sprites") or {}).get(kind) or {}).get(zoom)
+    if not sheet or not sheet.get("filename", "").startswith(CDN):
+        raise SystemExit("no %s sprite sheet at zoom %s on %s: update background()" % (kind, zoom, CDN))
+    return sheet
+
+
+def background(tree, groups, starts, zoom=BG_ZOOM, group_zoom=None, inactive=None):
+    """The in-game backdrop, as GGG's tree and PoB draw it: the repeated dark tile, then each
+    group's circle (a half image is its top half, mirrored for the bottom), then the class start
+    art. A sprite at zoom z is w / z tree units wide (PoB: PassiveTreeView DrawAsset).
+    groups: [(x, y, art key, half)], starts: [(node id, art key)]. Shared with make_atlasview.py."""
+    tile = bg_sheet(tree, "background", zoom)
+    tc = tile["coords"].get("Background2") or next(iter(tile["coords"].values()))
+    gz = group_zoom or zoom
+    sheet = bg_sheet(tree, "groupBackground", gz)
+    coords = dict(sheet["coords"])
+    st = ((tree.get("sprites") or {}).get("startNode") or {}).get(gz)
+    if st:
+        if st["filename"] != sheet["filename"]:
+            raise SystemExit("start art is no longer on the group background sheet: update background()")
+        coords.update(st["coords"])
+    art, index = [], {}
+
+    def idx(key):
+        if key not in coords:
+            raise SystemExit("background art %r is not on %s" % (key, sheet["filename"]))
+        if key not in index:
+            c = coords[key]
+            index[key] = len(art)
+            art.append([key, c["x"], c["y"], c["w"], c["h"]])
+        return index[key]
+
+    flat, st_flat = [], []
+    for x, y, key, half in groups:
+        flat.extend([round(x), round(y), idx(key) * 2 + (1 if half else 0)])
+    for nid, key in starts:
+        st_flat.extend([int(nid), idx(key)])
+    out = {"tile": {"url": tile["filename"], "zoom": float(zoom), "rect": [tc["x"], tc["y"], tc["w"], tc["h"]]},
+           "sheet": {"url": sheet["filename"], "zoom": float(gz)}, "art": art, "groups": flat, "starts": st_flat}
+    if inactive:
+        out["startInactive"] = idx(inactive)
+    return out
 
 
 def build(tree):
@@ -206,9 +264,18 @@ def build(tree):
             if other in keep and not keep[other][0].get("isMastery"):
                 mastery_links.extend([int(nid), int(other)])
 
+    # the backdrop: circles behind the main tree's groups (proxies are cluster jewel stand-ins,
+    # ascendancy groups sit in their own inset), the start art on the class starts
+    main_groups = {str(n.get("group")) for n, _ in keep.values() if not n.get("ascendancyName")}
+    bg_groups = [(g["x"], g["y"], g["background"]["image"], bool(g["background"].get("isHalfImage")))
+                 for gid, g in sorted(groups.items(), key=lambda kv: int(kv[0]))
+                 if g.get("background") and not g.get("isProxy") and gid in main_groups]
+    bg_starts = [(c["start"], "center" + c["name"].lower()) for c in classes if c["start"] is not None]
+
     return {
         "tree": tree.get("tree", ""), "orbitRadii": tree["constants"]["orbitRadii"],
         "icons": icons(tree, out_nodes),
+        "background": background(tree, bg_groups, bg_starts, inactive="PSStartNodeBackgroundInactive"),
         "bounds": bounds, "nodes": out_nodes, "edges": edges, "arcs": arcs,
         "ascendancies": asc_list, "classes": classes, "masteryEffects": effects,
         "masteries": masteries, "masteryLinks": mastery_links,

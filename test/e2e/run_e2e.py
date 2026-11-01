@@ -2454,6 +2454,7 @@ delete window.__stubOverrides.get_character_passives;
 const D = POE_TREE_VIEW;
 out.iconData = !!(D.icons && D.icons.at.length === 2 * D.nodes.length && D.icons.size.length === 3);
 out.iconFallback = [TREE_SPRITES && TREE_SPRITES.state, cv.iconsDrawn];
+out.bgFallback = [TREE_BG && TREE_BG.state, cv.bgDrawn]; // the backdrop too: plain background
 // sheets from the art cache (one flat colour each): zoomed in, allocated nodes show the active one
 function sheet(rgb) {
   const c = document.createElement('canvas');
@@ -2481,6 +2482,38 @@ for (let i = 0; i < 10; i++) treeDraw(cv);
 out.drawMs = (performance.now() - t0) / 10;
 H.button(sec.querySelector('.tv-zoom'), 'Fit').click();
 out.iconsFit = cv.iconsDrawn;
+delete window.__stubOverrides.cache_art;
+// the in-game backdrop: tile + group circles + start art from the art cache, under the nodes
+const B = D.background;
+function sized(w, h, rgb) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = rgb; g.fillRect(0, 0, w, h);
+  return c.toDataURL('image/png');
+}
+const pixel = (x, y) => [...cv.ctx.getImageData(Math.round(x * cv.dpr), Math.round(y * cv.dpr), 1, 1).data].slice(0, 3);
+const plainMs = (() => { const t = performance.now(); for (let i = 0; i < 5; i++) treeDraw(cv); return (performance.now() - t) / 5; })();
+out.cornerPlain = pixel(2, 2);
+const bgArt = {};
+bgArt[B.tile.url] = sized(B.tile.rect[2], B.tile.rect[3], 'rgb(40,40,160)');
+bgArt[B.sheet.url] = sized(1312, 1100, 'rgb(200,160,60)');
+window.__stubOverrides.cache_art = { ok: true, art: bgArt };
+const nBg = H.calls('cache_art').length;
+TREE_BG = null;
+treeDraw(cv);
+await H.waitFor(() => TREE_BG && TREE_BG.state !== 'loading', 5000, 'background sheets');
+out.bgState = TREE_BG.state;
+out.bgCalls = H.calls('cache_art').slice(nBg).map(c => JSON.parse(c.args[0]));
+treeDraw(cv);
+out.bgFit = cv.bgDrawn;
+out.cornerBg = pixel(2, 2);
+const t1 = performance.now();
+for (let i = 0; i < 5; i++) treeDraw(cv);
+out.bgMs = [plainMs, (performance.now() - t1) / 5];
+out.insetBg = T.inset ? T.inset.bgDrawn : 'no inset';
+cv.cx = notable.x; cv.cy = notable.y; cv.s = 0.5; treeDraw(cv);
+out.bgZoomed = cv.bgDrawn;
+out.centreOverBg = pixel(cv.w / 2, cv.h / 2); // the allocated notable's icon still on top
 delete window.__stubOverrides.cache_art;
 return out;
 """
@@ -2546,6 +2579,26 @@ def scenario_tree(s, tag):
           px[1] > 150 and px[0] < 80 and px[2] < 90, (r["iconsZoomed"], px))
     check(tag + " icons: none when zoomed out to fit", r["iconsFit"] == 0, r["iconsFit"])
     check(tag + " icons: a zoomed-in redraw stays fast (< 30 ms)", r["drawMs"] < 30, r["drawMs"])
+    bg = tv["background"]
+    check(tag + " backdrop data: tile, group sheet, a circle per group, the 7 class start arts",
+          bg["tile"]["url"].startswith("https://web.poecdn.com/") and bg["sheet"]["url"].startswith("https://web.poecdn.com/") and
+          len(bg["groups"]) // 3 > 300 and len(bg["starts"]) == 14, (len(bg["groups"]) // 3, bg["starts"]))
+    check(tag + " backdrop: no sheets in the art cache -> plain background, nothing drawn", r["bgFallback"] == ["failed", None],
+          r["bgFallback"])
+    check(tag + " backdrop: tile + group sheets fetched through cache_art (one call)",
+          r["bgState"] == "ready" and r["bgCalls"] == [[bg["tile"]["url"], bg["sheet"]["url"]]], (r["bgState"], r["bgCalls"]))
+    fit = r["bgFit"] or {}
+    check(tag + " backdrop drawn at fit: tile, every group circle, every class start", fit.get("tile") and
+          fit.get("groups", 0) > 300 and fit.get("starts") == 7 and not fit.get("painting"), fit)
+    cp, cb = r["cornerPlain"], r["cornerBg"]
+    check(tag + " backdrop: the tile shows (dimmed) where the plain background was", cb != cp and cb[2] > cp[2] and cb[2] < 160,
+          (cp, cb))
+    check(tag + " backdrop: the ascendancy inset keeps its plain background", r["insetBg"] is None, r["insetBg"])
+    zb, c = r["bgZoomed"] or {}, r["centreOverBg"]
+    check(tag + " backdrop: zoomed in, nodes stay on top of it (allocated notable's icon at the centre)",
+          zb.get("tile") and c[1] > 150 and c[0] < 80 and c[2] < 90, (zb, c))
+    check(tag + " backdrop: a fitted redraw stays fast (< 40 ms, < plain + 15 ms)",
+          r["bgMs"][1] < 40 and r["bgMs"][1] < r["bgMs"][0] + 15, r["bgMs"])
 
 
 S28_STAGES = r"""
@@ -3926,6 +3979,39 @@ out.afterCancel = stored().length;
 btn('Delete').click(); await H.waitFor(dlg, 2000, 'confirm again');
 H.button(dlg(), 'Delete').click(); await H.sleep(30);
 out.afterDelete = [stored().length, atlasName(id), H.text('.atlas-title', V()), ATLAS.M.points];
+// the in-game backdrop: none in the stub's art cache -> plain; with sheets -> tile, painting, circles
+const cv2 = ATLAS.main, B = ATLAS.I.D.background;
+const pixel = (x, y) => [...cv2.ctx.getImageData(Math.round(x * cv2.dpr), Math.round(y * cv2.dpr), 1, 1).data].slice(0, 3);
+treeFit(cv2); atlasDraw();
+out.bgFallback = [ATLAS_BG && ATLAS_BG.state, cv2.bgDrawn];
+const corner = p => [(p[0] + 60 - cv2.cx) * cv2.s + cv2.w / 2, (p[1] + 60 - cv2.cy) * cv2.s + cv2.h / 2];
+const pr = B.painting.rect;
+out.plain = [pixel(2, 2), pixel.apply(null, corner(pr))];
+function sized(w, h, rgb) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = rgb; g.fillRect(0, 0, w, h);
+  return c.toDataURL('image/png');
+}
+const bgArt = {};
+bgArt[B.tile.url] = sized(B.tile.rect[2], B.tile.rect[3], 'rgb(40,40,160)');
+bgArt[B.sheet.url] = sized(1400, 1200, 'rgb(200,160,60)');
+bgArt[B.painting.url] = sized(2048, 1974, 'rgb(170,30,30)');
+window.__stubOverrides.cache_art = { ok: true, art: bgArt };
+const nBg = H.calls('cache_art').length;
+ATLAS_BG = null;
+atlasDraw();
+await H.waitFor(() => ATLAS_BG && ATLAS_BG.state !== 'loading', 5000, 'atlas background');
+out.bgState = ATLAS_BG.state;
+out.bgCalls = H.calls('cache_art').slice(nBg).map(c => JSON.parse(c.args[0]));
+atlasDraw();
+out.bgFit = cv2.bgDrawn;
+out.withBg = [pixel(2, 2), pixel.apply(null, corner(pr))];
+const t0 = performance.now();
+for (let i = 0; i < 5; i++) atlasDraw();
+out.bgMs = (performance.now() - t0) / 5;
+out.onPxBg = rgbAt(SMALL); // an allocated node keeps the accent colour over the painting
+delete window.__stubOverrides.cache_art;
 // the Tools nav lists it
 await H.loadBuild();
 out.nav = !!document.querySelector('#nav .nav-item[data-view="atlas"]');
@@ -3976,6 +4062,23 @@ def scenario_atlas(s, tag):
     check(tag + " Cancel keeps it", r["afterCancel"] == 1, r["afterCancel"])
     check(tag + " Delete removes it, the tree stays on screen unsaved", r["afterDelete"] == [0, None, "Imported tree (not saved)", len(ids)],
           r["afterDelete"])
+    bg = av["background"]
+    urls = [bg["tile"]["url"], bg["sheet"]["url"], bg["painting"]["url"]]
+    check(tag + " backdrop data: tile, group sheet, painting (GGG's CDN), a circle per group, the start art",
+          all(u.startswith("https://web.poecdn.com/") for u in urls) and len(bg["groups"]) // 3 > 100 and
+          len(bg["starts"]) == 2 and bg["starts"][0] in av["starts"], (len(bg["groups"]) // 3, bg["starts"]))
+    check(tag + " backdrop: no sheets in the art cache -> plain background, nothing drawn", r["bgFallback"] == ["failed", None],
+          r["bgFallback"])
+    check(tag + " backdrop: the three sheets fetched through cache_art (one call)",
+          r["bgState"] == "ready" and r["bgCalls"] == [urls], (r["bgState"], r["bgCalls"]))
+    fit = r["bgFit"] or {}
+    check(tag + " backdrop drawn at fit: tile, painting, every group circle, the start art", fit.get("tile") and
+          fit.get("painting") and fit.get("groups") == len(bg["groups"]) // 3 and fit.get("starts") == 1, fit)
+    (pc, pp), (bc, bp) = r["plain"], r["withBg"]
+    check(tag + " backdrop: tile outside the painting, the painting (dimmed) inside it",
+          bc != pc and bc[2] > bc[0] and bp != pp and bp[0] > bp[2] and bp[0] < 170, (r["plain"], r["withBg"]))
+    check(tag + " backdrop: allocated node still in the accent colour on top", r["onPxBg"] == r["accent"], (r["onPxBg"], r["accent"]))
+    check(tag + " backdrop: a fitted redraw stays fast (< 40 ms)", r["bgMs"] < 40, r["bgMs"])
     check(tag + " Tools nav lists the Atlas tree", r["nav"], r["nav"])
 
 

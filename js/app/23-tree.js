@@ -258,7 +258,8 @@ function treeShape(ctx, kind, x, y, r) {
 // greyed for the rest), loaded once through the art cache (08-cards.js). Each sheet is copied
 // once to a canvas with every icon already cut to its node's shape, so a frame only copies
 // sub-rects: no clipping, no image decoding. Without the bridge (browser) the tree keeps its
-// plain dots.
+// plain dots. The backdrop under them (tile, group circles, start art) is loaded the same way:
+// see treeBgLoad below.
 var TREE_ICON_MIN_PX = 7; // a node shows its icon once its radius on screen is at least this
 var TREE_SPRITES = null;  // { state: 'loading' | 'ready' | 'failed', active, inactive: canvases }
 
@@ -306,6 +307,155 @@ function treeCutIcons(I, img) {
   return c;
 }
 
+// ---- the in-game backdrop -----------------------------------------------------------------
+// data/treeview.js / data/atlasview.js background: GGG's dark tile, the circles behind each
+// group (a half image mirrored for its bottom), the start art and, on the Atlas, the painting.
+// Loaded once through the art cache like the icons; every piece is copied to canvases once,
+// with halved copies (mips) so a zoomed-out frame scales a small canvas, not a 2048 px one.
+// Until it is ready (or without the bridge) the trees keep their plain background.
+function treeBgLoad(bg, onReady) {
+  var api = isGui() && window.pywebview.api;
+  if (!bg || !api || !api.cache_art) return { state: 'failed' };
+  var S = { state: 'loading' };
+  var urls = [bg.tile && bg.tile.url, bg.sheet && bg.sheet.url, bg.painting && bg.painting.url].filter(Boolean);
+  var need = urls.filter(function (u) { return !ART[u]; });
+  (need.length ? api.cache_art(JSON.stringify(need)).then(function (r) {
+    if (r && r.ok) Object.keys(r.art || {}).forEach(function (u) { ART[u] = r.art[u]; });
+  }) : Promise.resolve()).then(function () {
+    return Promise.all(urls.map(function (u) {
+      if (!ART[u]) return null;
+      return new Promise(function (ok) {
+        var img = new Image();
+        img.onload = function () { ok(img); };
+        img.onerror = function () { ok(null); };
+        img.src = ART[u];
+      });
+    }));
+  }).then(function (imgs) {
+    var got = {};
+    urls.forEach(function (u, i) { got[u] = imgs[i]; });
+    var tile = bg.tile && got[bg.tile.url], sheet = bg.sheet && got[bg.sheet.url];
+    var paint = bg.painting && got[bg.painting.url];
+    if (tile) {
+      var r = bg.tile.rect;
+      S.tile = treeMips(treeBgCut(tile, r[0], r[1], r[2], r[3], false));
+      S.tileSize = r[2] / bg.tile.zoom; // tree units per tile
+    }
+    if (sheet) { // each piece cut the way it is used: whole, or as a mirrored half
+      var halves = {}, wholes = {}, i;
+      for (i = 2; i < bg.groups.length; i += 3) (bg.groups[i] & 1 ? halves : wholes)[bg.groups[i] >> 1] = true;
+      for (i = 1; i < (bg.starts || []).length; i += 2) wholes[bg.starts[i]] = true;
+      if (bg.startInactive !== undefined) wholes[bg.startInactive] = true;
+      S.art = bg.art.map(function (a, k) {
+        return { half: halves[k] ? treeMips(treeBgCut(sheet, a[1], a[2], a[3], a[4], true)) : null,
+                 full: wholes[k] ? treeMips(treeBgCut(sheet, a[1], a[2], a[3], a[4], false)) : null,
+                 w: a[3] / bg.sheet.zoom, h: a[4] / bg.sheet.zoom };
+      });
+    }
+    if (paint) S.painting = treeMips(treeBgCut(paint, 0, 0, paint.naturalWidth, paint.naturalHeight, false));
+    if (!S.tile && !S.art && !S.painting) throw new Error('background art not cached');
+    S.state = 'ready';
+    onReady();
+  }).catch(function () { S.state = 'failed'; });
+  return S;
+}
+
+// a sprite cut from its sheet; half: the top half with its mirror image below (PoB's DrawAsset)
+function treeBgCut(img, x, y, w, h, half) {
+  var c = document.createElement('canvas');
+  c.width = w;
+  c.height = half ? 2 * h : h;
+  var g = c.getContext('2d');
+  g.drawImage(img, x, y, w, h, 0, 0, w, h);
+  if (half) {
+    g.translate(0, 2 * h);
+    g.scale(1, -1);
+    g.drawImage(img, x, y, w, h, 0, 0, w, h);
+  }
+  return c;
+}
+
+// the canvas and its halved copies, down to about 32 px
+function treeMips(c) {
+  var out = [c];
+  while (c.width > 32 && c.height > 32) {
+    var n = document.createElement('canvas');
+    n.width = Math.ceil(c.width / 2);
+    n.height = Math.ceil(c.height / 2);
+    var g = n.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(c, 0, 0, n.width, n.height);
+    out.push(n);
+    c = n;
+  }
+  return out;
+}
+
+// the smallest copy at least px wide (device pixels)
+function treeMip(mips, px) {
+  for (var i = mips.length - 1; i > 0; i--) if (mips[i].width >= px) return mips[i];
+  return mips[0];
+}
+
+// how much the backdrop is dimmed under the theme's page colour: a little on dark themes, more on
+// light ones (where the nodes and labels are dark), so nodes and the allocated path stay readable
+function treeBgDim(ctx, bg) {
+  ctx.fillStyle = bg;
+  var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(ctx.fillStyle);
+  var lum = m ? (0.2126 * parseInt(m[1], 16) + 0.7152 * parseInt(m[2], 16) + 0.0722 * parseInt(m[3], 16)) / 255 : 0;
+  return lum > 0.5 ? 0.72 : 0.3;
+}
+
+// draws the backdrop over the plain fill; B = a ready treeBgLoad() state, bg = the data,
+// opts: { starts: function (node id, art index) → art index to draw or -1 }. Returns what it drew.
+function treeBgDraw(cv, B, bg, C, ox, oy, opts) {
+  var ctx = cv.ctx, s = cv.s, w = cv.w, h = cv.h, dpr = cv.dpr, done = { tile: false, painting: false, groups: 0, starts: 0 };
+  ctx.globalAlpha = 1;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'medium';
+  if (B.tile) { // a pattern per mip level, kept on the canvas (patterns belong to a context)
+    var tpx = B.tileSize * s, mip = treeMip(B.tile, tpx * dpr), lvl = B.tile.indexOf(mip);
+    cv.bgPats = cv.bgPats && cv.bgPats.src === B ? cv.bgPats : { src: B };
+    var pat = cv.bgPats[lvl] || (cv.bgPats[lvl] = ctx.createPattern(mip, 'repeat'));
+    if (pat && pat.setTransform) {
+      var k = tpx / mip.width;
+      pat.setTransform(new DOMMatrix([k, 0, 0, k, ox, oy]));
+      ctx.fillStyle = pat;
+      ctx.fillRect(0, 0, w, h);
+      done.tile = true;
+    }
+  }
+  if (B.painting && bg.painting) {
+    var p = bg.painting.rect, pw = (p[2] - p[0]) * s, ph = (p[3] - p[1]) * s;
+    ctx.drawImage(treeMip(B.painting, pw * dpr), p[0] * s + ox, p[1] * s + oy, pw, ph);
+    done.painting = true;
+  }
+  if (B.art) {
+    var one = function (a, half, x, y) {
+      var A = B.art[a];
+      if (!A || !(half ? A.half : A.full)) return false;
+      var gw = A.w * s, gh = (half ? 2 * A.h : A.h) * s, sx = x * s + ox, sy = y * s + oy;
+      if (gw < 1.5 || sx + gw / 2 < 0 || sy + gh / 2 < 0 || sx - gw / 2 > w || sy - gh / 2 > h) return false;
+      ctx.drawImage(treeMip(half ? A.half : A.full, gw * dpr), sx - gw / 2, sy - gh / 2, gw, gh);
+      return true;
+    };
+    var g = bg.groups, i;
+    for (i = 0; i < g.length; i += 3) if (one(g[i + 2] >> 1, g[i + 2] & 1, g[i], g[i + 1])) done.groups++;
+    var st = bg.starts || [], I = opts && opts.nodes;
+    for (i = 0; i < st.length; i += 2) {
+      var a = opts && opts.starts ? opts.starts(st[i], st[i + 1]) : st[i + 1], n = I && I[st[i]];
+      if (a >= 0 && n && one(a, false, n.x, n.y)) done.starts++;
+    }
+  }
+  ctx.globalAlpha = treeBgDim(ctx, C.bg);
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
+  return done;
+}
+
+var TREE_BG = null; // treeBgLoad() state for the passive tree
+
 function treeDraw(cv) {
   var T = TREEVIEW;
   if (!cv || !T || !cv.w) return;
@@ -315,6 +465,15 @@ function treeDraw(cv) {
   ctx.globalAlpha = 1;
   ctx.fillStyle = cv.opts.inset ? C.s1 : C.bg;
   ctx.fillRect(0, 0, w, h);
+  cv.bgDrawn = null;
+  var bgD = !cv.opts.inset && T.I.D.background;
+  if (bgD && !TREE_BG) TREE_BG = treeBgLoad(bgD, treeRedraw);
+  if (bgD && TREE_BG.state === 'ready') {
+    var cls = T.M.cls;
+    cv.bgDrawn = treeBgDraw(cv, TREE_BG, bgD, C, ox, oy, { nodes: T.I.byId, starts: function (id, a) {
+      return cls && cls.start === id ? a : bgD.startInactive !== undefined ? bgD.startInactive : -1;
+    } });
+  }
 
   // links: one path per colour
   var cats = { dim: [], alloc: [], take: [], refund: [] };
@@ -854,6 +1013,7 @@ function makeTreeView(b) {
   }
   if (TREEVIEW && TREEVIEW.ro) TREEVIEW.ro.disconnect(); // the previous build's view
   if (TREE_SPRITES && TREE_SPRITES.state === 'failed') TREE_SPRITES = null; // icons: try again
+  if (TREE_BG && TREE_BG.state === 'failed') TREE_BG = null;                 // and the backdrop
   var T = TREEVIEW = { b: b, I: I, M: treeModel(b, I), cmp: null, mode: 'build', q: '', hits: null, hitList: [],
                        hitCount: 0, hover: null, flash: null, insetAsc: -1, shown: false };
 

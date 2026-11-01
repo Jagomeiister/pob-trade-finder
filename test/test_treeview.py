@@ -105,6 +105,33 @@ odd = [n[0] for i, n in enumerate(TV["nodes"]) if n[3] > 2 and at[2 * i] != -1]
 check("icons: masteries, sockets and starts have none (-1)", not odd, odd[:5])
 check("icons: coords are non-negative integers", all(isinstance(v, int) and (v >= 0 or v == -1) for v in at))
 
+# the in-game backdrop: tile, group circles, class start art (make_treeview.background())
+bg = TV.get("background") or {}
+art = bg.get("art") or []
+check("backdrop: tile and group sheet on GGG's CDN, same zoom as the icons",
+      bg["tile"]["url"].startswith("https://web.poecdn.com/") and bg["sheet"]["url"].startswith("https://web.poecdn.com/") and
+      bg["tile"]["zoom"] == bg["sheet"]["zoom"] == ic["zoom"], (bg.get("tile"), bg.get("sheet")))
+check("backdrop: art pieces are [key, x, y, w, h], keys unique",
+      art and all(len(a) == 5 and isinstance(a[0], str) and all(isinstance(v, int) and v >= 0 for v in a[1:]) for a in art) and
+      len({a[0] for a in art}) == len(art), art[:3])
+bgg = [bg["groups"][i:i + 3] for i in range(0, len(bg["groups"]), 3)]
+check("backdrop: hundreds of group circles, each a known piece", 300 < len(bgg) < 800 and len(bg["groups"]) % 3 == 0 and
+      all(0 <= g[2] >> 1 < len(art) for g in bgg), len(bgg))
+check("backdrop: the big circles are half images (mirrored), the small ones whole",
+      {art[g[2] >> 1][0] for g in bgg if g[2] & 1} == {"PSGroupBackground3"} and
+      {art[g[2] >> 1][0] for g in bgg if not g[2] & 1} == {"PSGroupBackground1", "PSGroupBackground2"},
+      sorted({(art[g[2] >> 1][0], g[2] & 1) for g in bgg}))
+mainxy = [(n[1], n[2]) for n in TV["nodes"] if (len(n) < 7 or n[6] < 0)]
+far = [g for g in bgg if min((g[0] - x) ** 2 + (g[1] - y) ** 2 for x, y in mainxy) > 900 ** 2]
+check("backdrop: every circle sits on the main tree (a node within its orbits)", not far, far[:3])
+st = dict(zip(bg["starts"][0::2], bg["starts"][1::2]))
+check("backdrop: each class start has its class art, the others' inactive art",
+      sorted(st) == sorted(c["start"] for c in TV["classes"]) and
+      all(art[st[c["start"]]][0] == "center" + c["name"].lower() for c in TV["classes"]) and
+      art[bg["startInactive"]][0] == "PSStartNodeBackgroundInactive", st)
+check("backdrop: small (< 8 KB of the file)", len(json.dumps(bg, separators=(",", ":"))) < 8 * 1024,
+      len(json.dumps(bg, separators=(",", ":"))))
+
 # the shipped file matches a fresh build from the cached export (skipped without the cache)
 tree_path = os.path.join(ROOT, "data", "tree.min.json")
 if os.path.exists(tree_path):
@@ -122,6 +149,15 @@ if os.path.exists(tree_path):
             if at[2 * i] + w > sheet["w"] or at[2 * i + 1] + h > sheet["h"]:
                 outside.append(n[0])
     check("icons: every icon lies inside its %dx%d sheet" % (sheet["w"], sheet["h"]), not outside, outside[:5])
+    gs = next(v for z, v in tree["sprites"]["groupBackground"].items() if float(z) == bg["sheet"]["zoom"])
+    check("backdrop: the sheet URL and pieces match the export (group + start sprites, one sheet)",
+          gs["filename"] == bg["sheet"]["url"] and all(a[1] + a[3] <= gs["w"] and a[2] + a[4] <= gs["h"] for a in art),
+          gs["filename"])
+    main_groups = {str(n.get("group")) for n in tree["nodes"].values() if not n.get("ascendancyName") and not n.get("isProxy")}
+    want = sorted((round(g["x"]), round(g["y"])) for gid, g in tree["groups"].items()
+                  if g.get("background") and not g.get("isProxy") and gid in main_groups)
+    check("backdrop: a circle for every main-tree group the export gives a background",
+          sorted((g[0], g[1]) for g in bgg) == want, (len(bgg), len(want)))
     g = geometry(tree)
     check("make_timeless geometry and make_treeview agree on every shared node",
           all(abs(nodes[int(k)][1] - v[0]) <= 1 and abs(nodes[int(k)][2] - v[1]) <= 1 for k, v in g.items()))
