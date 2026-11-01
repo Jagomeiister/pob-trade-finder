@@ -318,13 +318,36 @@ Details:
 - PoE 1 items only. Currency stacks, maps and other non-gear items open a card but may
   not produce a useful search
 
-## 5c2. 🤝 Trade helper (selling)
+## 5c2. 🤝 In game: overlay, hotkeys, trade helper, tray
 
-Cards for every trade whisper, like PoE Lurker. Open it from **Tools → Trade helper** in the
-sidebar or **⚙ Settings → In game → Trade helper…**. It's a small window that stays on top of
-the game.
+Like Awakened PoE Trade and PoE Lurker, the app shows small see-through pieces over the game
+while Path of Exile is focused. They never take focus from the game, they hide when you switch
+to another program, and they stay stuck to the game window, even on another screen. The game
+must run in **Windowed** or **Windowed Fullscreen** (true fullscreen hides every overlay).
 
-**Switch it on** in its **Setup** tab. The app then reads Path of Exile's chat log
+**The pieces**, each dragged by its ⠿ grip to wherever you want it, on its own:
+
+- **PoB icon**: a green dot means it's running (hover it to see your hotkeys) and a number
+  counts open trades. Click it to show or hide the trade cards. With your mouse over it you
+  also get ⚙ Settings, ⌂ the app and $ Trade helper
+- **Trade cards**: put them where you like, e.g. just above the XP bar. Placed in the lower
+  half of the screen, new cards stack upwards
+
+**Hotkeys** (⚙ Settings → In game). Each one works only while the game is in front:
+
+| Default | What it does |
+|---|---|
+| Ctrl+D | Price the item under your cursor |
+| Shift+Space | Brings this whole app over the game: builds, gear, trades and settings without alt-tabbing. Press it again, Esc or **Back to the game** to return |
+| Alt+T | Show or hide the trade cards |
+
+**Tray**: closing the window keeps the app running in the tray (bottom right of the taskbar).
+Click the icon to open it; right-click it for Open, Trade helper, Settings or **Quit**. You can
+turn this off in Settings → In game.
+
+### Trade helper (selling)
+
+**Switch it on** in **Trade helper → Setup**. The app then reads Path of Exile's chat log
 (`Client.txt` in the game folder → `logs`) while it runs. If it can't find the file, start the
 game or press **Choose Client.txt…**. Everything stays on your PC: sales, buyer notes, flags
 and hidden buyers are never uploaded or shared.
@@ -340,29 +363,37 @@ note:
    outlines the item's cell over your open stash tab for 20 seconds (quad tabs too)
 2. When the buyer enters your area the card shows **In your hideout** and switches to
    **Trade**, **Kick**, **Thanks**
-3. Then record what happened: **✓ Completed** (confirm or edit the price you got), **✗ Not
-   completed**, **⌛ Time wasted** or **Other…** (with a note). If the game logged "Trade
-   accepted", Completed is highlighted for you. If you invited someone and they didn't come
-   within 5 minutes (change it in Setup), **Mark as no-show** appears
+3. Then record what happened: **✓ Completed** (records the listed price), **✗ Not completed**,
+   **⌛ Time wasted** or **Other**. If the game logged "Trade accepted", Completed is
+   highlighted for you. Got a different price, or want a note? **Edit** the row in **Sales**.
+   If you invited someone and they didn't come within 5 minutes (change it in Setup),
+   **Mark as no-show** appears
 
-⋯ on a card: **Whois**, **Flag buyer**, **Hide this buyer** (no more popups or sounds from
-them; their whispers go to the **Hidden** list) and **Ignore in game…** (sends `/ignore` once,
-after you confirm).
+The cards are click-only, so your keyboard always stays with the game. ⋯ on a card shows
+**Whois**, **Flag**, **Hide buyer** (no more popups or sounds from them; their whispers go to
+the **Hidden** list) and **Ignore in game** (click twice: sends `/ignore` once).
 
 Outgoing whispers (you buying) get a card too: **Visit hideout**, **Trade**, **Re-whisper**.
 
-**Sales** tab: every completed sale with its price in chaos and divines, buyer, league, time
-and stash position. It also shows totals, the average, a chart per day, best sellers and a
-per-league breakdown. Filter by league, period, outcome or text, and **Export CSV**.
+The **Trade helper** window (sidebar → Tools, the $ on the icon, or the tray menu):
 
-**Buyers** tab: each buyer's completed trades, total spent, time wasted and no-shows (a badge
-on their next whisper shows this), a private note, flag, hide, ignore in game, and **Clear
-history**.
+- **Sales**: every completed sale with its price in chaos and divines, buyer, league, time and
+  stash position, plus totals, average, a chart per day, best sellers and a per-league
+  breakdown. Filter by league, period, outcome or text, **Edit** a row, **Export CSV**
+- **Buyers**: each buyer's completed trades, total spent, time wasted and no-shows (a badge on
+  their next whisper shows this), a private note, flag, hide, ignore in game, **Clear history**
+- **Setup**:
+  - on/off, the log file and the chat key read from your game settings
+  - **Sound**: Off, Chime, Bell, Soft, Ping or Coins, a **volume slider** (0 = silent) and
+    **▶ Test**
+  - **Overlay**: show the icon always or only when there are trades, size, an **opacity**
+    slider (solid while your mouse is over it), whether a new trade opens the cards,
+    **📌 Lock position** and **Reset position**
+  - the no-show time and your Busy / Sold / Still interested / Thanks messages (`{item}` and
+    `{price}` are filled in)
 
-**Setup**: on/off, the log file, the chat key read from your game settings, sounds, the
-no-show time and your Busy / Sold / Still interested / Thanks messages (`{item}` and
-`{price}` are filled in). If Path of Exile runs as administrator and the app doesn't, Windows
-blocks the buttons from typing; Setup warns you. Run both the same way.
+If Path of Exile runs as administrator and the app doesn't, Windows blocks the buttons from
+typing; Setup warns you. Run both the same way.
 
 ## 5d. ⏳ Timeless jewels
 

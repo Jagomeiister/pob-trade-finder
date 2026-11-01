@@ -403,6 +403,45 @@ body.trades .trades-root { display: block; }
 .sales-chart rect { fill: var(--accent); }
 .sales-chart text { fill: var(--text-3); font-size: 12px; }
 .trades-body .data-table { display: block; max-width: 100%; overflow-x: auto; }
+.sale-edit { display: flex; flex-wrap: wrap; gap: 8px; }
+.sale-edit .field-wide { flex-basis: 100%; }
+
+/* main window brought over the game by the app hotkey (16-overlay.js __appOverlay) */
+.over-game-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 6px 12px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: var(--fs-sm); }
+
+/* in-game overlay (index.html?cards=1): see-through window, sized to this content by gui.py */
+html:has(body.trade-cards), body.trade-cards { background: transparent !important; overflow: hidden; }
+body.trade-cards .app-shell, body.trade-cards .app-main { display: block; padding: 0; margin: 0; max-width: none; min-height: 0; }
+body.trade-cards .trades-root { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  width: max-content; max-width: 376px; padding: 2px; opacity: var(--ov-opacity, .92); transition: opacity .15s; }
+body.trade-cards .trades-root:hover { opacity: 1; }
+.trade-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.trade-slider { width: 140px; accent-color: var(--accent); }
+.slider-val { min-width: 3.2em; color: var(--text-2); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); }
+.ov-bar { display: flex; align-items: center; gap: 4px; }
+.ov-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  border-radius: 50%; border: 2px solid var(--border-strong, var(--border)); background: var(--s2); color: var(--accent);
+  cursor: pointer; box-shadow: 0 2px 8px var(--shadow); padding: 0; font: inherit; }
+.ov-icon:hover { border-color: var(--accent); }
+.ov-logo { font-weight: 700; font-size: var(--fs-xs); letter-spacing: .02em; }
+.ov-dot { position: absolute; right: 1px; bottom: 1px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--text-3); border: 2px solid var(--s2); }
+.ov-icon.is-running .ov-dot { background: var(--success); }
+.ov-count { position: absolute; top: -4px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; line-height: 18px; text-align: center; }
+.ov-grip { cursor: move; color: var(--text-3); padding: 4px 2px; user-select: none; font-size: 14px;
+  background: var(--s2); border-radius: var(--r-sm); opacity: .8; }
+.ov-bar .btn-icon { background: var(--s2); }
+.ov-cards { display: flex; flex-direction: column; gap: 6px; width: 372px; }
+.ov-head { display: flex; align-items: center; gap: 6px; width: 372px; padding: 3px 4px 3px 10px;
+  background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: 0 2px 8px var(--shadow); }
+.ov-head-title { flex: 1; color: var(--accent); font-weight: 600; font-size: var(--fs-sm); }
+.ov-cards .trade-card { box-shadow: 0 4px 14px var(--shadow); background: var(--s1); }
+.ov-note { padding: 8px 10px; background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-md);
+  color: var(--text-2); font-size: var(--fs-sm); }
+.tc-more { display: flex; gap: 6px; flex-wrap: wrap; }
+.tc-actions .is-on { color: var(--accent); }
 .trade-setup { display: flex; flex-direction: column; gap: 8px; }
 .trade-setup .field-wide { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
 .trade-h3 { font-size: var(--fs-md); margin: 8px 0 0; }

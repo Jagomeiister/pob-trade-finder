@@ -39,6 +39,7 @@ STEPS = [
     [sys.executable, "test/test_oauth.py"],
     [sys.executable, "test/test_quick_price.py"],
     [sys.executable, "test/test_trade_helper.py"],
+    [sys.executable, "test/test_tray.py"],
     ["node", "server/test/prices.test.mjs"],  # backend (needs: cd server && npm install)
     [sys.executable, "test/e2e/run_e2e.py"],  # headless Chrome, stubbed bridge, offline
 ]

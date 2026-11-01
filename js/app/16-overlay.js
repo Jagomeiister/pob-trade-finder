@@ -74,8 +74,60 @@ function refreshHotkeyStatus(promise) {
   if (!el || !isGui() || !window.pywebview.api.hotkey_status) return;
   (promise || window.pywebview.api.hotkey_status()).then(function (st) {
     el.textContent = hotkeyStatusText(st);
+    if (!window.pywebview.api.hotkeys_status) return;
+    return window.pywebview.api.hotkeys_status().then(function (all) {
+      var errs = Object.keys((all && all.hotkeys) || {}).map(function (k) { return all.hotkeys[k].error; }).filter(Boolean);
+      if (errs.length) el.textContent += ' · ⚠ ' + errs.join(' · ');
+    });
   }, function () { /* bridge gone */ });
 }
+
+// Settings → In game: the other two hotkeys (gui.py HOTKEY_DEFAULTS) and close-to-tray
+var EXTRA_HOTKEYS = [['pref-hotkey-app', 'app', 'hotkeyApp', 'shift+space'],
+                     ['pref-hotkey-trades', 'trades', 'hotkeyTrades', 'alt+t']];
+function wireExtraHotkeys() {
+  EXTRA_HOTKEYS.forEach(function (h) {
+    var sel = document.getElementById(h[0]);
+    if (!sel) return;
+    sel.value = PREFS[h[2]] || h[3];
+    sel.addEventListener('change', async function () {
+      var prev = PREFS[h[2]] || h[3];
+      if (!isGui() || !window.pywebview.api.set_hotkey) return;
+      var r = await window.pywebview.api.set_hotkey(h[1], this.value);
+      if (r && r.ok === false) { UI.toast(r.error, 'warn'); this.value = prev; return; }
+      PREFS[h[2]] = this.value;
+      savePrefs();
+      refreshHotkeyStatus();
+    });
+  });
+  var tray = document.getElementById('pref-close-tray');
+  if (tray) {
+    tray.checked = PREFS.closeToTray !== false;
+    tray.addEventListener('change', function () { PREFS.closeToTray = this.checked; savePrefs(); });
+  }
+}
+
+// App hotkey (default Shift+Space): gui.py brings this window over the game and calls this.
+// Esc, ✕ on the banner, or the hotkey again puts it back and returns to the game.
+var appOverGame = false;
+window.__appOverlay = function (on) {
+  appOverGame = !!on;
+  document.body.classList.toggle('over-game', appOverGame);
+  var bar = document.getElementById('over-game-bar');
+  if (appOverGame && !bar) {
+    bar = UI.el('div', 'over-game-bar');
+    bar.id = 'over-game-bar';
+    var keyName = (document.getElementById('pref-hotkey-app') || {}).selectedOptions;
+    bar.appendChild(UI.el('span', null, '🎮 Over the game · Esc or ' + (keyName && keyName[0] ? keyName[0].textContent : 'the hotkey') +
+      ' to go back'));
+    bar.appendChild(UI.button('secondary', { size: 'sm', label: 'Back to the game',
+      onClick: function () { window.pywebview.api.app_overlay(false); } }));
+    document.body.insertBefore(bar, document.body.firstChild);
+  } else if (!appOverGame && bar) {
+    bar.remove();
+  }
+  return true;
+};
 
 document.addEventListener('DOMContentLoaded', function () {
   var sel = document.getElementById('pref-hotkey');
@@ -92,6 +144,14 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById(id).addEventListener('click', function () { refreshHotkeyStatus(); });
     });
   }
+  wireExtraHotkeys();
+  document.addEventListener('keydown', function (e) {
+    // over the game: Esc goes back (unless a dialog, menu or the settings panel wants it first)
+    if (!appOverGame || e.key !== 'Escape' || e.defaultPrevented || document.querySelector('dialog[open]')) return;
+    var settingsOpen = !document.getElementById('settings-panel').classList.contains('hidden');
+    if (settingsOpen) return;
+    window.pywebview.api.app_overlay(false);
+  });
   if (!OVERLAY) return;
   var bar = document.createElement('div');
   bar.id = 'overlay-bar';

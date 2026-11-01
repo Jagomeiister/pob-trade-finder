@@ -234,6 +234,18 @@ STUB_JS = r"""
     session_status: function () { return { ok: true, set: false }; },
     timeless_sockets: function () { return { ok: true, sockets: [] }; },
     hotkey_status: function () { return { ok: true, hotkey: 'ctrl+d', label: 'Ctrl+D', running: false, active: false, error: null }; },
+    overlay_fit: function () { return { ok: true }; },
+    overlay_status: function () { return { ok: true, hotkey: 'Ctrl+D', hotkeys: { price: 'Ctrl+D', app: 'Shift+Space', trades: 'Alt+T' }, logWatching: true }; },
+    trade_status: function () { return { ok: true, watching: true, logName: 'Client.txt' }; },
+    trade_prefs_changed: function () { return { ok: true }; },
+    open_main: function () { return { ok: true }; },
+    overlay_toggle_cards: function () { return { ok: true }; },
+    set_hotkey: function (n, spec) { return { ok: true, hotkeys: {} }; },
+    hotkeys_status: function () { return { ok: true, hotkeys: {} }; },
+    app_overlay: function () { return { ok: true }; },
+    quit_app: function () { return { ok: true }; },
+    overlay_visible: function () { return { ok: true }; },
+    overlay_reset_pos: function () { return { ok: true }; },
     set_price_hotkey: function (spec) { return { ok: true, hotkey: spec, label: spec, running: false, active: false, error: null }; }
   };
   // every bridge method exists; unknown ones resolve to a soft failure and are recorded.
@@ -1449,38 +1461,35 @@ def scenario_v21b(s, tag):
         "https://www.pathofexile.com/trade/exchange/") and "%22want%22%3A%5B%22chaos%22%5D" in r["exUrl"], r["exUrl"])
 
 
-S19_TRADES = r"""
+S19_CARDS = r"""
 const H = window.__e2e;
 const out = {};
 const sends = () => H.calls('trade_send').map(c => c.args);
 const card = name => [...document.querySelectorAll('.trade-card')].find(c => c.querySelector('.tc-name').textContent === name);
-const clickDialog = async label => { await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'dialog');
-  H.button(document.querySelector('dialog[open]'), label).click(); await H.sleep(30); };
-out.layout = { trades: document.body.classList.contains('trades'),
-  rootShown: getComputedStyle(document.getElementById('trades-root')).display !== 'none',
-  resultsHidden: getComputedStyle(document.getElementById('results')).display === 'none' };
-out.offText = H.text('.trades-body');
-// switch on: privacy notice first, then the log is read
-H.button(document, 'Open Setup').click();
+out.layout = { cards: document.body.classList.contains('trade-cards'),
+  bg: getComputedStyle(document.body).backgroundColor,
+  resultsHidden: getComputedStyle(document.getElementById('results')).display === 'none',
+  noIcon: !document.querySelector('.ov-icon'), empty: !document.querySelector('.ov-cards') };
+out.firstVisible = (H.calls('overlay_visible')[0] || { args: [] }).args;
+out.fitCalls = H.calls('overlay_fit').length;
+window.__ovToggle(); // the icon click / hotkey, relayed by gui.py
 await H.sleep(30);
-out.enableBefore = H.calls('trade_enable').map(c => c.args[0]);
-document.getElementById('trade-enabled').click();
-await H.sleep(30);
-out.enableBefore = out.enableBefore.concat(H.calls('trade_enable').map(c => c.args[0])); // dialog still open
-await clickDialog('Switch on');
-await H.waitFor(() => H.calls('trade_enable').some(c => c.args[0] === true), 3000, 'enable');
-out.enableArgs = H.calls('trade_enable').slice(-1)[0].args;
-await H.sleep(30);
-out.status = H.text('#trades-status');
-H.button(document.querySelector('.trades-tabs'), 'Trades').click();
-// incoming trade whisper (guild tag) → a card; nothing is sent by the event itself
+out.offNote = H.text('.ov-note');
+out.grip = !!document.querySelector('.ov-head .ov-grip.pywebview-drag-region');
+localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ enabled: true, ack: true, sound: false }));
+await window.__tradePrefsChanged();
+window.__ovToggle(); // hide again: a new trade must open it
+await H.sleep(20);
+out.hiddenAgain = !document.querySelector('.ov-cards');
 const T = { kind: 'item', item: 'Doom Loop Two-Stone Ring', price: 2, currency: 'divine', league: 'Standard',
   tab: '~price 2 div', left: 5, top: 3, note: 'offer 1.5?' };
 window.__tradeEvent({ type: 'whisper', dir: 'in', guild: '<ART>™', name: 'BuyerOne', text: 'Hi, I would like to buy…', trade: T });
-await H.sleep(20);
+await H.sleep(30);
 let c = card('BuyerOne');
+out.opened = !!c && H.text('.ov-head-title') === 'Trades (1)';
+out.visibleCall = H.calls('overlay_visible').slice(-1)[0].args;
 out.newCard = { actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent), item: H.text('.tc-item', c),
-  where: H.text('.tc-where', c), note: H.text('.tc-note', c) };
+  where: H.text('.tc-where', c), note: H.text('.tc-note', c), inputs: c.querySelectorAll('input, select').length };
 out.sendsAfterWhisper = sends().length;
 H.button(c, 'Invite').click();
 await H.sleep(30);
@@ -1490,7 +1499,17 @@ out.sends1 = sends();
 H.button(card('BuyerOne'), '▣ Show in stash').click();
 await H.sleep(30);
 out.highlight = H.calls('trade_highlight')[0].args;
-// buyer joins: badge + stage 2, still nothing sent on its own
+// ⋯ opens an inline row (no pop-up menu); Ignore needs two clicks
+card('BuyerOne').querySelector('.tc-actions .btn-icon').click();
+await H.sleep(20);
+out.moreRow = [...card('BuyerOne').querySelectorAll('.tc-more .btn')].map(b => b.textContent);
+const n0 = sends().length;
+H.button(card('BuyerOne'), 'Ignore in game').click();
+await H.sleep(20);
+out.ignoreArmedSends = sends().length - n0;
+H.button(card('BuyerOne'), 'Click again: /ignore BuyerOne').click();
+await H.sleep(30);
+out.ignoreSent = sends().slice(n0);
 window.__tradeEvent({ type: 'joined', name: 'BuyerOne' });
 await H.sleep(20);
 c = card('BuyerOne');
@@ -1499,92 +1518,147 @@ out.joined = { here: !!c.querySelector('.tc-here'), actions: [...c.querySelector
 window.__tradeEvent({ type: 'trade_accepted' });
 await H.sleep(20);
 c = card('BuyerOne');
-out.suggested = H.button(c, '✓ Completed').classList.contains('suggested');
+out.suggested = c.querySelector('.tc-outcomes .btn.suggested') ? c.querySelector('.tc-outcomes .btn.suggested').textContent : null;
 out.sendsAfterEvents = sends().length;
 window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
-c.querySelector('.tc-price-in').value = '1.5';
-H.button(c, '✓ Completed').click();
+c.querySelector('.tc-outcomes .btn.suggested').click();
 await H.waitFor(() => !card('BuyerOne'), 3000, 'card closed');
 out.sales = JSON.parse(localStorage.getItem('pobtf-sales'));
 out.buyers = JSON.parse(localStorage.getItem('pobtf-buyers'));
-// same buyer again: reputation badge
 window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'BuyerOne', text: 'hi', trade: Object.assign({}, T, { item: 'Other Ring' }) });
 await H.sleep(20);
 out.badge = H.text('.buyer-badge', card('BuyerOne'));
 H.button(card('BuyerOne'), 'Invite').click();
 await H.sleep(30);
-// no-show offered after the set minutes
 tradeCards.find(x => x.name === 'BuyerOne').invitedAt = Date.now() - 6 * 60000;
 renderTrades();
 H.button(card('BuyerOne'), '⌛ Mark as no-show').click();
 await H.sleep(30);
 out.noShow = JSON.parse(localStorage.getItem('pobtf-buyers')).buyerone.noShow;
-// outgoing whisper: visit / trade / re-whisper
 window.__tradeEvent({ type: 'whisper', dir: 'out', name: 'SellerTwo', text: 'Hi, I would like to buy your X listed for 5 chaos in Standard',
   trade: { kind: 'item', item: 'X', price: 5, currency: 'chaos', league: 'Standard' } });
 await H.sleep(20);
 c = card('SellerTwo');
 out.outActions = [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent);
-const n0 = sends().length;
+const n1 = sends().length;
 H.button(c, 'Re-whisper').click();
 await H.sleep(30);
-out.rewhisper = sends().slice(n0);
-// hide a buyer: their cards go to Hidden, no popup
+out.rewhisper = sends().slice(n1);
 window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'Spammer', text: 'hi', trade: Object.assign({}, T, { item: 'Junk' }) });
 await H.sleep(20);
 await hideBuyer(tradeCards.find(x => x.name === 'Spammer'));
 window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'Spammer', text: 'hi', trade: Object.assign({}, T, { item: 'Junk 2' }) });
 await H.sleep(20);
 out.hidden = { visible: !!card('Spammer'), summary: H.text('.disclosure summary') };
-// Sales page + CSV (formula-safe)
-const L = JSON.parse(localStorage.getItem('pobtf-sales'));
-L.push({ id: 'x', time: Date.now(), outcome: 'completed', league: 'Standard', item: '=HYPERLINK("x")', price: 10, currency: 'chaos',
-  chaos: 10, div: 0.05, buyer: 'Z' });
-localStorage.setItem('pobtf-sales', JSON.stringify(L));
+out.fit = H.calls('overlay_fit').slice(-1)[0].args;
+out.noDialogs = !document.querySelector('dialog');
+localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ enabled: true, ack: true, sound: 'off', opacity: 50, locked: true }));
+window.__ovToggle(); if (!document.querySelector('.ov-head')) window.__ovToggle();
+renderTrades();
+out.opacity = getComputedStyle(document.getElementById('trades-root')).getPropertyValue('--ov-opacity').trim();
+out.gripWhenLocked = !!document.querySelector('.ov-grip');
+return out;
+"""
+
+S19_HELPER = r"""
+const H = window.__e2e;
+const out = {};
+const clickDialog = async label => { await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'dialog');
+  H.button(document.querySelector('dialog[open]'), label).click(); await H.sleep(30); };
+out.tabs = [...document.querySelectorAll('.trades-tab')].map(b => b.textContent);
+out.firstTab = H.text('.trades-tab[aria-selected="true"]');
+out.enableAtStart = H.calls('trade_enable').length;
+H.button(document.querySelector('.trades-tabs'), 'Setup').click();
+await H.sleep(30);
+out.iconToggle = [...document.querySelectorAll('.trade-setup .toggle')].some(t => /PoB icon over the game/.test(t.textContent));
+out.soundOpts = [...document.querySelectorAll('.trade-setup select[aria-label=Sound] option')].map(o => o.textContent);
+out.sliders = [...document.querySelectorAll('.trade-setup input[type=range]')].map(r => r.getAttribute('aria-label'));
+const vol = document.querySelector('.trade-setup input[aria-label=Volume]');
+vol.value = '0'; vol.dispatchEvent(new Event('change'));
+const op = document.querySelector('.trade-setup input[aria-label=Opacity]');
+op.value = '60'; op.dispatchEvent(new Event('change'));
+out.lock = [...document.querySelectorAll('.trade-setup .toggle')].some(t => /Lock position/.test(t.textContent));
+await H.sleep(30);
+out.prefsAfter = JSON.parse(localStorage.getItem('pobtf-trade-prefs'));
+document.getElementById('trade-enabled').click();
+await H.sleep(30);
+out.enableBeforeConfirm = H.calls('trade_enable').length;
+await clickDialog('Switch on');
+await H.waitFor(() => H.calls('trade_enable').some(c => c.args[0] === true), 3000, 'enable');
+await H.waitFor(() => H.calls('trade_prefs_changed').length, 3000, 'overlay told');
+out.status = H.text('#trades-status');
+// sales recorded by the overlay; edit one here
+const now = Date.now();
+localStorage.setItem('pobtf-sales', JSON.stringify([
+  { id: 'a', time: now - 3600e3, outcome: 'completed', league: 'Standard', item: 'Doom Loop', price: 2, currency: 'divine', chaos: 400, div: 2, buyer: 'BuyerOne' },
+  { id: 'b', time: now, outcome: 'completed', league: 'Standard', item: '=HYPERLINK("x")', price: 10, currency: 'chaos', chaos: 10, div: 0.05, buyer: 'Z' }]));
+localStorage.setItem('pobtf-buyers', JSON.stringify({ buyerone: { name: 'BuyerOne', names: ['BuyerOne'], completed: 1, spent: 400,
+  wasted: 0, noShow: 0, notCompleted: 0, other: 0, flag: false, hidden: false, note: '' } }));
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
 H.button(document.querySelector('.trades-tabs'), 'Sales').click();
 await H.sleep(30);
 out.tiles = [...document.querySelectorAll('.sales-tile')].map(t => t.textContent);
 out.chart = !!document.querySelector('.sales-chart rect');
+const row = [...document.querySelectorAll('.data-table tbody tr')].find(r => r.textContent.includes('Doom Loop') && H.button(r, 'Edit'));
+H.button(row, 'Edit').click();
+await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'edit dialog');
+const dlg = document.querySelector('dialog[open]');
+dlg.querySelector('input[type=number]').value = '1.5';
+dlg.querySelector('input[aria-label=Note]').value = 'haggled';
+await clickDialog('Save');
+await H.sleep(50);
+out.edited = JSON.parse(localStorage.getItem('pobtf-sales')).find(s => s.id === 'a');
 H.button(document, 'Export CSV').click();
 await H.sleep(50);
 out.csv = H.calls('save_text_file')[0].args[1];
-// Buyers page: ignore in game sends /ignore once, after a confirm
 H.button(document.querySelector('.trades-tabs'), 'Buyers').click();
 await H.sleep(30);
 out.buyerRows = document.querySelectorAll('.buyer-row').length;
-const n1 = sends().length;
+const n1 = H.calls('trade_send').length;
 H.button(document.querySelector('.buyer-row'), 'Ignore in game…').click();
 await clickDialog('Send /ignore');
 await H.sleep(30);
-out.ignore = sends().slice(n1);
+out.ignore = H.calls('trade_send').slice(n1).map(c => c.args);
 return out;
 """
 
 
 def scenario_trades(s, tag):
-    s.fresh("?trades=1")
-    r = s.run(S19_TRADES, timeout=60)
-    check(tag + " trades window shows only the trade helper", all(r["layout"].values()), r["layout"])
-    check(tag + " off until switched on", "Trade helper is off" in (r["offText"] or ""), r["offText"])
-    check(tag + " switching on asks first, then reads the log", True not in r["enableBefore"] and
-          r["enableArgs"][0] is True and "Reading" in r["status"], (r["enableBefore"], r["enableArgs"], r["status"]))
+    s.fresh("?cards=1")
+    r = s.run(S19_CARDS, timeout=60)
+    L = r["layout"]
+    check(tag + " cards overlay: see-through, its own window (no icon), hidden until needed", L["cards"] and
+          L["resultsHidden"] and L["noIcon"] and L["empty"] and L["bg"] in ("rgba(0, 0, 0, 0)", "transparent") and
+          r["firstVisible"][:2] == ["cards", False], (L, r["firstVisible"]))
+    check(tag + " cards overlay sizes its window to the content", r["fit"][0] == "cards" and
+          0 < r["fit"][1] <= 400, r["fit"])
+    check(tag + " icon/hotkey toggle shows the cards, with their own drag grip", r["grip"] and r["hiddenAgain"], r)
+    check(tag + " helper off: says where to switch it on", "Setup" in (r["offNote"] or ""), r["offNote"])
+    check(tag + " new trade opens the cards and reports the count for the icon", r["opened"] and
+          r["visibleCall"] == ["cards", True, 1], (r["opened"], r["visibleCall"]))
     check(tag + " incoming card: Invite · Busy · Sold · Still interested?",
           r["newCard"]["actions"][:4] == ["Invite", "Busy", "Sold", "Still interested?"], r["newCard"])
     check(tag + " card shows item, price, tab position and note", "2 div" in r["newCard"]["item"] and
           "left 5, top 3" in r["newCard"]["where"] and "offer 1.5?" in r["newCard"]["note"], r["newCard"])
+    check(tag + " overlay cards have no text inputs (never take the keyboard)", r["newCard"]["inputs"] == 0, r["newCard"])
     check(tag + " a whisper sends nothing by itself", r["sendsAfterWhisper"] == 0, r["sendsAfterWhisper"])
     check(tag + " one press = one command", r["sends1"] == [["invite", "BuyerOne", None],
           ["whisper", "BuyerOne", "I'm busy right now, I'll invite you shortly"]], r["sends1"])
     check(tag + " stash highlight gets the position", r["highlight"][:2] == [5, 3], r["highlight"])
+    check(tag + " ⋯ shows an inline row (Whois, Flag, Hide, Ignore)", r["moreRow"] == ["Whois", "⚑ Flag", "Hide buyer",
+          "Ignore in game"], r["moreRow"])
+    check(tag + " Ignore needs a second click, then sends /ignore once", r["ignoreArmedSends"] == 0 and
+          r["ignoreSent"] == [["ignore", "BuyerOne", None]], (r["ignoreArmedSends"], r["ignoreSent"]))
     check(tag + " buyer joined: badge, Trade · Kick · Thanks, outcomes", r["joined"]["here"] and
           r["joined"]["actions"][:3] == ["Trade", "Kick", "Thanks"] and
-          r["joined"]["outcomes"][:1] == ["✓ Completed"] and "⌛ Time wasted" in r["joined"]["outcomes"], r["joined"])
-    check(tag + " Trade accepted pre-selects Completed, sends nothing", r["suggested"] and r["sendsAfterEvents"] == 2, r)
+          r["joined"]["outcomes"][0].startswith("✓ Completed") and "⌛ Time wasted" in r["joined"]["outcomes"], r["joined"])
+    check(tag + " Trade accepted highlights Completed (listed price), sends nothing",
+          (r["suggested"] or "").startswith("✓ Completed · 2 div") and r["sendsAfterEvents"] == 3, r)
     sale = (r["sales"] or [{}])[0]
-    check(tag + " sale recorded at the confirmed price", sale.get("outcome") == "completed" and sale.get("price") == 1.5 and
-          sale.get("currency") == "divine" and sale.get("chaos") == 300 and sale.get("buyer") == "BuyerOne", sale)
+    check(tag + " sale recorded at the listed price", sale.get("outcome") == "completed" and sale.get("price") == 2 and
+          sale.get("currency") == "divine" and sale.get("chaos") == 400 and sale.get("buyer") == "BuyerOne", sale)
     b = (r["buyers"] or {}).get("buyerone") or {}
-    check(tag + " buyer reputation counts the sale", b.get("completed") == 1 and b.get("spent") == 300, b)
+    check(tag + " buyer reputation counts the sale", b.get("completed") == 1 and b.get("spent") == 400, b)
     check(tag + " repeat buyer gets a badge", "1 bought" in (r["badge"] or ""), r["badge"])
     check(tag + " no-show after the set minutes", r["noShow"] == 1, r["noShow"])
     check(tag + " outgoing card: Visit hideout · Trade · Re-whisper",
@@ -1593,12 +1667,71 @@ def scenario_trades(s, tag):
           and r["rewhisper"][0][2].startswith("Hi, I would like"), r["rewhisper"])
     check(tag + " hidden buyer: no card, listed under Hidden", not r["hidden"]["visible"] and
           "Hidden (2)" in (r["hidden"]["summary"] or ""), r["hidden"])
+    check(tag + " overlay never opens a dialog", r["noDialogs"], r["noDialogs"])
+    check(tag + " overlay opacity setting applied, Lock hides the drag grip", r["opacity"] == "0.5" and
+          not r["gripWhenLocked"], (r["opacity"], r["gripWhenLocked"]))
+
+    s.fresh("?trades=1")
+    r = s.run(S19_HELPER, timeout=60)
+    check(tag + " helper window: Sales · Buyers · Setup, opens on Sales", r["tabs"] == ["Sales", "Buyers", "Setup"] and
+          r["firstTab"] == "Sales", r["tabs"])
+    check(tag + " helper window doesn't restart the log reader on open", r["enableAtStart"] == 0, r["enableAtStart"])
+    check(tag + " Setup has the overlay icon option", r["iconToggle"], r["iconToggle"])
+    check(tag + " Sound: Off + styles, volume and opacity sliders, lock", r["soundOpts"][0] == "Off" and
+          len(r["soundOpts"]) >= 4 and r["sliders"] == ["Volume", "Opacity"] and r["lock"], (r["soundOpts"], r["sliders"]))
+    pa = r["prefsAfter"] or {}
+    check(tag + " sliders save (volume 0 = silent, opacity 60%)", pa.get("volume") == 0 and pa.get("opacity") == 60, pa)
+    check(tag + " switching on asks first, then reads the log and tells the overlay",
+          r["enableBeforeConfirm"] == 0 and "Reading" in (r["status"] or ""), r)
     check(tag + " sales totals + chart", any("Sales2" in t.replace(" ", "") for t in r["tiles"]) and r["chart"], r["tiles"])
+    e = r["edited"] or {}
+    check(tag + " Edit sale: new price re-valued, note kept", e.get("price") == 1.5 and e.get("chaos") == 300 and
+          e.get("note") == "haggled", e)
     check(tag + " CSV export: header + formula-safe cells", (r["csv"] or "").startswith("time,outcome,league,item") and
           "'=HYPERLINK" in r["csv"], (r["csv"] or "")[:200])
-    check(tag + " Buyers page lists them", r["buyerRows"] >= 2, r["buyerRows"])
-    check(tag + " Ignore in game: one /ignore after confirming", len(r["ignore"]) == 1 and r["ignore"][0][0] == "ignore",
-          r["ignore"])
+    check(tag + " Buyers page lists them", r["buyerRows"] >= 1, r["buyerRows"])
+    check(tag + " Ignore in game (helper window): one /ignore after confirming",
+          r["ignore"] == [["ignore", "BuyerOne", None]], r["ignore"])
+
+
+
+S19_ICON = r"""
+const H = window.__e2e;
+const out = {};
+await H.waitFor(() => document.querySelector('.ov-icon.is-running'), 3000, 'status');
+out.icon = { running: true, title: document.querySelector('.ov-icon').title, grip: !!document.querySelector('.ov-grip'),
+  buttons: document.querySelectorAll('.ov-bar .btn').length, cards: !!document.querySelector('.trade-card') };
+window.__ovCount(2, true);
+await H.sleep(20);
+out.count = H.text('.ov-count');
+document.querySelector('.ov-icon').click();
+await H.sleep(30);
+out.toggles = H.calls('overlay_toggle_cards').length;
+document.getElementById('trades-root').dispatchEvent(new Event('mouseenter'));
+await H.sleep(20);
+out.hoverButtons = [...document.querySelectorAll('.ov-bar .btn')].map(b => b.getAttribute('aria-label'));
+document.getElementById('trades-root').dispatchEvent(new Event('mouseleave'));
+localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ iconMode: 'trades' }));
+window.__ovCount(0, false);
+await H.sleep(30);
+out.lastVisible = H.calls('overlay_visible').slice(-1)[0].args;
+out.fit = H.calls('overlay_fit').slice(-1)[0].args;
+return out;
+"""
+
+
+def scenario_overlay_icon(s, tag):
+    s.fresh("?ovicon=1")
+    r = s.run(S19_ICON, timeout=30)
+    i = r["icon"]
+    check(tag + " icon overlay: PoB button + grip, no cards, status in the tooltip", i["grip"] and not i["cards"] and
+          i["buttons"] == 0 and "Shift+Space" in i["title"] and "Alt+T" in i["title"], i)
+    check(tag + " icon shows the open-trade count", r["count"] == "2", r["count"])
+    check(tag + " icon click toggles the cards (through gui.py)", r["toggles"] == 1, r["toggles"])
+    check(tag + " extra buttons only on hover (settings, app, trade helper)", len(r["hoverButtons"]) == 3, r["hoverButtons"])
+    check(tag + " 'only when there are trades' hides the icon with none", r["lastVisible"][:2] == ["icon", False],
+          r["lastVisible"])
+    check(tag + " icon window sized to the button", r["fit"][0] == "icon" and 0 < r["fit"][1] < 200, r["fit"])
 
 
 SCENARIOS = [
@@ -1621,6 +1754,7 @@ SCENARIOS = [
     ("17 v21", scenario_v21),
     ("18 v21b", scenario_v21b),
     ("19 trades", scenario_trades),
+    ("20 ovicon", scenario_overlay_icon),
 ]
 
 

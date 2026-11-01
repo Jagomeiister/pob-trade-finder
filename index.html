@@ -142,7 +142,27 @@
             <option value="off">Off</option>
           </select>
         </label>
+        <label class="field">
+          <span class="field-label">Open the app over the game</span>
+          <select id="pref-hotkey-app" title="Brings this window over Path of Exile (trades, gear, settings) without alt-tabbing. Press it again or Esc to go back to the game.">
+            <option value="shift+space">Shift+Space</option>
+            <option value="ctrl+shift+space">Ctrl+Shift+Space</option>
+            <option value="alt+space">Alt+Space</option>
+            <option value="f9">F9</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Show / hide trade cards</span>
+          <select id="pref-hotkey-trades" title="Shows or hides the trade cards over the game (same as clicking the PoB icon)">
+            <option value="alt+t">Alt+T</option>
+            <option value="ctrl+shift+t">Ctrl+Shift+T</option>
+            <option value="f8">F8</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
         <div id="hotkey-status" class="hotkey-status"></div>
+        <label class="toggle"><input type="checkbox" id="pref-close-tray" checked> Closing the window keeps the app in the tray (right-click the tray icon to quit)</label>
         <div class="input-row">
           <button id="open-trades" class="btn btn-secondary btn-sm" title="Cards for trade whispers, your sales and buyer notes (reads Client.txt once you switch it on)">🤝 Trade helper…</button>
         </div>

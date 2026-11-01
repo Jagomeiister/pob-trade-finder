@@ -60,7 +60,21 @@ OVERLAY_SIZE = (560, 700)
 
 # trade helper: a third window on index.html?trades=1 (js/app/19-trades.js)
 TRADES_TITLE = "PoB Trade Finder - Trades"
-TRADES_SIZE = (440, 680)
+TRADES_SIZE = (720, 680)
+# in-game overlay (Awakened Trade / Lurker style): a small PoB icon over the game while it's
+# focused, with trade cards under it. Frameless, see-through, never takes focus.
+MAIN_TITLE = "PoB Trade Finder"
+# Separate pieces, each draggable on its own (Lurker / Awakened style). default = where the
+# top-left (or, for one in the lower half, the bottom edge) sits as a fraction of the game.
+OVERLAYS = {
+    "icon": {"title": "PoB Trade Finder - Icon", "query": "?ovicon=1", "pos": "pobtf-ov-icon-pos",
+             "default": (0.55, 0.006), "size": (60, 48)},
+    "cards": {"title": "PoB Trade Finder - Trade cards", "query": "?cards=1", "pos": "pobtf-ov-cards-pos",
+              "default": (0.5, 0.80), "size": (380, 60)},  # centred, above the skill bar / XP bar
+}
+# Hotkeys (Settings → In game): each held only while the game (or our overlay) is focused.
+HOTKEY_DEFAULTS = {"price": "ctrl+d", "app": "shift+space", "trades": "alt+t"}
+HOTKEY_PREFS = {"price": "hotkey", "app": "hotkeyApp", "trades": "hotkeyTrades"}
 CHAT_KEY_NAMES = {13: "Enter", 9: "Tab", 32: "Space", 192: "` (backtick)", 222: "' (quote)", 191: "/ (slash)"}
 
 
@@ -139,16 +153,31 @@ class Api:
         self._destroy_lock = threading.Lock()
         # trade helper (wired up by main()): Client.txt tail, chat sender, stash outline
         self._trades = None
+        self._overlay_windows = {}  # name -> pywebview window (OVERLAYS)
+        self._ov = {n: {"content": True, "placed": None, "placed_at": 0.0, "dragging": False, "replace": False}
+                    for n in OVERLAYS}
+        self._app_overlay = False   # main window brought over the game by the app hotkey
+        self._main_was_hidden = False
+        self._main = None
+        self._tray = None
+        self._hotkeys = {}
         self._tail = None
         self._sender = None
         self._highlight = None
         self._trade_lock = threading.Lock()
+        self._hotkey_specs = {}
         try:
-            spec = json.loads(self._storage.get("pobtf-prefs") or "{}").get("hotkey", "ctrl+d")
-            price_hotkey.parse_hotkey(spec)
+            prefs = json.loads(self._storage.get("pobtf-prefs") or "{}")
         except Exception:
-            spec = "ctrl+d"
-        self._hotkey_spec = spec
+            prefs = {}
+        for name, default in HOTKEY_DEFAULTS.items():
+            spec = prefs.get(HOTKEY_PREFS[name], default)
+            try:
+                price_hotkey.parse_hotkey(spec)
+            except Exception:
+                spec = default
+            self._hotkey_specs[name] = spec
+        self._hotkey_spec = self._hotkey_specs["price"]
 
     # -- shared HTTP helper: quota-aware throttle, global 429 lockout ------------
     def _read_quota(self, headers):
@@ -996,10 +1025,12 @@ class Api:
 
         def main_closed():
             # the hidden overlay would otherwise keep the app alive
+            _debug_log("main window closed: app exiting")
             self._quitting = True
             self._destroy_once(overlay)
 
         def overlay_closing():
+            _debug_log("price check: close requested (app quitting=%s)" % self._quitting)
             if self._quitting:
                 return True
             # the overlay's own close box only hides it (it is reused on every press)
@@ -1009,38 +1040,213 @@ class Api:
         main_window.events.closed += main_closed
         overlay.events.closing += overlay_closing
 
-    def _attach_trades(self, main_window, trades):
+    def _attach_trades(self, main_window, trades, overlays):
+        self._main = main_window
         self._trades = trades
+        self._overlay_windows = overlays
+
+        def main_closing():
+            # ✕ on the main window: to the tray (Settings → "Close to tray"), like other tray apps
+            if self._quitting or not self._close_to_tray():
+                _debug_log("main window: close requested, quitting")
+                return True
+            _debug_log("main window: close requested, hiding to the tray")
+            threading.Thread(target=self._hide_main_to_tray, daemon=True).start()
+            return False
 
         def main_closed():
             self._quitting = True
             if self._tail:
                 self._tail.stop()
+            if self._tray:
+                self._tray.stop()
             self._destroy_once(trades)
+            for w in overlays.values():
+                self._destroy_once(w)
+
+        def overlay_closing():
+            _debug_log("overlay: close requested (app quitting=%s)" % self._quitting)
+            return bool(self._quitting)  # Alt+F4 on an overlay must not end the app
 
         def trades_closing():
+            _debug_log("trade helper window: close requested (app quitting=%s)" % self._quitting)
             if self._quitting:
                 return True
             threading.Thread(target=trades.hide, daemon=True).start()  # ✕ hides; reopened from the app
             return False
 
+        main_window.events.closing += main_closing
         main_window.events.closed += main_closed
         trades.events.closing += trades_closing
+        for w in overlays.values():
+            w.events.closing += overlay_closing
+        threading.Thread(target=self._follow_game, daemon=True, name="overlay-follow").start()
 
-    def _start_hotkey(self):
-        if sys.platform != "win32" or self._hotkey:
+    # -- tray icon + main window over the game ----------------------------------------
+    def _start_tray(self):
+        """Notification-area icon: click opens the app; right-click menu like other tray apps."""
+        if sys.platform != "win32" or self._tray:
             return
         try:
-            self._hotkey = price_hotkey.HotkeyWatcher(self._on_price_hotkey, self._hotkey_spec,
-                                                      log=_debug_log)
-            self._hotkey.start()
+            import tray
+            self._tray = tray.TrayIcon(
+                "PoB Trade Finder", icon_path=os.path.join(APP_DIR, "icon.ico"), log=_debug_log,
+                on_click=lambda: self._show_main(),
+                menu=[("Open PoB Trade Finder", lambda: self._show_main()),
+                      ("Trade helper", lambda: self._show_trades(activate=True)),
+                      ("Settings", lambda: self._show_main(settings=True)),
+                      None,
+                      ("Quit", self._quit)])
+            if not self._tray.start():
+                _debug_log("tray icon unavailable")
+                self._tray = None
         except Exception as e:
-            _debug_log("price hotkey unavailable: %s" % e)
-            self._hotkey = None
+            _debug_log("tray icon unavailable: %s" % e)
+            self._tray = None
+
+    def _quit(self):
+        """Tray → Quit: really exit (closing the main window only hides it to the tray)."""
+        _debug_log("quit from the tray")
+        self._quitting = True
+        if self._tray:
+            self._tray.stop()
+        self._destroy_once(self._main)
+
+    def quit_app(self):
+        try:
+            threading.Thread(target=self._quit, daemon=True).start()
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def _prefs(self):
+        try:
+            return json.loads(self._storage.get("pobtf-prefs") or "{}")
+        except Exception:
+            return {}
+
+    def _close_to_tray(self):
+        return bool(self._tray and self._tray.running and self._prefs().get("closeToTray", True) is not False)
+
+    def _hide_main_to_tray(self):
+        if self._app_overlay:
+            self._set_app_overlay(False, refocus=True)
+        self._main.hide()
+        if not self._storage.get("pobtf-tray-told"):
+            self.storage_set("pobtf-tray-told", "1")
+            self._tray.notify("PoB Trade Finder is still running",
+                              "It's in the tray. Right-click the icon to open it or quit.")
+
+    def _show_main(self, settings=False, over_game=False):
+        main = self._main
+        if not main:
+            return
+        main.show()
+        hwnd = price_hotkey.find_window(MAIN_TITLE)
+        if hwnd and sys.platform == "win32":
+            import ctypes
+            u = ctypes.windll.user32
+            if u.IsIconic(hwnd):
+                u.ShowWindow(hwnd, 9)  # SW_RESTORE
+            if over_game:  # topmost while it's over the game, so the game can't cover it
+                main.on_top = True
+            price_hotkey.focus_window(hwnd)
+        if settings:
+            self._eval_in(main, "window.openSettings && openSettings()")
+
+    def _set_app_overlay(self, on, refocus=True):
+        """App hotkey: the main window over the game (trades, gear, settings without alt-tab);
+        again, or Esc, puts it back and returns to the game."""
+        self._app_overlay = bool(on)
+        self._eval_in(self._main, "window.__appOverlay && window.__appOverlay(%s)" % ("true" if on else "false"))
+        if on:
+            self._show_main(over_game=True)
+            return
+        if self._main:
+            self._main.on_top = False
+        if self._close_to_tray() and self._main_was_hidden:
+            self._main.hide()
+        game = self._find_poe_window()
+        if refocus and game:
+            price_hotkey.focus_window(game)
+
+    def app_overlay(self, on):
+        """Esc / ✕ in the in-game app banner."""
+        try:
+            self._set_app_overlay(bool(on))
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def _on_app_hotkey(self, hwnd):
+        if self._app_overlay:
+            self._set_app_overlay(False)
+            return
+        main = price_hotkey.find_window(MAIN_TITLE)
+        import ctypes
+        self._main_was_hidden = not (main and ctypes.windll.user32.IsWindowVisible(main))
+        self._set_app_overlay(True)
+
+    def _on_trades_hotkey(self, hwnd):
+        self.overlay_toggle_cards()
+
+    def _hotkey_target(self):
+        """Hotkeys work while the game, one of our overlays, or the app over the game is in front."""
+        fg = price_hotkey.foreground_game_window()
+        if fg:
+            return fg
+        import ctypes
+        cur = ctypes.windll.user32.GetForegroundWindow()
+        ours = {price_hotkey.find_window(o["title"]) for o in OVERLAYS.values()}
+        if self._app_overlay:
+            ours.add(price_hotkey.find_window(MAIN_TITLE))
+        return cur if cur and cur in ours else None
+
+    def _start_hotkey(self):
+        if sys.platform != "win32" or self._hotkeys:
+            return
+        fire = {"price": self._on_price_hotkey, "app": self._on_app_hotkey, "trades": self._on_trades_hotkey}
+        for name, fn in fire.items():
+            try:
+                w = price_hotkey.HotkeyWatcher(fn, self._hotkey_specs[name], log=_debug_log,
+                                               is_target=None if name == "price" else self._hotkey_target)
+                w.start()
+                self._hotkeys[name] = w
+            except Exception as e:
+                _debug_log("%s hotkey unavailable: %s" % (name, e))
+        self._hotkey = self._hotkeys.get("price")
 
     def _stop_hotkey(self):
-        if self._hotkey:
-            self._hotkey.stop()
+        for w in self._hotkeys.values():
+            w.stop()
+
+    def set_hotkey(self, name, spec):
+        """Settings → In game: change one hotkey (price | app | trades) at runtime."""
+        try:
+            if name not in HOTKEY_DEFAULTS:
+                return {"ok": False, "error": "unknown hotkey"}
+            spec = (spec or "off").strip().lower().replace(" ", "")
+            price_hotkey.parse_hotkey(spec)
+            taken = [n for n, s in self._hotkey_specs.items() if n != name and s == spec and spec not in price_hotkey.OFF]
+            if taken:
+                return {"ok": False, "error": "%s is already used for another hotkey" % price_hotkey.hotkey_label(spec)}
+            self._hotkey_specs[name] = spec
+            if name == "price":
+                self._hotkey_spec = spec
+            if name in self._hotkeys:
+                self._hotkeys[name].set_spec(spec)
+            return self.hotkeys_status()
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+
+    def hotkeys_status(self):
+        out = {}
+        for name, spec in self._hotkey_specs.items():
+            w = self._hotkeys.get(name)
+            st = w.status() if w else {"hotkey": spec, "label": price_hotkey.hotkey_label(spec), "active": False,
+                                       "error": None if sys.platform == "win32" else "Windows only"}
+            out[name] = st
+        return {"ok": True, "hotkeys": out}
 
     def _on_price_hotkey(self, game_hwnd):
         text = price_hotkey.copy_item_text()
@@ -1090,23 +1296,214 @@ class Api:
 
     # -- trade helper (js/app/19-trades.js) -------------------------------------------
     # Reads Client.txt once the user switches it on; log events become cards in the
-    # trades window. GGG's rules: game commands go out only from a button press
+    # in-game overlay. GGG's rules: game commands go out only from a button press
     # (trade_send, one command per call), never from a log event or a timer.
-    def _trades_eval(self, js):
-        win = self._trades
+    def _on_trade_event(self, ev):
+        # cards live in the in-game overlay, which shows whenever the game is focused
+        self._eval_in(self._overlay_windows.get("cards"), "window.__tradeEvent && window.__tradeEvent(%s)" % json.dumps(ev))
+
+    def _eval_in(self, win, js):
         if not win:
             return
         try:
             win.evaluate_js(js)
         except Exception as e:
-            _debug_log("trades window: %s" % e)
+            _debug_log("evaluate_js: %s" % e)
 
-    def _on_trade_event(self, ev):
-        self._trades_eval("window.__tradeEvent && window.__tradeEvent(%s)" % json.dumps(ev))
-        # a new incoming trade brings the (always-on-top) window up without taking focus
-        # from the game: display only, nothing is sent
-        if ev.get("type") == "whisper" and ev.get("dir") == "in" and ev.get("trade"):
-            self._show_trades(activate=False)
+    # -- in-game overlays: icon + trade cards ---------------------------------------
+    # Separate see-through windows (OVERLAYS), each shown only while Path of Exile (or one
+    # of our windows) is the foreground window, like Awakened Trade's widget. Display only.
+    # Each one can be dragged anywhere; its spot is kept relative to the game window, and
+    # one placed in the lower half grows upwards (cards above the XP bar).
+    def _overlay_pref(self, name):
+        try:
+            p = json.loads(self._storage.get("pobtf-trade-prefs") or "{}")
+        except Exception:
+            p = {}
+        return p.get("icon", True) is not False if name == "icon" else True
+
+    def _follow_game(self):
+        import ctypes
+        u = ctypes.windll.user32
+        game, found_at = 0, 0.0
+        while not self._quitting:
+            time.sleep(0.3)
+            try:
+                now = time.time()
+                if now - found_at > 2 or (game and not u.IsWindow(game)):
+                    game, found_at = self._find_poe_window() or 0, now
+                fg = u.GetForegroundWindow()
+                hwnds = {n: price_hotkey.find_window(o["title"]) for n, o in OVERLAYS.items()}
+                ours = set(hwnds.values()) | {price_hotkey.find_window(OVERLAY_TITLE)}
+                if self._app_overlay:
+                    ours.add(price_hotkey.find_window(MAIN_TITLE))
+                game_up = bool(game) and not u.IsIconic(game) and (fg == game or fg in ours)
+                lbutton = u.GetAsyncKeyState(0x01) & 0x8000
+                for name, hwnd in hwnds.items():
+                    if hwnd:
+                        self._follow_one(u, name, hwnd, game, game_up and self._overlay_pref(name)
+                                         and self._ov[name]["content"], lbutton, now)
+            except Exception as e:
+                _debug_log("overlay follow: %s" % e)
+                time.sleep(2)
+
+    def _follow_one(self, u, name, hwnd, game, want, lbutton, now):
+        st = self._ov[name]
+        # check the real window state each tick: pywebview shows a transparent window by
+        # itself once its page loads, whatever hidden=True said
+        vis = bool(u.IsWindowVisible(hwnd))
+        if st["replace"]:  # Setup → Reset position
+            st["replace"], st["placed"] = False, None
+        if not want:
+            if vis:
+                u.ShowWindow(hwnd, 0)  # SW_HIDE
+            st["placed"], st["dragging"] = None, False  # placed again on the next show
+            return
+        g = trade_helper.game_client_rect(game)
+        if not vis or st["placed"] is None or (g and g != st.get("game") and not st["dragging"]):
+            # first show, or the game window moved / resized / went to another screen: the
+            # overlay goes with it, to the same spot relative to the game
+            st["placed"], st["placed_at"], st["game"] = self._place_overlay(name, game, hwnd), now, g
+            if not vis:
+                u.ShowWindow(hwnd, 4)  # SW_SHOWNOACTIVATE
+            return
+        r = price_hotkey.window_rect(hwnd)
+        if lbutton:
+            # a drag is the mouse held down on this overlay; anything else that moves it isn't
+            if not st["dragging"] and r:
+                from ctypes import wintypes, byref
+                pt = wintypes.POINT()
+                if u.GetCursorPos(byref(pt)) and r[0] <= pt.x < r[2] and r[1] <= pt.y < r[3]:
+                    st["dragging"] = True
+            return
+        if not r or (r[0], r[1]) == st["placed"]:
+            st["dragging"] = False
+            return
+        if not st["dragging"]:
+            if now - st["placed_at"] < 2:  # moved by Windows/pywebview right after showing
+                st["placed"] = self._place_overlay(name, game, hwnd)
+            else:
+                st["placed"] = (r[0], r[1])
+            return
+        if g:  # dropped: remember the spot relative to the game window
+            self.storage_set(OVERLAYS[name]["pos"], json.dumps({"dx": r[0] - g[0], "dy": r[1] - g[1],
+                                                                 "bottom": r[3] - g[1]}))
+        st["placed"], st["dragging"] = (r[0], r[1]), False
+
+    def _overlay_saved(self, name):
+        try:
+            return json.loads(self._storage.get(OVERLAYS[name]["pos"]) or "{}")
+        except Exception:
+            return {}
+
+    def _place_overlay(self, name, game, hwnd):
+        g = trade_helper.game_client_rect(game)
+        r = price_hotkey.window_rect(hwnd)
+        if not g or not r:
+            return None
+        w, h = r[2] - r[0], r[3] - r[1]
+        pos = self._overlay_saved(name)
+        fx, fy = OVERLAYS[name]["default"]  # fraction of the game window (top-left of the overlay)
+        dx = pos.get("dx", int(g[2] * fx - (w / 2 if name == "cards" else 0)))
+        if self._grows_up(name, g):
+            bottom = pos.get("bottom", int(g[3] * fy))
+            dy = bottom - h
+        else:
+            dy = pos.get("dy", int(g[3] * fy))
+        x = max(g[0], min(g[0] + g[2] - w, g[0] + dx))  # keep it on the game window
+        y = max(g[1], min(g[1] + g[3] - min(h, 40), g[1] + dy))
+        price_hotkey.place_window(hwnd, x, y)
+        return (x, y)
+
+    def _grows_up(self, name, g):
+        """An overlay whose bottom edge sits in the lower half of the game grows upwards."""
+        pos = self._overlay_saved(name)
+        if "bottom" in pos:
+            return pos["bottom"] > g[3] / 2
+        return OVERLAYS[name]["default"][1] > 0.5
+
+    def overlay_fit(self, name, width, height):
+        """Size an overlay window to its content (CSS px from the page)."""
+        try:
+            import ctypes
+            u = ctypes.windll.user32
+            if name not in OVERLAYS:
+                return {"ok": False}
+            hwnd = price_hotkey.find_window(OVERLAYS[name]["title"])
+            r = price_hotkey.window_rect(hwnd)
+            if not hwnd or not r:
+                return {"ok": False}
+            scale = u.GetDpiForWindow(hwnd) / 96.0 if hasattr(u, "GetDpiForWindow") else 1.0
+            w = int(max(24, min(600, float(width))) * scale)
+            h = int(max(24, min(1200, float(height))) * scale)
+            game = self._find_poe_window()
+            g = trade_helper.game_client_rect(game) if game else None
+            if g and self._grows_up(name, g):  # keep the bottom edge where it is
+                u.SetWindowPos(hwnd, 0, r[0], r[3] - h, w, h, 0x0004 | 0x0010)  # NOZORDER | NOACTIVATE
+                if self._ov[name]["placed"]:
+                    self._ov[name]["placed"] = (r[0], r[3] - h)
+            else:
+                u.SetWindowPos(hwnd, 0, 0, 0, w, h, 0x0002 | 0x0004 | 0x0010)  # + NOMOVE
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def overlay_status(self):
+        """What the overlay icon shows: hotkeys and log reader state."""
+        st = {"ok": True, "logWatching": bool(self._tail and self._tail.running), "hotkeys": {}}
+        for name, w in self._hotkeys.items():
+            try:
+                s = w.status()
+                st["hotkeys"][name] = s.get("label") if s.get("hotkey") not in price_hotkey.OFF else None
+            except Exception:
+                pass
+        st["hotkey"] = st["hotkeys"].get("price")
+        return st
+
+    def overlay_visible(self, name, on, count=None):
+        """An overlay page says whether it has anything to show; the cards also report how
+        many trades are open, for the icon's badge."""
+        if name in self._ov:
+            self._ov[name]["content"] = bool(on)
+        if name == "cards" and count is not None:
+            self._eval_in(self._overlay_windows.get("icon"), "window.__ovCount && window.__ovCount(%d, %s)"
+                          % (int(count), "true" if on else "false"))
+        return {"ok": True}
+
+    def overlay_toggle_cards(self):
+        """Icon click (or the trade cards hotkey): show / hide the trade cards."""
+        self._eval_in(self._overlay_windows.get("cards"), "window.__ovToggle && window.__ovToggle()")
+        return {"ok": True}
+
+    def overlay_reset_pos(self, name=None):
+        """Setup → Reset position: back to the default spot on the next show."""
+        for n in ([name] if name in OVERLAYS else OVERLAYS):
+            self._storage.pop(OVERLAYS[n]["pos"], None)
+            self.storage_set(OVERLAYS[n]["pos"], "{}")
+            self._ov[n]["replace"] = True
+        return {"ok": True}
+
+    def trade_prefs_changed(self):
+        """Settings changed in the Trade helper window: the overlays re-read them."""
+        for win in self._overlay_windows.values():
+            self._eval_in(win, "window.__tradePrefsChanged && window.__tradePrefsChanged()")
+        return {"ok": True}
+
+    def open_main(self, settings=False):
+        """Overlay ⌂ / ⚙ buttons: the app over the game (Esc goes back), or just forward."""
+        try:
+            if self._find_poe_window() and not self._app_overlay:
+                import ctypes
+                main = price_hotkey.find_window(MAIN_TITLE)
+                self._main_was_hidden = not (main and ctypes.windll.user32.IsWindowVisible(main))
+                self._set_app_overlay(True)
+                if settings:
+                    self._eval_in(self._main, "window.openSettings && openSettings()")
+            else:
+                self._show_main(settings=settings)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def _show_trades(self, activate=True):
         win = self._trades
@@ -1158,7 +1555,16 @@ class Api:
 
                 self._tail = trade_helper.LogTail(path, self._on_trade_event, on_error=on_error)
                 self._tail.start()
+                self._tail_path = path
                 return self._trade_status(path)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def trade_status(self):
+        """Current reader state, without restarting it (Trade helper window)."""
+        try:
+            running = bool(self._tail and self._tail.running)
+            return self._trade_status(getattr(self, "_tail_path", None) if running else None)
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
@@ -1231,12 +1637,8 @@ class Api:
     def set_price_hotkey(self, spec):
         """Change the price-check hotkey at runtime: ctrl+d | ctrl+shift+d | alt+d | off."""
         try:
-            spec = (spec or "off").strip().lower().replace(" ", "")
-            price_hotkey.parse_hotkey(spec)
-            self._hotkey_spec = spec
-            if self._hotkey:
-                self._hotkey.set_spec(spec)
-            return self.hotkey_status()
+            r = self.set_hotkey("price", spec)
+            return self.hotkey_status() if r.get("ok") else r
         except ValueError as e:
             return {"ok": False, "error": str(e)}
 
@@ -1723,17 +2125,41 @@ def main():
         js_api=api,
         width=TRADES_SIZE[0],
         height=TRADES_SIZE[1],
-        min_size=(360, 320),
+        min_size=(420, 360),
         hidden=True,
-        on_top=True,
         background_color="#0f0e0c",
     )
+    # in-game overlays (icon, trade cards): see-through, never take focus from the game,
+    # each dragged and placed on its own
+    overlays = {}
+    for name, o in OVERLAYS.items():
+        overlays[name] = webview.create_window(
+            o["title"],
+            index + o["query"],
+            js_api=api,
+            width=o["size"][0],
+            height=o["size"][1],
+            hidden=True,
+            on_top=True,
+            frameless=True,
+            easy_drag=False,
+            transparent=True,
+            focus=False,
+            shadow=False,
+            resizable=False,
+            min_size=(24, 24),
+        )
     api._attach_windows(main_window, overlay)
-    api._attach_trades(main_window, trades)
+    api._attach_trades(main_window, trades, overlays)
     api._start_hotkey()
+    api._start_tray()
     try:
         webview.start()
+    except BaseException as e:
+        _debug_log("app crashed: %r" % e)
+        raise
     finally:
+        _debug_log("app exit")
         api._stop_hotkey()
 
 

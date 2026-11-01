@@ -135,6 +135,29 @@ GGG rules, enforced by the shape of the code. Keep them:
 | `trades_show()` / `trades_hide()` | the trades window |
 | `trade_pick_log()` / `save_text_file(name, text)` | file dialogs (Client.txt pick, CSV export) |
 
+## In-game overlays, hotkeys, tray (gui.py)
+
+- `OVERLAYS` = separate frameless, transparent, `focus=False` (WS_EX_NOACTIVATE) windows:
+  `icon` (`?ovicon=1`) and `cards` (`?cards=1`, which also owns the Client.txt reader).
+- `_follow_game` (0.3 s) shows each one only while the game or one of our windows is in
+  front. It checks the real visibility every tick, because pywebview shows transparent
+  windows by itself on load.
+- Placement is relative to the game's client rect and redone whenever that rect changes, so
+  overlays follow the game across screens.
+- A drag is the mouse held down on the overlay; on release the spot is saved
+  (`pobtf-ov-<name>-pos`, with `bottom` for the ones that grow upwards from the lower half).
+- Pages size their own window with `overlay_fit(name, w, h)` and report
+  `overlay_visible(name, on, count)`. The icon ↔ cards messages go through Python
+  (`overlay_toggle_cards`, `__ovCount`).
+- Hotkeys: `HOTKEY_DEFAULTS` price / app / trades, one `HotkeyWatcher` each, held only while
+  the game, one of our overlays, or the app-over-game window is in front. `set_hotkey`,
+  `hotkeys_status`.
+- App hotkey: `_set_app_overlay` makes the main window `on_top` and focused with a banner
+  (`__appOverlay`); Esc or the hotkey returns to the game.
+- Tray (`tray.py`, ctypes Shell_NotifyIcon): the main window's ✕ hides to the tray
+  (`closeToTray` pref). Menu: Open, Trade helper, Settings, Quit (`_quit` sets `_quitting`
+  and destroys the main window).
+
 ## Rate limiting (do not weaken this)
 
 All GGG calls go through `Api._http`:

@@ -4,10 +4,9 @@
 'use strict';
 
 // ==== trade helper ================================================================
-// gui.py opens a third window on index.html?trades=1 (always on top, hidden until needed)
-// that shares the Api instance. With the helper switched on, Python tails Client.txt
-// (trade_helper.LogTail) and calls window.__tradeEvent(<event>) for whispers, players
-// joining/leaving your area and "Trade accepted".
+// With the helper switched on, Python tails Client.txt (trade_helper.LogTail) and calls
+// window.__tradeEvent(<event>) in the overlay for whispers, players joining/leaving your
+// area and "Trade accepted".
 //
 // GGG's rules for tools, kept by design here:
 // - every in-game command is ONE button press → ONE chat command (trade_send), never on
@@ -16,8 +15,18 @@
 // - nothing is shared: sales, buyer notes, flags and hidden buyers stay on this machine;
 // - "Ignore in game" sends /ignore once, only when pressed. Hiding a buyer only hides
 //   their popups here.
-var TRADES = /[?&]trades=1(&|$)/.test(location.search);
+// Two windows, both on this file:
+// - index.html?cards=1  the overlay: frameless, see-through, never takes focus from the game
+//   (like PoE Lurker). Cards only, click-only (typing would go to the game).
+// - index.html?trades=1 the Trade helper window: Sales, Buyers and Setup, normal focus.
+// - index.html?ovicon=1 the PoB icon over the game (status, trade count): its own window, so
+//   it and the cards can be dragged to different places (e.g. cards above the XP bar).
+var TRADE_CARDS = /[?&]cards=1(&|$)/.test(location.search);
+var TRADE_ICON = /[?&]ovicon=1(&|$)/.test(location.search);
+var TRADE_OVERLAY = TRADE_CARDS || TRADE_ICON;
+var TRADES = TRADE_OVERLAY || /[?&]trades=1(&|$)/.test(location.search);
 if (TRADES) document.body.classList.add('trades');
+if (TRADE_OVERLAY) document.body.classList.add('trade-cards');
 
 var TRADE_PREFS_KEY = 'pobtf-trade-prefs', SALES_KEY = 'pobtf-sales', BUYERS_KEY = 'pobtf-buyers';
 var SALES_MAX = 5000;
@@ -29,7 +38,7 @@ var TRADE_MSGS = {
 };
 var tradeCards = [];         // open cards, newest first
 var tradeSeq = 0;
-var tradeTab = 'trades';
+var tradeTab = TRADE_CARDS ? 'trades' : 'sales';
 var tradeStatus = null;      // last trade_status() answer
 var tradeRates = {};         // league -> { div: chaos per divine, at }
 var tradeAudio = null;
@@ -37,12 +46,27 @@ var tradeAudio = null;
 function tradePrefs() {
   var p;
   try { p = JSON.parse(localStorage.getItem(TRADE_PREFS_KEY)) || {}; } catch (e) { p = {}; }
-  if (p.sound === undefined) p.sound = true;
+  // overlay + sound customisation (Setup → Overlay / Sound)
+  if (p.sound === undefined || p.sound === true) p.sound = 'chime';
+  if (p.sound === false) p.sound = 'off';
+  if (p.volume === undefined) p.volume = 40;
+  if (p.opacity === undefined) p.opacity = 92;
+  if (!p.scale) p.scale = 100;
+  if (!p.iconMode) p.iconMode = 'always';  // 'always' | 'trades': only while there are trades
+  if (p.autoOpen === undefined) p.autoOpen = true;
   if (!p.noShowMin) p.noShowMin = 5;
   p.msgs = Object.assign({}, TRADE_MSGS, p.msgs || {});
   return p;
 }
-function saveTradePrefs(p) { persist(TRADE_PREFS_KEY, JSON.stringify(p)); }
+function saveTradePrefs(p) { saveShared(TRADE_PREFS_KEY, JSON.stringify(p)); }
+// Trade helper window → overlay: save durably first, then tell the overlay to re-read
+function saveShared(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) { /* fine */ }
+  if (!isGui() || !window.pywebview.api.storage_set) return;
+  window.pywebview.api.storage_set(key, value).then(function () {
+    if (!TRADE_CARDS && window.pywebview.api.trade_prefs_changed) window.pywebview.api.trade_prefs_changed();
+  }, function () {});
+}
 function loadSales() {
   try { return JSON.parse(localStorage.getItem(SALES_KEY)) || []; } catch (e) { return []; }
 }
@@ -50,7 +74,7 @@ function saveSales(list) { persist(SALES_KEY, JSON.stringify(list.slice(-SALES_M
 function loadBuyers() {
   try { return JSON.parse(localStorage.getItem(BUYERS_KEY)) || {}; } catch (e) { return {}; }
 }
-function saveBuyers(b) { persist(BUYERS_KEY, JSON.stringify(b)); }
+function saveBuyers(b) { saveShared(BUYERS_KEY, JSON.stringify(b)); }
 
 // buyers are tracked by account name when known, else by character name
 function buyerKey(card) { return (card.account || card.name || '').toLowerCase(); }
@@ -108,7 +132,7 @@ function priceText(price, currency) {
 
 // ---- events from Client.txt --------------------------------------------------------
 window.__tradeEvent = function (ev) {
-  if (!TRADES || !ev) return false;
+  if (!TRADE_CARDS || !ev) return false;
   if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch (e) { return false; } }
   handleTradeEvent(ev);
   return true;
@@ -136,7 +160,9 @@ function handleTradeEvent(ev) {
         var b = dir === 'in' ? buyerFor(card) : null;
         card.hidden = !!(b && b.hidden);
         tradeCards.unshift(card);
-        if (dir === 'in' && !card.hidden) tradeChime('new');
+        var autoOpen = tradePrefs().autoOpen;
+        if (dir === 'in' && !card.hidden) { tradeChime('new'); if (autoOpen) overlayOpen = true; }
+        if (dir === 'out' && autoOpen) overlayOpen = true;
       }
     } else if (card) {
       card.lastText = ev.text; // a chat reply to an open trade
@@ -170,23 +196,34 @@ function handleTradeEvent(ev) {
 }
 var tradeStatusFlags = { afk: false, dnd: false };
 
-function tradeChime(kind) {
-  var p = tradePrefs();
-  if (!p.sound) return;
+// Sounds (Setup → Sound): a style, a volume slider, or off. Synthesised, so no files ship.
+// Each style: [new trade notes, buyer arrived notes, wave, note length s, gap s]
+var TRADE_SOUNDS = {
+  chime: { label: 'Chime', fresh: [784, 1175, 1568], joined: [660, 990], wave: 'triangle', len: 0.3, gap: 0.1 },
+  bell: { label: 'Bell', fresh: [1047, 1568], joined: [880], wave: 'sine', len: 0.9, gap: 0.16 },
+  soft: { label: 'Soft', fresh: [523, 659], joined: [440], wave: 'sine', len: 0.45, gap: 0.14 },
+  ping: { label: 'Ping', fresh: [1760], joined: [1320], wave: 'square', len: 0.12, gap: 0.08 },
+  coins: { label: 'Coins', fresh: [2093, 2637, 2093, 2637], joined: [1568, 2093], wave: 'triangle', len: 0.09, gap: 0.07 }
+};
+function tradeChime(kind, override) {
+  var p = Object.assign(tradePrefs(), override || {});
+  var snd = TRADE_SOUNDS[p.sound];
+  var vol = Math.max(0, Math.min(100, parseInt(p.volume, 10) || 0)) / 100;
+  if (!snd || !vol) return;
   try {
     if (!tradeAudio) tradeAudio = new (window.AudioContext || window.webkitAudioContext)();
     var t = tradeAudio.currentTime;
-    var notes = kind === 'joined' ? [660, 990] : [784, 1175, 1568];
-    var peak = Math.max(0.02, Math.min(1, (parseInt(PREFS.volume, 10) || 25) / 100));
-    notes.forEach(function (f, i) {
+    var peak = Math.max(0.001, vol * vol); // perceived loudness: the slider feels even
+    (kind === 'joined' ? snd.joined : snd.fresh).forEach(function (f, i) {
       var o = tradeAudio.createOscillator(), g = tradeAudio.createGain();
-      o.type = 'triangle';
+      var at = t + i * snd.gap;
+      o.type = snd.wave;
       o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t + i * 0.1);
-      g.gain.exponentialRampToValueAtTime(peak, t + i * 0.1 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.1 + 0.3);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(peak, at + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + snd.len);
       o.connect(g); g.connect(tradeAudio.destination);
-      o.start(t + i * 0.1); o.stop(t + i * 0.1 + 0.35);
+      o.start(at); o.stop(at + snd.len + 0.05);
     });
   } catch (e) { /* no sound */ }
 }
@@ -305,26 +342,42 @@ function renderTradeCard(card) {
         title: 'Outline the item\'s cell over your open stash tab for 20 seconds',
         onClick: function () { window.pywebview.api.trade_highlight(t.left, t.top, t.tab || ''); } }));
     }
-    acts.appendChild(UI.menu(function () {
-      return [
-        { label: 'Whois', onClick: function () { tradeSend(card, 'whois'); }, title: 'Send /whois ' + card.name },
-        { label: (buyerFor(card) || {}).flag ? 'Unflag buyer' : '⚑ Flag buyer', onClick: function () {
-          updateBuyer(card, function (b) { b.flag = !b.flag; }); renderTrades(); } },
-        { label: 'Hide this buyer', onClick: function () { hideBuyer(card); },
-          title: 'No more popups or sounds from them here; their whispers go to the Hidden list' },
-        { label: 'Ignore in game…', onClick: function () { ignoreInGame(card); },
-          title: 'Send /ignore ' + card.name + ' once' }
-      ];
-    }, { ariaLabel: 'More for ' + card.name, size: 'sm' }));
+    // inline, not a pop-up menu: the overlay window is only as big as its content
+    acts.appendChild(UI.iconButton('⋯', 'More for ' + card.name, { size: 'sm', cls: card.more ? 'is-on' : '',
+      onClick: function () { card.more = !card.more; card.ignoreArmed = false; renderTrades(); } }));
   } else {
     act('Visit hideout', 'hideout', null, 'primary', 'Send /hideout ' + card.name);
     act('Trade', 'trade', null, null, 'Send /tradewith ' + card.name);
     act('Re-whisper', 'whisper', card.text, null, 'Send your original whisper again');
   }
   el.appendChild(acts);
+  if (card.dir === 'in' && card.more) el.appendChild(renderMoreRow(card));
 
   if (card.dir === 'in') el.appendChild(renderOutcomes(card, p));
   return el;
+}
+
+function renderMoreRow(card) {
+  var row = UI.el('div', 'tc-more');
+  var flagged = (buyerFor(card) || {}).flag;
+  row.appendChild(UI.button('ghost', { size: 'sm', label: 'Whois', title: 'Send /whois ' + card.name,
+    onClick: function () { tradeSend(card, 'whois'); } }));
+  row.appendChild(UI.button('ghost', { size: 'sm', label: flagged ? 'Unflag' : '⚑ Flag', onClick: function () {
+    updateBuyer(card, function (b) { b.flag = !b.flag; }); renderTrades(); } }));
+  row.appendChild(UI.button('ghost', { size: 'sm', label: 'Hide buyer',
+    title: 'No more popups or sounds from them here; their whispers go to the Hidden list',
+    onClick: function () { hideBuyer(card); } }));
+  // two clicks, no dialog: the first arms it, the second sends /ignore once
+  var ig = UI.button(card.ignoreArmed ? 'danger' : 'ghost', { size: 'sm',
+    label: card.ignoreArmed ? 'Click again: /ignore ' + card.name : 'Ignore in game',
+    title: 'Sends /ignore ' + card.name + ' once. Undo in game with /unignore.',
+    onClick: function () {
+      if (!card.ignoreArmed) { card.ignoreArmed = true; renderTrades(); return; }
+      card.ignoreArmed = false;
+      tradeSend(card, 'ignore', null, ig);
+    } });
+  row.appendChild(ig);
+  return row;
 }
 
 function renderOutcomes(card, p) {
@@ -338,33 +391,20 @@ function renderOutcomes(card, p) {
     }
     return box;
   }
-  var row = UI.el('div', 'tc-done');
-  var priceIn = UI.input({ type: 'number', cls: 'tc-price-in', value: t.price != null ? t.price : '', min: 0, step: 'any',
-    width: '72px', ariaLabel: 'Price received' });
-  var curSel = UI.select([['chaos', 'c'], ['divine', 'div']].concat(
-    t.currency && t.currency !== 'chaos' && t.currency !== 'divine' ? [[t.currency, t.currency]] : []), t.currency || 'chaos',
-    { ariaLabel: 'Currency received' });
-  var done = UI.button(card.acceptHint ? 'primary' : 'secondary', { size: 'sm', label: '✓ Completed',
-    title: card.acceptHint ? 'The game logged "Trade accepted"' : 'Record the sale at this price',
-    onClick: function () {
-      var v = parseFloat(priceIn.value);
-      recordOutcome(card, 'completed', { price: isNaN(v) ? null : v, currency: curSel.value });
-    } });
+  // click-only (the overlay never takes the keyboard from the game): Completed records the
+  // listed price; a different price or a note is edited later in Trade helper → Sales
+  var done = UI.button(card.acceptHint ? 'primary' : 'secondary', { size: 'sm',
+    label: '✓ Completed' + (t.price != null ? ' · ' + priceText(t.price, t.currency) : ''),
+    title: (card.acceptHint ? 'The game logged "Trade accepted". ' : '') +
+      'Records the sale at the listed price. Got a different price? Edit it in Trade helper → Sales.',
+    onClick: function () { recordOutcome(card, 'completed'); } });
   if (card.acceptHint) done.classList.add('suggested');
-  row.appendChild(done);
-  row.appendChild(priceIn);
-  row.appendChild(curSel);
-  box.appendChild(row);
   var more = UI.el('div', 'tc-other');
+  more.appendChild(done);
   more.appendChild(UI.button('ghost', { size: 'sm', label: '✗ Not completed', onClick: function () { recordOutcome(card, 'not_completed'); } }));
   more.appendChild(UI.button('ghost', { size: 'sm', label: '⌛ Time wasted', onClick: function () { recordOutcome(card, 'wasted'); } }));
-  more.appendChild(UI.button('ghost', { size: 'sm', label: 'Other…', onClick: function () {
-    var note = UI.input({ placeholder: 'What happened?', width: '180px', ariaLabel: 'Note' });
-    UI.dialog({ title: 'Other outcome', body: note, confirmLabel: 'Save' }).then(function (ok) {
-      if (ok) recordOutcome(card, 'other', { note: note.value.trim() });
-    });
-    setTimeout(function () { note.focus(); }, 30);
-  } }));
+  more.appendChild(UI.button('ghost', { size: 'sm', label: 'Other', title: 'Add a note in Trade helper → Sales',
+    onClick: function () { recordOutcome(card, 'other'); } }));
   box.appendChild(more);
   return box;
 }
@@ -375,6 +415,7 @@ async function hideBuyer(card) {
   UI.toast(card.name + ' is hidden here. Buyers tab to undo.', 'info');
   renderTrades();
 }
+// Buyers page (Trade helper window, which can show a dialog)
 async function ignoreInGame(card) {
   var ok = await UI.dialog({ title: 'Ignore ' + card.name + ' in game?',
     body: 'Sends /ignore ' + card.name + ' to Path of Exile once. Undo in game with /unignore.', confirmLabel: 'Send /ignore' });
@@ -384,33 +425,156 @@ async function ignoreInGame(card) {
 function renderTrades() {
   var root = document.getElementById('trades-root');
   if (!root) return;
+  if (TRADE_CARDS) { renderCardsOverlay(root); return; }
+  if (TRADE_ICON) { renderIconOverlay(root); return; }
   root.querySelectorAll('.trades-tab').forEach(function (b) {
     b.setAttribute('aria-selected', b.dataset.tab === tradeTab ? 'true' : 'false');
   });
   var body = document.getElementById('trades-body');
   body.textContent = '';
-  if (tradeTab === 'trades') renderTradeList(body);
-  else if (tradeTab === 'sales') renderSalesPage(body);
+  if (tradeTab === 'sales') renderSalesPage(body);
   else if (tradeTab === 'buyers') renderBuyersPage(body);
   else renderTradeSetup(body);
   renderTradeStatusLine();
 }
 
-function renderTradeList(body) {
+// ---- in-game overlays: two windows, each dragged to its own spot ------------------------
+// icon: the PoB button (status dot + open-trade count) — click shows/hides the cards;
+// cards: the trade cards. gui.py keeps each where it was dropped, relative to the game.
+var overlayOpen = false;     // cards window: cards showing
+var overlayWanted = null;    // last value sent to overlay_visible()
+var overlayState = {};       // overlay_status(): hotkeys, log reader
+var iconCount = 0, iconHover = false;
+
+function overlayLook(root, p) {
+  root.style.setProperty('--ov-opacity', String(Math.max(30, Math.min(100, p.opacity)) / 100));
+  root.style.zoom = String((p.scale || 100) / 100);
+}
+function overlayGrip(p, what) {
+  if (p.locked) return null; // 📌 Lock in Setup pins it where it is
+  var grip = UI.el('span', 'ov-grip pywebview-drag-region', '⠿');
+  grip.title = 'Drag to move ' + what + ' (lock it in Trade helper → Setup)';
+  return grip;
+}
+function reportOverlay(name, wanted, count) {
+  if (!isGui() || !window.pywebview.api.overlay_visible) return;
+  var key = name + ':' + wanted + ':' + count;
+  if (overlayWanted === key) return;
+  overlayWanted = key;
+  window.pywebview.api.overlay_visible(name, wanted, count == null ? null : count);
+}
+
+function renderIconOverlay(root) {
+  root.textContent = '';
   var p = tradePrefs();
-  if (!p.enabled) {
-    body.appendChild(UI.emptyState({ title: 'Trade helper is off',
-      text: 'Switch it on in Setup to get a card for every trade whisper.',
-      action: UI.button('primary', { label: 'Open Setup', onClick: function () { tradeTab = 'setup'; renderTrades(); } }) }));
-    return;
+  overlayLook(root, p);
+  // "only when there are trades": no icon until a whisper arrives
+  reportOverlay('icon', p.iconMode !== 'trades' || iconCount > 0);
+  var bar = UI.el('div', 'ov-bar');
+  var hk = overlayState.hotkeys || {};
+  var running = !!(hk.price || overlayState.logWatching);
+  var icon = UI.el('button', 'ov-icon' + (running ? ' is-running' : ''));
+  icon.type = 'button';
+  icon.title = 'PoB Trade Finder is running' +
+    (hk.price ? '\n• ' + hk.price + ': price the item under your cursor' : '') +
+    (hk.app ? '\n• ' + hk.app + ': open the app over the game' : '') +
+    (hk.trades ? '\n• ' + hk.trades + ': show / hide trade cards' : '') +
+    (overlayState.logWatching ? '\n• Trade helper: reading the chat log' : '\n• Trade helper: off') +
+    '\nClick: show / hide trade cards';
+  icon.appendChild(UI.el('span', 'ov-logo', 'PoB'));
+  icon.appendChild(UI.el('span', 'ov-dot'));
+  if (iconCount) icon.appendChild(UI.el('span', 'ov-count', String(iconCount)));
+  icon.addEventListener('click', function () { window.pywebview.api.overlay_toggle_cards(); });
+  bar.appendChild(icon);
+  var grip = overlayGrip(p, 'the icon');
+  if (grip) bar.appendChild(grip);
+  if (iconHover) { // extra buttons only while the mouse is over it: out of the way otherwise
+    bar.appendChild(UI.iconButton('⚙', 'Settings (app over the game)', { size: 'sm',
+      onClick: function () { window.pywebview.api.open_main(true); } }));
+    bar.appendChild(UI.iconButton('⌂', 'Open PoB Trade Finder', { size: 'sm',
+      onClick: function () { window.pywebview.api.open_main(false); } }));
+    bar.appendChild(UI.iconButton('$', 'Trade helper: sales, buyers, setup', { size: 'sm',
+      onClick: function () { window.pywebview.api.trades_show(); } }));
   }
+  root.appendChild(bar);
+  fitOverlay('icon');
+}
+
+function renderCardsOverlay(root) {
+  root.textContent = '';
+  var p = tradePrefs();
+  overlayLook(root, p);
   var shown = tradeCards.filter(function (c) { return !c.hidden; });
-  var hidden = tradeCards.filter(function (c) { return c.hidden; });
-  if (!shown.length) {
-    body.appendChild(UI.emptyState({ title: 'No trades right now',
-      text: 'Trade whispers you get or send in game show up here.' }));
+  var showing = overlayOpen && (shown.length > 0 || tradeCards.length > 0 || overlayOpenedByHand);
+  reportOverlay('cards', showing, shown.length);
+  if (!showing) { fitOverlay('cards'); return; }
+  var head = UI.el('div', 'ov-head');
+  head.appendChild(UI.el('span', 'ov-head-title', 'Trades' + (shown.length ? ' (' + shown.length + ')' : '')));
+  var grip = overlayGrip(p, 'the trade cards');
+  if (grip) head.appendChild(grip);
+  head.appendChild(UI.iconButton('–', 'Hide the trade cards (the icon or ' + ((overlayState.hotkeys || {}).trades || 'its hotkey') +
+    ' brings them back)', { size: 'sm', onClick: function () { overlayOpen = false; overlayOpenedByHand = false; renderTrades(); } }));
+  root.appendChild(head);
+  var list = UI.el('div', 'ov-cards');
+  if (!p.enabled && !shown.length) {
+    list.appendChild(UI.el('div', 'ov-note', 'Trade helper is off. Trade helper → Setup to switch it on.'));
+  } else if (!shown.length) {
+    list.appendChild(UI.el('div', 'ov-note', 'No trades right now.'));
   }
-  shown.forEach(function (c) { body.appendChild(renderTradeCard(c)); });
+  shown.forEach(function (c) { list.appendChild(renderTradeCard(c)); });
+  renderHiddenList(list);
+  root.appendChild(list);
+  fitOverlay('cards');
+}
+var overlayOpenedByHand = false;
+
+// icon click / trade cards hotkey (via gui.py)
+window.__ovToggle = function () {
+  if (!TRADE_CARDS) return false;
+  overlayOpen = !overlayOpen;
+  overlayOpenedByHand = overlayOpen;
+  renderTrades();
+  return overlayOpen;
+};
+// the cards window reports how many trades are open (via gui.py)
+window.__ovCount = function (n, cardsShowing) {
+  if (!TRADE_ICON) return false;
+  iconCount = n;
+  renderTrades();
+  return true;
+};
+
+function fitOverlay(name) {
+  if (!isGui() || !window.pywebview.api.overlay_fit) return;
+  requestAnimationFrame(function () {
+    var root = document.getElementById('trades-root');
+    if (!root) return;
+    var r = root.getBoundingClientRect();
+    window.pywebview.api.overlay_fit(name, Math.ceil(r.width) + 2, Math.ceil(r.height) + 2);
+  });
+}
+
+async function refreshOverlayStatus() {
+  if (!isGui() || !window.pywebview.api.overlay_status) return;
+  try {
+    var st = await window.pywebview.api.overlay_status();
+    if (st && st.ok && JSON.stringify(st) !== JSON.stringify(overlayState)) { overlayState = st; renderTrades(); }
+  } catch (e) { /* bridge gone */ }
+}
+
+// the Trade helper window changed a setting: re-read it here
+window.__tradePrefsChanged = async function () {
+  if (!TRADE_OVERLAY) return false;
+  if (tradeHydrate) { try { await tradeHydrate(); } catch (e) { /* keep */ } }
+  tradeCards.forEach(function (c) { var b = c.dir === 'in' ? buyerFor(c) : null; c.hidden = !!(b && b.hidden); });
+  overlayWanted = null;
+  refreshOverlayStatus();
+  renderTrades();
+  return true;
+};
+
+function renderHiddenList(body) {
+  var hidden = tradeCards.filter(function (c) { return c.hidden; });
   if (hidden.length) {
     var box = UI.el('div', 'tc-hidden');
     hidden.forEach(function (c) {
@@ -421,7 +585,9 @@ function renderTradeList(body) {
       r.appendChild(UI.button('ghost', { size: 'sm', label: 'Dismiss', onClick: function () { closeCard(c); } }));
       box.appendChild(r);
     });
-    body.appendChild(UI.disclosure('Hidden (' + hidden.length + ')', box));
+    var d = UI.disclosure('Hidden (' + hidden.length + ')', box);
+    d.addEventListener('toggle', function () { fitOverlay('cards'); });
+    body.appendChild(d);
   }
 }
 
@@ -559,8 +725,42 @@ function renderSalesPage(body) {
     { key: 'buyer', label: 'Buyer' },
     { key: 'league', label: 'League' },
     { key: 'tab', label: 'Stash', render: function (s) { return s.tab ? s.tab + (s.left ? ' (' + s.left + ',' + s.top + ')' : '') : ''; } },
-    { key: 'outcome', label: 'Outcome', render: function (s) { return OUTCOME_LABEL[s.outcome] || s.outcome; } }
+    { key: 'outcome', label: 'Outcome', render: function (s) { return OUTCOME_LABEL[s.outcome] || s.outcome; } },
+    { key: 'note', label: 'Note' },
+    { key: 'edit', label: '', render: function (s) {
+      return UI.button('ghost', { size: 'sm', label: 'Edit', title: 'Change the price, outcome or note',
+        onClick: function () { editSale(s.id); } });
+    } }
   ], list.slice().reverse(), { sortable: true, emptyText: 'Nothing recorded yet. Mark a trade ✓ Completed to see it here.' }));
+}
+
+async function editSale(id) {
+  var list = loadSales();
+  var s = list.filter(function (x) { return x.id === id; })[0];
+  if (!s) return;
+  var box = UI.el('div', 'sale-edit');
+  var price = UI.input({ type: 'number', value: s.price != null ? s.price : '', min: 0, step: 'any', width: '90px', ariaLabel: 'Price' });
+  var cur = UI.select([['chaos', 'chaos'], ['divine', 'divine']].concat(
+    s.currency && s.currency !== 'chaos' && s.currency !== 'divine' ? [[s.currency, s.currency]] : []), s.currency || 'chaos',
+    { ariaLabel: 'Currency' });
+  var out = UI.select(Object.keys(OUTCOME_LABEL).map(function (k) { return [k, OUTCOME_LABEL[k]]; }), s.outcome,
+    { ariaLabel: 'Outcome' });
+  var note = UI.input({ value: s.note || '', width: '100%', placeholder: 'Note', ariaLabel: 'Note' });
+  UI.field('Price', price, { parent: box });
+  UI.field('Currency', cur, { parent: box });
+  UI.field('Outcome', out, { parent: box });
+  UI.field('Note', note, { parent: box, cls: 'field-wide' });
+  if (!(await UI.dialog({ title: 'Edit: ' + (s.item || 'sale'), body: box, confirmLabel: 'Save' }))) return;
+  var p = parseFloat(price.value);
+  s.price = isNaN(p) ? null : p;
+  s.currency = cur.value;
+  s.outcome = out.value;
+  s.note = note.value.trim();
+  var v = tradeValue(s.price, s.currency, await tradeDivRate(s.league));
+  s.chaos = v.chaos != null ? Math.round(v.chaos * 100) / 100 : null;
+  s.div = v.div != null ? Math.round(v.div * 1000) / 1000 : null;
+  saveSales(list);
+  renderTrades();
 }
 var OUTCOME_LABEL = { completed: 'Sold', not_completed: 'Not completed', wasted: 'Time wasted', no_show: 'No-show', other: 'Other' };
 
@@ -655,14 +855,67 @@ function renderTradeSetup(body) {
   }
   if (st.chatKeyName) sec.appendChild(UI.el('p', 'finder-sub', 'Chat key (from your game settings): ' + st.chatKeyName));
 
-  var snd = UI.el('label', 'toggle');
-  var scb = document.createElement('input');
-  scb.type = 'checkbox';
-  scb.checked = !!p.sound;
-  scb.addEventListener('change', function () { var q = tradePrefs(); q.sound = scb.checked; saveTradePrefs(q); });
-  snd.appendChild(scb);
-  snd.appendChild(UI.el('span', null, 'Sound on new trades and when a buyer arrives'));
-  sec.appendChild(snd);
+  function setPref(k, v) { var q = tradePrefs(); q[k] = v; saveTradePrefs(q); }
+  function toggle(label, on, onChange) {
+    var w = UI.el('label', 'toggle');
+    var c = document.createElement('input');
+    c.type = 'checkbox';
+    c.checked = !!on;
+    c.addEventListener('change', function () { onChange(c.checked); });
+    w.appendChild(c);
+    w.appendChild(UI.el('span', null, label));
+    return w;
+  }
+  // a range slider with its value shown next to it
+  function slider(label, value, min, max, step, unit, onInput, parent) {
+    var r = UI.input({ type: 'range', min: min, max: max, step: step, value: value, ariaLabel: label, cls: 'trade-slider' });
+    var v = UI.el('span', 'slider-val', value + unit);
+    r.addEventListener('input', function () { v.textContent = r.value + unit; });
+    r.addEventListener('change', function () { onInput(parseInt(r.value, 10)); });
+    var f = UI.field(label, r, { parent: parent });
+    f.appendChild(v);
+    return r;
+  }
+
+  // Sound: style, volume slider (0 = silent), test
+  sec.appendChild(UI.el('h3', 'trade-h3', 'Sound'));
+  var soundRow = UI.el('div', 'trade-row');
+  var soundSel = UI.select([['off', 'Off']].concat(Object.keys(TRADE_SOUNDS).map(function (k) { return [k, TRADE_SOUNDS[k].label]; })),
+    p.sound, { ariaLabel: 'Sound', onChange: function () { setPref('sound', this.value); tradeChime('new', { sound: this.value }); } });
+  UI.field('Sound', soundSel, { parent: soundRow });
+  var volRange = slider('Volume', p.volume, 0, 100, 5, '%', function (v) { setPref('volume', v); tradeChime('new', { volume: v }); }, soundRow);
+  soundRow.appendChild(UI.button('ghost', { size: 'sm', label: '▶ Test', onClick: function () {
+    tradeChime('new', { sound: soundSel.value, volume: parseInt(volRange.value, 10) });
+    setTimeout(function () { tradeChime('joined', { sound: soundSel.value, volume: parseInt(volRange.value, 10) }); }, 900);
+  } }));
+  sec.appendChild(soundRow);
+  sec.appendChild(UI.el('p', 'finder-sub', 'Plays for a new trade whisper, and a shorter one when the buyer enters your area. ' +
+    'Hidden buyers never make a sound.'));
+
+  // Overlay over the game (Awakened Trade / Lurker style)
+  sec.appendChild(UI.el('h3', 'trade-h3', 'Overlay in game'));
+  sec.appendChild(toggle('Show the PoB icon over the game while it\'s focused', p.icon !== false,
+    function (v) { setPref('icon', v); }));
+  var ovRow = UI.el('div', 'trade-row');
+  UI.field('Show it', UI.select([['always', 'Always'], ['trades', 'Only when there are trades']], p.iconMode,
+    { onChange: function () { setPref('iconMode', this.value); } }), { parent: ovRow });
+  UI.field('Size', UI.select([['85', 'Small'], ['100', 'Normal'], ['120', 'Large']], String(p.scale),
+    { onChange: function () { setPref('scale', parseInt(this.value, 10)); } }), { parent: ovRow });
+  slider('Opacity', p.opacity, 30, 100, 5, '%', function (v) { setPref('opacity', v); }, ovRow);
+  sec.appendChild(ovRow);
+  sec.appendChild(toggle('Open the cards when a trade arrives (off: the icon just counts them)', p.autoOpen,
+    function (v) { setPref('autoOpen', v); }));
+  var posRow = UI.el('div', 'trade-row');
+  posRow.appendChild(toggle('📌 Lock position', p.locked, function (v) { setPref('locked', v); }));
+  posRow.appendChild(UI.button('ghost', { size: 'sm', label: 'Reset position', title: 'Back to the top of the game window',
+    onClick: function () { window.pywebview.api.overlay_reset_pos(); UI.toast('The overlay moves back next time the game is focused.', 'success'); } }));
+  sec.appendChild(posRow);
+  sec.appendChild(UI.el('p', 'finder-sub', 'The icon and the trade cards are separate: drag the ⠿ grip on each to put ' +
+    'them anywhere, e.g. the cards just above your XP bar. Each stays where you put it, relative to the game window; ' +
+    'cards placed in the lower half stack upwards. They\'re see-through at the opacity above and solid while your ' +
+    'mouse is over them. Path of Exile must run in Windowed or Windowed Fullscreen for any overlay to show.'));
+
+  sec.appendChild(UI.el('h3', 'trade-h3', 'Trades'));
   var ns = UI.select([['3', '3 min'], ['5', '5 min'], ['10', '10 min'], ['15', '15 min']], String(p.noShowMin), {
     onChange: function () { var q = tradePrefs(); q.noShowMin = parseInt(this.value, 10); saveTradePrefs(q); } });
   UI.field('Offer "no-show" after', ns, { parent: sec });
@@ -699,6 +952,14 @@ async function startTradeHelper() {
   var p = tradePrefs();
   try { tradeStatus = await window.pywebview.api.trade_enable(!!p.enabled, p.logPath || null); }
   catch (e) { tradeStatus = { ok: false, error: String(e) }; }
+  if (TRADE_OVERLAY) refreshOverlayStatus();
+  renderTrades();
+}
+
+// Trade helper window: show what's running without restarting the log reader
+async function refreshTradeStatus() {
+  if (!isGui() || !window.pywebview.api.trade_status) return;
+  try { tradeStatus = await window.pywebview.api.trade_status(); } catch (e) { /* keep */ }
   renderTrades();
 }
 
@@ -712,11 +973,28 @@ function tradesClose() {
   if (isGui() && window.pywebview.api.trades_hide) window.pywebview.api.trades_hide();
 }
 
-// called from markGui() in the trades window
+// called from markGui() in the overlay and the Trade helper window
+var tradeHydrate = null;
 function tradesReady(hydrate) {
   document.body.classList.add('gui');
-  Promise.resolve(hydrate()).then(startTradeHelper, startTradeHelper);
-  setInterval(function () { if (tradeTab === 'trades' && tradeCards.length) renderTrades(); }, 30000); // ages, no-show
+  tradeHydrate = hydrate;
+  if (TRADE_CARDS) {
+    // the cards overlay owns the log reader: it is created at startup and lives as long as the app
+    Promise.resolve(hydrate()).then(startTradeHelper, startTradeHelper);
+    setInterval(function () { if (tradeCards.length) renderTrades(); }, 30000); // ages, no-show
+    setInterval(refreshOverlayStatus, 10000);
+    return;
+  }
+  if (TRADE_ICON) {
+    Promise.resolve(hydrate()).then(refreshOverlayStatus, refreshOverlayStatus);
+    setInterval(refreshOverlayStatus, 5000);
+    return;
+  }
+  Promise.resolve(hydrate()).then(refreshTradeStatus, refreshTradeStatus);
+  // sales and buyers are written by the overlay: re-read whenever this window comes forward
+  window.addEventListener('focus', function () {
+    Promise.resolve(hydrate()).then(refreshTradeStatus, refreshTradeStatus);
+  });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -725,8 +1003,18 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!TRADES) return;
   var root = UI.el('div', 'trades-root');
   root.id = 'trades-root';
+  var container = document.querySelector('.container');
+  if (TRADE_OVERLAY) {
+    container.insertBefore(root, container.firstChild);
+    if (TRADE_ICON) { // the extra buttons show only while the mouse is over the icon
+      root.addEventListener('mouseenter', function () { iconHover = true; renderTrades(); });
+      root.addEventListener('mouseleave', function () { iconHover = false; renderTrades(); });
+    }
+    renderTrades();
+    return;
+  }
   var bar = UI.el('div', 'trades-bar');
-  bar.appendChild(UI.el('span', 'ov-title', 'Trades'));
+  bar.appendChild(UI.el('span', 'ov-title', 'Trade helper'));
   var st = UI.el('span', 'trades-status');
   st.id = 'trades-status';
   bar.appendChild(st);
@@ -734,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function () {
   root.appendChild(bar);
   var tabs = UI.el('div', 'trades-tabs');
   tabs.setAttribute('role', 'tablist');
-  [['trades', 'Trades'], ['sales', 'Sales'], ['buyers', 'Buyers'], ['setup', 'Setup']].forEach(function (t) {
+  [['sales', 'Sales'], ['buyers', 'Buyers'], ['setup', 'Setup']].forEach(function (t) {
     var b = UI.el('button', 'trades-tab', t[1]);
     b.type = 'button';
     b.dataset.tab = t[0];
@@ -746,7 +1034,6 @@ document.addEventListener('DOMContentLoaded', function () {
   var body = UI.el('div', 'trades-body');
   body.id = 'trades-body';
   root.appendChild(body);
-  var container = document.querySelector('.container');
   container.insertBefore(root, container.firstChild);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('dialog[open]')) tradesClose();

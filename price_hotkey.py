@@ -45,6 +45,10 @@ def parse_hotkey(spec):
             raise ValueError("hotkey %r needs Ctrl, Shift or Alt" % spec)
     elif key[:1] == "f" and key[1:].isdigit() and 1 <= int(key[1:]) <= 24:
         vk = 0x70 + int(key[1:]) - 1
+    elif key == "space":  # Shift+Space: Awakened PoE Trade's "open the app" key
+        vk = 0x20
+        if not mods:
+            raise ValueError("hotkey %r needs Ctrl, Shift or Alt" % spec)
     else:
         raise ValueError("unsupported key %r in hotkey %r" % (key, spec))
     return mods, vk
@@ -57,7 +61,7 @@ def hotkey_label(spec):
         return "Off"
     mods, vk = parsed
     names = [n.capitalize() for n, bit in _MOD_ORDER if mods & bit]
-    key = chr(vk) if vk < 0x70 else "F%d" % (vk - 0x70 + 1)
+    key = "Space" if vk == 0x20 else chr(vk) if vk < 0x70 else "F%d" % (vk - 0x70 + 1)
     return "+".join(names + [key])
 
 
