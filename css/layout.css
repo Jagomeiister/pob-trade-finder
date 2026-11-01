@@ -555,11 +555,12 @@ body.trade-cards .sheet-head .btn-icon { width: 30px; height: 30px; font-size: v
 .sheet-pic .sheet-img { height: 72px; width: auto; margin: 0; border: 1px solid var(--border); }
 .sheet-pic .btn-icon { position: absolute; top: 2px; right: 2px; background: var(--s2); }
 /* mechanic sheets: tables, the sheet list (☰), the suggestion pill (?sheethint=1) */
-.sheet-table { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); line-height: 1.35; }
+.sheet-table { width: max-content; max-width: 100%; border-collapse: collapse; font-size: var(--fs-xs); line-height: 1.35; }
 .sheet-table th { position: sticky; top: -8px; background: var(--s2); color: var(--text-2); text-align: left;
   font-weight: 600; padding: 3px 6px; border-bottom: 1px solid var(--border); }
-.sheet-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
-.sheet-table td:first-child { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.sheet-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top;
+  min-width: 7em; max-width: 220px; }
+.sheet-table td:first-child { color: var(--accent); font-weight: 600; }
 .sheet-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--s2) 45%, transparent); }
 .sheet-picker { display: flex; flex-direction: column; gap: 6px; }
 .sheet-pick-row { display: flex; flex-wrap: wrap; gap: 4px; }

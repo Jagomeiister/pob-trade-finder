@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.3 released 2026-11-01** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -160,7 +160,14 @@ sources, or ask the author.
   - Your own sheets: text + pictures, for one act or every act.
   - "Follow my act" (asks first): reads Client.txt's `Generating level N area "2_6_town"` lines
     and turns the sheet to that act; marks the trial you're standing in.
-  - Still to do: league mechanic sheets; layout tips per zone (needs a source we may use).
+  - Mechanic sheets (v2.5.3): 15 from the wiki (Betrayal, Blight, Delve, Incursion, Expedition,
+    Sanctum, Kingsmarch, Ultimatum, Eldritch, Pantheon, Corruption, Bestiary, Harvest, vendor
+    recipes, essences), served from the app's server so they update between releases, plus a
+    small "Open the X cheat sheet?" pop-up on entering a mechanic's area (own movable overlay).
+    Re-run `tools/make_cheatsheets.py` after the 3.30 patch notes (13 Nov) and redeploy.
+  - Still to do: layout tips per zone (needs a source we may use).
+  - [ ] In game: the suggestion pop-up appears in a mechanic's area, Open shows the sheet,
+        it can be dragged and goes away by itself.
   - [ ] In game: Alt+C shows / hides it; it follows the game window; drag, lock, opacity,
         size and width work; "Follow my act" turns it when you change act.
 - [x] **Trade helper test mode** (released in v2.5.0): Setup → Test mode makes up

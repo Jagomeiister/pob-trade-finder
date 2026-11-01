@@ -2701,7 +2701,7 @@ const first = mechs[0];
 await H.sleep(30);
 out.title = H.text('.sheet-title');
 out.rows = document.querySelectorAll('.sheet-body .sheet-table tbody tr, .sheet-body .sheet-list .sheet-li').length;
-out.foot = H.text('.sheet-foot');
+out.foot = (document.querySelector('.sheet-head .sheet-title') || {}).title || ''; // credit: title tooltip (full line in the app)
 out.inputs = document.querySelectorAll('.sheet-panel input, .sheet-panel select, .sheet-panel textarea').length;
 document.querySelector('.sheet-head [aria-label="Back to the act sheet"]').click();
 await H.sleep(30);

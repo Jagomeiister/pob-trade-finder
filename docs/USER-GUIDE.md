@@ -559,8 +559,22 @@ and **Alt+C** shows it over the game. Use ‹ › to change act; drag it by ⠿.
 - **Follow my act** (asks first) reads the game's log file to see which act you're in and turns
   the sheet to it. It also marks the trial you're standing in. **Open it when a new act
   starts** pops it up for you.
-- Width, size, opacity, 📌 Lock and Reset position are on the same page. **Pretend I entered
-  it** tries an act change without playing.
+- **Mechanics**: ☰ on the sheet (or the Mechanics list on the Cheat sheets page) opens a sheet
+  for Betrayal (Syndicate rewards per member and division), Blight oils and anoints, Delve
+  fossils, Incursion temple rooms, Expedition vendors, Sanctum afflictions, Kingsmarch shipping,
+  Ultimatum modifiers, Eldritch altars, the Pantheon (and which map boss holds each soul),
+  Corruption (Vaal Orb outcomes), Bestiary recipes, Harvest crafts, vendor recipes and essences.
+  They come from the Path of Exile Wiki, checked against the current league's changes, and
+  update from the app's server between releases.
+- **Suggestions**: entering a mechanic's area (a Syndicate safehouse, the Azurite Mine, the
+  Temple, a Sanctum floor, a map whose boss holds a Pantheon soul, …) shows a small pop-up at
+  the top of the game for 20 seconds: **Open** shows that sheet, 🔕 stops suggestions for that
+  mechanic, ✕ dismisses it. It never opens anything big on its own. Drag it by ⠿ to put it
+  elsewhere. It needs **Follow my act** or the trade helper on (both read the game log), and can
+  be turned off on the Cheat sheets page.
+- Width, max height, size, opacity, 📌 Lock and Reset position are on the same page.
+  **Pretend I entered it** tries an act change, and **Pretend I entered its area** a
+  mechanic's suggestion, without playing.
 
 ## 5j. 🃏 Div cards
 

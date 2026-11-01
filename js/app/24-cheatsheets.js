@@ -219,7 +219,12 @@ function renderSheetOverlay() {
   if (!sheetOpen) { fitSheetOverlay(); return; }
   var mech = p.sheet ? mechanicById(p.sheet) : null;
   var panel = UI.el('div', 'sheet-panel');
-  panel.style.width = Math.max(220, Math.min(640, mech ? Math.max(p.width, 420) : p.width)) + 'px';
+  if (mech) { // a mechanic's table sets its width (up to 900px); the act sheet keeps the Width setting
+    panel.style.minWidth = Math.max(220, Math.min(640, p.width)) + 'px';
+    panel.style.maxWidth = '900px';
+  } else {
+    panel.style.width = Math.max(220, Math.min(640, p.width)) + 'px';
+  }
   var head = UI.el('div', 'sheet-head');
   var grip = overlayGrip(p, 'the cheat sheet', 'sheet', renderSheetOverlay);
   if (grip) head.appendChild(grip);
