@@ -36,7 +36,7 @@ NINJA = {"types": {
 
 api = gui.Api.__new__(gui.Api)
 api._currency_map = {"chaos": {"id": "C", "name": "Chaos Orb"}, "divine": {"id": "D", "name": "Divine Orb"},
-                     "scour": {"id": "S", "name": "Orb of Scouring"}}
+                     "scour": {"id": "S", "name": "Orb of Scouring", "cat": "Currency"}}
 api._feed = Feed()
 api._ninja_prices = lambda league: NINJA
 
@@ -71,6 +71,8 @@ r = qp(name="Headhunter", rarity="UNIQUE")
 check("backend down: quiet failure", r["ok"] is False and "404" in r["error"], r)
 check("backend down: exchange items still priced", qp(name="Chaos Orb", rarity="CURRENCY")["ok"])
 check("exchange answer carries the trade code", qp(name="Orb of Scouring", rarity="CURRENCY")["code"] == "scour")
+check("exchange answer carries its category (trade ledger: currency swaps)",
+      qp(name="Orb of Scouring", rarity="CURRENCY").get("cat") == "Currency")
 
 # live bulk exchange: one request, cheapest chaos-each first, divine offers converted
 sent = []

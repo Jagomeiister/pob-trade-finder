@@ -1031,7 +1031,9 @@ class Api:
                 rates, hour = self._feed.rates(league, [mid, div_id] if div_id else [mid])
                 if rates.get(mid) is not None:
                     each = rates[mid]
-                    out = {"ok": True, "source": "GGG currency exchange", "chaos": each, "code": code_by_name.get(key),
+                    code = code_by_name.get(key)
+                    out = {"ok": True, "source": "GGG currency exchange", "chaos": each, "code": code,
+                           "cat": (self._currency_map.get(code) or {}).get("cat"),  # e.g. "Currency", "Cards"
                            "divine": each / rates[div_id] if rates.get(div_id) else None}
                     stack = int(item.get("stackSize") or 0)
                     if stack > 1:

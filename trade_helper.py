@@ -591,7 +591,8 @@ def game_client_rect(hwnd):
 
 # -- chat commands --------------------------------------------------------------
 ACTIONS = {"invite": "/invite %s", "kick": "/kick %s", "trade": "/tradewith %s",
-           "hideout": "/hideout %s", "whois": "/whois %s", "ignore": "/ignore %s"}
+           "hideout": "/hideout %s", "whois": "/whois %s", "ignore": "/ignore %s",
+           "unignore": "/unignore %s"}
 _NAME = re.compile(r"\w{1,40}")
 MAX_WHISPER = 300
 

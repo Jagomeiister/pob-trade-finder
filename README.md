@@ -56,8 +56,10 @@ From source: `pip install pywebview`, then `python gui.py`.
     on its own**;
   - stash cell outline, your own card buttons, and sounds (built in or your own file) with a
     volume slider;
-  - Sales history (chaos + divine, chart, CSV) and buyer notes (reputation, flag, hide,
-    merge one player's characters). All local.
+  - a trade ledger: what you sold and bought, earned / spent / net profit, flips (bought then
+    sold), sales under the market price, reports by league or dates, a goal, CSV and backup;
+  - People: buyers and sellers with notes, flags, time wasters and who you've blocked (with
+    unblock), and merging one player's characters. All local.
 - **👁 Watcher's Eye & co.**:
   - Watcher's Eye with your build's auras pre-picked, current or legacy mods, and every pair
     or triple priced;
@@ -106,7 +108,7 @@ item art belong to GGG. How the app behaves toward GGG's services:
   log, Invite and Trade are separate buttons, and the app never reads or changes the game's
   memory.
 - **The trade helper reads the game's chat log (Client.txt)** only after you switch it on.
-  Sales, buyer notes and flags stay on your PC.
+  Sales, purchases, people notes and flags stay on your PC.
 - **The Market** uses GGG's public, documented currency-exchange feed.
 - **POESESSID** (optional) stays on your PC and is sent only to pathofexile.com.
 - **Official login (coming):** the app has GGG's documented OAuth sign-in built in (public

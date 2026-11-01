@@ -57,6 +57,7 @@ SHIP = [
     "js/app/22-divcards.js",
     "js/app/23-tree.js",
     "js/app/24-cheatsheets.js",
+    "js/app/25-trade-ledger.js",
     "data/stats.js",
     "data/leagues.js",
     "data/ranges.js",

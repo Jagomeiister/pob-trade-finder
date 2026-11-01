@@ -251,9 +251,9 @@ check("chat key: config file not modified", open(os.path.join(tmp, "b.ini"), "rb
 
 # -- command_for ----------------------------------------------------------------
 check("command: invite", th.command_for("invite", "Some_Name1") == "/invite Some_Name1")
-check("command: kick/trade/hideout/whois/ignore",
-      [th.command_for(a, "Bob") for a in ("kick", "trade", "hideout", "whois", "ignore")]
-      == ["/kick Bob", "/tradewith Bob", "/hideout Bob", "/whois Bob", "/ignore Bob"])
+check("command: kick/trade/hideout/whois/ignore/unignore",
+      [th.command_for(a, "Bob") for a in ("kick", "trade", "hideout", "whois", "ignore", "unignore")]
+      == ["/kick Bob", "/tradewith Bob", "/hideout Bob", "/whois Bob", "/ignore Bob", "/unignore Bob"])
 check("command: accented name", th.command_for("trade", "Ünïcode_Näme") == "/tradewith Ünïcode_Näme")
 check("command: whisper", th.command_for("whisper", "Bob", "  sold, sorry ") == "@Bob sold, sorry")
 check("command: whisper newlines stripped", th.command_for("whisper", "Bob", "one\r\ntwo\nthree\rfour")

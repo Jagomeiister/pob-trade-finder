@@ -120,6 +120,14 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 
 ## 3. To do (agreed, not started)
 
+- [x] **Trade ledger** (built 2026-11-01, asked by you): buying cards record Bought / Didn't happen /
+      No answer / Other (Trade accepted pre-selects Bought); Trades (Sold / Bought / Flips,
+      earned / spent / net, currency swaps valued both ways, under-market tag, + Add trade, CSV);
+      People (buyers + sellers, time wasters after N, Blocked = hidden or ignored-from-the-app,
+      Show popups / Unignore); Reports (range / league, item stats, top buyers / sellers, goal);
+      Setup → backup / restore; Today line on the trade cards; seller badge.
+  - [ ] In game: buy something, check Trade accepted highlights Bought and the purchase lands
+        in Trades → Bought; Unignore in game sends /unignore.
 - [x] **🌳 Skill tree view (mini Path of Building)**, shipped in v2.4.0. Still to confirm in game:
       the character compare against a real profile (the `mastery_effects` format in
       `get-passive-skills` wasn't checked live). It shows: the build's tree

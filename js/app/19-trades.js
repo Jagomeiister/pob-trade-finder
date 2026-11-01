@@ -38,7 +38,7 @@ var TRADE_MSGS = {
 };
 var tradeCards = [];         // open cards, newest first
 var tradeSeq = 0;
-var tradeTab = TRADE_CARDS ? 'trades' : 'sales';
+var tradeTab = 'trades'; // Trade helper window: trades | people | reports | setup
 var tradeStatus = null;      // last trade_status() answer
 var tradeRates = {};         // league -> { div: chaos per divine, at }
 var tradeAudio = null;
@@ -57,6 +57,8 @@ function tradePrefs() {
   if (!p.cardLayout) p.cardLayout = 'stack';   // 'stack' (vertical) | 'row' (side by side)
   if (!Array.isArray(p.customButtons)) p.customButtons = []; // [{ label, text, when: new|here|always|buying }]
   if (!p.noShowMin) p.noShowMin = 5;
+  if (!p.wasterAt) p.wasterAt = 2;            // time waster after this many bad outcomes (People)
+  if (p.showToday === undefined) p.showToday = true; // today's earned / spent line on the trade cards
   p.msgs = Object.assign({}, TRADE_MSGS, p.msgs || {});
   return p;
 }
@@ -73,6 +75,12 @@ function loadSales() {
   try { return JSON.parse(localStorage.getItem(SALES_KEY)) || []; } catch (e) { return []; }
 }
 function saveSales(list) { persist(SALES_KEY, JSON.stringify(list.slice(-SALES_MAX))); }
+// what you bought (cards for whispers you sent): same shape as a sale, with seller instead of buyer
+var PURCHASES_KEY = 'pobtf-purchases';
+function loadPurchases() {
+  try { return JSON.parse(localStorage.getItem(PURCHASES_KEY)) || []; } catch (e) { return []; }
+}
+function savePurchases(list) { persist(PURCHASES_KEY, JSON.stringify(list.slice(-SALES_MAX))); }
 function loadBuyers() {
   try { return JSON.parse(localStorage.getItem(BUYERS_KEY)) || {}; } catch (e) { return {}; }
 }
@@ -93,11 +101,14 @@ function mergeBuyers(fromKey, intoKey) {
   if (!fromKey || !intoKey || fromKey === intoKey) return false;
   var all = loadBuyers(), a = all[fromKey], b = all[intoKey];
   if (!a || !b) return false;
-  ['completed', 'wasted', 'noShow', 'notCompleted', 'other'].forEach(function (f) { b[f] = (b[f] || 0) + (a[f] || 0); });
+  PERSON_COUNTS.forEach(function (f) { b[f] = (b[f] || 0) + (a[f] || 0); });
   b.spent = Math.round(((b.spent || 0) + (a.spent || 0)) * 100) / 100;
+  b.paid = Math.round(((b.paid || 0) + (a.paid || 0)) * 100) / 100;
   b.names = (b.names || []).concat((a.names || []).filter(function (n) { return (b.names || []).indexOf(n) === -1; }));
   b.flag = b.flag || a.flag;
   b.hidden = b.hidden || a.hidden;
+  b.ignored = Math.max(b.ignored || 0, a.ignored || 0) || null;
+  if (a.waster != null && b.waster == null) b.waster = a.waster;
   b.note = [b.note, a.note].filter(Boolean).join(' · ');
   b.first = Math.min(b.first || Date.now(), a.first || Date.now());
   b.last = Math.max(b.last || 0, a.last || 0);
@@ -115,12 +126,22 @@ function buyerFor(card) {
   var all = loadBuyers();
   return all[buyerKey(card)] || null;
 }
+// People: everyone you've traded with, by the same key, buyers and sellers alike (one player can
+// be both). As a buyer: completed / spent (with you) / wasted / noShow / notCompleted / other.
+// As a seller: sold (to you) / paid (by you) / noAnswer / notBought / sellerOther.
+// waster: null = automatic (Setup → time waster after N), true / false = your call.
+// hidden = no popups here; ignored = when you sent /ignore from this app (null after /unignore).
+var PERSON_COUNTS = ['completed', 'wasted', 'noShow', 'notCompleted', 'other', 'sold', 'noAnswer', 'notBought', 'sellerOther'];
+function newPerson(card) {
+  return { name: card.name, account: card.account || null, names: [], completed: 0, spent: 0, wasted: 0, noShow: 0,
+    notCompleted: 0, other: 0, sold: 0, paid: 0, noAnswer: 0, notBought: 0, sellerOther: 0, flag: false, hidden: false,
+    ignored: null, waster: null, note: '', first: Date.now() };
+}
 function updateBuyer(card, fn) {
   if (card.test) return; // test mode: nothing about made-up buyers is kept
   var all = loadBuyers(), k = buyerKey(card);
   if (!k) return;
-  var b = all[k] || { name: card.name, account: card.account || null, names: [], completed: 0, spent: 0,
-    wasted: 0, noShow: 0, notCompleted: 0, other: 0, flag: false, hidden: false, note: '', first: Date.now() };
+  var b = Object.assign(newPerson(card), all[k] || {});
   if (b.names.indexOf(card.name) === -1) b.names.push(card.name);
   b.name = card.name;
   b.last = Date.now();
@@ -128,16 +149,40 @@ function updateBuyer(card, fn) {
   all[k] = b;
   saveBuyers(all);
 }
+// bad outcomes with you, either side: time wasted, no-show, a seller who didn't answer
+function wasteCount(b) { return (b.wasted || 0) + (b.noShow || 0) + (b.noAnswer || 0); }
+function isTimeWaster(b) {
+  if (!b) return false;
+  if (b.waster === true || b.waster === false) return b.waster;
+  return wasteCount(b) >= (tradePrefs().wasterAt || 2);
+}
 function buyerBadge(b) {
   if (!b) return null;
   var parts = [];
   if (b.completed) parts.push(b.completed + ' bought');
   if (b.wasted || b.noShow) parts.push((b.wasted + b.noShow) + ' wasted');
-  if (!parts.length && !b.flag) return null;
-  var tone = b.flag || (b.wasted + b.noShow) > b.completed ? 'danger' : 'success';
-  var c = UI.chip((b.flag ? '⚑ ' : '') + (parts.join(' · ') || 'flagged'), tone, 'buyer-badge');
-  c.title = (b.flag ? 'You flagged this buyer. ' : '') + (b.note || '') +
+  var waster = isTimeWaster(b);
+  if (!parts.length && !b.flag && !waster) return null;
+  var tone = b.flag || waster || (b.wasted + b.noShow) > b.completed ? 'danger' : 'success';
+  var c = UI.chip((b.flag ? '⚑ ' : '') + (waster ? '⌛ ' : '') + (parts.join(' · ') || (b.flag ? 'flagged' : 'time waster')),
+    tone, 'buyer-badge');
+  c.title = (b.flag ? 'You flagged this buyer. ' : '') + (waster ? 'Time waster. ' : '') + (b.note || '') +
     (b.spent ? ' Spent ' + fmtChaos(b.spent) + ' with you.' : '');
+  return c;
+}
+// the same for the seller on a card for a whisper you sent: their record of selling to you
+function sellerBadge(b) {
+  if (!b) return null;
+  var parts = [];
+  if (b.sold) parts.push('sold to you ' + b.sold + '×');
+  if (b.noAnswer) parts.push('didn\'t answer ' + b.noAnswer + '×');
+  var waster = isTimeWaster(b);
+  if (!parts.length && !b.flag && !waster) return null;
+  var tone = b.flag || waster || (b.noAnswer || 0) > (b.sold || 0) ? 'danger' : 'success';
+  var c = UI.chip((b.flag ? '⚑ ' : '') + (waster ? '⌛ ' : '') + (parts.join(' · ') || (b.flag ? 'flagged' : 'time waster')),
+    tone, 'buyer-badge seller-badge');
+  c.title = (b.flag ? 'You flagged this player. ' : '') + (waster ? 'Time waster. ' : '') + (b.note || '') +
+    (b.paid ? ' You paid them ' + fmtChaos(b.paid) + ' in all.' : '');
   return c;
 }
 
@@ -226,9 +271,14 @@ function handleTradeEvent(ev) {
     if (!cl) return;
     cl.left = true;
   } else if (ev.type === 'trade_accepted') {
-    // the log doesn't say with whom: the buyer who joined most recently
+    // the log doesn't say with whom: the buyer who joined most recently, else (you were buying)
+    // the seller whose hideout you went to, else your latest whisper to a seller
     var cands = tradeCards.filter(function (x) { return x.dir === 'in' && x.joined; })
       .sort(function (a, b2) { return (b2.joinedAt || 0) - (a.joinedAt || 0); });
+    if (!cands.length) {
+      cands = tradeCards.filter(function (x) { return x.dir === 'out' && now - x.at < 60 * 60 * 1000; })
+        .sort(function (a, b2) { return ((b2.sent.hideout || b2.at) - (a.sent.hideout || a.at)); });
+    }
     if (!cands.length) return;
     cands[0].acceptHint = true;
   } else if (ev.type === 'afk' || ev.type === 'dnd') {
@@ -339,6 +389,9 @@ async function tradeSend(card, action, text, btn) {
   }
   card.sent[action + (text ? ':' + text : '')] = Date.now();
   if (action === 'invite') card.invitedAt = card.invitedAt || Date.now();
+  // People → Blocked lists who you ignored through the app (the game's own list can't be read)
+  if (action === 'ignore') updateBuyer(card, function (b) { b.ignored = Date.now(); });
+  if (action === 'unignore') updateBuyer(card, function (b) { b.ignored = null; });
   renderTrades();
   return true;
 }
@@ -357,14 +410,16 @@ async function recordOutcome(card, outcome, opts) {
   var currency = opts.currency || t.currency;
   var div = await tradeDivRate(league);
   var v = tradeValue(price, currency, div);
+  var id = Date.now() + '-' + card.id;
+  var entry = { id: id, time: Date.now(), outcome: outcome, league: league, bulk: t.kind === 'bulk' || undefined,
+    item: t.item || '', count: t.count || null, price: price, currency: currency || null,
+    chaos: v.chaos != null ? Math.round(v.chaos * 100) / 100 : null,
+    div: v.div != null ? Math.round(v.div * 1000) / 1000 : null,
+    account: card.account || null, tab: t.tab || null, left: t.left || null, top: t.top || null, note: opts.note || '' };
   if (card.dir === 'in') {
+    entry.buyer = card.name;
     var list = loadSales();
-    list.push({ id: Date.now() + '-' + card.id, time: Date.now(), outcome: outcome, league: league,
-      item: t.item || '', count: t.count || null, price: price, currency: currency || null,
-      chaos: v.chaos != null ? Math.round(v.chaos * 100) / 100 : null,
-      div: v.div != null ? Math.round(v.div * 1000) / 1000 : null,
-      buyer: card.name, account: card.account || null, tab: t.tab || null, left: t.left || null, top: t.top || null,
-      note: opts.note || '' });
+    list.push(entry);
     saveSales(list);
     updateBuyer(card, function (b) {
       if (outcome === 'completed') { b.completed++; b.spent = Math.round(((b.spent || 0) + (v.chaos || 0)) * 100) / 100; }
@@ -373,8 +428,22 @@ async function recordOutcome(card, outcome, opts) {
       else if (outcome === 'not_completed') b.notCompleted++;
       else b.other++;
     });
+  } else {
+    entry.seller = card.name;
+    var bought = loadPurchases();
+    bought.push(entry);
+    savePurchases(bought);
+    updateBuyer(card, function (b) {
+      if (outcome === 'bought') { b.sold++; b.paid = Math.round(((b.paid || 0) + (v.chaos || 0)) * 100) / 100; }
+      else if (outcome === 'no_answer') b.noAnswer++;
+      else if (outcome === 'not_bought') b.notBought++;
+      else b.sellerOther++;
+    });
   }
   closeCard(card);
+  // after the card is gone: what the goods were worth at the time (bulk trades), and whether a
+  // sale went well under the market (Reports). Looked up once, saved on the entry.
+  if (outcome === 'completed' || outcome === 'bought') ledgerEnrich(card.dir === 'in' ? 'sold' : 'bought', id);
 }
 function closeCard(card) {
   tradeCards = tradeCards.filter(function (c) { return c !== card; });
@@ -389,7 +458,10 @@ function tradeAge(ms) {
 
 // one status per card, in words, with the matching colour on the card's edge (never colour alone)
 function tradeCardStatus(card) {
-  if (card.dir === 'out') return card.sent.hideout ? ['Going to their hideout', 'info'] : ['You whispered', 'neutral'];
+  if (card.dir === 'out') {
+    if (card.acceptHint) return ['Trade accepted', 'success'];
+    return card.sent.hideout ? ['Going to their hideout', 'info'] : ['You whispered', 'neutral'];
+  }
   if (card.left) return ['Left', 'neutral'];
   if (card.acceptHint) return ['Trade accepted', 'success'];
   if (card.joined) return ['In your hideout', 'success'];
@@ -417,7 +489,8 @@ function renderTradeCard(card) {
   var tags = UI.el('div', 'tc-tags');
   tags.appendChild(UI.chip(status[0], status[1], 'tc-status'));
   if (card.test) tags.appendChild(UI.chip('test', 'warn', 'tc-test'));
-  if (card.dir === 'in') { var bb = buyerBadge(buyerFor(card)); if (bb) tags.appendChild(bb); }
+  var bb = card.test ? null : card.dir === 'in' ? buyerBadge(buyerFor(card)) : sellerBadge(buyerFor(card));
+  if (bb) tags.appendChild(bb);
   if (card.repeats > 1) tags.appendChild(UI.chip('×' + card.repeats + ' whispers', 'info'));
   el.appendChild(tags);
 
@@ -471,11 +544,13 @@ function renderTradeCard(card) {
     customButtonsFor(p, 'buying').forEach(function (b) {
       act(b.label, 'whisper', fillMsg(b.text, card), null, 'Your button. Whisper: ' + fillMsg(b.text, card));
     });
+    acts.appendChild(UI.iconButton('⋯', 'More for ' + card.name, { size: 'sm', cls: card.more ? 'is-on' : '',
+      onClick: function () { card.more = !card.more; card.ignoreArmed = false; renderTrades(); } }));
   }
   el.appendChild(acts);
-  if (card.dir === 'in' && card.more) el.appendChild(renderMoreRow(card));
+  if (card.more) el.appendChild(renderMoreRow(card));
 
-  if (card.dir === 'in') el.appendChild(renderOutcomes(card, p));
+  el.appendChild(card.dir === 'in' ? renderOutcomes(card, p) : renderBuyOutcomes(card));
   return el;
 }
 
@@ -494,9 +569,11 @@ function renderMoreRow(card) {
     onClick: function () { tradeSend(card, 'whois'); } }));
   row.appendChild(UI.button('ghost', { size: 'sm', label: flagged ? 'Unflag' : '⚑ Flag', onClick: function () {
     updateBuyer(card, function (b) { b.flag = !b.flag; }); renderTrades(); } }));
-  row.appendChild(UI.button('ghost', { size: 'sm', label: 'Hide buyer',
-    title: 'No more popups or sounds from them here; their whispers go to the Hidden list',
-    onClick: function () { hideBuyer(card); } }));
+  if (card.dir === 'in') {
+    row.appendChild(UI.button('ghost', { size: 'sm', label: 'Hide buyer',
+      title: 'No more popups or sounds from them here; their whispers go to the Hidden list',
+      onClick: function () { hideBuyer(card); } }));
+  }
   // two clicks, no dialog: the first arms it, the second sends /ignore once
   var ig = UI.button(card.ignoreArmed ? 'danger' : 'ghost', { size: 'sm',
     label: card.ignoreArmed ? 'Click again: /ignore ' + card.name : 'Ignore in game',
@@ -543,12 +620,14 @@ async function swapSoldCurrency(card) {
   renderTrades();
 }
 function renderSoldRow(card, sold, changed) {
-  var t = card.trade || {};
+  var t = card.trade || {}, buying = card.dir === 'out';
   var row = UI.el('div', 'tc-sold');
-  row.appendChild(UI.el('span', 'tc-sold-label', 'Sold for'));
-  row.appendChild(UI.iconButton('−', 'Lower the price you got', { size: 'sm', onClick: function () { stepSoldPrice(card, -1); } }));
+  row.appendChild(UI.el('span', 'tc-sold-label', buying ? 'Paid' : 'Sold for'));
+  row.appendChild(UI.iconButton('−', buying ? 'Lower the price you paid' : 'Lower the price you got', { size: 'sm',
+    onClick: function () { stepSoldPrice(card, -1); } }));
   row.appendChild(UI.el('b', 'tc-sold-price', priceText(sold.price, sold.currency)));
-  row.appendChild(UI.iconButton('+', 'Raise the price you got', { size: 'sm', onClick: function () { stepSoldPrice(card, 1); } }));
+  row.appendChild(UI.iconButton('+', buying ? 'Raise the price you paid' : 'Raise the price you got', { size: 'sm',
+    onClick: function () { stepSoldPrice(card, 1); } }));
   if (sold.currency === 'chaos' || sold.currency === 'divine') {
     row.appendChild(UI.button('ghost', { size: 'sm', label: sold.currency === 'chaos' ? 'in div' : 'in c',
       title: 'Paid in ' + (sold.currency === 'chaos' ? 'divines' : 'chaos') + ' instead (converted at the current rate)',
@@ -575,13 +654,13 @@ function renderOutcomes(card, p) {
   }
   // click-only (the overlay never takes the keyboard from the game): Completed records the
   // price on the "Sold for" row, which starts at the listed price; a note is added later in
-  // Trade helper → Sales
+  // Trade helper → Trades
   var sold = soldPrice(card), changed = sold.price !== t.price || sold.currency !== t.currency;
   if (t.price != null) box.appendChild(renderSoldRow(card, sold, changed));
   var done = UI.button(card.acceptHint ? 'primary' : 'secondary', { size: 'sm',
     label: '✓ Completed' + (sold.price != null ? ' · ' + priceText(sold.price, sold.currency) : ''),
     title: (card.acceptHint ? 'The game logged "Trade accepted". ' : '') +
-      'Records the sale at the "Sold for" price. A note can be added in Trade helper → Sales.',
+      'Records the sale at the "Sold for" price. A note can be added in Trade helper → Trades.',
     onClick: function () { recordOutcome(card, 'completed', changed ? { price: sold.price, currency: sold.currency } : {}); } });
   done.classList.add('tc-complete');
   if (card.acceptHint) done.classList.add('suggested');
@@ -590,8 +669,33 @@ function renderOutcomes(card, p) {
   // the other outcomes: one even row of quiet buttons
   more.appendChild(UI.button('secondary', { size: 'sm', label: '✗ Not completed', onClick: function () { recordOutcome(card, 'not_completed'); } }));
   more.appendChild(UI.button('secondary', { size: 'sm', label: '⌛ Time wasted', onClick: function () { recordOutcome(card, 'wasted'); } }));
-  more.appendChild(UI.button('secondary', { size: 'sm', label: 'Other', title: 'Add a note in Trade helper → Sales',
+  more.appendChild(UI.button('secondary', { size: 'sm', label: 'Other', title: 'Add a note in Trade helper → Trades',
     onClick: function () { recordOutcome(card, 'other'); } }));
+  box.appendChild(more);
+  return box;
+}
+
+// your own whisper to a seller: what happened, click-only like the selling side. "Trade
+// accepted" in the log pre-selects Bought; the Paid row starts at the listed price.
+function renderBuyOutcomes(card) {
+  var t = card.trade || {};
+  var box = UI.el('div', 'tc-outcomes');
+  var paid = soldPrice(card), changed = paid.price !== t.price || paid.currency !== t.currency;
+  if (t.price != null) box.appendChild(renderSoldRow(card, paid, changed));
+  var done = UI.button(card.acceptHint ? 'primary' : 'secondary', { size: 'sm',
+    label: '✓ Bought' + (paid.price != null ? ' · ' + priceText(paid.price, paid.currency) : ''),
+    title: (card.acceptHint ? 'The game logged "Trade accepted". ' : '') +
+      'Records the purchase at the "Paid" price (Trade helper → Trades → Bought). A note can be added there.',
+    onClick: function () { recordOutcome(card, 'bought', changed ? { price: paid.price, currency: paid.currency } : {}); } });
+  done.classList.add('tc-complete');
+  if (card.acceptHint) done.classList.add('suggested');
+  var more = UI.el('div', 'tc-other');
+  more.appendChild(done);
+  more.appendChild(UI.button('secondary', { size: 'sm', label: '✗ Didn\'t happen', onClick: function () { recordOutcome(card, 'not_bought'); } }));
+  more.appendChild(UI.button('secondary', { size: 'sm', label: '⌛ No answer', title: 'The seller never answered or invited you',
+    onClick: function () { recordOutcome(card, 'no_answer'); } }));
+  more.appendChild(UI.button('secondary', { size: 'sm', label: 'Other', title: 'Add a note in Trade helper → Trades',
+    onClick: function () { recordOutcome(card, 'buy_other'); } }));
   box.appendChild(more);
   return box;
 }
@@ -599,14 +703,20 @@ function renderOutcomes(card, p) {
 async function hideBuyer(card) {
   updateBuyer(card, function (b) { b.hidden = true; });
   tradeCards.forEach(function (c) { if (c.dir === 'in' && buyerKey(c) === buyerKey(card)) c.hidden = true; });
-  UI.toast(card.name + ' is hidden here. Buyers tab to undo.', 'info');
+  UI.toast(card.name + ' is hidden here. People → Blocked to undo.', 'info');
   renderTrades();
 }
 // Buyers page (Trade helper window, which can show a dialog)
 async function ignoreInGame(card) {
   var ok = await UI.dialog({ title: 'Ignore ' + card.name + ' in game?',
-    body: 'Sends /ignore ' + card.name + ' to Path of Exile once. Undo in game with /unignore.', confirmLabel: 'Send /ignore' });
+    body: 'Sends /ignore ' + card.name + ' to Path of Exile once. Undo it here (People → Blocked) or in game with /unignore.',
+    confirmLabel: 'Send /ignore' });
   if (ok) tradeSend(card, 'ignore');
+}
+async function unignoreInGame(card) {
+  var ok = await UI.dialog({ title: 'Unignore ' + card.name + ' in game?',
+    body: 'Sends /unignore ' + card.name + ' to Path of Exile once.', confirmLabel: 'Send /unignore' });
+  if (ok) tradeSend(card, 'unignore');
 }
 
 function renderTrades() {
@@ -620,8 +730,9 @@ function renderTrades() {
   });
   var body = document.getElementById('trades-body');
   body.textContent = '';
-  if (tradeTab === 'sales') renderSalesPage(body);
-  else if (tradeTab === 'buyers') renderBuyersPage(body);
+  if (tradeTab === 'trades') renderLedgerPage(body);
+  else if (tradeTab === 'people') renderPeoplePage(body);
+  else if (tradeTab === 'reports') renderReportsPage(body);
   else renderTradeSetup(body);
   renderTradeStatusLine();
 }
@@ -718,7 +829,7 @@ function renderIconOverlay(root) {
   if (iconHover) { // extra buttons only while the mouse is over it: out of the way otherwise
     // the same icons as the app's sidebar, so each one means one thing everywhere
     var api = window.pywebview.api;
-    bar.appendChild(navIconButton('trades', 'Trade helper: sales, buyers, setup', function () { api.trades_show(); }));
+    bar.appendChild(navIconButton('trades', 'Trade helper: trades, people, reports', function () { api.trades_show(); }));
     if (api.overlay_toggle_sheet) {
       bar.appendChild(navIconButton('sheets', 'Show / hide the cheat sheet' + (hk.sheet ? ' (' + hk.sheet + ')' : ''),
         function () { api.overlay_toggle_sheet(); }));
@@ -753,6 +864,7 @@ function renderCardsOverlay(root) {
   head.appendChild(UI.iconButton('–', 'Hide the trade cards (the icon or ' + ((overlayState.hotkeys || {}).trades || 'its hotkey') +
     ' brings them back)', { size: 'sm', onClick: function () { overlayOpen = false; overlayOpenedByHand = false; renderTrades(); } }));
   root.appendChild(head);
+  if (p.showToday) { var today = todayLine(); if (today) root.appendChild(today); }
   var list = UI.el('div', 'ov-cards' + (p.cardLayout === 'row' ? ' is-row' : ''));
   if (!p.enabled && !shown.length) {
     list.appendChild(UI.el('div', 'ov-note', 'Trade helper is off. Trade helper → Setup to switch it on.'));
@@ -796,7 +908,7 @@ function fitOverlay(name, rootId) {
 // What's actually drawn, as rounded rectangles: gui.py clips the overlay window to these
 // (SetWindowRgn), so everything else is truly see-through and clicks go to the game.
 // WebView2 can't do real transparency here, so the window is cut to shape instead.
-var OVERLAY_SHAPES = '.ov-icon, .ov-grip, .ov-bar > .btn, .ov-head, .ov-zone, .ov-note, .ov-cards > .trade-card, ' +
+var OVERLAY_SHAPES = '.ov-icon, .ov-grip, .ov-bar > .btn, .ov-head, .ov-today, .ov-zone, .ov-note, .ov-cards > .trade-card, ' +
   '.ov-cards > .disclosure';
 function overlayShapes(root) {
   return Array.prototype.map.call(root.querySelectorAll(OVERLAY_SHAPES), function (el) {
@@ -861,236 +973,7 @@ function renderTradeStatusLine() {
   el.className = 'trades-status' + (st && st.error ? ' warn' : st && st.watching ? ' ok' : '');
 }
 
-// ---- Sales page ------------------------------------------------------------------------
-var salesFilter = { league: '', period: '30', outcome: 'completed', q: '' };
-function filteredSales() {
-  var since = salesFilter.period === 'all' ? 0 : Date.now() - parseInt(salesFilter.period, 10) * 86400000;
-  var q = salesFilter.q.toLowerCase();
-  return loadSales().filter(function (s) {
-    return s.time >= since && (!salesFilter.league || s.league === salesFilter.league) &&
-      (salesFilter.outcome === 'all' || s.outcome === salesFilter.outcome) &&
-      (!q || (s.item + ' ' + s.buyer).toLowerCase().indexOf(q) !== -1);
-  });
-}
-function dayKey(ms) {
-  var d = new Date(ms);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-function salesSummary(list) {
-  var done = list.filter(function (s) { return s.outcome === 'completed'; });
-  var chaos = 0, div = 0, priced = 0, byLeague = {}, byDay = {}, byItem = {};
-  done.forEach(function (s) {
-    if (s.chaos != null) { chaos += s.chaos; priced++; }
-    if (s.div != null) div += s.div;
-    var L = byLeague[s.league] = byLeague[s.league] || { n: 0, chaos: 0, div: 0 };
-    L.n++; L.chaos += s.chaos || 0; L.div += s.div || 0;
-    var d = byDay[dayKey(s.time)] = byDay[dayKey(s.time)] || { n: 0, chaos: 0 };
-    d.n++; d.chaos += s.chaos || 0;
-    var it = byItem[s.item] = byItem[s.item] || { item: s.item, n: 0, chaos: 0 };
-    it.n++; it.chaos += s.chaos || 0;
-  });
-  var best = Object.keys(byItem).map(function (k) { return byItem[k]; })
-    .sort(function (a, b) { return b.chaos - a.chaos || b.n - a.n; }).slice(0, 10);
-  return { count: done.length, chaos: chaos, div: div, avg: priced ? chaos / priced : null,
-    byLeague: byLeague, byDay: byDay, best: best };
-}
-
-function salesCsv(list) {
-  var cols = ['time', 'outcome', 'league', 'item', 'count', 'price', 'currency', 'chaos', 'div', 'buyer', 'account',
-              'tab', 'left', 'top', 'note'];
-  function cell(v) {
-    if (v === null || v === undefined) return '';
-    var s = String(v);
-    if (/^[=+\-@\t\r]/.test(s)) s = '\'' + s; // spreadsheet formula injection
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  }
-  return [cols.join(',')].concat(list.map(function (s) {
-    return cols.map(function (c) { return cell(c === 'time' ? new Date(s.time).toISOString() : s[c]); }).join(',');
-  })).join('\n');
-}
-
-function salesChart(byDay, days) {
-  var keys = [];
-  for (var i = days - 1; i >= 0; i--) keys.push(dayKey(Date.now() - i * 86400000));
-  var max = Math.max.apply(null, keys.map(function (k) { return (byDay[k] || {}).chaos || 0; }).concat([1]));
-  var w = 600, h = 90, bw = w / keys.length;
-  var svg = '<svg class="sales-chart" viewBox="0 0 ' + w + ' ' + (h + 14) + '" role="img" aria-label="Chaos earned per day, last ' + days + ' days">';
-  keys.forEach(function (k, i) {
-    var v = (byDay[k] || {}).chaos || 0, bh = Math.round(v / max * h);
-    svg += '<rect x="' + (i * bw + 1).toFixed(1) + '" y="' + (h - bh) + '" width="' + Math.max(1, bw - 2).toFixed(1) +
-      '" height="' + bh + '"><title>' + k + ': ' + Math.round(v) + 'c, ' + ((byDay[k] || {}).n || 0) + ' sold</title></rect>';
-  });
-  svg += '<text x="0" y="' + (h + 12) + '">' + keys[0].slice(5) + '</text><text x="' + w + '" y="' + (h + 12) +
-    '" text-anchor="end">today</text></svg>';
-  var box = UI.el('div', 'sales-chart-box');
-  box.innerHTML = svg;
-  return box;
-}
-
-function renderSalesPage(body) {
-  var all = loadSales();
-  var leagues = [];
-  all.forEach(function (s) { if (s.league && leagues.indexOf(s.league) === -1) leagues.push(s.league); });
-  var bar = UI.el('div', 'sales-filters');
-  function onF(k) { return function () { salesFilter[k] = this.value; renderTrades(); }; }
-  UI.field('League', UI.select([['', 'All']].concat(leagues.map(function (l) { return [l, l]; })), salesFilter.league,
-    { onChange: onF('league') }), { parent: bar });
-  UI.field('Period', UI.select([['1', 'Today'], ['7', '7 days'], ['30', '30 days'], ['all', 'All time']], salesFilter.period,
-    { onChange: onF('period') }), { parent: bar });
-  UI.field('Show', UI.select([['completed', 'Sales'], ['all', 'All outcomes'], ['wasted', 'Time wasted'],
-    ['no_show', 'No-shows'], ['not_completed', 'Not completed'], ['other', 'Other']], salesFilter.outcome,
-    { onChange: onF('outcome') }), { parent: bar });
-  var q = UI.input({ placeholder: 'Item or buyer', width: '140px', value: salesFilter.q, ariaLabel: 'Search sales' });
-  q.addEventListener('change', onF('q'));
-  UI.field('Search', q, { parent: bar });
-  var list = filteredSales();
-  bar.appendChild(UI.button('ghost', { size: 'sm', label: 'Export CSV', onClick: function () { exportSalesCsv(list); } }));
-  body.appendChild(bar);
-
-  var sum = salesSummary(list);
-  var tiles = UI.el('div', 'sales-tiles');
-  [['Sales', String(sum.count)], ['Total', fmtChaos(sum.chaos) + (sum.div ? ' · ' + fmtCompact(sum.div) + ' div' : '')],
-   ['Average', sum.avg != null ? fmtChaos(sum.avg) : '—']].forEach(function (x) {
-    var tl = UI.el('div', 'sales-tile');
-    tl.appendChild(UI.el('span', 'st-label', x[0]));
-    tl.appendChild(UI.el('b', 'st-value', x[1]));
-    tiles.appendChild(tl);
-  });
-  body.appendChild(tiles);
-  if (sum.count) body.appendChild(salesChart(sum.byDay, salesFilter.period === '1' ? 7 : 30));
-  var lk = Object.keys(sum.byLeague);
-  if (lk.length > 1) {
-    body.appendChild(UI.table([{ key: 'l', label: 'League' }, { key: 'n', label: 'Sales', num: true },
-      { key: 'c', label: 'Chaos', num: true }, { key: 'd', label: 'Divine', num: true }],
-      lk.map(function (l) { var L = sum.byLeague[l]; return { l: l, n: L.n, c: Math.round(L.chaos), d: fmtCompact(L.div) }; }),
-      { caption: 'Per league' }));
-  }
-  if (sum.best.length) {
-    body.appendChild(UI.table([{ key: 'item', label: 'Best sellers' }, { key: 'n', label: 'Sold', num: true },
-      { key: 'c', label: 'Chaos', num: true }],
-      sum.best.map(function (b) { return { item: b.item, n: b.n, c: Math.round(b.chaos) }; })));
-  }
-  body.appendChild(UI.table([
-    { key: 'time', label: 'When', render: function (s) { return new Date(s.time).toLocaleString(); }, sort: function (s) { return s.time; } },
-    { key: 'item', label: 'Item' },
-    { key: 'price', label: 'Price', render: function (s) { return priceText(s.price, s.currency); } },
-    { key: 'chaos', label: 'Chaos', num: true, render: function (s) { return s.chaos != null ? fmtCompact(s.chaos) : ''; } },
-    { key: 'div', label: 'Div', num: true, render: function (s) { return s.div != null ? fmtCompact(s.div) : ''; } },
-    { key: 'buyer', label: 'Buyer' },
-    { key: 'league', label: 'League' },
-    { key: 'tab', label: 'Stash', render: function (s) { return s.tab ? s.tab + (s.left ? ' (' + s.left + ',' + s.top + ')' : '') : ''; } },
-    { key: 'outcome', label: 'Outcome', render: function (s) { return OUTCOME_LABEL[s.outcome] || s.outcome; } },
-    { key: 'note', label: 'Note' },
-    { key: 'edit', label: '', render: function (s) {
-      return UI.button('ghost', { size: 'sm', label: 'Edit', title: 'Change the price, outcome or note',
-        onClick: function () { editSale(s.id); } });
-    } }
-  ], list.slice().reverse(), { sortable: true, emptyText: 'Nothing recorded yet. Mark a trade ✓ Completed to see it here.' }));
-}
-
-async function editSale(id) {
-  var list = loadSales();
-  var s = list.filter(function (x) { return x.id === id; })[0];
-  if (!s) return;
-  var box = UI.el('div', 'sale-edit');
-  var price = UI.input({ type: 'number', value: s.price != null ? s.price : '', min: 0, step: 'any', width: '90px', ariaLabel: 'Price' });
-  var cur = UI.select([['chaos', 'chaos'], ['divine', 'divine']].concat(
-    s.currency && s.currency !== 'chaos' && s.currency !== 'divine' ? [[s.currency, s.currency]] : []), s.currency || 'chaos',
-    { ariaLabel: 'Currency' });
-  var out = UI.select(Object.keys(OUTCOME_LABEL).map(function (k) { return [k, OUTCOME_LABEL[k]]; }), s.outcome,
-    { ariaLabel: 'Outcome' });
-  var note = UI.input({ value: s.note || '', width: '100%', placeholder: 'Note', ariaLabel: 'Note' });
-  UI.field('Price', price, { parent: box });
-  UI.field('Currency', cur, { parent: box });
-  UI.field('Outcome', out, { parent: box });
-  UI.field('Note', note, { parent: box, cls: 'field-wide' });
-  if (!(await UI.dialog({ title: 'Edit: ' + (s.item || 'sale'), body: box, confirmLabel: 'Save' }))) return;
-  var p = parseFloat(price.value);
-  s.price = isNaN(p) ? null : p;
-  s.currency = cur.value;
-  s.outcome = out.value;
-  s.note = note.value.trim();
-  var v = tradeValue(s.price, s.currency, await tradeDivRate(s.league));
-  s.chaos = v.chaos != null ? Math.round(v.chaos * 100) / 100 : null;
-  s.div = v.div != null ? Math.round(v.div * 1000) / 1000 : null;
-  saveSales(list);
-  renderTrades();
-}
-var OUTCOME_LABEL = { completed: 'Sold', not_completed: 'Not completed', wasted: 'Time wasted', no_show: 'No-show', other: 'Other' };
-
-async function exportSalesCsv(list) {
-  var text = salesCsv(list);
-  if (isGui() && window.pywebview.api.save_text_file) {
-    var r = await window.pywebview.api.save_text_file('sales-' + dayKey(Date.now()) + '.csv', text);
-    if (r && r.ok) UI.toast('Saved ' + list.length + ' rows.', 'success');
-    else if (r && r.error) UI.toast('Not saved: ' + r.error, 'danger');
-    return;
-  }
-  navigator.clipboard.writeText(text).then(function () { UI.toast('CSV copied to the clipboard.', 'success'); });
-}
-
-// ---- Buyers page -----------------------------------------------------------------------
-function renderBuyersPage(body) {
-  var all = loadBuyers();
-  var keys = Object.keys(all).sort(function (a, b) { return (all[b].last || 0) - (all[a].last || 0); });
-  if (!keys.length) {
-    body.appendChild(UI.emptyState({ title: 'No buyers yet', text: 'Buyers appear here after you record a trade outcome or flag someone.' }));
-    return;
-  }
-  keys.forEach(function (k) {
-    var b = all[k];
-    var row = UI.el('div', 'buyer-row' + (b.hidden ? ' is-hidden' : ''));
-    var head = UI.el('div', 'buyer-head');
-    head.appendChild(UI.el('b', null, b.account || b.name));
-    if (b.names && b.names.length > 1) head.appendChild(UI.el('span', 'finder-sub', b.names.join(', ')));
-    if (b.flag) head.appendChild(UI.chip('⚑ Flagged', 'danger'));
-    if (b.hidden) head.appendChild(UI.chip('Hidden', 'neutral'));
-    row.appendChild(head);
-    row.appendChild(UI.el('div', 'buyer-stats', b.completed + ' bought · ' + fmtChaos(b.spent || 0) + ' spent · ' +
-      b.wasted + ' time wasted · ' + b.noShow + ' no-shows · ' + b.notCompleted + ' not completed'));
-    var note = UI.input({ placeholder: 'Note (only you see this)', value: b.note || '', width: '100%', ariaLabel: 'Note on ' + b.name });
-    note.addEventListener('change', function () {
-      var a = loadBuyers(); if (a[k]) { a[k].note = note.value; saveBuyers(a); }
-    });
-    row.appendChild(note);
-    var acts = UI.el('div', 'buyer-actions');
-    function toggle(field, on, off) {
-      acts.appendChild(UI.button('ghost', { size: 'sm', label: b[field] ? off : on, onClick: function () {
-        var a = loadBuyers(); a[k][field] = !a[k][field]; saveBuyers(a);
-        if (field === 'hidden') tradeCards.forEach(function (c) { if (buyerKey(c) === k) c.hidden = a[k].hidden; });
-        renderTrades();
-      } }));
-    }
-    toggle('flag', '⚑ Flag', 'Unflag');
-    toggle('hidden', 'Hide popups', 'Show popups');
-    var others = keys.filter(function (o) { return o !== k; });
-    if (others.length) {
-      var into = UI.select([['', 'Same person as…']].concat(others.map(function (o) { return [o, all[o].name]; })), '',
-        { ariaLabel: 'Merge ' + b.name + ' into another buyer', onChange: function () {
-          if (!this.value) return;
-          var target = all[this.value];
-          if (mergeBuyers(k, this.value)) UI.toast(b.name + ' now counts as ' + target.name + '.', 'success');
-          renderTrades();
-        } });
-      into.title = 'One player on several characters: their history adds up, and future whispers from ' + b.name +
-        ' count for the buyer you pick';
-      acts.appendChild(into);
-    }
-    acts.appendChild(UI.button('ghost', { size: 'sm', label: 'Ignore in game…',
-      onClick: function () { ignoreInGame({ name: b.name, sent: {} }); } }));
-    acts.appendChild(UI.button('danger', { size: 'sm', label: 'Clear history', onClick: function () {
-      UI.confirmDanger('Clear ' + b.name + '?', 'Removes their counts, note, flag and hidden setting. Your sales list keeps the sales.',
-        'Clear').then(function (ok) {
-        if (!ok) return;
-        var a = loadBuyers(); delete a[k]; saveBuyers(a);
-        tradeCards.forEach(function (c) { if (buyerKey(c) === k) c.hidden = false; });
-        renderTrades();
-      });
-    } }));
-    row.appendChild(acts);
-    body.appendChild(row);
-  });
-}
+// ---- Trades, People and Reports pages: js/app/25-trade-ledger.js -------------------------
 
 // ---- Setup → Test mode: made-up trades in the in-game overlay -----------------------------
 // gui.py runs made-up Client.txt lines through the real parser and hands the events to the
@@ -1263,6 +1146,13 @@ function renderTradeSetup(body) {
   var ns = UI.select([['3', '3 min'], ['5', '5 min'], ['10', '10 min'], ['15', '15 min']], String(p.noShowMin), {
     onChange: function () { var q = tradePrefs(); q.noShowMin = parseInt(this.value, 10); saveTradePrefs(q); } });
   UI.field('Offer "no-show" after', ns, { parent: sec });
+  var wa = UI.select([['1', 'after 1'], ['2', 'after 2'], ['3', 'after 3'], ['5', 'after 5']], String(p.wasterAt), {
+    onChange: function () { var q = tradePrefs(); q.wasterAt = parseInt(this.value, 10); saveTradePrefs(q); } });
+  wa.title = 'Time wasted, no-show or a seller who didn\'t answer: after this many, People marks them a time waster ' +
+    '(you can always say yes or no yourself)';
+  UI.field('Time waster', wa, { parent: sec });
+  sec.appendChild(toggle('Today\'s earned / spent line on the trade cards', p.showToday,
+    function (v) { setPref('showToday', v); }));
 
   sec.appendChild(UI.el('h3', 'trade-h3', 'Zone notes'));
   sec.appendChild(toggle('Show my note for an area when I enter it (from the chat log; display only)',
@@ -1341,6 +1231,7 @@ function renderTradeSetup(body) {
     });
     UI.field(m[1], inp, { parent: sec, cls: 'field-wide' });
   });
+  renderTradeDataSetup(sec); // backup / restore (25-trade-ledger.js)
   body.appendChild(sec);
 }
 
@@ -1448,7 +1339,7 @@ function mountTradeHelper(container, embedded) {
   root.appendChild(bar);
   var tabs = UI.el('div', 'trades-tabs');
   tabs.setAttribute('role', 'tablist');
-  [['sales', 'Sales'], ['buyers', 'Buyers'], ['setup', 'Setup']].forEach(function (t) {
+  [['trades', 'Trades'], ['people', 'People'], ['reports', 'Reports'], ['setup', 'Setup']].forEach(function (t) {
     var b = UI.el('button', 'trades-tab', t[1]);
     b.type = 'button';
     b.dataset.tab = t[0];
