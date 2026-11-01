@@ -732,6 +732,10 @@ for (const c of priced) await H.priceCard(c);
 const fgPayloads = H.calls('trade_search').filter(c => c.args[2] !== true).map(c => c.args[1]).sort();
 document.getElementById('save-build').click();
 await H.sleep(30);
+// ☆ Save asks for a name (prefilled): confirm it
+const saveDlg = document.querySelector('dialog[open]');
+if (saveDlg) H.button(saveDlg, 'Save').click();
+await H.sleep(30);
 const out = { saved: lib().length, savedCode: lib()[0] && lib()[0].code === document.getElementById('pob-input').value };
 document.getElementById('new-build').click();
 await H.sleep(30);
@@ -2257,7 +2261,7 @@ def scenario_trade_embed(s, tag):
     check(tag + " Trade helper opens as a view of the main window (no build needed)", r["view"] == "trades" and
           r["visible"] and r["tabs"] == ["Trades", "People", "Reports", "Setup"] and r["settingsClosed"], r)
     check(tag + " reads the log reader's state on open", r["status"] >= 1, r["status"])
-    check(tag + " Back returns to the landing without a build", r["backTo"] == "" and r["landing"], r)
+    check(tag + " Back returns to the Builds page without a build", r["backTo"] == "home" and r["landing"], r)
     check(tag + " with a build: in the sidebar, Esc returns to where you were", r["inNav"] and r["escBack"] == "gems", r)
 
 
@@ -3592,6 +3596,96 @@ return out;
 """
 
 
+S41_NOBUILD = r"""
+const H = window.__e2e;
+const out = {};
+const navKeys = () => [...document.querySelectorAll('#nav .nav-item')].map(b => b.dataset.view);
+out.shell = document.body.classList.contains('shell') && H.visible(document.getElementById('sidebar'));
+out.view = document.body.dataset.view;
+out.landing = H.visible(document.getElementById('input-panel'));
+out.nav = navKeys();
+// tools without a build
+const go = async k => { document.querySelector('#nav .nav-item[data-view="' + k + '"]').click(); await H.sleep(40); };
+await go('search');
+out.search = H.visible(document.querySelector('#tool-sections .tab-section[data-tab="search"]')) && !H.visible(document.getElementById('input-panel'));
+await go('divcards');
+out.divcards = H.visible(document.querySelector('#tool-sections .tab-section[data-tab="divcards"]'));
+await go('uniques');
+out.uniques = H.visible(document.querySelector('#tool-sections .tab-section[data-tab="uniques"]'));
+out.noBulk = !H.visible(document.getElementById('open-all')) && !H.visible(document.getElementById('check-all'));
+setView('gear'); // a build view without a build: the Builds page instead
+out.gearFallback = document.body.dataset.view;
+await go('home');
+out.homeAgain = H.visible(document.getElementById('input-panel'));
+return out;
+"""
+
+S41_SAVE = r"""
+const H = window.__e2e;
+const out = {};
+const lib = () => JSON.parse(localStorage.getItem('pobtf-builds') || '[]');
+await H.loadBuild();
+await H.sleep(60);
+const offer = [...document.querySelectorAll('.toast')].find(t => /Save this build/.test(t.textContent));
+out.offer = !!offer;
+H.button(offer, '☆ Save').click();
+await H.sleep(40);
+const dlg = document.querySelector('dialog[open]');
+out.prefill = dlg.querySelector('.lib-name-input').value;
+dlg.querySelector('.lib-name-input').value = 'My league starter';
+H.button(dlg, 'Save').click();
+await H.sleep(40);
+out.saved = lib().map(b => ({ name: b.name, asc: b.asc, cls: b.cls, skill: b.skill, has: !!b.code }));
+out.btn = document.getElementById('save-build').textContent;
+// the Builds page: one card, sorted, searchable
+document.querySelector('#nav .nav-item[data-view="home"]').click();
+await H.sleep(40);
+out.cards = [...document.querySelectorAll('#saved-list .saved-name')].map(e => e.textContent);
+out.count = H.text('#saved-count');
+// loading it again: no second offer, marked opened
+const toastsBefore = document.querySelectorAll('.toast').length;
+document.querySelector('#saved-list .saved-open').click();
+await H.waitFor(() => document.body.dataset.view !== 'home', 5000, 'reload');
+await H.sleep(60);
+out.noSecondOffer = ![...document.querySelectorAll('.toast')].some(t => /Save this build/.test(t.textContent));
+out.opened = !!lib()[0].opened;
+// ⋯ rename
+document.querySelector('#nav .nav-item[data-view="home"]').click();
+await H.sleep(30);
+document.querySelector('#saved-list button[aria-label^="Rename, Atlas strategy, delete"]').click();
+await H.sleep(30);
+const ed = document.querySelector('dialog[open]');
+ed.querySelector('.lib-name-input').value = 'Renamed starter';
+H.button(ed, 'Save changes').click();
+await H.sleep(40);
+out.renamed = lib()[0].name;
+return out;
+"""
+
+
+def scenario_nobuild(s, tag):
+    s.fresh()
+    r = s.run(S41_NOBUILD, timeout=60)
+    check(tag + " launch: sidebar + Builds page without a build", r["shell"] and r["view"] == "home" and r["landing"], r)
+    check(tag + " nav: Builds + the tools that need no build, not the build ones",
+          r["nav"][:1] == ["home"] and all(k in r["nav"] for k in ("search", "divcards", "uniques", "sheets", "dust", "market"))
+          and not any(k in r["nav"] for k in ("gear", "planner", "tree", "timeless", "finder")), r["nav"])
+    check(tag + " search text, div cards, Watcher's Eye open with no build", r["search"] and r["divcards"] and r["uniques"], r)
+    check(tag + " no build: no Open all / Check all prices", r["noBulk"], r)
+    check(tag + " a build-only view falls back to the Builds page", r["gearFallback"] == "home" and r["homeAgain"], r)
+    s.fresh()
+    r = s.run(S41_SAVE, timeout=90)
+    check(tag + " importing a new build offers to save it", r["offer"], r)
+    check(tag + " save asks for a name, prefilled with skill + ascendancy", " · " in (r["prefill"] or ""), r["prefill"])
+    sv = (r["saved"] or [{}])[0]
+    check(tag + " saved with your name, class and main skill", sv.get("name") == "My league starter" and sv.get("has")
+          and (sv.get("asc") or sv.get("cls")), r["saved"])
+    check(tag + " the build card shows ★ Saved", r["btn"] == "★ Saved", r["btn"])
+    check(tag + " Builds page lists it", r["cards"] == ["My league starter"] and r["count"] == "1", (r["cards"], r["count"]))
+    check(tag + " reloading a saved build: no second offer, marked opened", r["noSecondOffer"] and r["opened"], r)
+    check(tag + " ⋯ renames it", r["renamed"] == "Renamed starter", r["renamed"])
+
+
 def scenario_anoints(s, tag):
     s.fresh()
     r = s.run(S40_ANOINT_APP, timeout=60)
@@ -3750,6 +3844,7 @@ SCENARIOS = [
     ("38 sheets2", scenario_sheets2),
     ("39 autocompare", scenario_autocompare),
     ("40 anoints", scenario_anoints),
+    ("41 nobuild", scenario_nobuild),
 ]
 
 

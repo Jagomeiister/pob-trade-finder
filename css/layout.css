@@ -4,13 +4,14 @@
 /* --zoom = the Text size setting (body zoom); 100vh inside a zoomed body is zoom × the window,
    so viewport-tall pieces divide by it or their bottoms end up below the window */
 .app-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-height: calc(100vh / var(--zoom, 1)); }
-body.has-build .app-shell { grid-template-columns: 240px minmax(0, 1fr); }
+body.shell .app-shell { grid-template-columns: 240px minmax(0, 1fr); }
 .app-main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; }
 /* with the sidebar, content starts right beside it (no gap on wide screens);
    the market page uses the full width for its chart and table */
-body.has-build .app-main { margin: 0; max-width: 1480px; }
-body.has-build[data-view="market"] .app-main { max-width: none; }
-body:not(.has-build) .app-main { max-width: 860px; padding-top: 28px; }
+body.shell .app-main { margin: 0; max-width: 1480px; }
+body.shell[data-view="home"] .app-main { max-width: 960px; padding-top: 4px; }
+body.shell[data-view="market"] .app-main { max-width: none; }
+body:not(.shell) .app-main { max-width: 860px; padding-top: 28px; }
 .ctrl-spacer { flex: 1; }
 
 /* ---- sidebar ---- */
@@ -19,7 +20,7 @@ body:not(.has-build) .app-main { max-width: 860px; padding-top: 28px; }
   flex-direction: column; gap: 14px; padding: 14px 12px;
   background: var(--s1); border-right: 1px solid var(--border);
 }
-body.has-build .sidebar { display: flex; }
+body.shell .sidebar { display: flex; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: var(--fs-md); color: var(--text); padding: 2px 4px; }
 .brand svg { flex: none; }
 .build-card { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: var(--r-lg); background: var(--s2); }
@@ -59,7 +60,9 @@ body.has-build .sidebar { display: flex; }
   margin: 0 -24px 16px; padding: 10px 24px;
   background: var(--bg); border-bottom: 1px solid var(--border);
 }
-body.has-build .topbar { display: flex; }
+body.shell .topbar { display: flex; }
+/* no build loaded: nothing to open or price in bulk */
+body.shell:not(.has-build) #open-all, body.shell:not(.has-build) #check-all { display: none; }
 .view-title { margin: 0; font-size: var(--fs-xl); font-weight: 600; color: var(--text); }
 .context-chips {
   display: flex; gap: 6px; flex: 1 1 0; min-width: 0; overflow: hidden;
@@ -114,7 +117,8 @@ body > .search-settings, body > .char-pop { display: none; }
 .how-steps li { display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px dashed var(--border-strong); border-radius: var(--r-lg); }
 .how-steps b { color: var(--accent); font-size: var(--fs-sm); }
 .how-steps span { color: var(--text-2); font-size: var(--fs-sm); }
-body.has-build #input-panel { display: none; }
+/* the paste box + saved builds are the Builds page ('home' view): with or without a build loaded */
+body.shell:not([data-view="home"]) #input-panel { display: none; }
 
 .section-head {
   color: var(--accent); font-size: var(--fs-lg); margin: 26px 0 10px;
@@ -261,7 +265,7 @@ body:not(.has-build)[data-view="dust"] #input-panel { display: none; }
 .qp-dust { color: var(--text-2); font-size: var(--fs-sm); }
 #view-trades .trades-root { display: block; }
 /* a pasted item without a loaded build still shows under the landing */
-body:not(.has-build) .tab-section[data-tab="pasted"] { display: block; margin-top: 16px; }
+body:not(.has-build)[data-view="home"] .tab-section[data-tab="pasted"] { display: block; margin-top: 16px; }
 #view-planner:has(> #gear-value:not(.hidden)) #planner-empty,
 #view-planner:has(> #cost-summary:not(.hidden)) #planner-empty,
 #view-planner:has(> #basket:not(.hidden)) #planner-empty { display: none; }
@@ -681,7 +685,7 @@ body.trade-cards .ov-bar .btn-icon .ni { width: 20px; height: 20px; color: var(-
 .nav-item .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #rail-build-btn { display: none; }
 @media (min-width: 1001px) and (max-width: 1180px) {
-  body.has-build .app-shell { grid-template-columns: 216px minmax(0, 1fr); }
+  body.shell .app-shell { grid-template-columns: 216px minmax(0, 1fr); }
   .sidebar { padding-left: 8px; padding-right: 8px; }
   .side-foot .market-tile { display: none !important; }
   .master-detail { grid-template-columns: 220px minmax(0, 1fr); }
@@ -689,7 +693,7 @@ body.trade-cards .ov-bar .btn-icon .ni { width: 20px; height: 20px; color: var(-
 
 /* ---- narrow windows: sidebar on top, slot list above the item ---- */
 @media (max-width: 1000px) {
-  body.has-build .app-shell { grid-template-columns: minmax(0, 1fr); }
+  body.shell .app-shell { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: flex-start; border-right: 0; border-bottom: 1px solid var(--border); }
   .build-card { flex: 1 1 220px; }
   .nav { flex: 2 1 320px; flex-direction: row; flex-wrap: wrap; }
@@ -710,3 +714,18 @@ body.compact .listing { padding: 6px; margin-bottom: 5px; }
 @media (max-width: 640px) {
   .btns { margin-left: 0; width: 100%; }
 }
+
+/* ---- Builds page: your saved builds (04-library.js) ---- */
+.saved-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.saved-head .landing-h2 { margin: 0; }
+.saved-count { color: var(--text-3); font-size: var(--fs-sm); font-weight: 400; margin-left: 4px; }
+.saved-search { margin-left: auto; width: 240px; max-width: 100%; }
+.saved-search.hidden { display: none; }
+.saved-when { color: var(--text-3); }
+.lib-save { display: flex; flex-direction: column; gap: 10px; min-width: 320px; }
+.lib-name-input { width: 100%; }
+.build-atlas.hidden { display: none; }
+.lib-atlas-link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm);
+  cursor: pointer; text-align: left; }
+.lib-atlas-link:hover { text-decoration: underline; }
+.saved-section { margin-bottom: 18px; }

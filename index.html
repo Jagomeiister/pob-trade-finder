@@ -23,7 +23,7 @@
 })();
 </script>
 </head>
-<body>
+<body data-view="home">
 <div class="app-shell">
   <!-- sidebar: brand, build, views, market + settings (shown once a build is loaded) -->
   <aside id="sidebar" class="sidebar" aria-label="Build and views">
@@ -44,9 +44,10 @@
       <div id="build-cost" class="build-cost hidden"></div>
       <div id="set-picker-slot"></div>
       <div class="build-actions">
-        <button id="save-build" class="btn btn-secondary btn-sm" title="Keep this build in the library for one-click reload">☆ Save</button>
-        <button id="new-build" class="btn btn-ghost btn-sm" title="Paste or pick a different build">Switch build</button>
+        <button id="save-build" class="btn btn-secondary btn-sm" title="Keep this build in your library for one-click reload">☆ Save</button>
+        <button id="new-build" class="btn btn-ghost btn-sm" title="Your saved builds, or paste a different one">Switch build</button>
       </div>
+      <div id="build-atlas" class="build-atlas hidden"></div>
       <button id="compare-btn" class="btn btn-ghost btn-sm gui-only" title="Load your character and see what each slot is missing">⚖ Compare with character…</button>
     </div>
     <nav id="nav" class="nav" aria-label="Views"></nav>
@@ -295,6 +296,14 @@
         </div>
       </div>
 
+      <section id="saved-section" class="saved-section hidden" aria-labelledby="saved-title">
+        <div class="saved-head">
+          <h2 id="saved-title" class="landing-h2">Your builds <span id="saved-count" class="saved-count"></span></h2>
+          <input type="search" id="saved-search" class="saved-search hidden" placeholder="Search builds…" aria-label="Search saved builds">
+        </div>
+        <div id="saved-list" class="saved-list"></div>
+      </section>
+
       <section class="panel landing-paste">
         <label for="pob-input" class="landing-label">Paste a build</label>
         <textarea id="pob-input" placeholder="PoB export code, or a pobb.in / pastebin / poe.ninja link…&#10;(PoB → Import/Export Build → Generate → Copy)"></textarea>
@@ -306,10 +315,6 @@
         <div id="status" role="status"></div>
       </section>
 
-      <section id="saved-section" class="saved-section hidden" aria-labelledby="saved-title">
-        <h2 id="saved-title" class="landing-h2">Saved builds</h2>
-        <div id="saved-list" class="saved-list"></div>
-      </section>
 
       <ol class="how-steps" aria-label="How it works">
         <li><b>1 · Paste</b><span>Any PoB code or build link.</span></li>
@@ -343,6 +348,7 @@
     </div>
 
     <div id="results"></div>
+    <div id="tool-sections"></div>
 
     <div class="footer">PoB Trade Finder · This product isn't affiliated with or endorsed by Grinding Gear Games in any way. · game data and art © GGG</div>
   </div>

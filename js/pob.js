@@ -238,6 +238,7 @@
     if (bm) {
       out.className = attr(bm[1], 'className') || '';
       out.ascendClass = attr(bm[1], 'ascendClassName') || '';
+      out.level = parseInt(attr(bm[1], 'level') || '0', 10) || null;
     }
 
     var itemRe = /<Item\b([^>]*)>([\s\S]*?)<\/Item>/g, im;
