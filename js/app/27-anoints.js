@@ -103,19 +103,27 @@ function anointYours() {
   return { anoint: b.anoint || null, tree: tree };
 }
 
-function anointOilIcon(name, cls) {
+// an oil: its in-game icon; the name shows next to it (iconOnly: as a tooltip only), and alone
+// when there's no icon (offline before the first download, or in a plain browser)
+function anointOilIcon(name, cls, iconOnly) {
   var o = anoint.prices && anoint.prices.oils && anoint.prices.oils[name];
   var short = name.replace(/ Oil$/, '');
   var el = UI.el('span', 'anoint-oil' + (cls ? ' ' + cls : ''));
   el.title = name + (o && o.chaos != null ? ' · ' + anointCostText(o.chaos) : '');
+  el.setAttribute('aria-label', name);
+  var label = UI.el('span', 'anoint-oil-name', short);
   if (o && o.img) {
     var img = document.createElement('img');
     img.src = o.img;
     img.alt = '';
     img.loading = 'lazy';
+    // a missing icon falls back to the oil's name, never a blank
+    img.addEventListener('error', function () { img.remove(); el.classList.remove('has-icon', 'icon-only'); });
     el.appendChild(img);
+    el.classList.add('has-icon');
+    if (iconOnly) el.classList.add('icon-only');
   }
-  el.appendChild(UI.el('span', 'anoint-oil-name', short));
+  el.appendChild(label);
   return el;
 }
 
@@ -171,7 +179,7 @@ function anointHelper(opts) {
     for (var i = 0; i < kind.oils; i++) {
       var o = anoint.picked[i];
       if (o) {
-        var chip = anointOilIcon(o, 'is-picked');
+        var chip = anointOilIcon(o, 'is-picked', true);
         (function (idx) {
           chip.title = 'Remove ' + o;
           chip.addEventListener('click', function () { anoint.picked.splice(idx, 1); draw(); });
@@ -232,7 +240,7 @@ function anointHelper(opts) {
         if (r.text) main.appendChild(UI.el('div', 'anoint-text', r.text));
         row.appendChild(main);
         var oils = UI.el('div', 'anoint-row-oils');
-        r.oils.forEach(function (o) { oils.appendChild(anointOilIcon(o)); });
+        r.oils.forEach(function (o) { oils.appendChild(anointOilIcon(o, null, true)); });
         row.appendChild(oils);
         row.appendChild(UI.el('div', 'anoint-cost', anointCostText(r.cost)));
         if (!opts.overlay && kind.key !== 'map') {

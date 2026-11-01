@@ -3425,12 +3425,15 @@ const out = {};
 document.getElementById('open-sheets').click();
 await H.sleep(60);
 // a long mechanic sheet gets a filter box (app only)
-[...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => /Blight/.test(b.textContent)).click();
+// (Blight's anoint tables live in the anoint helper now: use the Scarabs sheet)
+[...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => /Scarab/.test(b.textContent)).click();
 await H.sleep(60);
 const f = document.querySelector('#view-sheets .sheet-filter');
 out.filter = !!f;
 const all = document.querySelectorAll('#view-sheets .sheet-table tbody tr').length;
-f.value = 'Whispers of Doom';
+const want = document.querySelector('#view-sheets .sheet-table tbody tr td').textContent;
+out.want = want;
+f.value = want;
 f.dispatchEvent(new Event('input'));
 await H.sleep(30);
 const vis = [...document.querySelectorAll('#view-sheets .sheet-table tbody tr')].filter(r => r.style.display !== 'none');
@@ -3546,7 +3549,7 @@ def scenario_sheets2(s, tag):
     s.fresh()
     r = s.run(S38_VIEW, timeout=60)
     check(tag + " long sheets get a filter that narrows rows", r["filter"] and r["rows"][0] > 100 and
-          0 < r["rows"][1] < 10 and "Whispers of Doom" in (r["hit"] or ""), (r["rows"], r["hit"]))
+          0 < r["rows"][1] < 10 and r["want"] in (r["hit"] or ""), (r["rows"], r["hit"]))
     check(tag + " gems for a picked class", r["gemsTitle"] == "Gems · Marauder", r["gemsTitle"])
     check(tag + " 20+ mechanic sheets", r["newCount"] >= 20, r["newCount"])
 

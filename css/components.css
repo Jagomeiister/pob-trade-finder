@@ -848,7 +848,10 @@ body.gui .settings-section.gui-only { display: flex; }
 .anoint-oil-price { color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .anoint-oil-count { position: absolute; top: 1px; right: 3px; color: var(--success); font-size: var(--fs-xs); font-weight: 700; }
 .anoint-oil { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); color: var(--text); white-space: nowrap; }
-.anoint-oil img { width: 22px; height: 22px; object-fit: contain; }
+.anoint-oil img { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.anoint-oil.icon-only .anoint-oil-name { display: none; }      /* the icon says it; the name is the tooltip */
+.anoint-oil-btn .anoint-oil img { width: 34px; height: 34px; }
+.anoint-row-oils .anoint-oil img { width: 30px; height: 30px; }
 .anoint-oil-btn .anoint-oil { flex-direction: column; gap: 0; }
 .anoint-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .anoint-picked { display: flex; gap: 4px; }

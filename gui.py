@@ -863,11 +863,16 @@ class Api:
                 rates, hour = self._feed.rates(league, want)
             except Exception:
                 rates, hour = {}, None  # offline: icons still show, prices don't
+            remote = {name: ("https://web.poecdn.com" + m["img"]) if (m.get("img") or "").startswith("/") else None
+                      for name, m in oils.items()}
+            try:  # the icons through the art cache: a local copy, so they show offline too
+                art = self._art.cache([u for u in remote.values() if u][:40]) if getattr(self, "_art", None) else {}
+            except Exception:
+                art = {}
             out = {}
             for name, m in oils.items():
-                img = m.get("img") or ""
-                out[name] = {"img": ("https://web.poecdn.com" + img) if img.startswith("/") else None,
-                             "chaos": rates.get(m["id"])}
+                u = remote[name]
+                out[name] = {"img": (art.get(u) or u) if u else None, "chaos": rates.get(m["id"])}
             return {"ok": True, "oils": out, "divine": rates.get(div_id) if div_id else None, "hour": hour}
         except Exception as e:
             return {"ok": False, "error": str(e)}
