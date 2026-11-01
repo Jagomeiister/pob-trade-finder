@@ -272,6 +272,9 @@ async function main() {
     'gems per group (disabled skipped)');
   assert(build.gems.length === 4, 'flattened gems keep per-group copies: ' + build.gems.length);
   assert(!build.gems.some(g => g.name === 'Disabled Gem'), 'disabled gems skipped');
+  assert(build.gemGroups[0].offGems.length === 1 && build.gemGroups[0].offGems[0].name === 'Disabled Gem' &&
+    build.gemGroups[0].offGems[0].enabled === false && build.gemGroups[1].offGems.length === 0,
+    'unticked gems kept per group as options: ' + JSON.stringify(build.gemGroups.map(g => g.offGems)));
   assert(!build.gems.some(g => g.name === 'Summon Raging Spirit'), 'inactive skill set skipped');
   assert(!build.gems.some(g => g.name === 'Granted By Item'), 'item-granted skills skipped');
   assert(!build.gems.some(g => g.name === 'Mana-Infused Staff'), 'gemId-less granted skills skipped even without source attr');

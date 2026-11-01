@@ -311,22 +311,24 @@
         var group = {
           slot: attr(sk[1], 'slot') || '',
           label: attr(sk[1], 'label') || '',
-          gems: []
+          gems: [],
+          offGems: [] // unticked in PoB: swap-in options, not part of the setup
         };
         var gemRe = /<Gem\b([^>]*)\/?>/g, gm;
         while ((gm = gemRe.exec(sk[2]))) {
-          if (attr(gm[1], 'enabled') === 'false') continue;
+          var off = attr(gm[1], 'enabled') === 'false';
           var gname = attr(gm[1], 'nameSpec');
           if (!gname) continue;
           // real gems always carry a gemId; item-granted skills don't (and not
           // every PoB version marks the parent Skill with a source attribute)
           if (!attr(gm[1], 'gemId') && !attr(gm[1], 'variantId')) continue;
-          group.gems.push({
+          var gemObj = {
             name: gname,
             level: parseInt(attr(gm[1], 'level') || '1', 10),
             quality: parseInt(attr(gm[1], 'quality') || '0', 10),
             count: parseInt(attr(gm[1], 'count') || '1', 10)
-          });
+          };
+          if (off) { gemObj.enabled = false; group.offGems.push(gemObj); } else group.gems.push(gemObj);
         }
         if (group.gems.length) {
           // group title: user label, else the first (main) gem's name

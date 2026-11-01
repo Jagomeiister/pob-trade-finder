@@ -261,7 +261,11 @@ main button for the way that listing is bought. Everything else is under **⋯**
   selected group's gems on the right. Each gem has editable min level/quality, the
   cheapest price, **↗** to open its search, and **▾** for full listings, live search and
   pinning. **Price this group** / **Price all gems** fill in the prices and totals
-  ("Gems ≈ 3.2 div"); **Open searches ↗** opens a group's (or every) gem search
+  ("Gems ≈ 3.2 div"); **Open searches ↗** opens a group's (or every) gem search.
+  Gems unticked in PoB (swap-in options kept in a group, often more than the item can
+  socket) are listed under the setup as *unticked*, with their own ↗ and ▾ but left out
+  of the group's prices, totals and the character compare. The group shows "3 gems +
+  2 unticked"
 - **Paste an in-game item** — Ctrl+C any item in the client and paste it into the build
   box (Switch build → paste): it opens on a **Pasted item** page with all its mods
   matched, ready to price-check, sell-price, or compare against your character. The
@@ -637,6 +641,33 @@ automatically, so treat it as a guide.
 It checks every place an item can be: a ring counts in either ring slot, and a jewel counts
 wherever it sits in your tree (the build's socket doesn't have to match). The same click reads
 your tree jewels, and the Skill tree's *Compare with my character* reuses them.
+
+**Gems** compare by setup, not by slot. Each PoB link group finds your best-matching link
+group on any worn item, weapon swap included (gems in your bag don't count), and each of your
+link groups fills only one PoB group:
+
+> **You:** your Helmet · 4L (PoB has it in Body Armour) — 4/4 linked
+
+- **Matched** means every gem is there, with enough links. Running the Awakened or Vaal
+  version of a build gem counts as having it.
+- **Close** means some gems are missing, or you have a near version (the plain gem where the
+  build has the Awakened one, or a different transfigured version), or the group has fewer
+  links than the build uses.
+- Every gem in the table gets a tag: **linked** (in the matched link group), **not linked**
+  (socketed in the same item but a separate link group), **in your Amulet** (you have it on
+  another item), or **missing** (not in anything you wear). The strip sums it up, e.g.
+  *2/4 linked · 1 socketed but not linked: Overloaded Intensity*.
+- Under the strip, a **socket picture** shows your gear the way the game does: one box per
+  item, and in it each link group as a chain of socket dots joined by a gold bar, with the
+  gem in each socket. Separate link groups on one item are lettered (**Link A**, **Link B**),
+  the gem tags use the same letters (*linked · Boots A*, *not linked · Boots B*), and the
+  group matched to this setup is outlined and tagged *this setup*. The setup's gems are
+  bright, other gems dimmed, empty sockets say *empty*.
+- A link group only counts as the setup when at least two of its gems are linked together
+  (one for a single-gem group), so a lone socket with one shared support doesn't.
+- Gems below the build's level or quality are listed as *lower* but don't change the status.
+- If you run one of PoB's unticked options in place of a ticked gem, the strip names it
+  (*running unticked option: Spell Echo Support*) next to the ticked gem it replaced.
 
 ## 6c. Budget, deals, basket
 

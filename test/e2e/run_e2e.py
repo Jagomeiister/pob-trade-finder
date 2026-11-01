@@ -2448,6 +2448,109 @@ def scenario_chardiff(s, tag):
     check(tag + " Skill tree compare reuses the passives already read", r["reuse"] == "MyChar", r["reuse"])
 
 
+S32_GEMDIFF = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+const views = gemGroupViews.filter(v => v.group.gems.length >= 3);
+out.groups = views.length;
+const [A, B, C, D] = views;
+// A: every gem, worn in a different item than PoB puts it
+const invA = A.group.slot === 'Helmet' ? 'Gloves' : 'Helm';
+out.whereA = invA === 'Helm' ? 'Helmet' : 'Gloves';
+const gemsOf = (g) => g.gems.map(x => ({ name: x.name, level: x.level, quality: x.quality }));
+// B: first gem kept, its last gem missing, one link short
+const gB = gemsOf(B.group).slice(0, -1);
+const item = (inv, groups) => ({ inventoryId: inv, x: 0, name: 'Some Name', base: 'Base', frameType: 2, icon: '', ilvl: 84,
+  corrupted: false, implicitMods: [], explicitMods: [], craftedMods: [], fracturedMods: [], enchantMods: [],
+  // sockets as the bridge sends them: one per link, gem name or '' when empty
+  linkGroups: groups.map(g => Object.assign({ sockets: g.gems.map(x => ({ c: 'B', gem: x.name }))
+    .concat(Array(Math.max(0, g.links - g.gems.length)).fill({ c: 'R', gem: '' })) }, g)) });
+window.__stubOverrides.get_character_items = { ok: true, items: [
+  item(invA, [{ links: A.group.gems.length, gems: gemsOf(A.group) }]),
+  item('Weapon2', [{ links: gB.length, gems: gB }]),
+  item('MainInventory', [{ links: 6, gems: gemsOf(C.group) }]),  // bag items don't count
+  // D: all but its last two gems linked in the boots, one in a separate boots socket, one in the amulet
+  item('Boots', [{ links: D.group.gems.length - 2, gems: gemsOf(D.group).slice(0, -2) }, { links: 1, gems: gemsOf(D.group).slice(-2, -1) }]),
+  item('Amulet', [{ links: 1, gems: gemsOf(D.group).slice(-1) }]),
+] };
+window.__stubOverrides.get_character_passives = { ok: true, hashes: [], hashesEx: [], masteries: {}, jewels: [] };
+document.getElementById('acct-input').value = 'Me#1';
+const sel = document.getElementById('char-select');
+const o = document.createElement('option'); o.value = 'MyChar'; o.textContent = 'MyChar'; sel.appendChild(o); sel.value = 'MyChar';
+document.getElementById('char-compare').click();
+await H.waitFor(() => /comparing against/.test(H.text('#char-status') || ''), 4000, 'compare');
+const st = v => ({ cls: ['diff-matched', 'diff-close', 'diff-missing'].filter(c => v.card.classList.contains(c))[0],
+  row: ['diff-matched', 'diff-close', 'diff-missing'].filter(c => v.row.classList.contains(c))[0],
+  text: (v.card.querySelector('.char-diff') || {}).textContent || '',
+  chips: [...v.card.querySelectorAll('.gem-you')].length,
+  links: ['linked', 'unlinked', 'elsewhere', 'missing'].map(k => v.card.querySelectorAll('.gem-link-' + k).length) });
+out.A = st(A); out.B = st(B); out.C = st(C); out.D = st(D); out.dN = D.group.gems.length;
+// D's socket picture: both boots link groups, A outlined as this setup, the amulet beside
+out.viz = { items: [...D.card.querySelectorAll('.glv-item-name')].map(e => e.textContent),
+  heads: [...D.card.querySelectorAll('.glv-head')].map(e => e.textContent),
+  matched: H.text('.glv-group.matched .glv-head', D.card), chains: D.card.querySelectorAll('.glv-chain.linked').length,
+  chips: [...D.card.querySelectorAll('.gem-you')].map(e => e.textContent) };
+out.aSlot = A.group.slot; out.bLast = B.group.gems[B.group.gems.length - 1].name;
+out.bLinks = gB.length; out.bWant = Math.min(6, B.group.gems.length);
+// gemFit: awakened upgrade full, plain-for-awakened half, transfigured half, heralds different
+out.fit = [gemFit('Added Fire Damage', 'Awakened Added Fire Damage Support'), gemFit('Awakened Added Fire Damage', 'Added Fire Damage Support'),
+  gemFit('Kinetic Blast of Clustering', 'Kinetic Blast'), gemFit('Herald of Ice', 'Herald of Thunder'), gemFit('Grace', 'Vaal Grace')];
+// exact matches first, whatever the listing order: transfigured listed before its plain gem
+const order = groupFit([{ name: 'Summon Stone Golem of Safeguarding', level: 20, quality: 20 }, { name: 'Summon Stone Golem', level: 20, quality: 20 }],
+  { links: 2, gems: [{ name: 'Summon Stone Golem', level: 20, quality: 20 }] });
+out.order = [order.full, order.missing.join(), order.variants.length];
+// unticked gems: listed after the setup, dimmed, not in the group's price rows; the compare
+// names them as options when you run one in place of a ticked gem
+const g0 = A.group, off = { name: 'Faster Casting Support', level: 20, quality: 20, count: 1, enabled: false };
+const gemsView = makeGemsCard([Object.assign({}, g0, { offGems: [off] })]);
+const offCard = gemsView.querySelector('.gem-group-card');
+out.off = { rows: offCard.querySelectorAll('.gem-row').length, offRows: offCard.querySelectorAll('.gem-row.gem-off').length,
+  head: H.text('.gem-off-head', offCard), tag: H.text('.slot-tag', offCard), badge: !!offCard.querySelector('.gem-off .off-badge'),
+  priced: gemGroupViews[0].gemRows.length, want: g0.gems.length };
+const swapped = groupFit(g0.gems, { links: g0.gems.length, gems: g0.gems.slice(0, -1).concat([{ name: 'Faster Casting Support', level: 20, quality: 20 }]) }, [off]);
+out.offFit = [swapped.missing.length, swapped.options.join()];
+delete window.__stubOverrides.get_character_items;
+delete window.__stubOverrides.get_character_passives;
+return out;
+"""
+
+
+def scenario_gemdiff(s, tag):
+    s.fresh()
+    r = s.run(S32_GEMDIFF, timeout=60)
+    if r["groups"] < 3:
+        check(tag + " build has 3+ gem groups", False, r["groups"])
+        return
+    a, b, c = r["A"], r["B"], r["C"]
+    check(tag + " setup in another item still matches", a["cls"] == "diff-matched" and a["row"] == "diff-matched"
+          and ("your " + r["whereA"]) in a["text"], a)
+    check(tag + " says where PoB has it", (not r["aSlot"]) or ("PoB has it in " + r["aSlot"]) in a["text"], (r["aSlot"], a["text"]))
+    check(tag + " weapon-swap gems count, missing gem named", b["cls"] in ("diff-close", "diff-missing")
+          and "Weapon 1 Swap" in b["text"] and r["bLast"] in b["text"] and b["chips"] >= 1, b)
+    check(tag + " short links flagged", ("%d links, build uses %d" % (r["bLinks"], r["bWant"])) in b["text"]
+          or r["bLinks"] >= r["bWant"], b["text"])
+    d = r["D"]
+    check(tag + " each gem marked linked / not linked / elsewhere / missing", a["links"] == [r["whereA"] and a["chips"], 0, 0, 0]
+          and d["links"][0] == r["dN"] - 2 and d["links"][1] == 1 and d["links"][2] == 1 and c["links"][3] >= 1, (a["links"], d["links"], c["links"]))
+    check(tag + " strip counts gems socketed but not linked", "1 socketed but not linked" in d["text"]
+          and "in another item:" in d["text"] and "(your Amulet)" in d["text"], d["text"])
+    z = r["viz"]
+    check(tag + " socket picture shows each link group on the item", z["items"] == ["Your Boots", "Your Amulet"]
+          and z["heads"][:2] == ["Link A · %dLthis setup" % (r["dN"] - 2), "Link B · 1L"] and z["heads"][2] == "1L"
+          and z["matched"].startswith("Link A"), z)
+    check(tag + " gem tags name the link group", ("not linked · Boots B" in z["chips"]) and ("in Amulet" in z["chips"])
+          and ("linked · Boots A" in z["chips"]), z["chips"])
+    check(tag + " gems in the bag don't count", c["cls"] == "diff-missing" and "no link group" in c["text"], c)
+    check(tag + " gem variants scored", r["fit"] == [1, 0.5, 0.5, 0, 1], r["fit"])
+    check(tag + " exact gem matched before a near version", r["order"] == [1, "Summon Stone Golem of Safeguarding", 0], r["order"])
+    o = r["off"]
+    check(tag + " unticked gem listed after the setup, dimmed", o["offRows"] == 1 and o["rows"] == o["want"] + 1 and o["badge"]
+          and "Unticked in PoB" in (o["head"] or "") and "+ 1 unticked" in (o["tag"] or ""), o)
+    check(tag + " unticked gem left out of group pricing and compare", o["priced"] == o["want"], o)
+    check(tag + " running an unticked option is named", r["offFit"] == [1, "Faster Casting Support"], r["offFit"])
+
+
 S30_TESTCARDS = r"""
 const H = window.__e2e;
 const out = {};
@@ -2623,6 +2726,7 @@ SCENARIOS = [
     ("29 chardiff", scenario_chardiff),
     ("30 testmode", scenario_testmode),
     ("31 sheets", scenario_sheets),
+    ("32 gemdiff", scenario_gemdiff),
 ]
 
 

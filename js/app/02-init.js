@@ -130,6 +130,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var slot = slotForInv(it);
         if (slot) charGear[slot] = it;
       });
+      setCharLinks(res.items); // gem setups, matched on any worn item (10-character.js)
       // jewels sit in the passive tree, not the inventory: read them too (same click), so a
       // build jewel counts as owned wherever in the tree you socketed it
       charJewels = [];
