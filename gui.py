@@ -23,6 +23,7 @@ import zipfile
 import webview
 
 import price_hotkey
+import single_instance
 import trade_helper
 from currency_feed import CurrencyFeed
 from timeless import TimelessData
@@ -2806,6 +2807,47 @@ class Api:
         except Exception as e:
             return {"ok": False, "current": VERSION, "error": str(e)}
 
+    @staticmethod
+    def _update_script(staged, app_dir, exe_path, pid):
+        """The swap script apply_update hands over to, run once this copy (pid) has exited.
+        Windows tools by full path: a "find" (or "ping"…) from Git or another toolkit earlier
+        on PATH answered differently, so "still running?" always said no."""
+        sys32 = '"%SystemRoot%\\System32\\'
+        tasklist, find, taskkill = sys32 + 'tasklist.exe"', sys32 + 'find.exe"', sys32 + 'taskkill.exe"'
+        ping, robocopy = sys32 + 'PING.EXE"', sys32 + 'Robocopy.exe"'
+        lines = [
+            "@echo off",
+            'cd /d "%~dp0"',
+            'echo update started %date% %time% > "_update.log"',
+            # wait until this copy has really exited (not a fixed delay: a slow close left
+            # files locked and the swap half done), up to ~30 s, then end it. 'timeout'
+            # needs a console stdin and dies when run windowless: ping is the reliable
+            # console-free delay
+            "set n=0",
+            ":wait",
+            tasklist + ' /FI "PID eq ' + str(pid) + '" /NH 2>nul | ' + find + ' "' + str(pid) + '" >nul || goto gone',
+            "set /a n+=1",
+            "if %n% geq 30 (",
+            '  echo old copy still running after 30 s: ending it >> "_update.log"',
+            "  " + taskkill + " /PID " + str(pid) + " /F >nul 2>&1",
+            "  goto gone",
+            ")",
+            ping + " -n 2 127.0.0.1 >nul",
+            "goto wait",
+            ":gone",
+            ping + " -n 2 127.0.0.1 >nul",
+            # /R:60 /W:1: retry a (briefly locked) file every second instead of robocopy's
+            # default 30 s waits
+            robocopy + ' "' + staged + '" "' + app_dir + '" /E /MOVE /R:60 /W:1 /NFL /NDL /NJH /NJS >> "_update.log" 2>&1',
+        ]
+        if exe_path:
+            # brief pause before relaunch: antivirus rescans the freshly written exe, and
+            # launching into that scan can fail. --after-update: the new copy waits for this
+            # one to finish closing instead of seeing it as "already running" (single_instance.py)
+            lines += [ping + " -n 4 127.0.0.1 >nul", 'start "" "' + exe_path + '" --after-update']
+        lines += ['echo update finished %date% %time% >> "_update.log"', 'del "%~f0"']
+        return "\n".join(lines) + "\n"
+
     def apply_update(self, url):
         """Download the release zip, stage it, and hand over to a swap script
         that replaces the app files after this process exits, then relaunches."""
@@ -2831,24 +2873,9 @@ class Api:
             exe_path = sys.executable if getattr(sys, "frozen", False) else None
             bat = os.path.join(APP_DIR, "_apply_update.bat")
             log = os.path.join(APP_DIR, "_update.log")
+            pid = os.getpid()
             with open(bat, "w", encoding="ascii") as f:
-                f.write("@echo off\n")
-                f.write('cd /d "%~dp0"\n')
-                f.write('echo update started %date% %time% > "_update.log"\n')
-                # 'timeout' needs a console stdin and dies when run windowless —
-                # ping is the reliable console-free delay
-                f.write("ping -n 3 127.0.0.1 >nul\n")
-                # /R:60 /W:1 — retry the (briefly locked) exe every second
-                # instead of robocopy's default 30s waits
-                f.write('robocopy "%s" "%s" /E /MOVE /R:60 /W:1 /NFL /NDL /NJH /NJS >> "_update.log" 2>&1\n'
-                        % (staged, APP_DIR))
-                if exe_path:
-                    # brief pause before relaunch: antivirus rescans the freshly
-                    # written exe, and launching into that scan can fail
-                    f.write("ping -n 4 127.0.0.1 >nul\n")
-                    f.write('start "" "%s"\n' % exe_path)
-                f.write('echo update finished %date% %time% >> "_update.log"\n')
-                f.write('del "%~f0"\n')
+                f.write(self._update_script(staged, APP_DIR, exe_path, pid))
             try:
                 os.remove(log)
             except Exception:
@@ -2861,7 +2888,16 @@ class Api:
                              stdin=subprocess.DEVNULL,
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL)
-            self._quitting = True  # let the overlay window close too
+            # a real exit, the same as tray → Quit: not "close to tray", no tray icon left
+            # behind (it made the app look still open), hotkeys and log reader released
+            self._quitting = True
+            _debug_log("update: exiting for the swap (pid %d)" % pid)
+            for stop in (lambda: self._tray and self._tray.stop(), lambda: self._tail and self._tail.stop(),
+                         self._stop_hotkey):
+                try:
+                    stop()
+                except Exception as e:
+                    _debug_log("update: cleanup: %s" % e)
             # overlay first, then the main window (whose closed event would close the
             # overlay again) — each exactly once
             for w in sorted(webview.windows, key=lambda w: w is not self._overlay):
@@ -2910,6 +2946,14 @@ def main():
     index = os.path.join(APP_DIR, "index.html")
     if not os.path.exists(index):
         sys.exit("index.html not found next to gui.py")
+    # one copy at a time: a second launch brings the running one forward instead (two
+    # copies fight over the update swap, hotkeys, tray, overlays and storage.json).
+    # --multi skips the check (development only).
+    instance = single_instance.SingleInstance()
+    if "--multi" not in sys.argv and not instance.acquire(wait=30 if "--after-update" in sys.argv else 0):
+        _debug_log("PoB Trade Finder is already running: bringing that window forward")
+        instance.ask_running_copy_to_show()
+        return
     _unblock_app_files()
     api = Api()
     main_window = webview.create_window(
@@ -2964,6 +3008,8 @@ def main():
     api._attach_trades(main_window, trades, overlays)
     api._start_hotkey()
     api._start_tray()
+    # another launch while this copy runs (often hidden in the tray): show this one
+    instance.listen_for_show(lambda: api._show_main(), lambda: api._quitting)
     try:
         webview.start()
     except BaseException as e:
