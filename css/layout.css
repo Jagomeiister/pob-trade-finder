@@ -398,6 +398,10 @@ body.trades .trades-root { display: block; }
 .tc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tc-age { flex: none; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .tc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-sold { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tc-sold-label { color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
+.tc-sold-price { min-width: 4.5em; text-align: center; color: var(--price); font-variant-numeric: tabular-nums; }
+.tc-sold-listed { color: var(--text-3); font-size: var(--fs-xs); }
 .tc-complete:not(.btn-primary) { color: var(--success); border-color: color-mix(in srgb, var(--success) 55%, var(--border)); }
 .tc-item { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .tc-item-name { font-weight: 600; }

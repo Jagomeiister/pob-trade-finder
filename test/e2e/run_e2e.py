@@ -1539,7 +1539,7 @@ await H.sleep(20);
 c = card('BuyerOne');
 out.joined = { here: H.text('.tc-status', c) === 'In your hideout' && c.dataset.status === 'success',
   actions: [...c.querySelectorAll('.tc-actions > .btn')].map(b => b.textContent),
-  outcomes: [...c.querySelectorAll('.tc-outcomes .btn')].map(b => b.textContent),
+  outcomes: [...c.querySelectorAll('.tc-outcomes .tc-other .btn')].map(b => b.textContent),
   headLines: Math.round(c.querySelector('.tc-head').getBoundingClientRect().height / 20) };
 window.__tradeEvent({ type: 'trade_accepted' });
 await H.sleep(20);
@@ -1547,6 +1547,20 @@ out.acceptedStatus = H.text('.tc-status', card('BuyerOne'));
 c = card('BuyerOne');
 out.suggested = c.querySelector('.tc-outcomes .btn.suggested') ? c.querySelector('.tc-outcomes .btn.suggested').textContent : null;
 out.sendsAfterEvents = sends().length;
+// "Sold for": − / + in price-sized steps, chaos ⇄ div at the current rate, Reset; no typing
+const soldStep = async (label) => { card('BuyerOne').querySelector('.tc-sold [aria-label="' + label + '"]').click(); await H.sleep(20); };
+const soldNow = () => [H.text('.tc-sold-price', card('BuyerOne')), (H.text('.tc-outcomes .btn.suggested', card('BuyerOne')) || '')];
+await soldStep('Raise the price you got'); out.soldUp = soldNow();
+await soldStep('Lower the price you got'); await soldStep('Lower the price you got'); out.soldDown = soldNow();
+out.soldListed = H.text('.tc-sold-listed', card('BuyerOne'));
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
+tradeRates = {};
+H.button(card('BuyerOne'), 'Reset').click(); await H.sleep(20);
+H.button(card('BuyerOne'), 'in c').click(); await H.waitFor(() => /c$/.test(H.text('.tc-sold-price', card('BuyerOne')) || ''), 2000, 'swap');
+out.soldChaos = soldNow();
+H.button(card('BuyerOne'), 'Reset').click(); await H.sleep(20);
+out.soldReset = [soldNow()[0], !card('BuyerOne').querySelector('.tc-sold-listed'), card('BuyerOne').querySelectorAll('input').length];
+out.sendsAfterSold = sends().length;
 window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
 c.querySelector('.tc-outcomes .btn.suggested').click();
 await H.waitFor(() => !card('BuyerOne'), 3000, 'card closed');
@@ -1708,6 +1722,12 @@ def scenario_trades(s, tag):
     check(tag + " buyer joined: badge, Trade · Kick · Thanks, outcomes", r["joined"]["here"] and
           r["joined"]["actions"][:3] == ["Trade", "Kick", "Thanks"] and
           r["joined"]["outcomes"][0].startswith("✓ Completed") and "⌛ Time wasted" in r["joined"]["outcomes"], r["joined"])
+    check(tag + " Sold for: + / − step 0.5 div and Completed follows", r["soldUp"] == ["2.5 div", "✓ Completed · 2.5 div"]
+          and r["soldDown"] == ["1.5 div", "✓ Completed · 1.5 div"] and r["soldListed"] == "listed 2 div",
+          (r["soldUp"], r["soldDown"], r["soldListed"]))
+    check(tag + " Sold for: in c converts at the rate (2 div × 200c)", r["soldChaos"] == ["400 c", "✓ Completed · 400 c"], r["soldChaos"])
+    check(tag + " Sold for: Reset goes back to the listed price; no inputs, nothing sent",
+          r["soldReset"] == ["2 div", True, 0] and r["sendsAfterSold"] == r["sendsAfterEvents"], (r["soldReset"], r["sendsAfterSold"]))
     check(tag + " Trade accepted highlights Completed (listed price), sends nothing",
           (r["suggested"] or "").startswith("✓ Completed · 2 div") and r["sendsAfterEvents"] == 3, r)
     sale = (r["sales"] or [{}])[0]

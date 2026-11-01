@@ -42,6 +42,14 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [ ] Search text → **Paste into game** with the stash open fills the search box.
 - [ ] The old report "closing the price-check pop-up closed the whole app" doesn't happen.
       If it does, send `data\debug.log`, which now logs every window close.
+- [ ] v2.5.1 overlays: dark over the game even with the light theme; cards say Waiting /
+      Invited / In your hideout / Trade accepted; long names cut short; text readable at a glance.
+- [ ] v2.5.1 icons: the sidebar's gold icons, and the PoB icon's hover buttons (Trade helper,
+      Cheat sheet, App, Settings) open the right things.
+- [ ] v2.5.4 socket colours: Compare gear → Gems shows the Socket colours box under a matched
+      setup, and its advice fits the item (base colours, bench craft, corrupted).
+- [ ] Sold for (card price): − / + change the price, "in div" / "in c" converts, ✓ Completed
+      records that price in Sales.
 
 
 
@@ -88,13 +96,14 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
       now available with *Include legacy mods*): research said 87 current mods; Path of Building's data gives
       80 after dropping legacy ones. Check which 7 differ (maybe Sublime Vision lines or new
       ones PoB hasn't added).
-- [ ] **Zone cheat sheets** (now part of the bigger *Cheat sheets* item in 3b): shipped as zone notes you write yourself, plus the 6 Act 1–3
+- [x] **Zone cheat sheets**: covered by the act sheets (v2.5.0) and mechanic sheets (v2.5.3);
+      per-zone layout tips stay in 3b until there's a source we may use. Was: shipped as zone notes you write yourself, plus the 6 Act 1–3
       trials. The original idea was ready-made cheat sheets per zone (layout tips, quests,
       skill points). Needs a trustworthy data source before adding any.
-- [ ] **Completed with the price edited on the card**: the spec had the price editable on the
-      card. It moved to Trade helper → Sales → Edit, because overlay cards can't take
-      typing without stealing the game's keyboard. Fine as is unless you want it back
-      (e.g. − / + price buttons on the card).
+- [x] **Completed with the price edited on the card** (built 2026-11-01): a "Sold for" row on the
+      card once the buyer is in your hideout. − / + in steps sized to the price (1 / 5 / 10c,
+      0.1 / 0.5 / 1 div), "in div" / "in c" converts at the current rate, Reset goes back to
+      the listed price; ✓ Completed records it. Click-only: overlay cards never take typing.
 - [ ] **Overlays on screens with different scaling** (e.g. 100% and 150%): the app is
       "system DPI aware", so positions may be off on the second screen. Check when moving
       the game between such screens.
@@ -136,7 +145,7 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
   If real numbers come out, add odds to `socketColourHelp` in js/app/10-character.js.
 - [x] **Overlay for the price-check pop-up (Ctrl+D)** (done 2026-11-01: no title bar, drag the banner, edges resize): it's still a normal window. Consider
       the same borderless, clipped style as the other overlays.
-- [x] **Gem setups: compare with your character** (released in v2.5.2) (asked 2026-11-01). The Gems view gets the
+- [x] **Gem setups: compare with your character** (released in v2.5.2; socket colours added in v2.5.4). The Gems view gets the
       same "you have / missing" marks as the gear compare. It reads the socketed gems from the
       imported character (`get-items`, `socketedItems`), already fetched by the gear compare.
   - Match each PoB skill group by its gems, **not by slot**. Players put links in other items

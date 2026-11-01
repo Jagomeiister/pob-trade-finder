@@ -381,9 +381,14 @@ note:
    blue for a quad tab (the whisper doesn't say which, so both show when it could be either)
 2. When the buyer enters your area the card shows **In your hideout** and switches to
    **Trade**, **Kick**, **Thanks**
-3. Then record what happened: **✓ Completed** (records the listed price), **✗ Not completed**,
-   **⌛ Time wasted** or **Other**. If the game logged "Trade accepted", Completed is
-   highlighted for you. Got a different price, or want a note? **Edit** the row in **Sales**.
+3. Then record what happened: **✓ Completed**, **✗ Not completed**, **⌛ Time wasted** or
+   **Other**. If the game logged "Trade accepted", Completed is highlighted for you.
+   Completed records the **Sold for** price above it. That starts at the listed price:
+   - **−** / **+** change it in steps that suit it (1, 5 or 10 chaos; 0.1, 0.5 or 1 divine);
+   - **in div** / **in c** converts it if you were paid in the other currency;
+   - **Reset** goes back to the listed price.
+
+   To add a note, **Edit** the row in **Sales**.
    If you invited someone and they didn't come within 5 minutes (change it in Setup),
    **Mark as no-show** appears
 
