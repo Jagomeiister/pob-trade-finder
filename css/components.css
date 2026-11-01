@@ -91,7 +91,7 @@ body:not(.gui) .btn.act-search { background: var(--accent); border-color: var(--
 }
 #update-banner.hidden { display: none; }
 .update-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 50%;
-  background: var(--success); color: var(--on-accent, #0b0b0b); font-weight: 700; }
+  background: var(--success); color: var(--on-accent); font-weight: 700; }
 .update-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 200px; }
 .update-summary { color: var(--text-2); font-size: var(--fs-sm); }
 .update-actions { display: flex; gap: 6px; margin-left: auto; }
