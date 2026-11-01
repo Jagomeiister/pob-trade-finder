@@ -104,9 +104,17 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
       card once the buyer is in your hideout. − / + in steps sized to the price (1 / 5 / 10c,
       0.1 / 0.5 / 1 div), "in div" / "in c" converts at the current rate, Reset goes back to
       the listed price; ✓ Completed records it. Click-only: overlay cards never take typing.
-- [ ] **Overlays on screens with different scaling** (e.g. 100% and 150%): the app is
-      "system DPI aware", so positions may be off on the second screen. Check when moving
-      the game between such screens.
+- [ ] **Overlays on screens with different scaling** (e.g. 100% and 150%).
+  - The risk: pywebview makes the app "system DPI aware", so on a screen scaled differently
+    from the main one Windows stretches the overlays (blurry). The see-through cut-out
+    (SetWindowRgn) may not line up.
+  - Checked 2026-11-01: the dev PC has two screens both at 100% (3440x1440 main + 2560x1440),
+    so it can't happen there. Testing would need a scaling change in Windows, which we don't
+    make on the user's PC.
+  - Settings → Copy diagnostics now lists every screen with its real scaling and says "Mixed
+    scaling: yes" when they differ, so a report from such a setup shows it straight away.
+  - Fix only if a report comes in. Candidate: per-monitor DPI awareness, but that changes
+    pywebview's own window sizing, so test it carefully.
 - [x] **README** (updated): doesn't mention anything from v2.1–v2.3 (trade helper, overlays, hotkeys,
       tray, Watcher's Eye & co., search text, div cards, quick price / upgrade check).
 - [x] **GitHub roadmap issue #1** (updated 2026-11-01) is stale: it lists Shipped only up to v1.12 and still has

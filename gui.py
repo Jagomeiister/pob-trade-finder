@@ -2617,6 +2617,49 @@ class Api:
         text = re.sub(r"\b[0-9a-fA-F]{32}\b", "<redacted>", text)
         return re.sub(r"(?i)([a-z]:\\users\\)[^\\/\s]+", r"\1<user>", text)
 
+    @staticmethod
+    def _display_lines():
+        """Each screen with its real scaling, for bug reports. The app is "system DPI aware"
+        (pywebview), so on a screen scaled differently from the main one Windows stretches the
+        overlays: if a report says they're offset or blurry, this shows whether that's the
+        setup. The real per-screen DPI needs a per-monitor-aware thread, so this thread is
+        switched for the read and straight back; the app's own awareness doesn't change."""
+        if sys.platform != "win32":
+            return []
+        import ctypes
+        from ctypes import wintypes
+        u, sh = ctypes.windll.user32, ctypes.windll.shcore
+        u.SetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+        u.SetThreadDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+        old = u.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))  # PER_MONITOR_AWARE_V2
+
+        class MONITORINFOEXW(ctypes.Structure):
+            _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT), ("rcWork", wintypes.RECT),
+                        ("dwFlags", wintypes.DWORD), ("szDevice", ctypes.c_wchar * 32)]
+        screens = []
+        proc = ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HMONITOR, wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+
+        def each(hmon, hdc, rect, lp):
+            mi = MONITORINFOEXW()
+            mi.cbSize = ctypes.sizeof(MONITORINFOEXW)
+            dx, dy = wintypes.UINT(), wintypes.UINT()
+            if u.GetMonitorInfoW(hmon, ctypes.byref(mi)) and sh.GetDpiForMonitor(hmon, 0, ctypes.byref(dx), ctypes.byref(dy)) == 0:
+                r = mi.rcMonitor
+                screens.append((mi.szDevice.replace("\\\\.\\", ""), r.right - r.left, r.bottom - r.top, r.left, r.top,
+                                round(dx.value * 100 / 96), bool(mi.dwFlags & 1)))
+            return 1
+        try:
+            u.EnumDisplayMonitors(None, None, proc(each), 0)
+        finally:
+            if old:
+                u.SetThreadDpiAwarenessContext(ctypes.c_void_p(old))
+        lines = ["Display %s: %dx%d at %d,%d, %d%%%s" % (s[0], s[1], s[2], s[3], s[4], s[5], " (main)" if s[6] else "")
+                 for s in screens]
+        if len({s[5] for s in screens}) > 1:
+            lines.append("Mixed scaling: yes (overlays on a screen scaled differently from the main one may be "
+                         "stretched or offset)")
+        return lines
+
     def diagnostics(self):
         """Plain-text app/environment summary + log tails for bug reports (Settings →
         Copy diagnostics). Redacted: no cookie, tokens or user name."""
@@ -2643,6 +2686,10 @@ class Api:
                 lines.append("Hotkey: %s%s" % (hk.get("hotkey"), " — " + hk["error"] if hk.get("error") else ""))
             except Exception as e:
                 lines.append("Hotkey: unavailable (%s)" % e)
+            try:
+                lines += self._display_lines()
+            except Exception as e:
+                lines.append("Displays: unavailable (%s)" % e)
             for title, path, n in (("debug.log", os.path.join(DATA_DIR, "debug.log"), 40),
                                    ("_update.log", os.path.join(APP_DIR, "_update.log"), 15)):
                 tail = self._tail(path, n)
