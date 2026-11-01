@@ -114,5 +114,31 @@ api._divcards_cache = None
 r = api.div_cards("Standard")
 check("a truncated download isn't trusted", r["ok"] and r["source"] == "shipped", r.get("source"))
 
+# the full card's text (tools/make_divcards.py): the wiki's reward markup -> coloured lines,
+# its flavour text -> plain lines. Samples are the wiki's own markup, escaped as Cargo returns it.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+import make_divcards as M  # noqa: E402
+
+HOVER = ('&lt;span class=&quot;tc -%s&quot;&gt;&lt;span class=&quot;hoverbox c-item-hoverbox&quot;&gt;'
+         '&lt;span class=&quot;hoverbox__activator c-item-hoverbox__activator&quot;&gt;[[File: %s  inventory icon.png|16x16px|link=|alt=]]'
+         '[[%s|%s]]&lt;/span&gt;&lt;span class=&quot;hoverbox__display c-item-hoverbox__display&quot;&gt;'
+         '[[File: %s  inventory icon.png|78x78px|link=|alt=|class=item-icon]]&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;')
+doctor = HOVER % ("unique", "Headhunter", "Headhunter", "Headhunter", "Headhunter")
+check("reward: one unique, named once (the hover copy dropped)", M.parse_reward(doctor) == [[["Headhunter", "unique"]]],
+      M.parse_reward(doctor))
+multi = (HOVER % ("unique", "Skin of the Loyal", "Skin of the Loyal", "Skin of the Loyal", "Skin of the Loyal") +
+         "&lt;br&gt;Item Level: &lt;span class=&quot;tc -normal&quot;&gt;25&lt;/span&gt;&lt;br /&gt;"
+         "&lt;span class=&quot;tc -corrupted&quot;&gt;Corrupted&lt;/span&gt;")
+check("reward: several lines, mixed colours", M.parse_reward(multi) == [[["Skin of the Loyal", "unique"]],
+      [["Item Level: ", "default"], ["25", "normal"]], [["Corrupted", "corrupted"]]], M.parse_reward(multi))
+check("reward: [[Page|Shown]] and plain counts", M.parse_reward(
+      "&lt;span class=&quot;tc -currency&quot;&gt;3x [[Exalted Orb|Exalted Orb]]&lt;/span&gt;") == [[["3x Exalted Orb", "currency"]]])
+check("reward: empty stays empty", M.parse_reward(None) == [] and M.parse_reward("") == [])
+check("flavour: <br> lines, entities decoded, tags gone",
+      M.parse_flavour("Fire filled the sky &lt;br&gt;Chaos reigned &lt;br&gt;-&lt;i&gt;Jozen&lt;/i&gt; &quot;Kasigi&quot;")
+      == 'Fire filled the sky\nChaos reigned\n-Jozen "Kasigi"',
+      M.parse_flavour("Fire filled the sky &lt;br&gt;Chaos reigned &lt;br&gt;-&lt;i&gt;Jozen&lt;/i&gt; &quot;Kasigi&quot;"))
+check("flavour: none is empty", M.parse_flavour(None) == "")
+
 print("\nALL TESTS PASSED" if not failures else "\n%d FAILED" % failures)
 sys.exit(1 if failures else 0)

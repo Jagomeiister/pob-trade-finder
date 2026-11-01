@@ -54,6 +54,14 @@
   --on-sock-light: #333333;
   --sock-shadow: #000000;
 
+  /* the div card picture on hover (22-divcards.js): the game's own look, the same in every theme */
+  --dc-bg: #0d0c0a; --dc-frame: #8c6b3e; --dc-frame-in: #2a2218; --dc-rule: #3a2f22;
+  --dc-title-hi: #e3d5b2; --dc-title-lo: #c7b48b; --on-dc-title: #1a140c;
+  --dc-stack-bg: rgba(0, 0, 0, .78); --dc-stack: #e6dcc6; --dc-shadow: rgba(0, 0, 0, .55);
+  --dc-unique: #af6025; --dc-currency: #aa9e82; --dc-divination: #0ebaff; --dc-gem: #1ba29b;
+  --dc-magic: #8888ff; --dc-rare: #ffff77; --dc-normal: #c8c8c8; --dc-corrupted: #d20000;
+  --dc-fractured: #a29162; --dc-enchanted: #b8daf2; --dc-default: #7f7f7f;
+
   /* type, shape, motion */
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: Consolas, "Cascadia Mono", monospace;

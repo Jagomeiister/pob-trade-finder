@@ -33,6 +33,7 @@ STEPS = [
     [sys.executable, "tools/make_cheatsheets.py"],  # leveling cheat sheets (Path of Exile Wiki)
     [sys.executable, "tools/make_dust.py"],  # dust per unique (pinned MIT dataset: bump its COMMIT for new uniques)
     [sys.executable, "tools/make_atlasview.py", "--fetch"],  # Atlas tree view (GGG export, pinned TAG: bump it each league)
+    [sys.executable, "tools/make_divweights.py"],  # div card drop weights (pinned MIT dataset: bump its COMMIT each league)
     ["node", "test/test.js"],
     [sys.executable, "test/test_currency_feed.py"],
     ["node", "test/test_craft.js"],
