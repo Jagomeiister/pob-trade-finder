@@ -88,7 +88,7 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
       now available with *Include legacy mods*): research said 87 current mods; Path of Building's data gives
       80 after dropping legacy ones. Check which 7 differ (maybe Sublime Vision lines or new
       ones PoB hasn't added).
-- [ ] **Zone cheat sheets**: shipped as zone notes you write yourself, plus the 6 Act 1–3
+- [ ] **Zone cheat sheets** (now part of the bigger *Cheat sheets* item in 3b): shipped as zone notes you write yourself, plus the 6 Act 1–3
       trials. The original idea was ready-made cheat sheets per zone (layout tips, quests,
       skill points). Needs a trustworthy data source before adding any.
 - [ ] **Completed with the price edited on the card**: the spec had the price editable on the
@@ -134,6 +134,52 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [ ] **Overlay for the price-check pop-up (Ctrl+D)**: it's still a normal window. Consider
       the same borderless, clipped style as the other overlays.
 
+## 3b. Cheat sheets + what Scalpel has that we don't (compared 2026-11-01)
+
+Source: Scalpel's README and repo (github.com/scalpelpoe/scalpel, AGPL-3.0). We can learn how
+it works, but we can't copy its code or data files into this MIT project. Use original
+sources, or ask the author.
+
+- [ ] **Cheat sheets** (you asked for these 2026-11-01). An overlay sheet you open with a hotkey
+      or the PoB icon, showing:
+  - ready-made sheets: leveling per act (Acts 1–10: quests, skill points, trials,
+    layout tips) and league mechanics;
+  - your own sheets: text and images (e.g. a screenshot of a map-device setup or crafting
+    steps);
+  - optionally, the act sheet switching itself when Client.txt says you entered a new area
+    (display only, like zone notes).
+
+  Scalpel ships prefabs (`cheat-sheet-prefabs/`: acts, leagues, "simple" act sheets), but
+  we'd need our own content or a source we may use. Our zone notes are the start of this.
+- [ ] **Dust explorer** (was parked as impossible; it isn't):
+  - Scalpel's dust formula: dust = base × 125 × (20 − (84 − ilvl)), with ilvl clamped to
+    65–84, × (1 + (2 × quality + 50 × influences) / 100).
+  - The formula is a fact we can use. The per-unique base value table
+    (`src/shared/data/economy/dust-values.json`) is AGPL and can't be copied; find where the
+    values originally come from (the game data), or ask Scalpel's author.
+  - Then: rank uniques by dust per chaos (poe.ninja prices through the server), and show dust
+    on the Ctrl+D price check.
+- [ ] **Div card expected value per map**: Scalpel gets drop weights from wraeclast.cards
+      (credits Maps of Exile + the Forbidden Library). Check its terms / an API. With weights,
+      our Div cards "by area" becomes a real expected value instead of "cards that can drop".
+- [ ] **Chat macros**: buttons or hotkeys for /hideout, /kingsmarch, /menagerie, /delve,
+      /exit and your own commands. One press = one command, like the trade buttons.
+- [ ] **View on poe.ninja**: we have PoE Wiki / PoEDB links on items; add poe.ninja (uniques,
+      gems, currency).
+- [ ] **More search text presets**: Scalpel / poe.re do flask and vendor regex too. Add a
+      Flasks tab (useful affixes, e.g. "of the Armadillo") and vendor presets (movement speed
+      boots, chromatic r-g-b, links).
+- [ ] **Socket recolour calculator**: already in section 3 (waiting on Allflame vs Standard).
+- [ ] **Loot filter tools** (Scalpel's biggest feature: an in-game filter editor, FilterBlade
+      online sync, "economy audit" re-tiering by poe.ninja prices, filter checkpoints). Big,
+      and needs care: it rewrites your own .filter file (that's allowed, it's your file) but
+      must never trigger reloads or game input on its own. Decide whether we want it.
+- [ ] Maybe later / probably not:
+  - Art mode: drawing on top of the game, for content creators.
+  - Plugins.
+  - "Scrollable stash tabs": sends input to the game, so check GGG's rules first.
+  - Path of Exile 2 support: still "not planned" on the roadmap.
+
 ## 4. Parked / decided against (and why)
 
 - **Travel to the seller's hideout using POESESSID** (instant buyout): needs an
@@ -141,11 +187,10 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
   account. GGG hasn't sanctioned it, and the site's code is behind Cloudflare. Instant
   buyout still opens the trade site's own button; in-person trades use ⚡ Whisper / Visit
   hideout in game. Revisit only if you explicitly accept the account risk.
-- **Dust (disenchant) explorer**: no reachable source has per-unique dust values. The
-  wiki only gives the rules (+2% per 1% quality, +50% per corruption implicit or
-  influence); poedb doesn't list them.
-- **True expected value per map for div cards**: drop rates aren't public. The Div cards
-  tool ranks areas by the cards that *can* drop there and says so.
+- ~~Dust (disenchant) explorer~~: un-parked 2026-11-01, see 3b (Scalpel shows the formula and a
+  per-unique table exist).
+- ~~True expected value per map for div cards~~: un-parked 2026-11-01, see 3b (wraeclast.cards has
+  drop weights).
 - **Server reading the wiki**: poewiki.net refuses Vercel (HTTP 403). Drop data is made on
   a PC (`tools/make_divcards.py`) and served as a static file.
 - **GGG OAuth / official login**: built but off. GGG isn't accepting new applications
