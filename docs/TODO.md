@@ -70,6 +70,39 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
   - Close / exit logging.
   - Zod override on the server (Dependabot).
 
+## 3a. Gaps found in the 2026-11-01 review (agreed earlier, built only partly)
+
+- [ ] **Stash outline on quad tabs**: the original spec said to draw *both* the normal-tab and
+      the quad-tab cell when the position is 12 or under (a quad tab can't be told from the
+      whisper). Right now it outlines the normal cell only, unless left/top > 12.
+- [ ] **Track buyers by account name** (spec: account name, else character name). Only
+      character names are used, so one buyer on two characters counts as two. Idea: read the
+      `/whois` reply from Client.txt (display only) to link a character to its account.
+- [ ] **Watcher's Eye: price 3-mod combinations** too (spec said 2- and 3-mod). Only pairs
+      exist; triples would need a cap (e.g. 5 ticked mods = 10 searches).
+- [ ] **Watcher's Eye mod count**: research said 87 current mods; Path of Building's data gives
+      80 after dropping legacy ones. Check which 7 differ (maybe Sublime Vision lines or new
+      ones PoB hasn't added).
+- [ ] **Zone cheat sheets**: shipped as zone notes you write yourself, plus the 6 Act 1–3
+      trials. The original idea was ready-made cheat sheets per zone (layout tips, quests,
+      skill points). Needs a trustworthy data source before adding any.
+- [ ] **Completed with the price edited on the card**: the spec had the price editable on the
+      card. It moved to Trade helper → Sales → Edit, because overlay cards can't take
+      typing without stealing the game's keyboard. Fine as is unless you want it back
+      (e.g. − / + price buttons on the card).
+- [ ] **Overlays on screens with different scaling** (e.g. 100% and 150%): the app is
+      "system DPI aware", so positions may be off on the second screen. Check when moving
+      the game between such screens.
+- [ ] **README**: doesn't mention anything from v2.1–v2.3 (trade helper, overlays, hotkeys,
+      tray, Watcher's Eye & co., search text, div cards, quick price / upgrade check).
+- [ ] **GitHub roadmap issue #1** is stale: it lists Shipped only up to v1.12 and still has
+      Glorious Vanity as "planned" (supported now). Needs your OK to edit (it's public).
+- [ ] **Real-window tests in the repo**: the overlay / tray / focus tests run so far live only
+      in a scratch folder. Add them as an opt-in manual script (never run while you're in
+      the game).
+- [ ] **Search text**: one map mod ("Monsters have #% increased Area of Effect") has no
+      unique plain-text token. It could use a small regex.
+
 ## 3. To do (agreed, not started)
 
 - [ ] **Socket recolour calculator** (chromatic / Vorici). The formula is verified from
