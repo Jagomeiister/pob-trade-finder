@@ -3,10 +3,11 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.1.0 released**. Everything below "Done, waiting for your in-game test" is pushed
-to `main` but **not released**. GitHub release v2.2.0 is held until the in-game tests pass.
+Status: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
+helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
+fails in a patch release.
 
-## 1. Waiting for your in-game test (then release v2.2.0)
+## 1. In-game checklist (v2.3.0 is out; fix failures in a patch)
 
 Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every overlay.
 
@@ -39,10 +40,9 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [ ] The old report "closing the price-check pop-up closed the whole app" doesn't happen.
       If it does, send `data\debug.log`, which now logs every window close.
 
-After these pass: bump the version if needed, write release notes (v2.2 trade helper +
-v2.3 tools), build, smoke test, `gh release create`.
 
-## 2. Done, pushed, unreleased (for the release notes)
+
+## 2. Shipped in v2.3.0
 
 - v2.2 trade helper:
   - Client.txt reader, trade cards (incoming and outgoing), one command per click.
@@ -83,10 +83,6 @@ v2.3 tools), build, smoke test, `gh release create`.
   matters, or support both with a toggle.
 - [ ] **Overlay for the price-check pop-up (Ctrl+D)**: it's still a normal window. Consider
       the same borderless, clipped style as the other overlays.
-- [ ] **Release v2.2.0** (section 1 first), then release the v2.3 tools as v2.3.0 or fold
-      them into the same release.
-- [ ] Tell users about Windowed / Windowed Fullscreen in the release notes, since overlays
-      don't show in true fullscreen.
 
 ## 4. Parked / decided against (and why)
 
