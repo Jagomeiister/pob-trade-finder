@@ -28,7 +28,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.4.1"
+VERSION = "2.4.2"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -1167,8 +1167,48 @@ class Api:
         for w in overlays.values():
             w.events.closing += overlay_closing
         threading.Thread(target=self._follow_game, daemon=True, name="overlay-follow").start()
+        if sys.platform == "win32":
+            threading.Thread(target=self._watch_foreground, daemon=True, name="foreground-hook").start()
 
     # -- tray icon + main window over the game ----------------------------------------
+    def _main_hwnd(self):
+        """The main window's handle, cached: over the game its title is cleared (that's how the
+        title bar goes away), so it can't be found by name then."""
+        h = getattr(self, "_main_hwnd_cache", 0)
+        if h and sys.platform == "win32":
+            import ctypes
+            if ctypes.windll.user32.IsWindow(h):
+                return h
+        h = price_hotkey.find_window(MAIN_TITLE)
+        if h:
+            self._main_hwnd_cache = h
+        return h
+
+    def _main_form(self):
+        """pywebview's WinForms form for the main window (changes to it must run on its UI thread)."""
+        try:
+            from webview.platforms.winforms import BrowserView
+            return BrowserView.instances.get(self._main.uid)
+        except Exception:
+            return None
+
+    def _on_ui(self, fn):
+        """Run fn on the main window's WinForms UI thread and wait for it (WinForms only behaves
+        when its forms are changed from their own thread)."""
+        form = self._main_form()
+        if form is None:
+            return fn()
+        from System import Func, Type
+        if not form.InvokeRequired:
+            return fn()
+        box = {}
+
+        def call():
+            box["r"] = fn()
+
+        form.Invoke(Func[Type](call))
+        return box.get("r")
+
     def _start_tray(self):
         """Notification-area icon: click opens the app; right-click menu like other tray apps."""
         if sys.platform != "win32" or self._tray:
@@ -1228,14 +1268,14 @@ class Api:
         if not main:
             return
         main.show()
-        hwnd = price_hotkey.find_window(MAIN_TITLE)
+        hwnd = self._main_hwnd()
         if hwnd and sys.platform == "win32":
             import ctypes
             u = ctypes.windll.user32
             if u.IsIconic(hwnd):
                 u.ShowWindow(hwnd, 9)  # SW_RESTORE
-            if over_game:  # topmost while it's over the game, so the game can't cover it
-                main.on_top = True
+            if over_game:  # frameless, on top and sized over the game first, then focused
+                self._overlay_frame(True)
             price_hotkey.focus_window(hwnd)
         if settings:
             self._eval_in(main, "window.openSettings && openSettings()")
@@ -1248,11 +1288,8 @@ class Api:
         self._eval_in(self._main, "window.__appOverlay && window.__appOverlay(%s)" % ("true" if on else "false"))
         if on:
             self._show_main(over_game=True)
-            self._overlay_frame(True)
             return
         self._overlay_frame(False)
-        if self._main:
-            self._main.on_top = False
         if self._close_to_tray() and self._main_was_hidden:
             self._main.hide()
         game = self._find_poe_window()
@@ -1276,7 +1313,7 @@ class Api:
     def _remember_over_game_rect(self, hwnd=None):
         game = self._find_poe_window()
         g = trade_helper.game_client_rect(game) if game else None
-        r = price_hotkey.window_rect(hwnd or price_hotkey.find_window(MAIN_TITLE))
+        r = price_hotkey.window_rect(hwnd or self._main_hwnd())
         if not g or not r or not g[2] or not g[3]:
             return
         frac = [(r[0] - g[0]) / g[2], (r[1] - g[1]) / g[3], (r[2] - r[0]) / g[2], (r[3] - r[1]) / g[3]]
@@ -1285,54 +1322,64 @@ class Api:
     def _overlay_frame(self, on):
         """Over the game the main window drops its title bar (an overlay, not a desktop window)
         but keeps resizable edges; drag the banner to move it, − / + to resize. Its size and
-        spot are remembered relative to the game. Off puts the window back exactly as it was."""
+        spot are remembered relative to the game. Off puts the window back exactly as it was.
+        Done through WinForms on its UI thread (no title text + no control box = no title bar),
+        so WinForms doesn't put its own frame and size back later."""
         if sys.platform != "win32":
             return
-        import ctypes
-        u = ctypes.windll.user32
-        hwnd = price_hotkey.find_window(MAIN_TITLE)
-        if not hwnd:
+        form = self._main_form()
+        if form is None:
             return
-        GWL_STYLE, GWL_EXSTYLE = -16, -20
-        FRAME = 0x00C00000 | 0x00020000 | 0x00010000 | 0x00080000  # caption, min/max, sysmenu (sizing edges stay)
-        WS_EX_LAYERED, LWA_ALPHA = 0x80000, 0x2
-        SWP = 0x0004 | 0x0020 | 0x0040  # NOZORDER | FRAMECHANGED | SHOWWINDOW
-        saved = getattr(self, "_frame_saved", None)
+        from System.Drawing import Rectangle
+        from System.Windows.Forms import FormWindowState
         if on:
             game = self._find_poe_window()
             g = trade_helper.game_client_rect(game) if game else None
             if not g:
                 return
-            if not saved:
-                if u.IsZoomed(hwnd):
-                    u.ShowWindow(hwnd, 9)  # SW_RESTORE: put back un-maximised, then restyle
-                self._frame_saved = (u.GetWindowLongW(hwnd, GWL_STYLE), u.GetWindowLongW(hwnd, GWL_EXSTYLE),
-                                     price_hotkey.window_rect(hwnd))
-            style, ex = self._frame_saved[0], self._frame_saved[1]
-            u.SetWindowLongW(hwnd, GWL_STYLE, (style & ~FRAME) | 0x00040000)  # + WS_THICKFRAME
-            pct = int(self._prefs().get("overGameOpacity", 100))
-            if pct < 100:  # see-through only when asked for (WebView2 + layered windows varies by GPU/driver)
-                u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED)
-                u.SetLayeredWindowAttributes(hwnd, 0, int(255 * max(60, pct) / 100), LWA_ALPHA)
             x, y, w, h = self._over_game_rect(g)
-            u.SetWindowPos(hwnd, 0, x, y, w, h, SWP)
+            pct = int(self._prefs().get("overGameOpacity", 100))
+
+            def apply():
+                if getattr(self, "_frame_saved", None) is None:
+                    if form.WindowState != FormWindowState.Normal:
+                        form.WindowState = FormWindowState.Normal
+                    b = form.Bounds
+                    self._frame_saved = (form.Text, form.ControlBox, (b.X, b.Y, b.Width, b.Height), form.Opacity)
+                form.ControlBox = False
+                form.Text = ""
+                form.TopMost = True
+                form.Bounds = Rectangle(x, y, w, h)
+                if pct < 100:  # see-through only when asked for (WebView2 + layered windows varies by GPU/driver)
+                    form.Opacity = max(60, pct) / 100.0
+            self._on_ui(apply)
+            self._debug_frame("on")
             return
-        if not saved:
+        if getattr(self, "_frame_saved", None) is None:
             return
-        self._remember_over_game_rect(hwnd)  # keeps a resize done with the window edges
-        style, ex, r = saved
+        self._remember_over_game_rect(self._main_hwnd())  # keeps a resize done with the window edges
+        text, box, r, opacity = self._frame_saved
         self._frame_saved = None
-        u.SetWindowLongW(hwnd, GWL_STYLE, style)
-        u.SetWindowLongW(hwnd, GWL_EXSTYLE, ex)
-        if r:
-            u.SetWindowPos(hwnd, 0, r[0], r[1], r[2] - r[0], r[3] - r[1], SWP)
+
+        def restore():
+            form.TopMost = False
+            form.Opacity = opacity
+            form.ControlBox = box
+            form.Text = text or MAIN_TITLE
+            form.Bounds = Rectangle(*r)
+        self._on_ui(restore)
+        self._debug_frame("off")
+
+    def _debug_frame(self, what):
+        r = price_hotkey.window_rect(self._main_hwnd())
+        _debug_log("app over game %s: window %s" % (what, r))
 
     def app_overlay_move(self, phase, dx=0, dy=0):
         """Banner drag over the game: start / move by (dx, dy) CSS px / end (remembered)."""
         try:
             import ctypes
             u = ctypes.windll.user32
-            hwnd = price_hotkey.find_window(MAIN_TITLE)
+            hwnd = self._main_hwnd()
             r = price_hotkey.window_rect(hwnd)
             if not self._app_overlay or not r:
                 return {"ok": False}
@@ -1356,7 +1403,7 @@ class Api:
         try:
             import ctypes
             u = ctypes.windll.user32
-            hwnd = price_hotkey.find_window(MAIN_TITLE)
+            hwnd = self._main_hwnd()
             game = self._find_poe_window()
             g = trade_helper.game_client_rect(game) if game else None
             r = price_hotkey.window_rect(hwnd)
@@ -1386,7 +1433,7 @@ class Api:
         if self._app_overlay:
             self._set_app_overlay(False)
             return
-        main = price_hotkey.find_window(MAIN_TITLE)
+        main = self._main_hwnd()
         import ctypes
         self._main_was_hidden = not (main and ctypes.windll.user32.IsWindowVisible(main))
         self._set_app_overlay(True)
@@ -1403,7 +1450,7 @@ class Api:
         cur = ctypes.windll.user32.GetForegroundWindow()
         ours = {price_hotkey.find_window(o["title"]) for o in OVERLAYS.values()}
         if self._app_overlay:
-            ours.add(price_hotkey.find_window(MAIN_TITLE))
+            ours.add(self._main_hwnd())
         return cur if cur and cur in ours else None
 
     def _start_hotkey(self):
@@ -1544,7 +1591,7 @@ class Api:
                 hwnds = {n: price_hotkey.find_window(o["title"]) for n, o in OVERLAYS.items()}
                 ours = set(hwnds.values()) | {price_hotkey.find_window(OVERLAY_TITLE)}
                 if self._app_overlay:
-                    ours.add(price_hotkey.find_window(MAIN_TITLE))
+                    ours.add(self._main_hwnd())
                 game_up = bool(game) and not u.IsIconic(game) and (fg == game or fg in ours)
                 lbutton = u.GetAsyncKeyState(0x01) & 0x8000
                 for name, hwnd in hwnds.items():
@@ -1554,6 +1601,42 @@ class Api:
             except Exception as e:
                 _debug_log("overlay follow: %s" % e)
                 time.sleep(2)
+
+    def _watch_foreground(self):
+        """Windows tells us each time the foreground window changes (SetWinEventHook): a click
+        back in the game while the app is over it puts the app away straight away, even if
+        something activates the app again a moment later (polling could miss that)."""
+        import ctypes
+        from ctypes import wintypes
+        u = ctypes.windll.user32
+        EVENT_SYSTEM_FOREGROUND, WINEVENT_OUTOFCONTEXT = 0x0003, 0x0000
+        proc_t = ctypes.WINFUNCTYPE(None, wintypes.HANDLE, wintypes.DWORD, wintypes.HWND, wintypes.LONG,
+                                    wintypes.LONG, wintypes.DWORD, wintypes.DWORD)
+
+        def on_event(hook, event, hwnd, obj, child, thread, ms):
+            try:
+                if not self._app_overlay or not hwnd:
+                    return
+                title = price_hotkey.window_title(hwnd)
+                _debug_log("app over game: foreground -> %r" % title)
+                if (title == price_hotkey.GAME_TITLE and time.time() - self._app_overlay_at > 0.5
+                        and self._prefs().get("closeOnGameClick", True) is not False):
+                    threading.Thread(target=self._set_app_overlay, args=(False, False), daemon=True).start()
+            except Exception as e:
+                _debug_log("foreground hook: %s" % e)
+
+        self._fg_proc = proc_t(on_event)  # keep a reference: Windows calls it for as long as we run
+        u.SetWinEventHook.restype = wintypes.HANDLE
+        hook = u.SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, None, self._fg_proc, 0, 0,
+                                 WINEVENT_OUTOFCONTEXT)
+        if not hook:
+            _debug_log("foreground hook unavailable")
+            return
+        msg = wintypes.MSG()
+        while not self._quitting and u.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            u.TranslateMessage(ctypes.byref(msg))
+            u.DispatchMessageW(ctypes.byref(msg))
+        u.UnhookWinEvent(hook)
 
     def _follow_one(self, u, name, hwnd, game, want, lbutton, now):
         st = self._ov[name]
@@ -1767,7 +1850,7 @@ class Api:
         try:
             if self._find_poe_window() and not self._app_overlay:
                 import ctypes
-                main = price_hotkey.find_window(MAIN_TITLE)
+                main = self._main_hwnd()
                 self._main_was_hidden = not (main and ctypes.windll.user32.IsWindowVisible(main))
                 self._set_app_overlay(True)
                 if settings:
@@ -1784,7 +1867,7 @@ class Api:
             return False
         if self._find_poe_window() and not self._app_overlay:
             import ctypes
-            main = price_hotkey.find_window(MAIN_TITLE)
+            main = self._main_hwnd()
             self._main_was_hidden = not (main and ctypes.windll.user32.IsWindowVisible(main))
             self._set_app_overlay(True)
         elif not self._app_overlay:

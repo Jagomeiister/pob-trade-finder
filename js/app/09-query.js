@@ -35,8 +35,9 @@ function buildTradePayload(state, quiet) {
   var filters = [];
   var seenIds = {};
   var rolls = {}; // filter id -> the build item's roll, in the filter's scale (weights + listing score)
-  var upgradeEq = (state.upgradeOnly && charGear && charGear[state.slot] && !state.unique)
-    ? equippedStats(charGear[state.slot], state.slot) : null;
+  // the item of yours this card was matched with (ring in the other slot, jewel anywhere in the tree)
+  var mine = charGear && (state.charMatch || charGear[state.slot]);
+  var upgradeEq = (state.upgradeOnly && mine && !state.unique) ? equippedStats(mine, state.slot) : null;
   state.rows.forEach(function (r) {
     if (!r.cb.checked || !r.match) return;
     var eff = effectiveMatch(r, pseudoOn);

@@ -2392,6 +2392,51 @@ def scenario_stages(s, tag):
           r["stillCompared"] and r["callsAfter"] == r["callsBefore"] == 1, r)
 
 
+S29_CHARDIFF = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+const ringState = cards.find(s => s.slot === 'Ring 1');
+const jewelStates = cards.filter(s => /jewel/i.test(s.slot) && s.card);
+out.haveRing = !!ringState; out.jewelCards = jewelStates.length;
+const asChar = (it) => ({ name: it.rarity === 'UNIQUE' ? it.name : 'Some Name', base: it.base, frameType: 2, icon: '',
+  ilvl: 84, corrupted: false, implicitMods: [], explicitMods: it.mods.filter(m => m.kind !== 'implicit').map(m => m.line),
+  craftedMods: [], fracturedMods: [], enchantMods: [] });
+const ringItem = ringState.item;
+window.__stubOverrides.get_character_items = { ok: true, items: [Object.assign(asChar(ringItem), { inventoryId: 'Ring2', x: 0 })] };
+const j0 = jewelStates[0].item;
+window.__stubOverrides.get_character_passives = { ok: true, hashes: [], hashesEx: [], masteries: {},
+  jewels: [Object.assign(asChar(j0), { x: 17 })] };
+document.getElementById('acct-input').value = 'Me#1';
+const sel = document.getElementById('char-select');
+const o = document.createElement('option'); o.value = 'MyChar'; o.textContent = 'MyChar'; sel.appendChild(o); sel.value = 'MyChar';
+document.getElementById('char-compare').click();
+await H.waitFor(() => /comparing against/.test(H.text('#char-status') || ''), 4000, 'compare');
+out.calls = [H.calls('get_character_items').length, H.calls('get_character_passives').length];
+const diffText = st => (st.card.querySelector('.char-diff') || {}).textContent || '';
+out.ring = { cls: ['diff-matched', 'diff-close', 'diff-missing'].filter(c => ringState.card.classList.contains(c))[0], text: diffText(ringState) };
+out.jewel0 = { cls: ['diff-matched', 'diff-close', 'diff-missing'].filter(c => jewelStates[0].card.classList.contains(c))[0], text: diffText(jewelStates[0]) };
+out.others = jewelStates.slice(1).map(s => diffText(s));
+out.reuse = typeof charPassives_ !== 'undefined' && charPassives_ && charPassives_.name;
+delete window.__stubOverrides.get_character_items;
+delete window.__stubOverrides.get_character_passives;
+return out;
+"""
+
+
+def scenario_chardiff(s, tag):
+    s.fresh()
+    r = s.run(S29_CHARDIFF, timeout=60)
+    check(tag + " one Compare click reads gear and tree jewels", r["calls"] == [1, 1], r["calls"])
+    check(tag + " ring worn in the other slot still counts", r["haveRing"] and r["ring"]["cls"] in ("diff-matched", "diff-close")
+          and "your Ring 2" in r["ring"]["text"], r["ring"])
+    check(tag + " jewel matched in any tree socket", r["jewelCards"] >= 1 and r["jewel0"]["cls"] in ("diff-matched", "diff-close")
+          and "in your tree" in r["jewel0"]["text"], r["jewel0"])
+    check(tag + " one tree jewel can't fill two cards", all("in your tree" not in t or "Some Name" not in t
+          for t in r["others"]) or len(r["others"]) == 0, r["others"])
+    check(tag + " Skill tree compare reuses the passives already read", r["reuse"] == "MyChar", r["reuse"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -2421,6 +2466,7 @@ SCENARIOS = [
     ("26 overgame", scenario_overgame),
     ("27 tree", scenario_tree),
     ("28 stages", scenario_stages),
+    ("29 chardiff", scenario_chardiff),
 ]
 
 

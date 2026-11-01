@@ -12,12 +12,14 @@ fails in a patch release.
 
 Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every overlay.
 
-- [ ] PoB icon overlay: no white box around it, before or after dragging (window now clipped
+- [x] PoB icon overlay: no white box around it, before or after dragging (confirmed 2026-11-01) (window now clipped
       to its content).
 - [ ] Drag the icon and the trade cards to different spots; move the game window, including
       to another screen: both follow and keep their spots.
-- [ ] Alt+T hides / shows the trade cards, more than once.
-- [ ] Shift+Space:
+- [x] Alt+T hides / shows the trade cards, more than once. (confirmed)
+- [ ] Shift+Space (v2.4.2 reworked after "switches size" + "click outside only works after a resize":
+      frame changes now go through WinForms on its UI thread, click-outside uses a foreground
+      event hook; debug.log logs each foreground change while over the game):
   - [ ] the app comes up over the game with no title bar, smaller than the game;
   - [ ] it resizes from its edges and with − / +, and moves by dragging the banner;
   - [ ] it stays where you left it next time;
@@ -27,7 +29,7 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
       input when they appear).
 - [ ] Trade helper is a page in the app: sidebar → Tools → Trade helper, the $ on the icon,
       the tray menu; ← Back / Esc return.
-- [ ] A real trade:
+- [ ] A real trade (waiting for a second person):
   - [ ] the buyer's whisper makes a card;
   - [ ] Invite → buyer joins → card shows "In your hideout";
   - [ ] Trade, Thanks and Kick each send exactly one command;
@@ -36,7 +38,7 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [ ] Your own card buttons (Trade helper → Setup → Your buttons) send their message once.
 - [ ] Side-by-side card layout (Setup → Trade cards).
 - [ ] Sound picker, volume slider (0 = silent) and ▶ Test.
-- [ ] Close the app window: it goes to the tray. Right-click the tray icon → Quit ends it.
+- [x] Close the app window: it goes to the tray. Right-click the tray icon → Quit ends it. (Quit confirmed)
 - [ ] Search text → **Paste into game** with the stash open fills the search box.
 - [ ] The old report "closing the price-check pop-up closed the whole app" doesn't happen.
       If it does, send `data\debug.log`, which now logs every window close.
@@ -114,6 +116,8 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
       `get-passive-skills` wasn't checked live). It shows: the build's tree
       (pan / zoom / search), jewel sockets with their jewels, mastery picks, and "points still
       to take" vs your imported character (`get-passive-skills`), in a BFS order.
+- [x] Character compare checks every place an item can be: jewels in any tree socket (read
+      with the gear in one click), rings in either ring slot (v2.4.2)
 - [x] Skill tree stages (PoB's several specs, e.g. Level 30 / 70 / Endgame): stage menu, compare carries over (v2.4.1, released)
 - [x] Div cards: 1+ divine shows as divines, under that as chaos (done 2026-11-01)
 - [x] Custom trade sounds: your own mp3/wav/ogg/m4a for new trade / buyer arrived (done)

@@ -137,72 +137,120 @@ function equippedStats(equipped, slot) {
   return tails;
 }
 
+// What you have that this card could be: the slot itself, both ring slots for a ring
+// (worn the other way round still counts), and every jewel in your tree for a jewel (any
+// socket: where the build puts it doesn't matter). Each tree jewel is matched once.
+var charJewels = [];     // get_character_passives jewels (tree sockets), read with the gear
+var charPassives_ = null; // the whole answer, reused by the Skill tree compare
+var charJewelClaims = {}; // jewel index -> card claiming it (one jewel can't fill two cards)
+function charCandidates(state) {
+  if (/^Ring [12]$/.test(state.slot)) {
+    return ['Ring 1', 'Ring 2'].map(function (s) { return charGear[s] ? { it: charGear[s], where: s } : null; }).filter(Boolean);
+  }
+  if (/jewel/i.test(state.slot)) {
+    return (charJewels || []).map(function (it, i) { return { it: it, where: 'tree', jewel: i }; })
+      .filter(function (c) { return !(c.jewel in charJewelClaims) || charJewelClaims[c.jewel] === state; });
+  }
+  return charGear[state.slot] ? [{ it: charGear[state.slot], where: state.slot }] : [];
+}
+
+// how well an item you have covers this card: { status, score, have, total, missing, lowRolls }
+function charScore(state, equipped) {
+  if (state.unique) {
+    var same = equipped.name === state.item.name;
+    return { status: same ? 'diff-matched' : 'diff-missing', score: same ? 2 : 0 };
+  }
+  var eq = equippedStats(equipped, state.slot);
+  var total = 0, have = 0, lowRolls = 0, missing = [];
+  state.rows.forEach(function (r) {
+    if (!r.cb.checked || !r.match) return;
+    total++;
+    var tail = r.match.entry.id.split('.').pop().split('|')[0];
+    if (tail in eq) {
+      have++;
+      var min = parseFloat(r.minInput.value);
+      if (!isNaN(min) && min > 0 && eq[tail] !== null && eq[tail] < min) lowRolls++;
+    } else {
+      missing.push(r.mod.line);
+    }
+  });
+  if (!total) return { status: null, score: 0, total: 0 };
+  return { status: (have === total && !lowRolls) ? 'diff-matched' : (have * 2 >= total) ? 'diff-close' : 'diff-missing',
+           score: (have - lowRolls * 0.5) / total, have: have, total: total, missing: missing, lowRolls: lowRolls };
+}
+
 function renderCharDiff(state) {
   if (!state.card) return; // gem panels have no card element
   var old = state.card.querySelector('.char-diff');
   if (old) old.remove();
   state.card.classList.remove('diff-matched', 'diff-close', 'diff-missing');
+  state.charMatch = null;
   if (!charGear) return;
 
   var strip = document.createElement('div');
   strip.className = 'char-diff';
-  var equipped = charGear[state.slot];
+  var best = null;
+  charCandidates(state).forEach(function (c) {
+    var s = charScore(state, c.it);
+    if (!best || s.score > best.s.score) best = { c: c, s: s };
+  });
+  var isJewel = /jewel/i.test(state.slot);
   var status;
-
-  if (!equipped) {
+  if (!best) {
     status = 'diff-missing';
-    strip.innerHTML = '<b>You:</b> <span class="miss">nothing equipped in this slot</span>';
-  } else if (state.unique) {
-    var same = equipped.name === state.item.name;
-    status = same ? 'diff-matched' : 'diff-missing';
-    strip.innerHTML = '<b>You:</b> ' + esc((equipped.name || equipped.base)) +
-      (same ? ' <span class="ok">— matches the build</span>'
-            : ' <span class="miss">— build wants ' + esc(state.item.name) + '</span>');
+    strip.innerHTML = '<b>You:</b> <span class="miss">' + (isJewel ? 'no jewel like this in your tree'
+      : 'nothing equipped in this slot') + '</span>';
   } else {
-    var eq = equippedStats(equipped, state.slot);
-    var total = 0, have = 0, lowRolls = 0;
-    var missing = [];
-    state.rows.forEach(function (r) {
-      if (!r.cb.checked || !r.match) return;
-      total++;
-      var tail = r.match.entry.id.split('.').pop().split('|')[0];
-      if (tail in eq) {
-        have++;
-        var min = parseFloat(r.minInput.value);
-        if (!isNaN(min) && min > 0 && eq[tail] !== null && eq[tail] < min) lowRolls++;
-      } else {
-        missing.push(r.mod.line);
-      }
-    });
-    if (!total) { strip.remove(); return; }
-    status = (have === total && !lowRolls) ? 'diff-matched'
-           : (have * 2 >= total) ? 'diff-close' : 'diff-missing';
-    strip.innerHTML = '<b>You:</b> ' + esc(equipped.name || equipped.base) +
-      ' — <span class="' + (have === total ? 'ok' : 'miss') + '">' + have + '/' + total + ' target mods</span>' +
-      (missing.length ? ' · missing: <span class="miss">' + esc(missing.slice(0, 3).join(' · ')) +
-        (missing.length > 3 ? ' +' + (missing.length - 3) : '') + '</span>' : '') +
-      (lowRolls ? ' · <span class="miss">' + lowRolls + ' low roll(s)</span>' : '');
-    // upgrade finder: search only items at least as good as yours on every ticked stat
-    var up = document.createElement('label');
-    up.className = 'toggle upgrade-toggle';
-    up.title = 'Raise each ticked mod\'s minimum to your equipped roll — searches, price checks and live alerts then only show upgrades';
-    var upCb = document.createElement('input');
-    upCb.type = 'checkbox';
-    upCb.checked = !!state.upgradeOnly;
-    upCb.addEventListener('change', function () {
-      state.upgradeOnly = upCb.checked;
-      if (state.upgradeOnly && isGui() && state.priceBtn) checkPrice(state);
-    });
-    up.appendChild(upCb);
-    up.appendChild(document.createTextNode(' ⬆ Upgrades only'));
-    strip.appendChild(document.createTextNode(' '));
-    strip.appendChild(up);
+    var equipped = best.c.it, s = best.s;
+    if (isJewel && s.score > 0) charJewelClaims[best.c.jewel] = state;
+    state.charMatch = equipped;
+    var where = best.c.where === 'tree' ? ' <span class="finder-sub">(in your tree)</span>'
+      : best.c.where !== state.slot ? ' <span class="finder-sub">(your ' + esc(best.c.where) + ')</span>' : '';
+    if (state.unique) {
+      status = s.status;
+      strip.innerHTML = '<b>You:</b> ' + esc((equipped.name || equipped.base)) + where +
+        (s.score ? ' <span class="ok">— matches the build</span>'
+                 : ' <span class="miss">— build wants ' + esc(state.item.name) + '</span>');
+    } else {
+      if (!s.total) { strip.remove(); return; }
+      status = s.status;
+      strip.innerHTML = '<b>You:</b> ' + esc(equipped.name || equipped.base) + where +
+        ' — <span class="' + (s.have === s.total ? 'ok' : 'miss') + '">' + s.have + '/' + s.total + ' target mods</span>' +
+        (s.missing.length ? ' · missing: <span class="miss">' + esc(s.missing.slice(0, 3).join(' · ')) +
+          (s.missing.length > 3 ? ' +' + (s.missing.length - 3) : '') + '</span>' : '') +
+        (s.lowRolls ? ' · <span class="miss">' + s.lowRolls + ' low roll(s)</span>' : '');
+      // upgrade finder: search only items at least as good as yours on every ticked stat
+      var up = document.createElement('label');
+      up.className = 'toggle upgrade-toggle';
+      up.title = 'Raise each ticked mod\'s minimum to your equipped roll — searches, price checks and live alerts then only show upgrades';
+      var upCb = document.createElement('input');
+      upCb.type = 'checkbox';
+      upCb.checked = !!state.upgradeOnly;
+      upCb.addEventListener('change', function () {
+        state.upgradeOnly = upCb.checked;
+        if (state.upgradeOnly && isGui() && state.priceBtn) checkPrice(state);
+      });
+      up.appendChild(upCb);
+      up.appendChild(document.createTextNode(' ⬆ Upgrades only'));
+      strip.appendChild(document.createTextNode(' '));
+      strip.appendChild(up);
+    }
   }
   state.card.classList.add(status);
   state.card.insertBefore(strip, state.card.children[1]);
 }
 
 function applyCharDiff() {
-  cards.forEach(renderCharDiff);
+  charJewelClaims = {};
+  // jewels: best-matching cards claim their jewel first, so a weak match can't take a jewel
+  // that another card matches exactly
+  var jewelCards = cards.filter(function (s) { return s.card && /jewel/i.test(s.slot); });
+  var ranked = jewelCards.map(function (s) {
+    var top = 0;
+    (charJewels || []).forEach(function (it) { top = Math.max(top, charGear ? charScore(s, it).score : 0); });
+    return { s: s, top: top };
+  }).sort(function (a, b) { return b.top - a.top; });
+  ranked.forEach(function (r) { renderCharDiff(r.s); });
+  cards.forEach(function (s) { if (jewelCards.indexOf(s) === -1) renderCharDiff(s); });
   refreshSlotLists();
 }

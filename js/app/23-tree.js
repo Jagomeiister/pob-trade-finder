@@ -742,7 +742,11 @@ async function treeRunCompare(btn) {
   if (btn) btn.disabled = true;
   T.cmpStatus.textContent = 'Reading ' + name + '\'s passives…';
   var r;
-  try { r = await window.pywebview.api.get_character_passives(acct, name); } catch (e) { r = { ok: false, error: String(e) }; }
+  if (typeof charPassives_ !== 'undefined' && charPassives_ && charPassives_.name === name) {
+    r = charPassives_; // already read by ⚖ Compare with character (gear + tree jewels)
+  } else {
+    try { r = await window.pywebview.api.get_character_passives(acct, name); } catch (e) { r = { ok: false, error: String(e) }; }
+  }
   if (TREEVIEW !== T) return; // another build was loaded meanwhile
   if (btn) btn.disabled = false;
   if (!r || !r.ok) {

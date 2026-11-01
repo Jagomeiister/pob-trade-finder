@@ -607,6 +607,11 @@ straight away.
 Each result links to its listings, and the total is an estimate. Rares are hard to price
 automatically, so treat it as a guide.
 
+
+It checks every place an item can be: a ring counts in either ring slot, and a jewel counts
+wherever it sits in your tree (the build's socket doesn't have to match). The same click reads
+your tree jewels, and the Skill tree's *Compare with my character* reuses them.
+
 ## 6c. Budget, deals, basket
 
 - **Max price** (per card, chaos-equivalent) filters searches, price checks, *and* live

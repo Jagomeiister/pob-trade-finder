@@ -130,6 +130,20 @@ document.addEventListener('DOMContentLoaded', function () {
         var slot = slotForInv(it);
         if (slot) charGear[slot] = it;
       });
+      // jewels sit in the passive tree, not the inventory: read them too (same click), so a
+      // build jewel counts as owned wherever in the tree you socketed it
+      charJewels = [];
+      charPassives_ = null;
+      if (window.pywebview.api.get_character_passives) {
+        status.textContent = 'fetching tree jewels…';
+        try {
+          var pas = await window.pywebview.api.get_character_passives(acct, charName);
+          if (pas && pas.ok) {
+            charJewels = pas.jewels || [];
+            charPassives_ = Object.assign({ name: charName }, pas); // the Skill tree compare reuses it
+          }
+        } catch (e) { /* gear still compares */ }
+      }
       applyCharDiff();
       // the price-check overlay compares Ctrl+D items with what you wear (18-upgrade.js)
       try { persist('pobtf-chargear', JSON.stringify({ name: charName, gear: charGear })); } catch (e) { /* storage full */ }
