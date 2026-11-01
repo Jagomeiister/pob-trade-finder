@@ -651,9 +651,18 @@ and **Alt+C** shows it over the game. Use ‹ › to change act; drag it by ⠿.
 Tools → **Div cards** shows where each divination card drops and what it's worth.
 
 - **By area**: every map (untick **Maps only** for other areas), with how many of its cards
-  are worth at least your minimum, its best card (price each and full set) and the sum of
-  one of each. Click an area for its card list. Drop rates aren't public, so this ranks
-  areas by the cards that *can* drop there; it isn't an expected value per map.
+  are worth at least your minimum, its best card (price each and full set), the sum of one
+  of each, and **≈ per 1000 drops**: the card value you'd expect per 1,000 items dropped
+  there. Areas are sorted by that value.
+  - It comes from community drop weights (the Prohibited Library's stacked deck data, via
+    maps-of-exile). They're estimates, not GGG numbers.
+  - Monster density isn't counted, so use it to compare areas, not as a promise per map.
+  - Cards without a known weight are left out; the value is marked **+N?** when an area has
+    any.
+  - **4 voidstones** (on by default) counts maps at area level 83, so cards that need a high
+    level are included.
+- Click an area for its card list. Each card shows **One per** (≈ how many item drops for
+  one of it) and its share of the area's value.
 - Prices of 1 divine or more show in divines, smaller ones in chaos.
 - **By card**: the card's picture (hover it for a bigger one), price each, set size, full set
   value, where it drops (or "no longer drops") and ↗ to the bulk exchange.

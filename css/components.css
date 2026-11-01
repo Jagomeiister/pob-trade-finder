@@ -596,6 +596,8 @@ body.gui .settings-section.gui-only { display: flex; }
 .dc-body .data-table { width: 100%; }
 .dc-list { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); }
 .dc-status { margin: 0; }
+.dc-ev { white-space: nowrap; }
+.dc-ev-unknown { color: var(--text-3); font-size: var(--fs-xs); }
 /* div card art: lazy thumbnail in the card column, enlarged on hover; invisible until loaded */
 .dc-card { display: inline-flex; align-items: center; gap: 8px; }
 .dc-art {

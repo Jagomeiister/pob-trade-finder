@@ -2130,6 +2130,22 @@ out.visible = sec.getBoundingClientRect().height > 100;
 out.calls = H.calls('div_cards').map(c => c.args);
 const rows = () => [...sec.querySelectorAll('.data-table tbody tr')].map(r => [...r.children].map(td => td.textContent.trim()));
 out.byMap = rows();
+// value per 1,000 drops from the community weights, recomputed here the long way:
+// weight / (pool + weights of the cards that can drop there at level 83) x price x 1000
+const W = window.POE_DIV_WEIGHTS, fixture = window.__stubOverrides.div_cards;
+const evOf = (ai, lvl) => {
+  const here = fixture.cards.filter(c => !c.off && (c.a || []).includes(ai) && W.cards[c.n] && lvl >= W.cards[c.n][1]);
+  const denom = W.pool + here.reduce((s, c) => s + W.cards[c.n][0], 0);
+  return here.reduce((s, c) => s + (c.c || 0) * W.cards[c.n][0] / denom * 1000, 0);
+};
+out.ev = { head: [...sec.querySelectorAll('.data-table thead th')].map(t => t.textContent).pop(),
+  shown: out.byMap.map(r => r[6]), expect: [dcFmt(evOf(0, 83)), dcFmt(evOf(1, 83))],
+  note: H.text('.dc-note', sec), weights: !!W && W.pool > 1e6 && Object.keys(W.cards).length > 250 };
+const vs = [...sec.querySelectorAll('.dc-controls .toggle')].find(t => t.textContent.includes('voidstones')).querySelector('input');
+vs.click(); await H.sleep(20);
+out.evListed = rows().map(r => r[6]);
+out.expectListed = [dcFmt(evOf(0, 75)), dcFmt(evOf(1, 78))];
+vs.click(); await H.sleep(20);
 sec.querySelector('.dc-controls input[type=checkbox]').click(); // include non-map areas
 await H.sleep(20);
 out.withActs = rows().map(r => r[0]);
@@ -2137,6 +2153,8 @@ H.button(sec, 'Burial Chambers ▸').click();
 await H.sleep(20);
 out.openTitle = H.text('.dc-list h3', sec);
 out.openCards = [...sec.querySelectorAll('.dc-list tbody tr')].map(r => r.children[0].textContent);
+out.openOdds = [...sec.querySelectorAll('.dc-list tbody tr')].map(r => r.children[6].textContent);
+out.openSum = H.text('.dc-list p', sec);
 sec.querySelector('.segmented [data-value="cards"]').click();
 await H.sleep(20);
 out.byCard = rows().map(r => [r[0], r[1], r[3], r[4]]);
@@ -2191,6 +2209,16 @@ def scenario_divcards(s, tag):
           bm[1][0].startswith("Cold River") and bm[1][2] == "1 / 2", bm)
     check(tag + " full set value = price x stack, in divines when 1+ div", bm[0][4] == "60 div (8)" and
           "6c" in bm[1][3], (bm[0][4], bm[1][3]))
+    ev = r["ev"]
+    check(tag + " value per 1,000 drops column = weight share x price (recomputed)", ev["weights"] and "1000 drops" in ev["head"]
+          and [s.split(" +")[0] for s in ev["shown"]] == ev["expect"], ev)
+    check(tag + " weights are labelled community estimates, not GGG numbers", "community estimates" in ev["note"]
+          and "maps-of-exile" in ev["note"], ev["note"])
+    check(tag + " '4 voidstones' off uses the maps' listed level", [s.split(" +")[0] for s in r["evListed"]] == r["expectListed"],
+          (r["evListed"], r["expectListed"]))
+    check(tag + " an opened area shows each card's odds and its share of the value",
+          r["openOdds"][0].startswith("≈ ") and "drops" in r["openOdds"][0] and "per 1000 items dropped" in (r["openSum"] or ""),
+          (r["openOdds"], r["openSum"]))
     check(tag + " 'Maps only' off adds other areas", any(x.startswith("The Docks") for x in r["withActs"]), r["withActs"])
     check(tag + " opening an area lists its cards, best first", "Burial Chambers" in (r["openTitle"] or "") and
           r["openCards"] == ["The Doctor", "A Chilling Wind"], r["openCards"])

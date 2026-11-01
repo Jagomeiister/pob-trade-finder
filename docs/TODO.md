@@ -213,9 +213,13 @@ sources, or ask the author.
     values originally come from (the game data), or ask Scalpel's author.
   - Then: rank uniques by dust per chaos (poe.ninja prices through the server), and show dust
     on the Ctrl+D price check.
-- [ ] **Div card expected value per map**: Scalpel gets drop weights from wraeclast.cards
-      (credits Maps of Exile + the Forbidden Library). Check its terms / an API. With weights,
-      our Div cards "by area" becomes a real expected value instead of "cards that can drop".
+- [x] **Div card value per area** (built 2026-11-01). wraeclast.cards has no licence (all rights
+      reserved) and its drop-rate API needs private keys, so it isn't used. Weights come from
+      deathbeam/maps-of-exile (MIT, pinned; `tools/make_divweights.py`). It builds them from
+      the Prohibited Library's stacked deck spreadsheets, as wraeclast.cards and Scalpel credit
+      too. Div cards → By area has "≈ per 1000 drops" (weight / (pool + area's card weights) ×
+      price), a 4-voidstones toggle (level 83), and odds per card. Not a per-map EV: monster
+      density isn't counted. Bump the pinned commit each league.
 - [x] **Chat macros** (done 2026-11-01: Settings → In game, ▶ or a hotkey; no /hideout, the game has its own key): buttons or hotkeys for /hideout, /kingsmarch, /menagerie, /delve,
       /exit and your own commands. One press = one command, like the trade buttons.
 - [x] **View on poe.ninja** (done 2026-11-01: card ⋯ menu, gem panels, Market chart, Ctrl+D quick price): we have PoE Wiki / PoEDB links on items; add poe.ninja (uniques,
