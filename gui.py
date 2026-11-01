@@ -29,7 +29,7 @@ from timeless import TimelessData
 from art_cache import ArtCache
 import oauth
 
-VERSION = "2.5.8"
+VERSION = "2.5.9"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
 CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
@@ -1090,7 +1090,9 @@ class Api:
                 rates, hour = self._feed.rates(league, [mid, div_id] if div_id else [mid])
                 if rates.get(mid) is not None:
                     each = rates[mid]
-                    out = {"ok": True, "source": "GGG currency exchange", "chaos": each, "code": code_by_name.get(key),
+                    code = code_by_name.get(key)
+                    out = {"ok": True, "source": "GGG currency exchange", "chaos": each, "code": code,
+                           "cat": (self._currency_map.get(code) or {}).get("cat"),  # e.g. "Currency", "Cards"
                            "divine": each / rates[div_id] if rates.get(div_id) else None}
                     stack = int(item.get("stackSize") or 0)
                     if stack > 1:

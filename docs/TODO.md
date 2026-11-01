@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.5.8 released 2026-11-01** (deeper cheat sheets: act routes, quest gems, 24 mechanics; div card art; tree icons; saved characters; update banner). Before: **v2.5.7 released 2026-11-01** (dust explorer + dust on the price check). Before: **v2.5.6** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.9 released 2026-11-01** (deeper cheat sheets: act routes, quest gems, 24 mechanics; div card art; tree icons; saved characters; update banner). Before: **v2.5.8 released 2026-11-01** (trade ledger: purchases, profit, flips, People, Reports, goal, backup). Before: **v2.5.7** (dust explorer + dust on the price check). Before: **v2.5.6** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -120,6 +120,14 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 
 ## 3. To do (agreed, not started)
 
+- [x] **Trade ledger** (released in v2.5.8): buying cards record Bought / Didn't happen /
+      No answer / Other (Trade accepted pre-selects Bought); Trades (Sold / Bought / Flips,
+      earned / spent / net, currency swaps valued both ways, under-market tag, + Add trade, CSV);
+      People (buyers + sellers, time wasters after N, Blocked = hidden or ignored-from-the-app,
+      Show popups / Unignore); Reports (range / league, item stats, top buyers / sellers, goal);
+      Setup → backup / restore; Today line on the trade cards; seller badge.
+  - [ ] In game: buy something, check Trade accepted highlights Bought and the purchase lands
+        in Trades → Bought; Unignore in game sends /unignore.
 - [x] **🌳 Skill tree view (mini Path of Building)**, shipped in v2.4.0. Still to confirm in game:
       the character compare against a real profile (the `mastery_effects` format in
       `get-passive-skills` wasn't checked live). It shows: the build's tree
@@ -177,7 +185,7 @@ sources, or ask the author.
     recipes, essences), served from the app's server so they update between releases, plus a
     small "Open the X cheat sheet?" pop-up on entering a mechanic's area (own movable overlay).
     Re-run `tools/make_cheatsheets.py` after the 3.30 patch notes (13 Nov) and redeploy.
-  - v2.5.8: full act routes (zones in order from the wiki's area connections, the one you're in
+  - v2.5.9: full act routes (zones in order from the wiki's area connections, the one you're in
     marked), quest gems per class with your build's gems marked, deeper sheets (all anoints,
     Sanctum boons/pacts/relics, Expedition factions, Incursion rooms, Delve depths, Heist) and 9 new
     mechanics (Heist, Breach, Legion, Abyss, Delirium, Ritual, Labyrinth, scarabs, Atlas): 24 in all.

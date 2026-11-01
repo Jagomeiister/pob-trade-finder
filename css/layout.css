@@ -447,6 +447,38 @@ body.trades .trades-root { display: block; }
 .trades-body .data-table { display: block; max-width: 100%; overflow-x: auto; }
 .sale-edit { display: flex; flex-wrap: wrap; gap: 8px; }
 .sale-edit .field-wide { flex-basis: 100%; }
+/* Trades / People / Reports (js/app/25-trade-ledger.js): money in green, out red, with words and signs */
+.ledger-sub { align-self: flex-start; }
+.trades-body .segmented.ledger-sub { flex-wrap: wrap; }
+.sales-tile.is-in .st-value, .is-in { color: var(--success); }
+.sales-tile.is-out .st-value, .is-out { color: var(--danger); }
+.ledger-chart .lc-in { fill: var(--success); }
+.ledger-chart .lc-out { fill: var(--danger); }
+.ledger-chart .lc-axis { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sales-chart.ledger-chart { height: 120px; }
+.lc-legend { display: flex; gap: 14px; font-size: var(--fs-xs); color: var(--text-2); }
+.lc-date { color: var(--text-3); }
+.lc-today { margin-left: auto; }
+.lc-key.is-in { color: var(--success); }
+.lc-key.is-out { color: var(--danger); }
+.ledger-tools { display: flex; justify-content: flex-end; }
+.ledger-row-acts { display: inline-flex; gap: 4px; align-items: center; }
+.under-chip { margin-left: 6px; }
+.report-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.goal-box { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); display: flex; flex-direction: column; gap: 6px; }
+.goal-box .trade-h3 { margin: 0; }
+.goal-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.goal-line { font-variant-numeric: tabular-nums; }
+.goal-bar { height: 10px; border-radius: 5px; background: var(--s2); border: 1px solid var(--border); overflow: hidden; }
+.goal-fill { display: block; height: 100%; background: var(--success); width: 0; transition: width .3s; }
+/* in game: today's line under the trade cards' header */
+.ov-today { display: flex; align-items: center; gap: 8px; padding: 3px 10px; font-size: var(--fs-sm);
+  background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-md); font-variant-numeric: tabular-nums; }
+body.trade-cards .ov-today { width: var(--ov-w); box-sizing: border-box; }
+.ov-today-label { color: var(--text-2); font-weight: 600; }
+.ov-today-in { color: var(--success); }
+.ov-today-out { color: var(--danger); }
+.ov-today-n { margin-left: auto; color: var(--text-3); }
 
 /* main window brought over the game by the app hotkey (16-overlay.js __appOverlay) */
 .over-game-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: center; gap: 12px;

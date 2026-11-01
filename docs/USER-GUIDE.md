@@ -363,7 +363,7 @@ they only work while the game is focused. (For your hideout, use the game's own 
 Click the icon to open it; right-click it for Open, Trade helper, Settings or **Quit**. You can
 turn this off in Settings → In game.
 
-### Trade helper (selling)
+### Trade helper (selling and buying)
 
 **Switch it on** in **Trade helper → Setup**. The app then reads Path of Exile's chat log
 (`Client.txt` in the game folder → `logs`) while it runs. If it can't find the file, start the
@@ -389,7 +389,7 @@ note:
    - **in div** / **in c** converts it if you were paid in the other currency;
    - **Reset** goes back to the listed price.
 
-   To add a note, **Edit** the row in **Sales**.
+   To add a note, **Edit** the row in **Trades**.
    If you invited someone and they didn't come within 5 minutes (change it in Setup),
    **Mark as no-show** appears
 
@@ -397,19 +397,51 @@ The cards are click-only, so your keyboard always stays with the game. ⋯ on a 
 **Whois**, **Flag**, **Hide buyer** (no more popups or sounds from them; their whispers go to
 the **Hidden** list) and **Ignore in game** (click twice: sends `/ignore` once).
 
-Outgoing whispers (you buying) get a card too: **Visit hideout**, **Trade**, **Re-whisper**.
+Outgoing whispers (you buying) get a card too: **Visit hideout**, **Trade**, **Re-whisper**, and
+⋯ for **Whois**, **Flag** and **Ignore in game**. The seller's record with you shows on the card
+(e.g. *sold to you 3× · didn't answer 2×*). Record what happened the same way as a sale:
+**✓ Bought** (at the **Paid** price above it, with − / + and **in div** / **in c**), **✗ Didn't
+happen**, **⌛ No answer** or **Other**. If the game logged "Trade accepted" while you were
+buying, Bought is highlighted for you.
+
+**Today** (a line under the trade cards' header, Setup can turn it off): what you earned and
+spent today, the net, and how many trades.
 
 The **Trade helper** is a page of the app (sidebar → Tools, ⚙ Settings → In game, the $ on the
 icon, or the tray menu), not another window. Over the game it opens with the app overlay.
 **← Back** or Esc returns to where you were:
 
-- **Sales**: every completed sale with its price in chaos and divines, buyer, league, time and
-  stash position, plus totals, average, a chart per day, best sellers and a per-league
-  breakdown. Filter by league, period, outcome or text, **Edit** a row, **Export CSV**
-- **Buyers**: each buyer's completed trades, total spent, time wasted and no-shows (a badge on
-  their next whisper shows this), a private note, flag, hide, ignore in game, **Clear history**.
-  **Same person as…** merges one player's characters: their history adds up and future
-  whispers from either character count for that person (whispers don't show account names)
+- **Trades**: **Sold**, **Bought** and **Flips**, filtered by league, period, outcome or text.
+  - Tiles for **Earned** (sales), **Spent** (purchases), **Net profit** and the number of
+    trades, and a chart of money in (up) and out (down) per day.
+  - **Currency trades**: a bulk swap of one currency for another (e.g. 300 chaos for 1 div)
+    is valued both ways at that hour's rate, and only the difference counts, so swapping at
+    the going rate is about ±0.
+  - **Flips**: when you buy an item and later sell the same item in the same league, the two
+    are paired: what you paid, what you got, the profit and how long you held it. **Bought,
+    not sold yet** lists what you're still holding.
+  - A sale more than 20% under poe.ninja / the exchange price at the time is tagged
+    **under market** (uniques, gems, currency and cards; rares can't be compared).
+  - **Edit** a row (price, currency, outcome, note), ✕ deletes one (asks first), **Export
+    CSV**, and **+ Add trade** for one done before the app or outside the trade helper.
+- **People**: everyone you've traded with, buyers and sellers in one list, with filters for
+  **Buyers**, **Sellers**, **⌛ Time wasters**, **⚑ Flagged** and **Blocked**.
+  - Each shows what they bought from you and what they sold you, time wasted, no-shows,
+    no answers, when you last traded, and your private note.
+  - **Time waster**: automatic after 2 time wasted / no-show / no answer (Setup changes the
+    number), or set it yourself to yes or no.
+  - **Blocked** means popups hidden here, or ignored in game from this app. **Show popups**
+    and **Unignore in game…** (sends `/unignore` once) undo them. The game's own ignore list
+    can't be read, so only ignores sent from the app are listed.
+  - **Same person as…** merges one player's characters: their history adds up and future
+    whispers from either character count for that person (whispers don't show account names).
+    **Clear history** forgets a person (the trades stay).
+- **Reports**: today, 7 / 30 / 90 days, all time or your own dates, for one league or all:
+  earned, spent, net, best day, time wasted, sales under market, **items you sold** (how many,
+  total, average, low, high, last sold, best buyer), **top buyers** and **top sellers**, and
+  the under-market list.
+  - **Goal**: e.g. *Mageblood, 40 div*. It counts your net profit (earned − spent) from the
+    moment you set it, with a progress bar.
 - **Setup**:
   - on/off, the log file and the chat key read from your game settings
   - **Sound**: Off, Chime, Bell, Soft, Ping, Coins or **your own sound** (an mp3, wav, ogg
@@ -423,6 +455,10 @@ icon, or the tray menu), not another window. Over the game it opens with the app
   - **Your buttons**: add your own card buttons (a label and a message, e.g. "1 min" → "one
     minute, finishing a map"). Choose whether each shows before the buyer arrives, once
     they're here, always, or on your own buying cards. Each press whispers the message once
+  - **Time waster** after how many bad outcomes, and the **Today** line on or off
+  - **Your trade data**: **Export backup** saves sales, purchases, people, merged characters
+    and your goal as one file; **Import backup…** adds what you don't have yet from such a
+    file (a reinstall or a new PC) and never removes anything
 
 If Path of Exile runs as administrator and the app doesn't, Windows blocks the buttons from
 typing; Setup warns you. Run both the same way.
@@ -431,7 +467,7 @@ typing; Setup warns you. Run both the same way.
 buyer. It makes up a buyer's whisper, a bulk whisper, the buyer arriving, "Trade accepted",
 the buyer leaving, your own buying whisper, or entering a zone. **▶ Whole trade** plays a
 complete trade over 12 seconds. These cards are marked **TEST**: their buttons send nothing
-to the game, and closing them saves nothing to Sales or Buyers. **Clear test cards** removes
+to the game, and closing them saves nothing to Trades or People. **Clear test cards** removes
 them. It works with the trade helper on or off.
 
 ## 5d. ⏳ Timeless jewels

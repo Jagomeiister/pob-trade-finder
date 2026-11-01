@@ -1661,7 +1661,7 @@ localStorage.setItem('pobtf-sales', JSON.stringify([
 localStorage.setItem('pobtf-buyers', JSON.stringify({ buyerone: { name: 'BuyerOne', names: ['BuyerOne'], completed: 1, spent: 400,
   wasted: 0, noShow: 0, notCompleted: 0, other: 0, flag: false, hidden: false, note: '' } }));
 window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
-H.button(document.querySelector('.trades-tabs'), 'Sales').click();
+H.button(document.querySelector('.trades-tabs'), 'Trades').click();
 await H.sleep(30);
 out.tiles = [...document.querySelectorAll('.sales-tile')].map(t => t.textContent);
 out.chart = !!document.querySelector('.sales-chart rect');
@@ -1677,7 +1677,7 @@ out.edited = JSON.parse(localStorage.getItem('pobtf-sales')).find(s => s.id === 
 H.button(document, 'Export CSV').click();
 await H.sleep(50);
 out.csv = H.calls('save_text_file')[0].args[1];
-H.button(document.querySelector('.trades-tabs'), 'Buyers').click();
+H.button(document.querySelector('.trades-tabs'), 'People').click();
 await H.sleep(30);
 out.buyerRows = document.querySelectorAll('.buyer-row').length;
 const n1 = H.calls('trade_send').length;
@@ -1738,8 +1738,8 @@ def scenario_trades(s, tag):
     check(tag + " buyer reputation counts the sale", b.get("completed") == 1 and b.get("spent") == 400, b)
     check(tag + " repeat buyer gets a badge", "1 bought" in (r["badge"] or ""), r["badge"])
     check(tag + " no-show after the set minutes", r["noShow"] == 1, r["noShow"])
-    check(tag + " outgoing card: Visit hideout · Trade · Re-whisper",
-          r["outActions"] == ["Visit hideout", "Trade", "Re-whisper"], r["outActions"])
+    check(tag + " outgoing card: Visit hideout · Trade · Re-whisper · ⋯",
+          r["outActions"] == ["Visit hideout", "Trade", "Re-whisper", "⋯"], r["outActions"])
     check(tag + " re-whisper sends the original text once", len(r["rewhisper"]) == 1 and r["rewhisper"][0][0] == "whisper"
           and r["rewhisper"][0][2].startswith("Hi, I would like"), r["rewhisper"])
     check(tag + " hidden buyer: no card, listed under Hidden", not r["hidden"]["visible"] and
@@ -1756,8 +1756,8 @@ def scenario_trades(s, tag):
 
     s.fresh("?trades=1")
     r = s.run(S19_HELPER, timeout=60)
-    check(tag + " helper window: Sales · Buyers · Setup, opens on Sales", r["tabs"] == ["Sales", "Buyers", "Setup"] and
-          r["firstTab"] == "Sales", r["tabs"])
+    check(tag + " helper window: Trades · People · Reports · Setup, opens on Trades",
+          r["tabs"] == ["Trades", "People", "Reports", "Setup"] and r["firstTab"] == "Trades", r["tabs"])
     check(tag + " helper window doesn't restart the log reader on open", r["enableAtStart"] == 0, r["enableAtStart"])
     check(tag + " Setup has the overlay icon option", r["iconToggle"], r["iconToggle"])
     check(tag + " zone notes: starters listed, new note saved", r["zoneRows"] >= 7 and r["zoneSaved"] == "Run fast",
@@ -1768,13 +1768,14 @@ def scenario_trades(s, tag):
     check(tag + " sliders save (volume 0 = silent, opacity 60%)", pa.get("volume") == 0 and pa.get("opacity") == 60, pa)
     check(tag + " switching on asks first, then reads the log and tells the overlay",
           r["enableBeforeConfirm"] == 0 and "Reading" in (r["status"] or ""), r)
-    check(tag + " sales totals + chart", any("Sales2" in t.replace(" ", "") for t in r["tiles"]) and r["chart"], r["tiles"])
+    check(tag + " totals + chart", any(t.replace(" ", "").startswith("Earned410") for t in r["tiles"]) and
+          any(t.replace(" ", "").startswith("Trades2") for t in r["tiles"]) and r["chart"], r["tiles"])
     e = r["edited"] or {}
     check(tag + " Edit sale: new price re-valued, note kept", e.get("price") == 1.5 and e.get("chaos") == 300 and
           e.get("note") == "haggled", e)
-    check(tag + " CSV export: header + formula-safe cells", (r["csv"] or "").startswith("time,outcome,league,item") and
+    check(tag + " CSV export: header + formula-safe cells", (r["csv"] or "").startswith("time,side,outcome,league,item") and
           "'=HYPERLINK" in r["csv"], (r["csv"] or "")[:200])
-    check(tag + " Buyers page lists them", r["buyerRows"] >= 1, r["buyerRows"])
+    check(tag + " People page lists them", r["buyerRows"] >= 1, r["buyerRows"])
     check(tag + " Ignore in game (helper window): one /ignore after confirming",
           r["ignore"] == [["ignore", "BuyerOne", None]], r["ignore"])
 
@@ -2243,7 +2244,7 @@ def scenario_trade_embed(s, tag):
     s.fresh()
     r = s.run(S25_EMBED, timeout=60)
     check(tag + " Trade helper opens as a view of the main window (no build needed)", r["view"] == "trades" and
-          r["visible"] and r["tabs"] == ["Sales", "Buyers", "Setup"] and r["settingsClosed"], r)
+          r["visible"] and r["tabs"] == ["Trades", "People", "Reports", "Setup"] and r["settingsClosed"], r)
     check(tag + " reads the log reader's state on open", r["status"] >= 1, r["status"])
     check(tag + " Back returns to the landing without a build", r["backTo"] == "" and r["landing"], r)
     check(tag + " with a build: in the sidebar, Esc returns to where you were", r["inNav"] and r["escBack"] == "gems", r)
@@ -2795,6 +2796,156 @@ def scenario_quickwins(s, tag):
     check(tag + " the close button doesn't start a drag", r["closeNoDrag"])
 
 
+S37_LEDGER_CARDS = r"""
+const H = window.__e2e;
+const out = {};
+const card = name => [...document.querySelectorAll('.trade-card')].find(c => c.querySelector('.tc-name').textContent === name);
+localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ enabled: true, ack: true, sound: 'off', wasterAt: 2 }));
+await window.__tradePrefsChanged();
+// one divine = 200c; every quick price answers 200c (the market check sees the sale at its going rate)
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1, cat: 'Currency' };
+const buy = { kind: 'item', item: 'Goldrim Leather Cap', price: 30, currency: 'chaos', league: 'Standard', tab: 'Shop', left: 1, top: 1 };
+window.__tradeEvent({ type: 'whisper', dir: 'out', name: 'SellerOne', text: 'Hi, I would like to buy your Goldrim', trade: buy });
+await H.sleep(30);
+let c = card('SellerOne');
+out.buyCard = { dir: H.text('.tc-dir', c), outcomes: [...c.querySelectorAll('.tc-other .btn')].map(b => b.textContent),
+  paid: H.text('.tc-sold', c), suggested: !!c.querySelector('.tc-complete.suggested'), inputs: c.querySelectorAll('input, select').length };
+H.button(c, 'Visit hideout').click();
+await H.sleep(20);
+window.__tradeEvent({ type: 'trade_accepted' });
+await H.sleep(20);
+c = card('SellerOne');
+out.accepted = { status: H.text('.tc-status', c), suggested: !!c.querySelector('.tc-complete.suggested') };
+c.querySelector('button[aria-label="Lower the price you paid"]').click();
+await H.sleep(10);
+card('SellerOne').querySelector('.tc-complete').click();
+await H.sleep(100);
+out.purchases = JSON.parse(localStorage.getItem('pobtf-purchases') || '[]');
+out.seller = JSON.parse(localStorage.getItem('pobtf-buyers') || '{}').sellerone;
+out.closed = !card('SellerOne');
+// a seller who doesn't answer twice is a time waster: their next card says so
+for (let i = 0; i < 2; i++) {
+  window.__tradeEvent({ type: 'whisper', dir: 'out', name: 'Ghosty', text: 'hi', trade: Object.assign({}, buy, { item: 'Thing ' + i }) });
+  await H.sleep(20);
+  H.button(card('Ghosty'), '⌛ No answer').click();
+  await H.sleep(60);
+}
+window.__tradeEvent({ type: 'whisper', dir: 'out', name: 'Ghosty', text: 'hi', trade: Object.assign({}, buy, { item: 'Thing 9' }) });
+await H.sleep(30);
+out.ghostBadge = H.text('.seller-badge', card('Ghosty'));
+out.todayAfterBuy = H.text('.ov-today');
+// sell the same item for 1 div: a flip, and today's line shows both sides
+window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'BuyerOne', text: 'Hi', trade: { kind: 'item', item: 'Goldrim Leather Cap',
+  price: 1, currency: 'divine', league: 'Standard' } });
+window.__tradeEvent({ type: 'joined', name: 'BuyerOne' });
+await H.sleep(30);
+card('BuyerOne').querySelector('.tc-complete').click();
+await H.sleep(150);
+out.sales = JSON.parse(localStorage.getItem('pobtf-sales') || '[]');
+out.today = H.text('.ov-today');
+out.flips = pairLedgerFlips(ledgerEntries()).flips.map(f => [f.item, f.profit]);
+out.shapeHasToday = (H.calls('overlay_shape').slice(-1)[0] || { args: [null, []] }).args[1].length >= 2;
+return out;
+"""
+
+S37_LEDGER_PAGES = r"""
+const H = window.__e2e;
+const out = {};
+const now = Date.now(), d = 86400000;
+const clickDialog = async label => { await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'dialog');
+  H.button(document.querySelector('dialog[open]'), label).click(); await H.sleep(40); };
+localStorage.setItem('pobtf-sales', JSON.stringify([
+  { id: 's1', time: now - 2 * d, outcome: 'completed', league: 'Standard', item: 'Mageblood Heavy Belt', price: 20, currency: 'divine',
+    chaos: 4000, div: 20, buyer: 'BigSpender', market: 6000, marketSource: 'poe.ninja', under: true },
+  { id: 's2', time: now - d, outcome: 'completed', league: 'Standard', item: 'Goldrim Leather Cap', price: 50, currency: 'chaos', chaos: 50, buyer: 'BuyerOne' },
+  { id: 's3', time: now - 3600e3, outcome: 'wasted', league: 'Standard', item: 'Junk', price: 5, currency: 'chaos', chaos: 5, buyer: 'Waster' },
+  { id: 's4', time: now - 1800e3, outcome: 'completed', league: 'Standard', item: 'Chaos Orb', count: 200, bulk: true, price: 1,
+    currency: 'divine', chaos: 200, goodsChaos: 190, goodsCat: 'Currency', buyer: 'Swapper' }]));
+localStorage.setItem('pobtf-purchases', JSON.stringify([
+  { id: 'p1', time: now - 3 * d, outcome: 'bought', league: 'Standard', item: 'Goldrim Leather Cap', price: 10, currency: 'chaos', chaos: 10, seller: 'SellerOne' },
+  { id: 'p2', time: now - 7200e3, outcome: 'bought', league: 'Standard', item: 'Tabula Rasa Simple Robe', price: 15, currency: 'chaos', chaos: 15, seller: 'SellerTwo' }]));
+const P = (name, extra) => Object.assign({ name: name, names: [name], completed: 0, spent: 0, wasted: 0, noShow: 0, notCompleted: 0, other: 0,
+  sold: 0, paid: 0, noAnswer: 0, notBought: 0, sellerOther: 0, flag: false, hidden: false, ignored: null, waster: null, note: '', last: now }, extra);
+localStorage.setItem('pobtf-buyers', JSON.stringify({ bigspender: P('BigSpender', { completed: 1, spent: 4000 }),
+  waster: P('Waster', { wasted: 2 }), ghost: P('Ghost', { noAnswer: 1, hidden: true, ignored: now - 1000 }),
+  sellerone: P('SellerOne', { sold: 1, paid: 10 }) }));
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 200, divine: 1 };
+const tab = label => H.button(document.querySelector('.trades-tabs'), label);
+const seg = label => [...document.querySelectorAll('.ledger-sub .seg')].find(b => b.textContent.startsWith(label));
+const tiles = () => [...document.querySelectorAll('.sales-tile')].map(t => t.querySelector('.st-label').textContent + '=' + t.querySelector('.st-value').textContent);
+const rows = () => [...document.querySelectorAll('.trades-body .data-table tbody tr')].map(r => r.textContent);
+tab('Trades').click(); await H.sleep(30);
+const period = [...document.querySelectorAll('.sales-filters select')].find(s => [...s.options].some(o => o.value === 'all'));
+period.value = 'all'; period.dispatchEvent(new Event('change')); await H.sleep(30);
+out.tiles = tiles();
+out.soldRows = rows();
+out.underChip = !!document.querySelector('.under-chip');
+seg('Bought').click(); await H.sleep(30);
+out.boughtRows = rows().length;
+seg('Flips').click(); await H.sleep(30);
+out.flipRows = [...document.querySelector('.trades-body .data-table').querySelectorAll('tbody tr')].map(r => r.textContent);
+out.holding = H.text('.trades-body details summary');
+// + Add trade (a purchase from before the app)
+seg('Bought').click(); await H.sleep(20);
+H.button(document, '+ Add trade').click();
+await H.waitFor(() => document.querySelector('dialog[open]'), 3000, 'add dialog');
+const dlg = document.querySelector('dialog[open]');
+dlg.querySelector('input[aria-label=Item]').value = 'Kaom\'s Heart Glorious Plate';
+dlg.querySelector('input[aria-label=Price]').value = '2';
+const cur = dlg.querySelector('select[aria-label=Currency]'); cur.value = 'divine';
+dlg.querySelector('input[aria-label="Buyer or seller"]').value = 'OldSeller';
+await clickDialog('Add');
+await H.sleep(60);
+const added = JSON.parse(localStorage.getItem('pobtf-purchases')).find(p => p.manual);
+out.added = added && [added.item, added.price, added.currency, added.chaos, added.seller, added.outcome];
+out.addedPerson = JSON.parse(localStorage.getItem('pobtf-buyers')).oldseller;
+// People
+tab('People').click(); await H.sleep(30);
+out.peopleSegs = [...document.querySelectorAll('.ledger-sub .seg')].map(b => b.textContent);
+seg('Blocked').click(); await H.sleep(30);
+out.blockedRows = [...document.querySelectorAll('.person-row')].map(r => r.querySelector('.buyer-head').textContent);
+const n0 = H.calls('trade_send').length;
+H.button(document.querySelector('.person-row'), 'Unignore in game…').click();
+await clickDialog('Send /unignore');
+await H.sleep(40);
+out.unignore = H.calls('trade_send').slice(n0).map(c => c.args);
+out.ghostAfter = JSON.parse(localStorage.getItem('pobtf-buyers')).ghost;
+H.button(document.querySelector('.person-row'), 'Show popups').click(); await H.sleep(30);
+out.blockedAfter = document.querySelectorAll('.person-row').length;
+seg('⌛ Time wasters').click(); await H.sleep(30);
+out.wasters = [...document.querySelectorAll('.person-row b')].map(b => b.textContent);
+const tws = document.querySelector('.person-row select[aria-label^="Time waster"]');
+tws.value = 'no'; tws.dispatchEvent(new Event('change')); await H.sleep(30);
+out.wasterSaved = JSON.parse(localStorage.getItem('pobtf-buyers')).waster.waster;
+out.wastersAfter = document.querySelectorAll('.person-row').length;
+// Reports
+tab('Reports').click(); await H.sleep(30);
+const range = [...document.querySelectorAll('.sales-filters select')][0];
+range.value = 'all'; range.dispatchEvent(new Event('change')); await H.sleep(30);
+out.reportTiles = tiles();
+out.itemRows = rows().filter(r => /Mageblood|Goldrim/.test(r)).length;
+out.underTable = [...document.querySelectorAll('.trades-body .data-table')].some(t => /Sold under market/.test(t.textContent));
+// goal: counts profit since it was set
+localStorage.setItem('pobtf-trade-goal', JSON.stringify({ name: 'Mirror', target: 100, unit: 'chaos', since: 0 }));
+tab('Trades').click(); tab('Reports').click(); await H.sleep(30);
+out.goal = H.text('.goal-line');
+out.goalBar = document.querySelector('.goal-bar').getAttribute('aria-valuenow');
+// Setup: backup out, then a backup with one new sale in
+tab('Setup').click(); await H.sleep(30);
+H.button(document, 'Export backup').click(); await H.sleep(40);
+const saved = H.calls('save_text_file').slice(-1)[0].args;
+const backup = JSON.parse(saved[1]);
+out.backup = [saved[0].startsWith('pobtf-trades-'), backup.kind, backup.sales.length, backup.purchases.length, Object.keys(backup.people).length];
+backup.sales.push({ id: 'imported', time: now - 5 * d, outcome: 'completed', league: 'Standard', item: 'From the old PC', price: 3, currency: 'chaos', chaos: 3, buyer: 'Old' });
+backup.people.newguy = P('NewGuy', { completed: 1 });
+importTradeBackup(JSON.stringify(backup));
+await clickDialog('Import');
+await H.sleep(40);
+out.afterImport = [JSON.parse(localStorage.getItem('pobtf-sales')).length, !!JSON.parse(localStorage.getItem('pobtf-buyers')).newguy];
+return out;
+"""
+
+
 S36_DUST = r"""
 const H = window.__e2e;
 const out = {};
@@ -2831,6 +2982,60 @@ out.data = [window.POE_DUST.items.length, window.POE_DUST.source];
 delete window.__stubOverrides.unique_prices;
 return out;
 """
+
+
+def scenario_ledger(s, tag):
+    s.fresh("?cards=1")
+    r = s.run(S37_LEDGER_CARDS, timeout=60)
+    b = r["buyCard"]
+    check(tag + " buying card: Paid row + Bought / Didn't happen / No answer / Other, no text inputs",
+          b["dir"] == "Buying from" and b["outcomes"][:4] == ["✓ Bought · 30 c", "✗ Didn't happen", "⌛ No answer", "Other"]
+          and "Paid" in (b["paid"] or "") and b["inputs"] == 0 and not b["suggested"], b)
+    check(tag + " Trade accepted pre-selects Bought", r["accepted"]["status"] == "Trade accepted" and r["accepted"]["suggested"],
+          r["accepted"])
+    p = (r["purchases"] or [{}])[0]
+    check(tag + " purchase saved at the price paid", len(r["purchases"]) >= 1 and p.get("item") == "Goldrim Leather Cap" and
+          p.get("price") == 25 and p.get("chaos") == 25 and p.get("seller") == "SellerOne" and r["closed"], p)
+    sl = r["seller"] or {}
+    check(tag + " seller's record: sold to you 1×, paid 25c", sl.get("sold") == 1 and sl.get("paid") == 25, sl)
+    check(tag + " seller who didn't answer twice gets the time-waster badge", "⌛" in (r["ghostBadge"] or "") and
+          "didn't answer 2×" in (r["ghostBadge"] or ""), r["ghostBadge"])
+    check(tag + " today line after a purchase", "Today" in (r["todayAfterBuy"] or "") and "−25c" in r["todayAfterBuy"], r["todayAfterBuy"])
+    check(tag + " today line after the sale: in, out, net", all(x in (r["today"] or "") for x in ("+200c", "−25c", "net +175c", "2 trades")),
+          r["today"])
+    check(tag + " buy then sell the same item = a flip", r["flips"] == [["Goldrim Leather Cap", 175]], r["flips"])
+    check(tag + " today line is part of the overlay's shape", r["shapeHasToday"])
+
+    s.fresh("?trades=1")
+    r = s.run(S37_LEDGER_PAGES, timeout=90)
+    t = r["tiles"]
+    check(tag + " Trades tiles: earned, spent, currency trades, net", "Earned=4050c" in t and "Spent=25c" in t and
+          "Currency trades=+10c" in t and "Net profit=+4035c" in t and "Trades=5" in t, t)
+    check(tag + " Sold list: finished sales only, under-market flagged", len(r["soldRows"]) == 3 and r["underChip"], r["soldRows"])
+    check(tag + " Bought list", r["boughtRows"] == 2, r["boughtRows"])
+    check(tag + " Flips: bought 10c, sold 50c = +40c; one still held", len(r["flipRows"]) == 1 and "+40c" in r["flipRows"][0]
+          and "Bought, not sold yet (1" in (r["holding"] or ""), (r["flipRows"], r["holding"]))
+    check(tag + " + Add trade saves a purchase by hand, valued in chaos, and counts the seller",
+          r["added"] == ["Kaom's Heart Glorious Plate", 2, "divine", 400, "OldSeller", "bought"] and
+          (r["addedPerson"] or {}).get("sold") == 1, (r["added"], r["addedPerson"]))
+    segs = " ".join(r["peopleSegs"])
+    check(tag + " People filters with counts", all(x in segs for x in ("Buyers (", "Sellers (", "Time wasters (1)", "Blocked (1)")), segs)
+    check(tag + " Blocked lists who's hidden or ignored", len(r["blockedRows"]) == 1 and "Ghost" in r["blockedRows"][0] and
+          "Ignored in game" in r["blockedRows"][0] and "Popups hidden" in r["blockedRows"][0], r["blockedRows"])
+    check(tag + " Unignore asks, then sends /unignore once", r["unignore"] == [["unignore", "Ghost", None]] and
+          not (r["ghostAfter"] or {}).get("ignored"), (r["unignore"], r["ghostAfter"]))
+    check(tag + " Show popups unblocks them", r["blockedAfter"] == 0, r["blockedAfter"])
+    check(tag + " time waster after 2; 'no' overrides it", r["wasters"] == ["Waster"] and r["wasterSaved"] is False and
+          r["wastersAfter"] == 0, (r["wasters"], r["wasterSaved"], r["wastersAfter"]))
+    rt = r["reportTiles"]
+    check(tag + " Reports: totals, best day, time wasted, under market", any(x.startswith("Best day=") for x in rt) and
+          "Time wasted=1" in rt and "Sold under market=1" in rt, rt)
+    check(tag + " Reports: item stats and the under-market list", r["itemRows"] >= 2 and r["underTable"], (r["itemRows"], r["underTable"]))
+    check(tag + " goal counts profit since it was set", (r["goal"] or "").startswith("Mirror:") and "reached" in r["goal"] and
+          r["goalBar"] == "100", (r["goal"], r["goalBar"]))
+    check(tag + " backup: one file with sales, purchases and people", r["backup"][:2] == [True, "trade-backup"] and
+          r["backup"][2] == 4 and r["backup"][3] == 3 and r["backup"][4] >= 4, r["backup"])
+    check(tag + " import adds only what's new", r["afterImport"] == [5, True], r["afterImport"])
 
 
 def scenario_dust(s, tag):
@@ -3367,6 +3572,7 @@ SCENARIOS = [
     ("34 quickwins", scenario_quickwins),
     ("35 uibatch", scenario_ui_batch),
     ("36 dust", scenario_dust),
+    ("37 ledger", scenario_ledger),
     ("38 sheets2", scenario_sheets2),
 ]
 

@@ -122,8 +122,12 @@ GGG rules, enforced by the shape of the code. Keep them:
   Log events never send anything.
 - No cycling: Invite and Trade are separate buttons. Nothing auto-thanks, auto-kicks or
   auto-ignores.
-- Reputation, flags and hidden buyers live in storage.json (`pobtf-buyers`,
-  `pobtf-sales`, `pobtf-trade-prefs`) and are never shared.
+- The trade ledger lives in storage.json and is never shared: `pobtf-sales` (sold),
+  `pobtf-purchases` (bought), `pobtf-buyers` (people, buyers and sellers: counts, flag,
+  hidden, `ignored` = when /ignore was sent from the app, `waster` override),
+  `pobtf-buyer-aliases`, `pobtf-trade-goal`, `pobtf-trade-prefs`. Pages and maths:
+  js/app/25-trade-ledger.js (bulk currency swaps count by `goodsChaos` vs `chaos`, filled in
+  once by `ledgerEnrich` via `quick_price`, whose exchange answers carry `cat`).
 - `trade_highlight` only draws a click-through outline (`StashHighlight`); it never moves
   the cursor.
 
