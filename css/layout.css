@@ -240,7 +240,8 @@ body[data-view="gear"] .tab-section.master-detail[data-tab="gear"],
 body[data-view="jewels"] .tab-section.master-detail[data-tab="jewels"],
 body[data-view="flasks"] .tab-section.master-detail[data-tab="flasks"] { display: grid; }
 body[data-view="planner"] #view-planner,
-body[data-view="market"] #view-market { display: block; }
+body[data-view="market"] #view-market,
+body[data-view="stash"] #view-stash { display: block; }
 /* a pasted item without a loaded build still shows under the landing */
 body:not(.has-build) .tab-section[data-tab="pasted"] { display: block; margin-top: 16px; }
 #view-planner:has(> #gear-value:not(.hidden)) #planner-empty,

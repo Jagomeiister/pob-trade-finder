@@ -253,12 +253,13 @@ document.addEventListener('DOMContentLoaded', function () {
     checkForUpdates();
     setInterval(checkForUpdates, 4 * 3600 * 1000); // not just at launch
     refreshSessionStatus(true);
+    refreshOAuth(); // official login: off until GGG issues a client id (17-stash.js)
     setInterval(function () { refreshSessionStatus(true); }, 30 * 60 * 1000);
     // market history loads after the saved league is restored; the feed is hourly
     hydrateFromBridge().then(function () { setTimeout(loadMarket, 1500); setTimeout(checkNewLeague, 4000); });
     setInterval(checkNewLeague, 6 * 3600 * 1000);
-    setTimeout(runTrackedBuilds, 2 * 60 * 1000); // after start-up traffic settles
-    setInterval(runTrackedBuilds, 60 * 60 * 1000);
+    setTimeout(remindTrackedBuilds, 60 * 1000); // reminders only: searches need a click
+    setInterval(remindTrackedBuilds, 60 * 60 * 1000);
     setInterval(loadMarket, 60 * 60 * 1000);
     document.getElementById('league').addEventListener('change', loadMarket);
     var tile = document.getElementById('market-tile');

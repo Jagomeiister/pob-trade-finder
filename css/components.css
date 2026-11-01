@@ -101,6 +101,12 @@ body:not(.gui) .btn.act-search { background: var(--accent); border-color: var(--
 .hotkey-status { color: var(--text-2); font-size: var(--fs-xs); white-space: normal; }
 
 /* ---- cost summary + basket ---- */
+.listing-score { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+.listing-value { color: var(--text-3); }
+.value-sort { margin-left: 4px; }
+.stash-total { font-size: var(--fs-xl); font-weight: 700; color: var(--price); font-variant-numeric: tabular-nums; }
+.stash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.settings-sub { margin: 14px 0 4px; font-size: var(--fs-sm); color: var(--text); }
 .cost-trend { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
 .cost-trend-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin-bottom: 4px; }
 .sell-hint {

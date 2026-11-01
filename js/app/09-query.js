@@ -24,10 +24,13 @@ function buildTradePayload(state, quiet) {
   var tradeFilters = Object.keys(tf).length ? { trade_filters: { filters: tf } } : null;
 
   var requireFrac = state.fracToggle && state.fracToggle.checkbox.checked;
-  var flexOn = state.flexToggle && state.flexToggle.checkbox.checked && pseudoOn;
+  var weighted = !state.unique && state.modeSel && state.modeSel.value === 'w';
+  // weighted mode already lets resistances trade off against each other (and everything else)
+  var flexOn = !weighted && state.flexToggle && state.flexToggle.checkbox.checked && pseudoOn;
   var flexDiverted = []; // {id, weight, min}
   var filters = [];
   var seenIds = {};
+  var rolls = {}; // filter id -> the build item's roll, in the filter's scale (weights + listing score)
   var upgradeEq = (state.upgradeOnly && charGear && charGear[state.slot] && !state.unique)
     ? equippedStats(charGear[state.slot], state.slot) : null;
   state.rows.forEach(function (r) {
@@ -73,9 +76,12 @@ function buildTradePayload(state, quiet) {
         // rolls ×2) — convert if the id we're sending uses a different one
         var targetScale = (pseudoOn && r.match.pseudo && !(requireFrac && r.mod.fractured))
           ? (r.pseudoMult || 1) : 1;
+        var roll = r.baseAvg !== null && r.baseAvg !== undefined ? r.baseAvg : min;
         if (r.inputScale && targetScale !== r.inputScale) {
           min = Math.round(min * targetScale / r.inputScale * 10) / 10;
+          roll = roll * targetScale / r.inputScale;
         }
+        if (roll > 0) rolls[f.id] = (rolls[f.id] || 0) + roll;
         if (r.exactCount) f.value = { min: min, max: min };
         // negative-value mods (e.g. -# mana cost): lower is better -> use max
         else f.value = (min < 0) ? { max: min } : { min: min };
@@ -122,8 +128,26 @@ function buildTradePayload(state, quiet) {
       return null;
     }
 
-    var mode = state.modeSel ? parseInt(state.modeSel.value, 10) : 0;
+    var mode = state.modeSel ? (parseInt(state.modeSel.value, 10) || 0) : 0;
     query.stats = [];
+    // weighted total: every positive numeric filter scores 100 points at the build item's
+    // roll (weight = 100 / roll); the group needs the target share of the total, so more
+    // of one stat makes up for less of another. Fixed-text, exact-count and "lower is
+    // better" filters stay hard requirements. Same weights as the listing score.
+    var weightGroup = null;
+    if (weighted) {
+      var wf = filters.filter(function (f) { return isWeightable(f) && rolls[f.id] > 0; });
+      if (wf.length >= 2) {
+        var pct = (parseInt(state.weightPct && state.weightPct.value, 10) || 90) / 100;
+        weightGroup = {
+          type: 'weight',
+          value: { min: Math.round(wf.length * 100 * pct) },
+          filters: wf.map(function (f) { return { id: f.id, value: { weight: Math.round(10000 / rolls[f.id]) / 100 } }; })
+        };
+        filters = filters.filter(function (f) { return wf.indexOf(f) === -1; });
+        mode = 0;
+      }
+    }
     if (filters.length) {
       var group;
       if (mode > 0 && filters.length > mode) {
@@ -133,6 +157,7 @@ function buildTradePayload(state, quiet) {
       }
       query.stats.push(group);
     }
+    if (weightGroup) query.stats.push(weightGroup);
     if (flexDiverted.length >= 2) {
       var flexMin = 0;
       flexDiverted.forEach(function (d) { flexMin += d.min * d.weight; });
@@ -183,6 +208,11 @@ function buildTradePayload(state, quiet) {
     if (Object.keys(qFilters).length) query.filters = qFilters;
   }
 
+  // listing score weights for this search (frozen with the results by checkPrice)
+  state.lastWeights = Object.keys(rolls).filter(function (id) {
+    return seenIds[id] && isWeightable(seenIds[id]);
+  }).map(function (id) { return { id: id, w: 100 / rolls[id] }; });
+
   // Sort: by a chosen mod's roll (server-side, across ALL listings), else price
   var sort = { price: 'asc' };
   if (state.sortSpec) {
@@ -190,6 +220,41 @@ function buildTradePayload(state, quiet) {
     sort[state.sortSpec.statKey] = state.sortSpec.dir;
   }
   return { query: query, sort: sort };
+}
+
+function isWeightable(f) {
+  return !!(f.value && f.value.min > 0 && f.value.max === undefined);
+}
+
+// ---- listing score: how a listing compares with the build item on the searched stats ----
+// Weights come from buildTradePayload (state.lastWeights, frozen per search): each numeric
+// stat searched is worth 100 points at the build item's roll. A listing's score sums
+// value × weight over those stats, so score / stats = "% of your item" (100 = as good on
+// these stats). Pseudo totals add up every mod that folds into them (life from implicit +
+// explicit + crafted, dual res ×2…).
+var LISTING_MOD_KINDS = [['implicitMods', 'implicit'], ['explicitMods', 'explicit'], ['craftedMods', 'crafted'],
+                         ['fracturedMods', 'fractured'], ['enchantMods', 'implicit']];
+function listingScore(li, weights, slot) {
+  if (!weights.length) return null;
+  var byTail = {}, byPseudo = {};
+  weights.forEach(function (x) {
+    if (x.id.indexOf('pseudo.') === 0) byPseudo[x.id] = x.w;
+    else byTail[x.id.split('.').pop().split('|')[0]] = x.w;
+  });
+  var score = 0;
+  LISTING_MOD_KINDS.forEach(function (pair) {
+    (li[pair[0]] || []).forEach(function (raw) {
+      var line = typeof raw === 'string' ? raw : (raw.description || '');
+      if (!line) return;
+      var m = Matcher.matchMod(statIndex, { line: line, kind: pair[1] === 'implicit' ? 'implicit' : 'explicit',
+        crafted: pair[0] === 'craftedMods', fractured: pair[0] === 'fracturedMods' }, slot);
+      if (!m || m.avg === null || m.avg === undefined) return;
+      var tail = m.entry.id.split('.').pop().split('|')[0];
+      if (byTail[tail]) score += m.avg * byTail[tail];
+      if (m.pseudo && byPseudo[m.pseudo.entry.id]) score += m.avg * m.pseudo.multiplier * byPseudo[m.pseudo.entry.id];
+    });
+  });
+  return { pct: score / weights.length, stats: weights.length }; // 100 = as good as the build item
 }
 
 // Max sockets a slot can hold: helm/gloves/boots 4, shield 3, body 6,

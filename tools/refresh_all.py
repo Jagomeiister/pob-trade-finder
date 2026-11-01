@@ -36,6 +36,7 @@ STEPS = [
     [sys.executable, "test/test_diagnostics.py"],
     [sys.executable, "test/test_icon_cache.py"],
     [sys.executable, "test/test_flips.py"],
+    [sys.executable, "test/test_oauth.py"],
     [sys.executable, "test/e2e/run_e2e.py"],  # headless Chrome, stubbed bridge, offline
 ]
 

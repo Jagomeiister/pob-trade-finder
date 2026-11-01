@@ -48,6 +48,7 @@ SHIP = [
     "js/app/14-basket-live.js",
     "js/app/15-price-check.js",
     "js/app/16-overlay.js",
+    "js/app/17-stash.js",
     "data/stats.js",
     "data/leagues.js",
     "data/ranges.js",

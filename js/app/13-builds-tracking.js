@@ -10,6 +10,7 @@
 // changed, with each one's old price from the cost history and the new price once
 // checked. Unchanged slots carry their cost history over to the new version.
 var DIFF_MIN_SAME = 0.4;
+var diffJob = null; // running "Price changed slots" batch: {stopped, i, n}
 var buildDiff = null; // {prevTs, total, rows: [{slot, kind, before, after, oldChaos}]}
 
 function itemSig(it) {
@@ -113,18 +114,26 @@ function renderBuildDiff() {
   var league = document.getElementById('league').value;
   var rows = buildDiff.rows;
   var toPrice = rows.filter(function (r) { var s = diffStateFor(r.slot); return s && s.cheapestChaos === undefined; });
-  var priceBtn = UI.button('secondary', { size: 'sm', label: toPrice.length ? 'Price changed slots (' + toPrice.length + ')' : 'All changed slots priced',
+  // the panel redraws after every price, so the running batch lives in diffJob, not the button
+  var priceBtn = UI.button('secondary', { size: 'sm',
+    label: diffJob ? '■ Stop (' + (diffJob.i + 1) + '/' + diffJob.n + ')'
+      : toPrice.length ? 'Price changed slots (' + toPrice.length + ')' : 'All changed slots priced',
     onClick: async function () {
-      priceBtn.disabled = true;
-      for (var i = 0; i < toPrice.length; i++) {
-        var s = diffStateFor(toPrice[i].slot);
-        if (!s || !buildDiff) break;
-        priceBtn.textContent = 'Checking ' + (i + 1) + '/' + toPrice.length + '…';
-        await checkPrice(s, true);
-      }
+      if (diffJob) { diffJob.stopped = true; priceBtn.textContent = 'Stopping…'; priceBtn.disabled = true; return; }
+      var job = diffJob = { stopped: false, i: 0, n: toPrice.length };
+      try {
+        for (var i = 0; i < toPrice.length && !job.stopped; i++) {
+          if (i) await sleep(BATCH_GAP_MS);
+          var s = diffStateFor(toPrice[i].slot);
+          if (job.stopped || !s || !buildDiff) break;
+          job.i = i;
+          renderBuildDiff();
+          await checkPrice(s, true);
+        }
+      } finally { diffJob = null; }
       renderBuildDiff();
     } });
-  priceBtn.disabled = !toPrice.length || !isGui();
+  priceBtn.disabled = !diffJob && (!toPrice.length || !isGui());
   var close = UI.iconButton('✕', 'Hide the changes list', { size: 'sm', onClick: function () {
     buildDiff = null;
     gearStates().forEach(function (s) { delete s.diffKind; });
@@ -182,12 +191,15 @@ function showLastBuildCost() {
   el.title = 'Cheapest listings for ' + n + ' slot' + (n > 1 ? 's' : '') + '. Check prices to compare with today.';
 }
 
-// ---- saved builds: daily background re-price ----------------------------------------
-// A tracked saved build re-runs, once a day, the searches last run for the slots in its
-// latest cost snapshot (pobtf-history keeps each slot's search) at background pace —
-// the bridge skips them during any rate-limit cooldown — and adds the result to the
-// build's cost history. Optional alert: total at or under a price, once per crossing.
-// lib entry: b.track = {on, below, unit: 'c'|'div', lastRun, last: {ts, total, n}, fired}
+// ---- saved builds: daily re-price reminder ------------------------------------------
+// Searches only ever run because the user clicked: a tracked build gets a reminder once
+// its prices are a day old, and "Re-price now" (on the reminder or the build card)
+// re-runs the searches last run for the slots in its latest cost snapshot (pobtf-history
+// keeps each slot's search), gently paced — the bridge refuses them during any rate-limit
+// cooldown — and adds the result to the build's cost history. Optional alert: total at or
+// under a price, once per crossing. No unattended searches: GGG's Terms of Use (7.6) bar
+// automated data gathering, and the community's line is one server action per user action.
+// lib entry: b.track = {on, below, unit: 'c'|'div', lastRun, remindedAt, last: {ts, total, n, change}, fired}
 var TRACK_EVERY_MS = 24 * 3600 * 1000, trackRunning = false;
 
 function trackableSlots(b) {
@@ -212,40 +224,69 @@ function cheapestChaos(listings, league) {
   return best;
 }
 
-async function runTrackedBuilds() {
-  if (trackRunning || !isGui() || !market) return; // market = chaos rates for every currency
-  var due = loadBuildLib().filter(function (b) {
-    return b.track && b.track.on && Date.now() - (b.track.lastRun || 0) > TRACK_EVERY_MS;
-  })[0];
-  if (!due) return;
-  trackRunning = true;
-  try { await repriceSavedBuild(due); } finally { trackRunning = false; }
+function buildTitle(b) { return String(b.name || 'Saved build').split(' · ')[0]; }
+
+// hourly: tracked builds whose prices are a day old get one reminder (no searches)
+function remindTrackedBuilds() {
+  if (!isGui()) return;
+  var lib = loadBuildLib(), now = Date.now(), changed = false;
+  lib.forEach(function (b) {
+    var t = b.track;
+    if (!t || !t.on || !trackableSlots(b).length) return;
+    if (now - (t.lastRun || 0) < TRACK_EVERY_MS || now - (t.remindedAt || 0) < TRACK_EVERY_MS) return;
+    t.remindedAt = now;
+    changed = true;
+    var msg = 'Prices for ' + buildTitle(b) + ' are ' + (t.lastRun ? 'a day old' : 'not checked yet') + '.';
+    UI.toast('📈 ' + msg, 'info', { timeout: 0, action: { label: 'Re-price now', onClick: function () {
+      repriceSavedBuild(b);
+    } } });
+    if (PREFS.notify !== false && window.pywebview.api.notify && !document.hasFocus()) {
+      window.pywebview.api.notify('Build prices', msg + ' Open PoB Trade Finder to re-price.').then(function () {}, function () {});
+    }
+  });
+  if (changed) saveBuildLib(lib);
 }
 
+// one click → the build's searches, gently paced (the user's action, never a timer's)
 async function repriceSavedBuild(b) {
+  if (trackRunning) { UI.toast('A build is already being re-priced.', 'warn'); return; }
+  if (!isGui()) return;
   var league = document.getElementById('league').value;
   var todo = trackableSlots(b), slots = {}, n = 0;
-  for (var i = 0; i < todo.length; i++) {
-    var r;
-    try { r = await window.pywebview.api.trade_search(league, todo[i].payloadStr, true); }
-    catch (e) { r = { ok: false, error: e.message }; }
-    if (!r || !r.ok) {
-      if (/cooldown|rate limit/i.test((r && r.error) || '')) return; // try again next hour
-      continue;
+  if (!todo.length) { UI.toast('Price ' + buildTitle(b) + ' once first (open it, Check all prices).', 'warn'); return; }
+  trackRunning = true;
+  UI.toast('Re-pricing ' + buildTitle(b) + ': ' + todo.length + ' search' + (todo.length > 1 ? 'es' : '') +
+    ', paced to stay well inside GGG\'s rate limits.', 'info');
+  try {
+    for (var i = 0; i < todo.length; i++) {
+      var r;
+      try { r = await window.pywebview.api.trade_search(league, todo[i].payloadStr, true); }
+      catch (e) { r = { ok: false, error: e.message }; }
+      if (!r || !r.ok) {
+        if (/cooldown|rate limit/i.test((r && r.error) || '')) {
+          UI.toast('Stopped: GGG rate-limit cooldown. Try again in a few minutes.', 'warn');
+          break;
+        }
+        continue;
+      }
+      var c = cheapestChaos(r.listings, league);
+      if (c !== null) { slots[todo[i].sk] = Math.round(c * 10) / 10; n++; }
     }
-    var c = cheapestChaos(r.listings, league);
-    if (c !== null) { slots[todo[i].sk] = Math.round(c * 10) / 10; n++; }
-  }
+  } finally { trackRunning = false; }
   var lib = loadBuildLib();
   var entry = lib.find(function (x) { return x.code === b.code; });
-  if (!entry || !entry.track) return;
-  entry.track.lastRun = Date.now();
+  if (!entry) return;
+  entry.track = entry.track || {};
   if (n) {
+    entry.track.lastRun = Date.now();
     var h = storeCostSnapshot(codeKey(b.code), league, slots);
     var trend = buildCostTrend(h, league);
     var total = 0;
     Object.keys(slots).forEach(function (k) { total += slots[k]; });
     entry.track.last = { ts: Date.now(), total: total, n: n, change: trend ? trend.change : null };
+    UI.toast(buildTitle(b) + ': ' + fmtEq(total, league) + ' for ' + n + ' slot' + (n > 1 ? 's' : '') +
+      (trend && trend.change !== null ? ' (' + (trend.change > 0 ? '+' : '') + (trend.change * 100).toFixed(1) + '% vs last time)' : '') + '.',
+      'success');
     trackAlert(entry, total, league);
   }
   saveBuildLib(lib);
@@ -259,7 +300,7 @@ function trackAlert(entry, total, league) {
   var v = t.unit === 'div' ? (dr ? total / dr : null) : total;
   if (v === null) return;
   var hit = v <= t.below;
-  var name = String(entry.name || 'Saved build').split(' · ')[0];
+  var name = buildTitle(entry);
   if (hit && !t.fired) {
     var msg = name + ' now costs ' + fmtCompact(v) + (t.unit === 'div' ? ' div' : 'c') +
       ' (alert: ' + t.below + (t.unit === 'div' ? ' div' : 'c') + ' or less)';
@@ -274,15 +315,19 @@ function trackAlert(entry, total, league) {
   t.fired = hit;
 }
 
-// inline settings under a saved build card: track daily + optional price alert
+// inline settings under a saved build card: re-price now, daily reminder, price alert
 function trackForm(b, idx) {
   var t = b.track || {};
   var form = UI.el('div', 'track-form');
+  var n = trackableSlots(b).length;
+  var now = UI.button('secondary', { size: 'sm', label: 'Re-price now', onClick: function () { repriceSavedBuild(b); } });
+  now.disabled = !n || !isGui();
+  form.appendChild(now);
   var onLab = UI.el('label', 'check');
   var on = UI.input({ type: 'checkbox' });
   on.checked = !!t.on;
   onLab.appendChild(on);
-  onLab.appendChild(document.createTextNode(' Re-price this build once a day'));
+  onLab.appendChild(document.createTextNode(' Remind me when its prices are a day old'));
   form.appendChild(onLab);
   var row = UI.el('div', 'track-row');
   var below = UI.input({ type: 'number', cls: 'min-input', min: 0, step: 'any', ariaLabel: 'Alert when it costs at most',
@@ -291,11 +336,10 @@ function trackForm(b, idx) {
   UI.field('Alert at or under', below, { parent: row });
   row.appendChild(unit);
   form.appendChild(row);
-  var n = trackableSlots(b).length;
   form.appendChild(UI.el('div', 'finder-sub', n
-    ? 'Re-runs your last search for each of ' + n + ' priced slot' + (n > 1 ? 's' : '') + ' while the app is open, ' +
-      'at a slow pace that never competes with your own searches.'
-    : 'Price this build once first (open it, Check all prices) so tracking knows what to search for.'));
+    ? 'Re-price now re-runs your last search for each of ' + n + ' priced slot' + (n > 1 ? 's' : '') +
+      ', slowly. Nothing is searched without your click; the reminder only tells you it\'s time.'
+    : 'Price this build once first (open it, Check all prices) so it knows what to search for.'));
   form.appendChild(UI.button('primary', { size: 'sm', label: 'Save', onClick: function () {
     var lib = loadBuildLib();
     var e = lib[idx];
@@ -304,9 +348,7 @@ function trackForm(b, idx) {
     e.track = Object.assign(e.track || {}, { on: on.checked, below: isFinite(v) && v > 0 ? v : null, unit: unit.value, fired: false });
     saveBuildLib(lib);
     refreshBuildSelect();
-    UI.toast(on.checked ? 'Tracking ' + String(b.name).split(' · ')[0] + ': the first re-price starts shortly, then once a day.'
-      : 'Tracking off.', 'success');
-    if (on.checked) setTimeout(runTrackedBuilds, 5000);
+    UI.toast(on.checked ? 'Daily reminder on for ' + buildTitle(b) + '.' : 'Reminder off.', 'success');
   } }));
   return form;
 }

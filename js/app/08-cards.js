@@ -614,9 +614,20 @@ function makeToggle(parent, text, checked) {
 }
 
 function makeModeSelect(parent, state) {
-  // "all but one" is the sweet spot for upgrade hunting
-  var sel = UI.select([['0', 'all mods'], ['1', 'all but one'], ['2', 'all but two']], '1');
-  UI.field('Match', sel, { parent: parent });
+  // "all but one" is the sweet spot for upgrade hunting; "weighted" trades stats off
+  // against each other (each ticked mod at the build's roll = 100 points, see buildTradePayload)
+  var sel = UI.select([['0', 'all mods'], ['1', 'all but one'], ['2', 'all but two'],
+                       ['w', 'weighted total (any mix)']], '1');
+  UI.field('Match', sel, { parent: parent, title: 'Weighted total: every ticked mod at your item\'s roll is worth ' +
+    '100 points, and a listing needs the target share of the total. More of one stat can make up for less of another.' });
+  var pct = UI.select([['80', '80%'], ['90', '90%'], ['100', '100%'], ['110', '110%'], ['125', '125%']], '90',
+    { ariaLabel: 'Weighted target' });
+  var pctField = UI.field('Target', pct, { parent: parent,
+    title: 'Share of your item\'s weighted total a listing needs. 100% = as good overall; 110% = an upgrade.' });
+  function sync() { pctField.hidden = sel.value !== 'w'; }
+  sel.addEventListener('change', sync);
+  sync();
+  state.weightPct = pct;
   return sel;
 }
 

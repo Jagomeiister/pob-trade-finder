@@ -31,7 +31,7 @@ function refreshBuildSelect() {
       var meta = UI.el('span', 'saved-track');
       meta.appendChild(document.createTextNode(tr.last
         ? '📈 ' + fmtEq(tr.last.total, league) + ' on ' + fmtShortDate(tr.last.ts / 1000) + ' '
-        : '📈 Tracking daily, first check pending'));
+        : '📈 Daily reminder on, not priced yet'));
       if (tr.last && tr.last.change != null) meta.appendChild(pctChip(tr.last.change, true));
       open.appendChild(meta);
     }
@@ -42,7 +42,7 @@ function refreshBuildSelect() {
     row.appendChild(open);
     var form = trackForm(b, i);
     form.hidden = true;
-    var trackBtn = UI.iconButton('📈', 'Daily price tracking for ' + parts[0], { size: 'sm', onClick: function () {
+    var trackBtn = UI.iconButton('📈', 'Re-price and price reminders for ' + parts[0], { size: 'sm', onClick: function () {
       form.hidden = !form.hidden;
       trackBtn.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
     } });

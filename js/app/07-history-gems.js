@@ -509,11 +509,10 @@ function makeGemsCard(gemGroups) {
   // cheapest listing per gem; group and page totals in the display currency
   async function priceRows(subset, btn, idleLabel) {
     if (!isGui()) return;
-    btn.disabled = true;
+    if (btn._batch) { runBatch(btn, idleLabel); return; } // second click = stop
     var league = document.getElementById('league').value;
-    for (var i = 0; i < subset.length; i++) {
+    await runBatch(btn, idleLabel, subset.length, async function (i) {
       var r = subset[i];
-      btn.textContent = 'Pricing ' + (i + 1) + '/' + subset.length + '…';
       r.priceSpan.textContent = '…';
       r.cheapest = null;
       try {
@@ -530,13 +529,17 @@ function makeGemsCard(gemGroups) {
           r.priceSpan.textContent = '';
           r.priceSpan.appendChild(res.ok ? UI.chip('None listed', 'danger') : UI.chip('Failed', 'danger'));
           if (!res.ok) r.priceSpan.title = res.error || '';
+          if (!res.ok && isCooldownError(res.error)) {
+            UI.toast('Gem pricing stopped: GGG rate-limit cooldown. Try again when it ends.', 'warn');
+            return false;
+          }
         }
       } catch (e) {
         r.priceSpan.textContent = '';
         r.priceSpan.appendChild(UI.chip('Failed', 'danger'));
         r.priceSpan.title = e.message;
       }
-    }
+    });
     // fetch any missing rates once, then total in the display currency
     var needCur = [];
     rows.forEach(function (r) {
@@ -570,8 +573,6 @@ function makeGemsCard(gemGroups) {
     });
     var all = total(rows);
     totalEl.textContent = all ? 'Gems ≈ ' + all : '';
-    btn.textContent = idleLabel;
-    btn.disabled = false;
   }
   priceAll.addEventListener('click', function () { priceRows(rows, priceAll, 'Price all gems'); });
   openAllG.addEventListener('click', function () { openRows(rows); });

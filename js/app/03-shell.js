@@ -181,16 +181,17 @@ var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'pas
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                     timeless: 'Timeless jewels', finder: 'Jewel finder', pasted: 'Pasted item',
-                    planner: 'Upgrade planner', market: 'Market' };
+                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', market: '📈' };
+                   timeless: '⏳', finder: '🔍', market: '📈', stash: '💰' };
 
 function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
 
 function setView(k) {
   document.body.dataset.view = k;
   if (k === 'market') renderMarketPage(); // built lazily: hundreds of rows
+  if (k === 'stash') renderStashPage();
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
     if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -227,7 +228,8 @@ function renderNav() {
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'timeless', 'finder', 'market'].filter(function (k) {
+  ['planner', 'timeless', 'finder', 'market', 'stash'].filter(function (k) {
+    if (k === 'stash') return OAUTH.signedIn; // official login only
     return k === 'planner' || k === 'market' || viewSection(k);
   }).forEach(item);
   setView(document.body.dataset.view || 'gear');

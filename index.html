@@ -143,11 +143,19 @@
       <section class="settings-section gui-only">
         <h3>Account</h3>
         <p class="settings-note">Optional. Your pathofexile.com POESESSID cookie unlocks instant live-search alerts and bigger searches. It is stored only on this PC and sent only to pathofexile.com. Save empty to clear.</p>
+        <p class="settings-note">Worth knowing: this uses the trade site's unofficial endpoints with your session, which Grinding Gear Games doesn't officially support for third-party tools. Many trade tools work this way, but it's at your own risk. Everything else in the app works without it.</p>
         <div class="char-sessid">
           <input type="password" id="sessid-input" aria-label="POESESSID" placeholder="POESESSID">
           <button id="sessid-save" class="btn btn-secondary">Save</button>
         </div>
         <div id="sessid-status"></div>
+        <h4 class="settings-sub">Official Path of Exile login</h4>
+        <p id="oauth-note" class="settings-note">Signing in with GGG's official login lets the app value your stash tabs
+          (Stash value page) through GGG's supported API, with no cookie needed.</p>
+        <div class="settings-row">
+          <button id="oauth-btn" class="btn btn-secondary" disabled>Sign in with Path of Exile</button>
+        </div>
+        <div id="oauth-status" class="settings-note"></div>
       </section>
       <section class="settings-section gui-only">
         <h3>Data and updates</h3>
@@ -164,6 +172,17 @@
         </div>
         <div class="settings-note">Copies the app version, recent errors and log lines, ready to paste into a bug report.
           Your POESESSID and Windows user name are never included.</div>
+      </section>
+      <section class="settings-section">
+        <h3>About</h3>
+        <p class="settings-note">PoB Trade Finder is a free, open-source fan project. This product isn't affiliated with
+          or endorsed by Grinding Gear Games in any way, and no community-made tool is GGG-approved.</p>
+        <p class="settings-note">Price checks use the trade site's unofficial endpoints, gently paced and within the limits
+          the site reports. The Market uses GGG's public currency-exchange feed. Searches only run when you click or press
+          the hotkey: one search per item, and the batch buttons (Check all prices and similar) go one at a time and can be
+          stopped. Whispers and the price-check hotkey do one thing per press and never touch the game itself.</p>
+        <p class="settings-note">Path of Exile and its item art belong to Grinding Gear Games. Timeless jewel data comes from
+          Path of Building (MIT); mod data from RePoE.</p>
       </section>
     </aside>
 
@@ -249,10 +268,13 @@
       </div>
       <div id="market-page" class="market-page"></div>
     </div>
+    <div id="view-stash" class="view-panel">
+      <div id="stash-page"></div>
+    </div>
 
     <div id="results"></div>
 
-    <div class="footer">PoB Trade Finder · data © Grinding Gear Games via the public trade API · not affiliated with GGG</div>
+    <div class="footer">PoB Trade Finder · This product isn't affiliated with or endorsed by Grinding Gear Games in any way. · game data and art © GGG</div>
   </div>
 </div>
 
@@ -308,7 +330,7 @@
   // js/app/: one program split by feature — order matters (docs/DEVELOPER.md)
   var APP = ['01-state', '02-init', '03-shell', '04-library', '05-craft', '06-jewels', '07-history-gems',
              '08-cards', '09-query', '10-character', '11-market', '12-cost', '13-builds-tracking',
-             '14-basket-live', '15-price-check', '16-overlay'];
+             '14-basket-live', '15-price-check', '16-overlay', '17-stash'];
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
    'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/sample.js',
    'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js'].concat(APP.map(function (n) {

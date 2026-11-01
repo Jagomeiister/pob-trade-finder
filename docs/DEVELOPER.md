@@ -54,6 +54,8 @@ index.html + js/*  ──────────────►  any browser   
 | `league_check()` | Live PC trade leagues vs the bundled list (one background call) → new-league banner |
 | `cx_overview(league)` / `cx_history(…)` | Market page: every exchange item, 7 days 6-hourly / one item's 1- or 30-day series (currency feed, no trade quota) |
 | `cx_flips(league)` | Latest hour's chaos-market vs divine-market price per item (`CurrencyFeed.pairs`, `<hour>.pairs.json`) |
+| `oauth_status()` / `oauth_login()` / `oauth_logout()` | Official login (`oauth.py`): GGG's public-client OAuth, PKCE S256, redirect `http://127.0.0.1:8080/callback`, tokens in `data/oauth.json`. Off while `OAUTH_CLIENT_ID` in `gui.py` is empty (GGG isn't accepting new applications) |
+| `stash_value(league)` | Official API (`account:stashes`, `OAuth {clientId}/…` User-Agent): every tab's exchange items valued at the currency feed's prices; other items counted |
 | `diagnostics()` | Bug-report text: version, OS, data dates, log tails; POESESSID, 32-hex tokens and the Windows user name redacted |
 | `check_update()` / `apply_update(url)` | GitHub Releases auto-update (see below) |
 

@@ -47,6 +47,7 @@ function valuePayload(it, slot) {
 
 async function valueMyGear(btn) {
   if (!charGear || !isGui()) return;
+  if (btn._batch) { runBatch(btn); return; } // second click = stop
   var box = document.getElementById('gear-value');
   box.classList.remove('hidden');
   box.textContent = '';
@@ -69,15 +70,17 @@ async function valueMyGear(btn) {
   var totalRow = document.createElement('div');
   totalRow.className = 'cost-row cost-total';
   box.appendChild(totalRow);
-  btn.disabled = true;
-  try {
-    for (var i = 0; i < slots.length; i++) {
+  var idle = btn.textContent;
+  await runBatch(btn, idle, slots.length, async function (i) {
       var s = slots[i], it = charGear[s], amt = rows[s].querySelector('.cost-amt');
       amt.textContent = 'checking…';
       var payload = valuePayload(it, s);
       try {
         var res = await window.pywebview.api.trade_search(league, JSON.stringify(payload));
-        if (!res.ok) { amt.textContent = '❌ ' + String(res.error).slice(0, 60); continue; }
+        if (!res.ok) {
+          amt.textContent = '❌ ' + String(res.error).slice(0, 60);
+          return isCooldownError(res.error) ? false : undefined; // a cooldown ends the batch
+        }
         var curs = [];
         res.listings.forEach(function (li) { if (li.currency && curs.indexOf(li.currency) === -1) curs.push(li.currency); });
         var rates = await craftRates(league, curs);
@@ -101,10 +104,7 @@ async function valueMyGear(btn) {
       }
       totalRow.innerHTML = '<span class="cost-slot">TOTAL</span><span class="cost-item">' + priced + ' of ' +
         slots.length + ' items priced (estimate)</span><span class="cost-amt">' + fmtEq(total, league) + '</span>';
-    }
-  } finally {
-    btn.disabled = false;
-  }
+  });
 }
 var INV_SLOT = { Helm: 'Helmet', BodyArmour: 'Body Armour', Gloves: 'Gloves', Boots: 'Boots',
                  Amulet: 'Amulet', Ring: 'Ring 1', Ring2: 'Ring 2', Belt: 'Belt',

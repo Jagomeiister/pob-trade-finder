@@ -19,8 +19,11 @@ Scenarios (each on a fresh page load with empty localStorage):
   9 flips      — Market chaos/divine gaps: volume/gap filter, min-volume select, error result
   10 diff      — re-importing an edited build lists the changed helmet with its old price, prices
                  it on request; same code / different class show no diff
-  11 track     — saved build daily tracking: background re-price per priced slot, price line,
-                 one alert (toast + notify), no second run within 24 h
+  11 track     — saved build re-pricing: no timer searches, daily reminder, click re-prices, price line,
+                 one alert (toast + notify), Re-price now in the form runs again
+  12 batch     — Check all prices becomes a stop button, a gap between searches, stopping works
+  13 weighted  — weighted-total search (weight group, 90% target), own item scores 100%, value sort
+  14 stash     — official login off by default; signed in: nav entry, Stash value page, one run per click
 
 Run a subset by number or name: python test/e2e/run_e2e.py 3 diff
 
@@ -212,6 +215,9 @@ STUB_JS = r"""
     art_manifest: function () { return { ok: true, art: {} }; },
     cache_art: function () { return { ok: true, art: {} }; },
     diagnostics: function () { return { ok: true, text: D.diagText }; },
+    // official login: GGG hasn't issued a client id, so the real bridge reports it switched off
+    oauth_status: function () { return { ok: true, enabled: false, signedIn: false, username: null }; },
+    stash_value: function () { return { ok: false, error: 'not signed in' }; },
     session_status: function () { return { ok: true, set: false }; },
     timeless_sockets: function () { return { ok: true, sockets: [] }; },
     hotkey_status: function () { return { ok: true, hotkey: 'ctrl+d', label: 'Ctrl+D', running: false, active: false, error: null }; },
@@ -225,7 +231,7 @@ STUB_JS = r"""
       if (typeof name !== 'string' || name === 'then' || name === 'toJSON') return undefined;
       return function () {
         var args = Array.prototype.slice.call(arguments);
-        window.__calls.push({ name: name, args: clone(args), stub: !impl[name] });
+        window.__calls.push({ name: name, args: clone(args), stub: !impl[name], t: Date.now() });
         var over = Object.prototype.hasOwnProperty.call(window.__stubOverrides, name);
         var fn = impl[name];
         return new Promise(function (resolve) {
@@ -661,7 +667,7 @@ return out;
 S11_TRACK = r"""
 const H = window.__e2e;
 const lib = () => JSON.parse(localStorage.getItem('pobtf-builds') || '[]');
-const bell = () => [...document.querySelectorAll('.toast')].filter(t => /🔔/.test(t.textContent)).map(t => t.textContent);
+const toasts = re => [...document.querySelectorAll('.toast')].filter(t => re.test(t.textContent));
 const bg = () => H.calls('trade_search').filter(c => c.args[2] === true);
 await H.loadBuild();
 await H.marketReady();
@@ -677,7 +683,7 @@ const item = () => document.querySelector('#saved-list .saved-item');
 out.landing = H.visible(document.getElementById('input-panel'));
 out.items = document.querySelectorAll('#saved-list .saved-item').length;
 const openForm = async () => {
-  const b = item().querySelector('button[aria-label^="Daily price tracking"]');
+  const b = item().querySelector('button[aria-label^="Re-price and price reminders"]');
   b.click();
   await H.sleep(30);
   return item().querySelector('.track-form');
@@ -688,31 +694,39 @@ out.formNote = H.text('.finder-sub', form);
 form.querySelector('input[type="checkbox"]').checked = true;
 form.querySelector('input[type="number"]').value = '100';
 form.querySelector('select').value = 'c';
-const t0 = Date.now();
 H.button(form, 'Save').click();
-await H.sleep(30);
+await H.sleep(6000); // the old code re-priced ~5 s after Save; nothing may run on its own now
 out.pending = H.text('.saved-track', item());
-out.bgImmediately = bg().length;
-await H.waitFor(() => bg().length >= priced.length && lib()[0].track && lib()[0].track.last, 10000, 'the background re-price');
-await H.waitFor(() => !/pending/.test(H.text('.saved-track', item()) || 'pending'), 2000, 'the tracked price line');
+out.bgAfterSave = bg().length;
+// the hourly reminder: a toast with a button, still no searches
+remindTrackedBuilds();
 await H.sleep(50);
-out.secs = (Date.now() - t0) / 1000;
+const rem = toasts(/Prices for/);
+out.reminders = rem.map(t => t.textContent);
+out.bgAfterReminder = bg().length;
+remindTrackedBuilds(); // a second check within 24 h stays quiet
+await H.sleep(50);
+out.reminders2 = toasts(/Prices for/).length;
+// the user clicks "Re-price now" on the reminder
+H.button(rem[0], 'Re-price now').click();
+await H.waitFor(() => bg().length >= priced.length && lib()[0].track && lib()[0].track.last, 15000, 'the re-price');
+await H.sleep(100);
 out.bg = bg().length;
 out.bgLeague = bg().every(c => c.args[0] === document.getElementById('league').value);
 out.bgSamePayloads = JSON.stringify(bg().map(c => c.args[1]).sort()) === JSON.stringify(fgPayloads);
 out.track = lib()[0].track;
 out.line = H.text('.saved-track', item());
-out.notify = H.calls('notify').map(c => c.args);
-out.bell = bell();
-// saving again within 24 h must not re-price
+out.alertNotify = H.calls('notify').filter(c => c.args[0] === 'Build price alert').length;
+out.bell = toasts(/🔔/).map(t => t.textContent);
+// "Re-price now" in the form: another user click, another round; the alert stays quiet
 form = await openForm();
 out.form2checked = form.querySelector('input[type="checkbox"]').checked;
-H.button(form, 'Save').click();
-await H.sleep(6500);
+H.button(form, 'Re-price now').click();
+await H.waitFor(() => bg().length >= 2 * priced.length, 15000, 'the second re-price');
+await H.sleep(100);
 out.bg2 = bg().length;
-out.notify2 = H.calls('notify').length;
-out.bell2 = bell().length;
-out.lastRun2 = lib()[0].track.lastRun;
+out.alertNotify2 = H.calls('notify').filter(c => c.args[0] === 'Build price alert').length;
+out.bell2 = toasts(/🔔/).length;
 return out;
 """
 
@@ -806,31 +820,31 @@ def scenario_diff(s, tag):
 
 def scenario_track(s, tag):
     s.fresh()
-    r = s.run(S11_TRACK, timeout=60)
+    r = s.run(S11_TRACK, timeout=90)
     check(tag + " build saved", r["saved"] == 1 and r["savedCode"], r)
     check(tag + " landing lists the saved build", r["landing"] and r["items"] == 1, r)
-    check(tag + " tracking form opens", r["formShown"], r)
+    check(tag + " re-price form opens", r["formShown"], r)
     check(tag + " form knows the 3 priced slots", "3 priced slots" in (r["formNote"] or ""), r["formNote"])
-    check(tag + " pending line right after Save", "first check pending" in (r["pending"] or ""), r["pending"])
-    check(tag + " no re-price before the delay", r["bgImmediately"] == 0, r["bgImmediately"])
-    check(tag + " re-price ran within ~6 s", r["secs"] < 8, r["secs"])
-    check(tag + " one background search per priced slot", r["bg"] == 3, r["bg"])
-    check(tag + " background searches repeat the slot searches", r["bgSamePayloads"] and r["bgLeague"])
+    check(tag + " card says the reminder is on", "reminder on" in (r["pending"] or ""), r["pending"])
+    check(tag + " nothing searched on its own after Save", r["bgAfterSave"] == 0, r["bgAfterSave"])
+    check(tag + " reminder toast offers Re-price now", len(r["reminders"]) == 1 and "Re-price now" in r["reminders"][0],
+          r["reminders"])
+    check(tag + " the reminder searches nothing", r["bgAfterReminder"] == 0, r["bgAfterReminder"])
+    check(tag + " one reminder per day", r["reminders2"] == 1, r["reminders2"])
+    check(tag + " click re-prices each priced slot once", r["bg"] == 3, r["bg"])
+    check(tag + " re-price repeats the slot searches", r["bgSamePayloads"] and r["bgLeague"])
     t = r["track"] or {}
     last = t.get("last") or {}
-    check(tag + " track.lastRun and result stored",
-          bool(t.get("lastRun")) and t.get("on") and last.get("n") == 3 and abs((last.get("total") or 0) - 3) < 1e-6,
-          t)
+    check(tag + " result stored", bool(t.get("lastRun")) and t.get("on") and last.get("n") == 3
+          and abs((last.get("total") or 0) - 3) < 1e-6, t)
     check(tag + " alert settings stored", t.get("below") == 100 and t.get("unit") == "c" and t.get("fired") is True, t)
-    check(tag + " saved card shows the tracked price", "📈" in (r["line"] or "") and "pending" not in r["line"],
-          r["line"])
+    check(tag + " saved card shows the price", "📈" in (r["line"] or "") and "not priced" not in r["line"], r["line"])
     check(tag + " alert toast once", len(r["bell"]) == 1 and "now costs" in r["bell"][0], r["bell"])
-    check(tag + " Windows notification once", len(r["notify"]) == 1 and r["notify"][0][0] == "Build price alert",
-          r["notify"])
-    check(tag + " form remembers tracking on", r["form2checked"])
-    check(tag + " no second re-price within 24 h", r["bg2"] == 3 and r["lastRun2"] == t.get("lastRun"),
-          (r["bg2"], r["lastRun2"], t.get("lastRun")))
-    check(tag + " no second alert", r["notify2"] == 1 and r["bell2"] == 1, (r["notify2"], r["bell2"]))
+    check(tag + " alert notification once", r["alertNotify"] == 1, r["alertNotify"])
+    check(tag + " form remembers the reminder", r["form2checked"])
+    check(tag + " Re-price now in the form runs another round", r["bg2"] == 6, r["bg2"])
+    check(tag + " no second alert while still under", r["alertNotify2"] == 1 and r["bell2"] == 1,
+          (r["alertNotify2"], r["bell2"]))
 
 
 # ---- runner -----------------------------------------------------------------------------
@@ -1003,6 +1017,151 @@ def scenario_keyboard(s, tag):
     check(tag + " build still loaded", a["hasBuild"])
 
 
+S12_BATCH = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const btn = document.getElementById('check-all');
+const n = H.gearCards().length;
+const before = H.calls('trade_search').length;
+const t0 = Date.now();
+btn.click();
+await H.waitFor(() => H.calls('trade_search').length >= before + 2, 15000, 'two searches');
+const gap = (H.calls('trade_search')[before + 1].t || Date.now()) - (H.calls('trade_search')[before].t || t0);
+const running = btn.textContent;
+btn.click(); // stop
+const stopping = btn.textContent;
+await H.waitFor(() => btn.textContent === 'Check all prices', 15000, 'the batch to stop');
+await H.sleep(4000); // nothing more may start
+return { n: n, running: running, stopping: stopping, searched: H.calls('trade_search').length - before,
+         gapMs: gap, idle: btn.textContent, disabled: btn.disabled };
+"""
+
+
+def scenario_batch(s, tag):
+    s.fresh()
+    r = s.run(S12_BATCH, timeout=60)
+    check(tag + " button turns into a stop button", r["running"].startswith("■ Stop (") and r["running"].endswith(")"),
+          r["running"])
+    check(tag + " clicking it stops", r["stopping"] == "Stopping…", r["stopping"])
+    check(tag + " stopped after the search in progress", 2 <= r["searched"] <= 3, r["searched"])
+    check(tag + " gap between batch searches", r["gapMs"] >= 2500, r["gapMs"])
+    check(tag + " button back to normal", r["idle"] == "Check all prices" and not r["disabled"], r)
+
+
+S13_WEIGHTED = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+// first rare gear card with a Match select that offers the weighted mode
+const card = H.gearCards().find(c => [...c.querySelectorAll('select')].some(s => [...s.options].some(o => o.value === 'w')) &&
+  cards.find(s => s.card === c).item.mods.some(m => /maximum Life|Resistance/.test(m.line))); // stub listings: life + res
+out.found = !!card;
+if (!card) return out;
+const st = cards.find(s => s.card === card);
+const sel = [...card.querySelectorAll('select')].find(s => [...s.options].some(o => o.value === 'w'));
+const target = st.weightPct;
+out.targetHiddenBefore = target.closest('.field').hidden;
+sel.value = 'w';
+sel.dispatchEvent(new Event('change'));
+out.targetHiddenAfter = target.closest('.field').hidden;
+const before = H.calls('trade_search').length;
+await H.priceCard(card);
+const call = H.calls('trade_search')[before];
+const q = JSON.parse(call.args[1]).query;
+const wg = (q.stats || []).find(g => g.type === 'weight');
+out.weightGroup = wg ? { n: wg.filters.length, min: wg.value.min, weights: wg.filters.map(f => f.value.weight) } : null;
+out.otherGroups = (q.stats || []).filter(g => g.type !== 'weight').map(g => ({ type: g.type, n: g.filters.length }));
+// the build item itself scores 100% on its own weights
+const mods = st.item.mods;
+const own = { implicitMods: mods.filter(m => m.kind === 'implicit').map(m => m.line),
+              explicitMods: mods.filter(m => m.kind !== 'implicit' && !m.crafted && !m.fractured).map(m => m.line),
+              craftedMods: mods.filter(m => m.crafted).map(m => m.line),
+              fracturedMods: mods.filter(m => m.fractured).map(m => m.line) };
+const s = listingScore(own, st.priceState.weights, st.slot);
+out.ownPct = s && s.pct;
+out.weightsN = st.priceState.weights.length;
+out.scores = [...card.querySelectorAll('.listing .listing-score')].map(e => e.textContent);
+// best value first: ascending price per %
+await H.sleep(200);
+const vbtn = H.button(card, 'Best value first');
+out.hasValueBtn = !!vbtn;
+vbtn.click();
+await H.sleep(300);
+out.values = [...card.querySelectorAll('.card-side .listing')].map(e => parseFloat(e.dataset.value));
+out.valueBtnOn = !!H.button(card, '✓ Best value first');
+return out;
+"""
+
+
+def scenario_weighted(s, tag):
+    s.fresh()
+    r = s.run(S13_WEIGHTED, timeout=60)
+    if not check(tag + " a rare card offers weighted mode", r.get("found"), r):
+        return
+    check(tag + " target only shows in weighted mode", r["targetHiddenBefore"] and not r["targetHiddenAfter"], r)
+    wg = r.get("weightGroup")
+    if not check(tag + " search has a weight group of 2+ stats", wg and wg["n"] >= 2, r.get("weightGroup")):
+        return
+    check(tag + " target = 90% of 100 per stat", wg["min"] == round(wg["n"] * 100 * 0.9), wg)
+    check(tag + " every weight positive", all(w > 0 for w in wg["weights"]), wg["weights"])
+    check(tag + " your own item scores 100%", r["ownPct"] is not None and abs(r["ownPct"] - 100) < 1.5, r["ownPct"])
+    check(tag + " listings show a score", len(r["scores"]) == 10 and all("% of your item" in x for x in r["scores"]),
+          r["scores"][:3])
+    vals = [v for v in r["values"] if v is not None]  # unpriced / unscored listings come back as null
+    check(tag + " best value first sorts by price per %", r["hasValueBtn"] and r["valueBtnOn"] and len(vals) >= 2
+          and vals == sorted(vals), r["values"])
+
+
+S14_STASH = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const navHas = () => [...document.querySelectorAll('#nav .nav-item')].some(b => b.dataset.view === 'stash');
+const out = {};
+// default: no client id from GGG -> switched off
+out.offNote = H.text('#oauth-status');
+out.offBtnDisabled = document.getElementById('oauth-btn').disabled;
+out.offNav = navHas();
+// once GGG issues a client id and the user signs in
+window.__stubOverrides.oauth_status = { ok: true, enabled: true, signedIn: true, username: 'Exile#1234' };
+window.__stubOverrides.stash_value = { ok: true, hour: 1793448000, total: 4300, divine: 200,
+  tabs: [{ name: 'Cards', type: 'DivinationCardStash', total: 3000, items: 1, unvalued: 0 },
+         { name: 'Currency', type: 'CurrencyStash', total: 1300, items: 2, unvalued: 0 },
+         { name: 'Maps', type: 'MapStash', total: 0, items: 2, unvalued: 2 }],
+  top: [{ name: 'The Doctor', qty: 2, each: 1500, total: 3000 }, { name: 'Chaos Orb', qty: 500, each: 1, total: 500 }],
+  unvalued: 2 };
+await refreshOAuth();
+out.onNote = H.text('#oauth-status');
+out.onBtn = document.getElementById('oauth-btn').textContent;
+out.onNav = navHas();
+[...document.querySelectorAll('#nav .nav-item')].find(b => b.dataset.view === 'stash').click();
+await H.sleep(50);
+out.view = document.body.dataset.view;
+out.visible = H.visible(document.getElementById('view-stash'));
+H.button(document.getElementById('stash-page'), 'Value my stash').click();
+await H.waitFor(() => document.querySelector('#stash-page .stash-total'), 5000, 'the stash total');
+out.calls = H.calls('stash_value').map(c => c.args[0]);
+out.total = H.text('#stash-page .stash-total');
+out.tabs = [...document.querySelectorAll('#stash-page table')].map(t => t.querySelectorAll('tbody tr').length);
+out.history = JSON.parse(localStorage.getItem('pobtf-networth') || '[]').length;
+return out;
+"""
+
+
+def scenario_stash(s, tag):
+    s.fresh()
+    r = s.run(S14_STASH, timeout=60)
+    check(tag + " off until GGG issues a client id", "Not available yet" in (r["offNote"] or "") and r["offBtnDisabled"]
+          and not r["offNav"], r)
+    check(tag + " signed in: status + sign-out button", "Signed in as Exile#1234" in (r["onNote"] or "")
+          and r["onBtn"] == "Sign out", r)
+    check(tag + " Stash value appears in the nav only when signed in", r["onNav"])
+    check(tag + " opens the Stash value page", r["view"] == "stash" and r["visible"], r)
+    check(tag + " one click = one stash_value call for the league", len(r["calls"]) == 1, r["calls"])
+    check(tag + " total shown", (r["total"] or "").startswith("4300"), r["total"])
+    check(tag + " tab and item tables", r["tabs"] == [3, 2], r["tabs"])
+    check(tag + " run saved for the chart", r["history"] == 1, r["history"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -1015,6 +1174,9 @@ SCENARIOS = [
     ("9 flips", scenario_flips),
     ("10 diff", scenario_diff),
     ("11 track", scenario_track),
+    ("12 batch", scenario_batch),
+    ("13 weighted", scenario_weighted),
+    ("14 stash", scenario_stash),
 ]
 
 

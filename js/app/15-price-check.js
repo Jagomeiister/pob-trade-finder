@@ -9,6 +9,7 @@ async function checkPrice(state, quiet) {
   var payload = null;
   try { payload = buildTradePayload(state, quiet); } catch (e) { /* stale card after re-render */ }
   if (!payload) return;
+  var weights = (!state.gemSpec && !state.customPayload && state.lastWeights) || []; // this search's score scale
   var league = document.getElementById('league').value;
   var payloadStr = JSON.stringify(payload);
   // request generation token: rapid sort clicks race — only the newest wins
@@ -24,7 +25,7 @@ async function checkPrice(state, quiet) {
       if (showCooldown(box, res.error, function () { checkPrice(state, quiet); })) { state.priceState = null; return; }
       box.textContent = '❌ ' + res.error +
         (/complex/i.test(res.error || '') && !HAS_SESSION
-          ? ' — flexible-resistance checks need a saved POESESSID (higher query budget); the trade-site link works while logged in there.'
+          ? ' — weighted and flexible-resistance searches need a saved POESESSID (higher query budget); the trade-site link works while logged in there.'
           : '');
       state.priceState = null; // stop the sold watcher polling a dead panel
       return;
@@ -39,7 +40,8 @@ async function checkPrice(state, quiet) {
       // freeze the query the listings came from — the sold watcher must
       // validate against THIS, not whatever the controls say later
       payloadStr: payloadStr,
-      league: league
+      league: league,
+      weights: weights
     };
     renderListings(state);
     ensureSoldWatcher();
@@ -116,6 +118,19 @@ function renderListings(state) {
   var label = document.createElement('span');
   label.textContent = ps.total + ' listed';
   head.appendChild(label);
+  if (ps.weights && ps.weights.length) {
+    // client-side: this page by price per % of your item (lower = more stats per chaos)
+    var vbtn = UI.button(state.valueSort ? 'secondary' : 'ghost', { size: 'sm', cls: 'value-sort',
+      label: state.valueSort ? '✓ Best value first' : 'Best value first',
+      title: 'Sort this page by price per % of your item: the most stats for the chaos first' });
+    vbtn.setAttribute('aria-pressed', state.valueSort ? 'true' : 'false');
+    vbtn.addEventListener('click', function () {
+      state.valueSort = !state.valueSort;
+      renderListings(state);
+      annotateChaosEq(state);
+    });
+    head.appendChild(vbtn);
+  }
   if (state.sortSpec) {
     var chip = document.createElement('span');
     chip.className = 'sort-chip';
@@ -173,6 +188,21 @@ function renderListings(state) {
     foot.appendChild(bottomNav);
     box.appendChild(foot);
   }
+}
+
+// "Best value first": reorder this page's listings by price per % of your item (lowest
+// first); listings without a price or a score keep their order at the end
+function sortListingsByValue(box) {
+  var els = Array.prototype.slice.call(box.querySelectorAll(':scope > .listing'));
+  if (els.length < 2) return;
+  var anchor = els[els.length - 1].nextSibling;
+  els.map(function (el, i) { return { el: el, i: i, v: parseFloat(el.dataset.value) }; })
+    .sort(function (a, b) {
+      var av = isFinite(a.v), bv = isFinite(b.v);
+      if (av && bv) return a.v - b.v || a.i - b.i;
+      return av ? -1 : bv ? 1 : a.i - b.i;
+    })
+    .forEach(function (x) { box.insertBefore(x.el, anchor); });
 }
 
 // stat-id tails of the mods a search filtered on — used to highlight them on listings
@@ -481,12 +511,21 @@ function listingCard(li, tails, state) {
     amt.dataset.amount = li.amount;
     amt.dataset.currency = li.currency;
   }
+  // score vs the build item on the searched stats (per-chaos value added by annotateChaosEq)
+  var ws = state && state.priceState && state.priceState.weights;
+  var sc = ws && ws.length ? listingScore(li, ws, state.slot) : null;
+  if (sc) {
+    card.dataset.score = sc.pct;
+    var scoreEl = UI.el('div', 'listing-score', Math.round(sc.pct) + '% of your item');
+    scoreEl.title = 'On the ' + sc.stats + ' stat' + (sc.stats > 1 ? 's' : '') + ' searched, each worth 100% at your item\'s roll';
+  }
   // price type: ~b/o = buyout, ~price = fixed, neither = negotiable
   var ptype = document.createElement('span');
   ptype.className = 'ptype';
   ptype.textContent = li.priceType === '~price' ? 'fixed' : (li.priceType === '~b/o' ? 'b/o' : (priced ? '' : 'negotiable'));
   if (ptype.textContent) amt.appendChild(ptype);
   side.appendChild(amt);
+  if (scoreEl) side.appendChild(scoreEl);
   var instant = li.fee !== null && li.fee !== undefined;
   if (instant) {
     var feeEl = document.createElement('div');
@@ -570,21 +609,54 @@ async function sendPoeChat(btn, text, restoreLabel) {
   setTimeout(function () { btn.textContent = restoreLabel; btn.disabled = false; }, ok ? 1200 : 3000);
 }
 
+// ---- batch searches: one click, several searches ----------------------------------
+// Check all prices, Price changed slots, gem pricing and Value my gear run one search at
+// a time with an extra gap on top of the bridge's rate-limit pacing, and the same button
+// stops them. A rate-limit cooldown ends the batch instead of queueing behind it.
+var BATCH_GAP_MS = 3000;
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+// step(i) → false stops early. Clicking btn again while it runs stops after the current search.
+async function runBatch(btn, idleLabel, count, step) {
+  if (btn._batch) {
+    btn._batch.stopped = true;
+    btn.textContent = 'Stopping…';
+    btn.disabled = true;
+    return;
+  }
+  var job = btn._batch = { stopped: false };
+  btn.disabled = false;
+  btn.title = 'Click to stop';
+  try {
+    for (var i = 0; i < count && !job.stopped; i++) {
+      if (i) await sleep(BATCH_GAP_MS);
+      if (job.stopped) break;
+      btn.textContent = '■ Stop (' + (i + 1) + '/' + count + ')';
+      if (await step(i) === false) break;
+    }
+  } finally {
+    btn._batch = null;
+    btn.disabled = false;
+    btn.title = '';
+    btn.textContent = idleLabel;
+  }
+}
+
+function isCooldownError(msg) { return /cooldown|rate limit/i.test(msg || ''); }
+
 async function checkAllPrices() {
   if (!isGui()) { UI.toast('Live price checking needs the desktop app (run PoB Trade Finder.bat).', 'warn'); return; }
   var btn = document.getElementById('check-all');
-  btn.disabled = true;
   var snapshot = cards; // renderBuild() replaces `cards` if the user switches gear set mid-scan
-  try {
-    for (var i = 0; i < snapshot.length; i++) {
-      if (cards !== snapshot) break; // build/set changed — stale cards, stop
-      btn.textContent = 'Checking ' + (i + 1) + '/' + snapshot.length + '…';
-      await checkPrice(snapshot[i], true); // Python bridge throttles between API calls
+  await runBatch(btn, 'Check all prices', snapshot.length, async function (i) {
+    if (cards !== snapshot) return false; // build/set changed — stale cards, stop
+    await checkPrice(snapshot[i], true);
+    var st = snapshot[i].priceBox && snapshot[i].priceBox.textContent;
+    if (isCooldownError(st) && !snapshot[i].priceState) {
+      UI.toast('Check all prices stopped: GGG rate-limit cooldown. Try again when it ends.', 'warn');
+      return false;
     }
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Check all prices';
-  }
+  });
 }
 
 // ---- refresh bundled trade data (desktop app only) -----------------------------

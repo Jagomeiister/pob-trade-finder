@@ -76,5 +76,41 @@ check("exalted divine-market volume in chaos", PD["items"][EX]["d"][1], 600, 0)
 check("no-trade hour has no market entry", 1 if THIN not in PD["items"] else 0, 1, 0)
 check("divine-only item has only a divine market", 1 if list(PD["items"][MIRROR]) == ["d"] else 0, 1, 0)
 
+# polling the newest hour (GGG: the running hour is never available; once you have the
+# newest hour, wait for the next hourly boundary before asking again)
+import currency_feed as cf  # noqa: E402
+
+
+class ProbeFeed(cf.CurrencyFeed):
+    def __init__(self, published):
+        super().__init__(None, "test")
+        self.published, self.asked = published, []
+
+    def snapshot(self, hour):
+        self.asked.append(hour)
+        return {} if hour in self.published else None
+
+
+T0 = 1793448000  # an hour boundary
+clock = [T0 + 20 * 60]  # 20 minutes into hour T0
+cf.time.time = lambda: clock[0]
+feed = ProbeFeed({T0 - HOUR, T0 - 2 * HOUR})
+check("newest = the hour before the running one", feed.latest_hour(), T0 - HOUR, 0)
+check("the running hour is never requested", 1 if T0 not in feed.asked else 0, 1, 0)
+feed.asked = []
+clock[0] = T0 + 59 * 60
+feed.latest_hour()
+check("no requests before the next boundary", len(feed.asked), 0, 0)
+clock[0] = T0 + HOUR + 2 * 60  # past the boundary, but GGG hasn't published T0 yet
+feed.latest_hour()
+check("past the boundary: looks for the new hour once", 1 if feed.asked[:1] == [T0] else 0, 1, 0)
+feed.asked = []
+clock[0] += 5 * 60
+feed.latest_hour()
+check("not out yet: waits the retry interval", len(feed.asked), 0, 0)
+feed.published.add(T0)
+clock[0] += 6 * 60
+check("picks it up on the retry", feed.latest_hour(), T0, 0)
+
 print("\nALL TESTS PASSED" if not failures else "\n%d FAILED" % failures)
 sys.exit(1 if failures else 0)

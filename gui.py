@@ -25,10 +25,16 @@ import price_hotkey
 from currency_feed import CurrencyFeed
 from timeless import TimelessData
 from art_cache import ArtCache
+import oauth
 
-VERSION = "2.0.4"
+VERSION = "2.0.5"
 GITHUB_OWNER = "Jagomeiister"
 GITHUB_REPO = "pob-trade-finder"
+CONTACT = "https://github.com/%s/%s/issues" % (GITHUB_OWNER, GITHUB_REPO)
+# Official OAuth client id from GGG (public client, redirect http://127.0.0.1:8080/callback).
+# Empty = official login switched off: GGG isn't accepting new applications yet. Once one
+# is issued, set it here and stash value + official character access turn on (oauth.py).
+OAUTH_CLIENT_ID = ""
 
 # Frozen (PyInstaller) exe lives next to index.html/js/data — same layout as source
 if getattr(sys, "frozen", False):
@@ -36,7 +42,9 @@ if getattr(sys, "frozen", False):
 else:
     APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(APP_DIR, "data")
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PoB-Trade-Finder/1.0"
+# GGG's developer docs ask every client to identify itself with a version and a contact.
+# Not "OAuth {clientId}/…": this app has no registered OAuth client, so it doesn't claim one.
+UA = "PoBTradeFinder/%s (contact: %s)" % (VERSION, CONTACT)
 TRADE_BASE = "https://www.pathofexile.com/api/trade"
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
@@ -72,9 +80,7 @@ class Api:
         self._blocked_until = 0.0  # global hold-off from 429s / quota headers
         self._err_times = []  # recent 4xx timestamps — GGG restricts clients that burst errors
         self._rate_cache = {}  # league -> {currency: (chaos_rate, fetched_at)}
-        self._feed = CurrencyFeed(os.path.join(DATA_DIR, "cx_cache"),
-                                  "PoBTradeFinder/%s (+https://github.com/%s/%s)"
-                                  % (VERSION, GITHUB_OWNER, GITHUB_REPO))
+        self._feed = CurrencyFeed(os.path.join(DATA_DIR, "cx_cache"), UA)
         try:
             with open(os.path.join(DATA_DIR, "currencymap.json"), "r", encoding="utf-8") as f:
                 self._currency_map = json.load(f)  # trade code -> {id, name, img}
@@ -97,8 +103,9 @@ class Api:
                 self._icon_meta = json.load(f)
         except Exception:
             self._icon_meta = {}
-        self._art = ArtCache(DATA_DIR, "PoBTradeFinder/%s (+https://github.com/%s/%s)"
-                             % (VERSION, GITHUB_OWNER, GITHUB_REPO))
+        self._art = ArtCache(DATA_DIR, UA)
+        self._oauth = oauth.OAuth(OAUTH_CLIENT_ID, VERSION, CONTACT, os.path.join(DATA_DIR, "oauth.json"),
+                                  open_url=webbrowser.open)
         self._session_path = os.path.join(DATA_DIR, "session.json")
         self._poesessid = ""
         try:
@@ -154,7 +161,7 @@ class Api:
     BG_INTERVAL = 6.0  # background (icon prefetch) calls pace far gentler
     ERR_BURST, ERR_WINDOW, ERR_HOLD = 5, 60.0, 60.0  # 5 errors in 60s -> 60s pause
 
-    def _http(self, url, payload=None, background=False):
+    def _http(self, url, payload=None, background=False, extra_headers=None):
         with self._lock:
             now = time.time()
             hold = self._blocked_until - now
@@ -174,9 +181,12 @@ class Api:
         data = json.dumps(payload).encode() if payload is not None else None
         headers = {"User-Agent": UA, "Content-Type": "application/json"}
         # logged-in trade requests get higher rate and query-complexity budgets
-        # (needed for weight-group searches); cookie goes only to pathofexile.com
-        if self._poesessid and "pathofexile.com" in url:
+        # (needed for weight-group searches); the cookie goes only to the trade site's
+        # host — never to api.pathofexile.com, which takes the official OAuth token
+        if self._poesessid and urllib.parse.urlsplit(url).hostname == "www.pathofexile.com":
             headers["Cookie"] = "POESESSID=" + self._poesessid
+        if extra_headers:
+            headers.update(extra_headers)
         req = urllib.request.Request(url, data=data, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -988,6 +998,75 @@ class Api:
             return {"ok": False, "error": str(e)}
 
     # -- rate-limit visibility -------------------------------------------------------
+    # -- official login (OAuth, see oauth.py) + stash value -------------------------------
+    def oauth_status(self):
+        try:
+            return dict(ok=True, **self._oauth.status())
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def oauth_login(self):
+        try:
+            return dict(ok=True, **self._oauth.login())
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def oauth_logout(self):
+        self._oauth.logout()
+        return {"ok": True}
+
+    def _oauth_state_text(self):
+        oa = getattr(self, "_oauth", None)
+        st = oa.status() if oa else {"enabled": False}
+        return "not available yet" if not st["enabled"] else "signed in" if st["signedIn"] else "signed out"
+
+    def _api_get(self, path):
+        """GET on api.pathofexile.com with the official token and the OAuth User-Agent the
+        docs require; same rate-limit handling as every other call."""
+        token = self._oauth.access_token()
+        if not token:
+            raise RuntimeError("not signed in")
+        try:
+            return self._http(oauth.API_BASE + path, extra_headers={
+                "Authorization": "Bearer " + token, "User-Agent": self._oauth.user_agent})
+        except RuntimeError as e:
+            if str(e).startswith("HTTP 401"):
+                self._oauth.token_rejected()
+                raise RuntimeError("your official login expired — sign in again")
+            raise
+
+    def stash_value(self, league):
+        """Value every stash tab in a league with the official API (scope account:stashes):
+        exchange items (currency, fragments, scarabs, essences, cards…) at the currency
+        feed's chaos prices; other items are counted, not guessed. One click = one run."""
+        try:
+            q = urllib.parse.quote(league, safe="")
+            tabs = self._api_get("/stash/%s" % q).get("stashes") or []
+            by_name, ids = {}, set()
+            for code, m in self._currency_map.items():
+                by_name.setdefault(m["name"].lower(), m["id"])
+                ids.add(m["id"])
+            rates, hour = self._feed.rates(league, sorted(ids))
+            out_tabs, all_items = [], []
+            for tab in tabs:
+                if (tab.get("metadata") or {}).get("folder") or tab.get("children"):
+                    continue  # folders and container tabs: their sub-tabs are listed separately
+                path = "/stash/%s/%s" % (q, tab["parent"] + "/" + tab["id"] if tab.get("parent") else tab["id"])
+                stash = self._api_get(path).get("stash") or {}
+                if tab.get("parent"):  # a sub-tab comes back wrapped in its parent
+                    stash = next((c for c in stash.get("children") or [] if c.get("id") == tab["id"]), stash)
+                items = stash.get("items") or []
+                total, lines, unvalued = oauth.value_items(items, by_name, rates)
+                all_items.extend(items)
+                out_tabs.append({"name": tab.get("name", ""), "type": tab.get("type", ""), "total": round(total, 1),
+                                 "items": len(items), "unvalued": unvalued})
+            total, lines, unvalued = oauth.value_items(all_items, by_name, rates)
+            return {"ok": True, "hour": hour, "total": round(total, 1), "divine": rates.get(
+                        self._currency_map.get("divine", {}).get("id")),
+                    "tabs": sorted(out_tabs, key=lambda t: -t["total"]), "top": lines[:40], "unvalued": unvalued}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     def rate_status(self):
         hold = max(0.0, self._blocked_until - time.time())
         return {"ok": True, "cooldownSeconds": int(hold)}
@@ -1002,9 +1081,12 @@ class Api:
             return []
 
     def _redact(self, text):
-        """Never hand out the session cookie, other 32-hex tokens or the Windows user name."""
+        """Never hand out the session cookie, OAuth tokens, other 32-hex tokens or the Windows user name."""
         if self._poesessid:
             text = text.replace(self._poesessid, "<POESESSID>")
+        oa = getattr(self, "_oauth", None)
+        for secret in (oa.secrets() if oa else []):
+            text = text.replace(secret, "<token>")
         text = re.sub(r"\b[0-9a-fA-F]{32}\b", "<redacted>", text)
         return re.sub(r"(?i)([a-z]:\\users\\)[^\\/\s]+", r"\1<user>", text)
 
@@ -1023,6 +1105,7 @@ class Api:
                      "Python %s · pywebview %s" % (platform.python_version(), pywebview_v),
                      "App folder writable: %s" % os.access(APP_DIR, os.W_OK),
                      "POESESSID saved: %s" % ("yes" if self._poesessid else "no"),
+                     "Official login: %s" % self._oauth_state_text(),
                      "Rate-limit cooldown: %ds" % max(0, int(self._blocked_until - time.time()))]
             for name in ("stats.json", "leagues.json", "currencymap.json"):
                 p = os.path.join(DATA_DIR, name)

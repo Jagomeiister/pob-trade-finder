@@ -57,5 +57,28 @@ From source: `pip install pywebview`, then `python gui.py`.
 | Run tests | `node test/test.js` (+ `test_craft.js`, `test_jewels.js`, `test_contrast.js`, and the `test/*.py` suites) |
 | Release | bump `VERSION` in `gui.py` → `python tools/build_release.py` → `gh release create v{V} dist/PoBTradeFinder-v{V}.zip` |
 
-PoE 1 only for now. Not affiliated with Grinding Gear Games. Mod range data via
-[RePoE](https://repoe-fork.github.io/). MIT licensed.
+PoE 1 only for now. MIT licensed.
+
+### Not affiliated with GGG
+
+**This product isn't affiliated with or endorsed by Grinding Gear Games in any way.** It's
+a free fan project, and no community-made tool is GGG-approved. Path of Exile and its
+item art belong to GGG. How the app behaves toward GGG's services:
+
+- **Price checks** use the trade site's unofficial endpoints (as other trade tools do),
+  identify the app in their User-Agent, and follow the rate limits the site reports.
+  GGG doesn't officially support these endpoints for third-party tools.
+- **Searches only run when you act:** one search per click or hotkey press. Batch buttons
+  (Check all prices and similar) go one search at a time with a gap between them and
+  can be stopped. Saved-build price tracking only *reminds* you; it never searches
+  on a timer.
+- **Whispers and the in-game hotkey** do one thing per press (one chat line, one Ctrl+C)
+  and never read or change the game's memory.
+- **The Market** uses GGG's public, documented currency-exchange feed.
+- **POESESSID** (optional) stays on your PC and is sent only to pathofexile.com.
+- **Official login (coming):** the app has GGG's documented OAuth sign-in built in (public
+  client, PKCE, local callback) for stash value, switched off until GGG issues it a
+  client id. GGG isn't accepting new applications at the moment.
+
+Timeless jewel data from [Path of Building](https://github.com/PathOfBuildingCommunity/PathOfBuilding)
+(MIT); mod range data via [RePoE](https://repoe-fork.github.io/).

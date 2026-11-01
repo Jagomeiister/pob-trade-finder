@@ -26,12 +26,13 @@ The start screen has one big paste box.
 - **Or paste a link** — pobb.in, pastebin, and poe.ninja/pob links are fetched for you
 - **Saved builds** appear as cards under the paste box: click one to load it, 🗑 to
   delete it (it asks first). Save the current build with **☆ Save** in the sidebar
-- **📈 Daily price tracking** (on a saved build card): tick *Re-price this build once a
-  day* and optionally set *Alert at or under* a price. While the app is open, once a day
-  it re-runs your last search for each slot you priced, slowly and never during a
-  rate-limit cooldown, and the card shows the total and the change. When the total drops
-  to your price you get a message and a Windows notification. Price the build once first
-  (**Check all prices**) so it knows what to search for
+- **📈 Re-pricing a saved build** (on a saved build card): **Re-price now** re-runs your
+  last search for each slot you priced, slowly, and the card shows the total and the
+  change. Tick *Remind me when its prices are a day old* for a daily reminder (in the app,
+  plus a Windows notification when it's in the background) with a **Re-price now**
+  button. Optionally set *Alert at or under* a price: when a re-price comes in at or
+  under it, you get a message. Nothing is searched on a timer, only when you click. Price
+  the build once first (**Check all prices**) so it knows what to search for
 - **Loading a newer version of a build** (same class, most items the same): a **Changed
   since the version you loaded…** list appears above the gear. For each changed slot it
   shows what changed (the item, or the mod lines added and removed), what it cost when you
@@ -76,7 +77,10 @@ Once a build loads, the window has three parts:
 | **Pseudo totals** | Folds life/resist/attribute rolls into pseudo stats so hybrid-rolled items still match — finds strictly more items, recommended on |
 
 **Open all searches** opens every slot's search in browser tabs; **Check all prices**
-live-prices every slot in sequence (rate-limit safe).
+live-prices every slot one at a time, with a short gap between searches. Click it again
+(**■ Stop**) to stop after the current one. It also stops by itself if GGG's rate-limit
+cooldown starts. *Price changed slots*, *Price all gems* and *Value my gear* work the
+same way.
 
 **Market** (sidebar, or click the Divine Orb tile) covers every item traded on GGG's
 currency exchange in your league, around 480 of them: currency, fossils, essences, oils,
@@ -146,7 +150,14 @@ how many you've changed from the defaults, e.g. *More filters · 2 changed*:
 - **Search by** — how strictly to match the base: *this base* (default for weapons),
   *any base with the same defences* (e.g. any pure-ES helmet), *any weapon of that class*
   (e.g. any wand), or *any base* for the slot. Broader searches usually find cheaper items
-- **Match** — *all mods* / *all but one* (default — upgrades usually miss one mod) / *all but two*
+- **Match** — *all mods* / *all but one* (default — upgrades usually miss one mod) / *all but two* /
+  **weighted total (any mix)**: every ticked mod is worth 100 points at your item's roll,
+  and a listing needs the **Target** share of the total (90% by default; 110% = an
+  upgrade). More of one stat makes up for less of another, e.g. +20 life can cover a
+  weaker resistance. Mods without a number (and "lower is better" ones) stay required.
+  This is how Path of Building's own trade search weighs stats, without its DPS engine.
+  In-app checks of weighted searches need a saved POESESSID (bigger query budget); the
+  trade-site link works while you're logged in there
 - **Require influence** — on by default when the build item is influenced (the mod pool needs it)
 - **Flexible resistances (any split)** — on cards with 2+ resistance mods: match the
   *combined* total instead of each roll separately (a 75% total split 20/55 matches a
@@ -183,6 +194,10 @@ filters still apply.
 - **Click any mod line to re-sort all results by it** (server-side — ranks every listing,
   not just the visible page); the active sort shows as a chip with ✕ to clear
 - **10 listings per page**, Prev/Next above *and* below (up to the first 100)
+- **"% of your item"** under each price: how the listing compares with your build item
+  on the stats you searched (each worth 100% at your item's roll), then **price per %**.
+  **Best value first** (above the listings) re-sorts the page so the most stats per chaos
+  come first
 
 While a results panel is open, the app **re-checks it every 60s** and greys out anything
 **sold / delisted** until you press Check price again.
@@ -469,6 +484,18 @@ Everything works from the keyboard: Tab moves between controls, arrows move thro
 slot list, menus and Off / Want / Must switches, and Esc closes menus, pop-ups and panels.
 
 All preferences persist across launches and updates.
+
+### 7d. Official Path of Exile login and Stash value (coming)
+
+**⚙ Settings → Account → Official Path of Exile login** signs in through GGG's own login
+page in your browser (the app never sees your password). Once signed in, **Stash value**
+appears in the sidebar under Tools: **Value my stash** values every tab in the selected
+league (currency, fragments, scarabs, essences, divination cards and other exchange items
+at the hourly exchange prices; gear, gems and maps are counted, not priced), lists the
+most valuable items and charts each run over time.
+
+It's built to GGG's developer rules but **switched off for now**: GGG isn't accepting new
+apps for its official login, and it turns on in an update once they approve this one.
 
 ## 8. Rate limits
 

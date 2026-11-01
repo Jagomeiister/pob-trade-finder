@@ -902,6 +902,19 @@ async function annotateChaosEq(state) {
       }
     });
   }
+  // value: price per % of your item (from the listing score), and the optional page sort
+  priced.forEach(function (p) {
+    var listing = p.el.closest('.listing');
+    var pct = listing && parseFloat(listing.dataset.score);
+    if (!listing || !(pct > 0)) return;
+    var per = p.chaos / pct;
+    listing.dataset.value = per;
+    var scoreEl = listing.querySelector('.listing-score');
+    if (scoreEl && !scoreEl.querySelector('.listing-value')) {
+      scoreEl.appendChild(UI.el('span', 'listing-value', ' · ' + fmtEq(per, league) + ' per %'));
+    }
+  });
+  if (state.valueSort) sortListingsByValue(state.priceBox);
   // pasted / Ctrl+D items: you're selling — suggest a list price from the cheapest page
   var psSell = state.priceState;
   if (state === pastedState && psSell && !state.sortSpec) {

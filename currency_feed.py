@@ -139,7 +139,7 @@ def pair_digest(raw):
 
 class CurrencyFeed:
     PACE = 1.0          # seconds between feed downloads (a CDN, but be polite)
-    LATEST_TTL = 600    # re-probe for a newer hour every 10 minutes
+    LATEST_TTL = 600    # newest hour not out yet after its boundary: look again in 10 minutes
     KEEP_DAYS = 45
 
     def __init__(self, cache_dir, user_agent):
@@ -148,7 +148,7 @@ class CurrencyFeed:
         self._net_lock = threading.Lock()
         self._last_call = 0.0
         self._mem = {}            # hour -> distilled (or None = unpublished)
-        self._latest = (0, 0.0)   # (hour, checked_at)
+        self._latest = (0, 0.0)   # (newest known hour, don't look for a newer one before this time)
 
     # -- network ------------------------------------------------------------------
     def _download(self, hour):
@@ -222,16 +222,22 @@ class CurrencyFeed:
         return digest.get(league) or {"div": None, "items": {}}, hour
 
     def latest_hour(self):
-        hour, checked = self._latest
-        if hour and time.time() - checked < self.LATEST_TTL:
+        """Newest published hour. GGG's docs: the current hour is never available, and a
+        client that has the newest hour should wait for the next hourly boundary before
+        asking again. So: never request the running hour, and once hour h is known, don't
+        look for h+1 until it can exist (the h+2 boundary); retry every LATEST_TTL after."""
+        hour, next_probe = self._latest
+        now_t = time.time()
+        if hour and now_t < next_probe:
             return hour
-        now = int(time.time()) // HOUR * HOUR
-        for back in range(0, 7):
+        now = int(now_t) // HOUR * HOUR
+        for back in range(1, 8):  # the running hour (back=0) is never published
             h = now - back * HOUR
             if h == hour or self.snapshot(h) is not None:
-                self._latest = (h, time.time())
+                newest = h == now - HOUR  # nothing newer can exist until the next boundary
+                self._latest = (h, now + HOUR + 60 if newest else now_t + self.LATEST_TTL)
                 return h
-        raise RuntimeError("currency feed has no snapshot in the last 6 hours")
+        raise RuntimeError("currency feed has no snapshot in the last 7 hours")
 
     # -- queries --------------------------------------------------------------------
     LOOKBACK_HOURS = 48      # thin markets (some fossils, essences) skip hours
