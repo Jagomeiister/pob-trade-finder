@@ -145,6 +145,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   wireExtraHotkeys();
+  var forget = document.getElementById('forget-habits');
+  if (forget) forget.addEventListener('click', forgetFilterHabits);
   document.addEventListener('keydown', function (e) {
     // over the game: Esc goes back (unless a dialog, menu or the settings panel wants it first)
     if (!appOverGame || e.key !== 'Escape' || e.defaultPrevented || document.querySelector('dialog[open]')) return;

@@ -189,10 +189,39 @@ function handleTradeEvent(ev) {
     cands[0].acceptHint = true;
   } else if (ev.type === 'afk' || ev.type === 'dnd') {
     tradeStatusFlags[ev.type] = !!ev.on;
+  } else if (ev.type === 'zone') {
+    // zone notes: display only, from "You have entered <area>." in the log
+    var note = tradePrefs().zoneNotes === false ? null : zoneNoteFor(ev.area);
+    zoneNote = note ? { area: ev.area, text: note } : null;
   } else {
     return;
   }
   renderTrades();
+}
+
+// ---- zone notes (Trade helper → Setup): your notes per area, shown when you enter it ------
+var ZONE_NOTES_KEY = 'pobtf-zone-notes';
+var zoneNote = null; // { area, text } for the area you're in, until dismissed or you leave
+// starters: only facts that don't change between leagues; edit or delete them freely
+var ZONE_NOTE_STARTERS = {
+  'The Lower Prison': 'Trial of Ascendancy here (normal Labyrinth).',
+  'The Crypt Level 1': 'Trial of Ascendancy here (normal Labyrinth).',
+  'The Chamber of Sins Level 2': 'Trial of Ascendancy here (normal Labyrinth).',
+  'The Crematorium': 'Trial of Ascendancy here (normal Labyrinth).',
+  'The Catacombs': 'Trial of Ascendancy here (normal Labyrinth).',
+  'The Imperial Gardens': 'Trial of Ascendancy here (normal Labyrinth).'
+};
+function loadZoneNotes() {
+  var raw = null;
+  try { raw = localStorage.getItem(ZONE_NOTES_KEY); } catch (e) { /* fine */ }
+  if (raw === null) return Object.assign({}, ZONE_NOTE_STARTERS);
+  try { return JSON.parse(raw) || {}; } catch (e) { return {}; }
+}
+function saveZoneNotes(n) { saveShared(ZONE_NOTES_KEY, JSON.stringify(n)); }
+function zoneNoteFor(area) {
+  var notes = loadZoneNotes(), a = String(area || '').toLowerCase();
+  var key = Object.keys(notes).filter(function (k) { return k.toLowerCase() === a; })[0];
+  return key ? notes[key] : null;
 }
 var tradeStatusFlags = { afk: false, dnd: false };
 
@@ -506,7 +535,14 @@ function renderCardsOverlay(root) {
   overlayLook(root, p);
   var shown = tradeCards.filter(function (c) { return !c.hidden; });
   var showing = overlayOpen && (shown.length > 0 || tradeCards.length > 0 || overlayOpenedByHand);
-  reportOverlay('cards', showing, shown.length);
+  reportOverlay('cards', showing || !!zoneNote, shown.length);
+  if (zoneNote) {
+    var zn = UI.el('div', 'ov-zone');
+    zn.appendChild(UI.el('b', 'ov-zone-area', zoneNote.area));
+    zn.appendChild(UI.el('span', 'ov-zone-text', zoneNote.text));
+    zn.appendChild(UI.iconButton('✕', 'Hide this zone note', { size: 'sm', onClick: function () { zoneNote = null; renderTrades(); } }));
+    root.appendChild(zn);
+  }
   if (!showing) { fitOverlay('cards'); return; }
   var head = UI.el('div', 'ov-head');
   head.appendChild(UI.el('span', 'ov-head-title', 'Trades' + (shown.length ? ' (' + shown.length + ')' : '')));
@@ -919,6 +955,39 @@ function renderTradeSetup(body) {
   var ns = UI.select([['3', '3 min'], ['5', '5 min'], ['10', '10 min'], ['15', '15 min']], String(p.noShowMin), {
     onChange: function () { var q = tradePrefs(); q.noShowMin = parseInt(this.value, 10); saveTradePrefs(q); } });
   UI.field('Offer "no-show" after', ns, { parent: sec });
+
+  sec.appendChild(UI.el('h3', 'trade-h3', 'Zone notes'));
+  sec.appendChild(toggle('Show my note for an area when I enter it (from the chat log; display only)',
+    p.zoneNotes !== false, function (v) { setPref('zoneNotes', v); }));
+  var zl = UI.el('div', 'zone-notes');
+  function drawZones() {
+    zl.textContent = '';
+    var notes = loadZoneNotes();
+    Object.keys(notes).sort().forEach(function (area) {
+      var row = UI.el('div', 'zone-row');
+      row.appendChild(UI.el('b', 'zone-area', area));
+      var inp = UI.input({ value: notes[area], width: '100%', ariaLabel: 'Note for ' + area });
+      inp.addEventListener('change', function () { var n = loadZoneNotes(); n[area] = inp.value; saveZoneNotes(n); });
+      row.appendChild(inp);
+      row.appendChild(UI.iconButton('✕', 'Delete the note for ' + area, { size: 'sm', onClick: function () {
+        var n = loadZoneNotes(); delete n[area]; saveZoneNotes(n); drawZones();
+      } }));
+      zl.appendChild(row);
+    });
+    var add = UI.el('div', 'zone-row');
+    var an = UI.input({ placeholder: 'Area, e.g. The Ledge', width: '200px', ariaLabel: 'New zone note area' });
+    var at = UI.input({ placeholder: 'Your note', width: '100%', ariaLabel: 'New zone note text' });
+    add.appendChild(an);
+    add.appendChild(at);
+    add.appendChild(UI.button('ghost', { size: 'sm', label: 'Add', onClick: function () {
+      var area = an.value.trim(), text = at.value.trim();
+      if (!area || !text) { UI.toast('Type the area name and a note.', 'warn'); return; }
+      var n = loadZoneNotes(); n[area] = text; saveZoneNotes(n); drawZones();
+    } }));
+    zl.appendChild(add);
+  }
+  drawZones();
+  sec.appendChild(zl);
 
   sec.appendChild(UI.el('h3', 'trade-h3', 'Messages'));
   sec.appendChild(UI.el('p', 'finder-sub', '{item} and {price} are filled in from the trade.'));

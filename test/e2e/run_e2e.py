@@ -1558,6 +1558,13 @@ window.__ovToggle(); if (!document.querySelector('.ov-head')) window.__ovToggle(
 renderTrades();
 out.opacity = getComputedStyle(document.getElementById('trades-root')).getPropertyValue('--ov-opacity').trim();
 out.gripWhenLocked = !!document.querySelector('.ov-grip');
+localStorage.removeItem('pobtf-zone-notes');
+window.__tradeEvent({ type: 'zone', area: 'The Lower Prison' });
+await H.sleep(20);
+out.zone = H.text('.ov-zone');
+window.__tradeEvent({ type: 'zone', area: 'The Twilight Strand' });
+await H.sleep(20);
+out.zoneGone = !document.querySelector('.ov-zone');
 return out;
 """
 
@@ -1572,6 +1579,12 @@ out.enableAtStart = H.calls('trade_enable').length;
 H.button(document.querySelector('.trades-tabs'), 'Setup').click();
 await H.sleep(30);
 out.iconToggle = [...document.querySelectorAll('.trade-setup .toggle')].some(t => /PoB icon over the game/.test(t.textContent));
+out.zoneRows = document.querySelectorAll('.zone-row').length;
+document.querySelector('input[aria-label="New zone note area"]').value = 'The Ledge';
+document.querySelector('input[aria-label="New zone note text"]').value = 'Run fast';
+H.button(document.querySelector('.zone-notes'), 'Add').click();
+await H.sleep(20);
+out.zoneSaved = JSON.parse(localStorage.getItem('pobtf-zone-notes'))['The Ledge'];
 out.soundOpts = [...document.querySelectorAll('.trade-setup select[aria-label=Sound] option')].map(o => o.textContent);
 out.sliders = [...document.querySelectorAll('.trade-setup input[type=range]')].map(r => r.getAttribute('aria-label'));
 const vol = document.querySelector('.trade-setup input[aria-label=Volume]');
@@ -1669,6 +1682,8 @@ def scenario_trades(s, tag):
     check(tag + " hidden buyer: no card, listed under Hidden", not r["hidden"]["visible"] and
           "Hidden (2)" in (r["hidden"]["summary"] or ""), r["hidden"])
     check(tag + " overlay never opens a dialog", r["noDialogs"], r["noDialogs"])
+    check(tag + " zone note shows on entering an area with a note, not elsewhere",
+          "The Lower Prison" in (r["zone"] or "") and "Trial of Ascendancy" in r["zone"] and r["zoneGone"], r["zone"])
     check(tag + " overlay opacity setting applied, Lock hides the drag grip", r["opacity"] == "0.5" and
           not r["gripWhenLocked"], (r["opacity"], r["gripWhenLocked"]))
 
@@ -1678,6 +1693,8 @@ def scenario_trades(s, tag):
           r["firstTab"] == "Sales", r["tabs"])
     check(tag + " helper window doesn't restart the log reader on open", r["enableAtStart"] == 0, r["enableAtStart"])
     check(tag + " Setup has the overlay icon option", r["iconToggle"], r["iconToggle"])
+    check(tag + " zone notes: starters listed, new note saved", r["zoneRows"] >= 7 and r["zoneSaved"] == "Run fast",
+          (r["zoneRows"], r["zoneSaved"]))
     check(tag + " Sound: Off + styles, volume and opacity sliders, lock", r["soundOpts"][0] == "Off" and
           len(r["soundOpts"]) >= 4 and r["sliders"] == ["Volume", "Opacity"] and r["lock"], (r["soundOpts"], r["sliders"]))
     pa = r["prefsAfter"] or {}
@@ -1906,6 +1923,60 @@ def scenario_search(s, tag):
           r["noneWords"] == '"!movement speed|r-g-b"', (r["anyWords"], r["noneWords"]))
 
 
+S23_HABITS = r"""
+const H = window.__e2e;
+const out = { rounds: [] };
+const ITEM = ['Item Class: Rings', 'Rarity: Rare', 'Doom Loop', 'Two-Stone Ring', '--------', 'Item Level: 84', '--------',
+  '{ Prefix Modifier "Prime" (Tier: 1) — Life }', '+90(90-99) to maximum Life',
+  '{ Suffix Modifier "of the Volcano" (Tier: 1) — Elemental, Fire, Resistance }', '+44(42-45)% to Fire Resistance'].join('\n');
+window.__stubOverrides.trade_search = { ok: true, total: 0, searchId: 'h', ids: [], pageSize: 10, listings: [] };
+async function paste() {
+  document.getElementById('pob-input').value = ITEM;
+  document.getElementById('decode-btn').click();
+  await H.waitFor(() => document.querySelector('.card.pasted'), 5000, 'pasted');
+  await H.sleep(30);
+  return cards.find(s => s.card === document.querySelector('.card.pasted'));
+}
+for (let i = 0; i < 3; i++) {
+  const st = await paste();
+  const life = st.rows.find(r => /maximum Life/.test(r.mod.line));
+  out.rounds.push({ on: life.cb.checked, learned: !!life.cb.closest('.mod-row, label, div').parentElement.querySelector('.badge.tone-info') ||
+    [...st.card.querySelectorAll('.badge')].some(b => b.textContent === 'learned') });
+  if (life.cb.checked) life.cb.click(); // the user turns life off by hand
+  // a preset change must not count
+  H.button(st.card, 'Check price').click();
+  await H.sleep(80);
+}
+out.habits = JSON.parse(localStorage.getItem('pobtf-filter-habits'));
+forgetFilterHabits();
+const st4 = await paste();
+out.afterForget = st4.rows.find(r => /maximum Life/.test(r.mod.line)).cb.checked;
+// presets don't teach: Exact turns everything on without a click
+localStorage.setItem('pobtf-filter-habits', '{}');
+const st5 = await paste();
+st5.card.querySelector('.segmented [data-value="exact"]').click();
+await H.sleep(20);
+H.button(st5.card, 'Check price').click();
+await H.sleep(80);
+out.afterPreset = localStorage.getItem('pobtf-filter-habits');
+delete window.__stubOverrides.trade_search;
+return out;
+"""
+
+
+def scenario_habits(s, tag):
+    s.fresh()
+    r = s.run(S23_HABITS, timeout=60)
+    rd = r["rounds"]
+    check(tag + " first two pastes: life on (normal default)", rd[0]["on"] and rd[1]["on"] and
+          not rd[0]["learned"] and not rd[1]["learned"], rd)
+    check(tag + " after turning it off twice: starts off, marked learned", not rd[2]["on"] and rd[2]["learned"], rd)
+    h = r["habits"] or {}
+    check(tag + " habit stored per trade stat", any(v.get("off", 0) >= 2 for v in h.values()), h)
+    check(tag + " Forget learned filters: back to the default", r["afterForget"] is True, r["afterForget"])
+    check(tag + " presets don't count as habits", r["afterPreset"] in ("{}", None), r["afterPreset"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -1929,6 +2000,7 @@ SCENARIOS = [
     ("20 ovicon", scenario_overlay_icon),
     ("21 uniques", scenario_uniques),
     ("22 search", scenario_search),
+    ("23 habits", scenario_habits),
 ]
 
 

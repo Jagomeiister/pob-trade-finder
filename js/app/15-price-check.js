@@ -25,6 +25,7 @@ async function checkPrice(state, quiet, fresh) {
   var payload = null;
   try { payload = buildTradePayload(state, quiet); } catch (e) { /* stale card after re-render */ }
   if (!payload) return;
+  recordFilterHabits(state); // pasted / Ctrl+D items: learn which mods you switch on or off
   var weights = (!state.gemSpec && !state.customPayload && state.lastWeights) || []; // this search's score scale
   var league = document.getElementById('league').value;
   var payloadStr = JSON.stringify(payload);

@@ -443,6 +443,13 @@ body.trade-cards .trades-root:hover { opacity: 1; }
 .ov-note { padding: 8px 10px; background: var(--s2); border: 1px solid var(--border); border-radius: var(--r-md);
   color: var(--text-2); font-size: var(--fs-sm); }
 .tc-more { display: flex; gap: 6px; flex-wrap: wrap; }
+.ov-zone { display: flex; align-items: center; gap: 8px; width: 372px; padding: 6px 6px 6px 10px; background: var(--s1);
+  border: 1px solid var(--border); border-left: 3px solid var(--info); border-radius: var(--r-md); box-shadow: 0 4px 14px var(--shadow); }
+.ov-zone-area { color: var(--info); white-space: nowrap; }
+.ov-zone-text { flex: 1; min-width: 0; color: var(--text-2); font-size: var(--fs-sm); }
+.zone-notes { display: flex; flex-direction: column; gap: 4px; }
+.zone-row { display: flex; align-items: center; gap: 8px; }
+.zone-area { min-width: 190px; font-size: var(--fs-sm); }
 .tc-actions .is-on { color: var(--accent); }
 .trade-setup { display: flex; flex-direction: column; gap: 8px; }
 .trade-setup .field-wide { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }

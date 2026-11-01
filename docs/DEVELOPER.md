@@ -158,6 +158,31 @@ GGG rules, enforced by the shape of the code. Keep them:
   (`closeToTray` pref). Menu: Open, Trade helper, Settings, Quit (`_quit` sets `_quitting`
   and destroys the main window).
 
+## v2.3 tools
+
+- `js/app/20-unique-jewels.js` (view `uniques`):
+  - Data comes from `data/watcherseye.js` (`tools/make_watcherseye.py`). That reads Path of
+    Building's `WatchersEye.lua` plus `watchersEyeLegacyMods`, drops legacy mods and checks
+    every stat id against `data/stats.json`.
+  - `data/forbidden.js` (`tools/make_forbidden.py`) holds the per-node stat ids
+    (`explicit.stat_2460506030|<node>` Flame, `explicit.stat_1190333629|<node>` Flesh), the
+    ascendancy from the tree, and Thread of Hope's `explicit.stat_3642528642|1..5`.
+  - Batches go through `runBatch` (paced, Stop).
+- `js/app/21-search-text.js` (view `search`):
+  - `data/mapmods.js` (`tools/make_mapmods.py`) has the shortest unique token per map mod.
+    The generator drops quantity/pack-size lines, avoids map names, and allows matches only
+    with mods that share the same line.
+  - `atLeastRegex(n)` builds the quantity part.
+  - Paste goes through `game_search_paste` → `ChatSender.paste_search` (Ctrl+F, Ctrl+A,
+    paste, no Enter).
+- Learned filters (08-cards):
+  - `pobtf-filter-habits` maps a stat id to `{on, off}`, counting only hand clicks
+    (`rowState.userSet`) that differ from the default. They are recorded in `checkPrice` for
+    pasted items.
+  - A score of ±2 sets the default, shown with a "learned" chip.
+- Zone notes (19-trades): a `zone` event looks up `pobtf-zone-notes` (starters:
+  Act 1–3 trials). The note shows in the cards overlay; display only.
+
 ## Rate limiting (do not weaken this)
 
 All GGG calls go through `Api._http`:

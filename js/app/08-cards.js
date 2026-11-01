@@ -481,6 +481,15 @@ function makeModRow(state, mod, match, defaultOff) {
       (pastedItem && mod.tier > 2 && !mod.fractured ? ' — off by default: low tiers rarely set the price' : '');
     label.appendChild(tierChip);
   }
+  // learned from what you tick and untick when pricing pasted / Ctrl+D items (Scalpel-style)
+  var learned = pastedItem && match && !state.unique && !cb.disabled ? filterHabit(match.entry.id) : null;
+  if (learned) {
+    cb.checked = learned === 'on';
+    var lc = UI.chip('learned', 'info');
+    lc.title = 'You usually turn this mod ' + learned + ' when pricing, so it starts ' + learned +
+      '. Settings → In game → Forget learned filters resets it.';
+    label.appendChild(lc);
+  }
   if (mod.kind === 'implicit' && !mod.crafted) label.title = 'Implicit';
 
   // clicking anywhere on the row toggles the mod — not just the tiny checkbox
@@ -500,7 +509,9 @@ function makeModRow(state, mod, match, defaultOff) {
   tag.className = 'match-tag';
 
   var rowState = { mod: mod, match: match, cb: cb, minInput: minInput, baseAvg: null,
-                   exactCount: false, pseudoMult: 1, inputScale: 1 };
+                   exactCount: false, pseudoMult: 1, inputScale: 1, defaultOn: cb.checked, learned: learned };
+  // only clicks count as habits (presets change boxes without a change event)
+  cb.addEventListener('change', function () { rowState.userSet = true; });
   if (match && match.pseudo) {
     rowState.pseudoMult = match.pseudo.multiplier;
     if (document.getElementById('pseudo').checked) rowState.inputScale = match.pseudo.multiplier;
@@ -748,6 +759,37 @@ function applyPreset(state, preset, start) {
   if (state.ilvlInput) state.ilvlInput.value = preset === 'base' ? String(state.item.itemLevel || '') : start.ilvl;
   if (state.inflToggle) state.inflToggle.checkbox.checked = true;
   if (state.pctSel) state.pctSel.value = 'global';
+}
+
+// ---- learned filters (Scalpel-style) -------------------------------------------------
+// When you price a pasted / Ctrl+D item, every mod you switched on or off by hand counts
+// once per item. Twice more one way than the other and it becomes that mod's default.
+var HABITS_KEY = 'pobtf-filter-habits';
+function loadHabits() {
+  try { return JSON.parse(localStorage.getItem(HABITS_KEY)) || {}; } catch (e) { return {}; }
+}
+function filterHabit(statId) {
+  var h = loadHabits()[statId];
+  if (!h) return null;
+  var score = (h.on || 0) - (h.off || 0);
+  return score >= 2 ? 'on' : score <= -2 ? 'off' : null;
+}
+function recordFilterHabits(state) {
+  if (!state || !state.item || state.item.itemClass === undefined || state.unique) return;
+  var all = loadHabits(), changed = false;
+  state.rows.forEach(function (r) {
+    if (!r.match || !r.userSet || r.habitDone || r.cb.checked === r.defaultOn) return;
+    var id = r.match.entry.id;
+    var h = all[id] = all[id] || { on: 0, off: 0 };
+    if (r.cb.checked) h.on++; else h.off++;
+    r.habitDone = true;
+    changed = true;
+  });
+  if (changed) persist(HABITS_KEY, JSON.stringify(all));
+}
+function forgetFilterHabits() {
+  persist(HABITS_KEY, '{}');
+  UI.toast('Learned filters forgotten: pasted items start from the normal defaults again.', 'success');
 }
 
 function makeMiniSelect(parent, label, options, value) {

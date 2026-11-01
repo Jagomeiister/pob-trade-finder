@@ -471,6 +471,54 @@ numbered steps: **1 Your build**, **2 Jewel and search type**, **3 Pick mods**,
   searches when logged in, so in-app checks need a saved POESESSID; the trade-site
   link works while you're logged in there.
 
+## 5f. 👁 Watcher's Eye & co.
+
+Tools → **Watcher's Eye & co.** Three jewels that the normal item cards can't price well:
+
+- **Watcher's Eye**:
+  - Your build's auras are pre-picked; click to add or remove any.
+  - Tick the mods worth having, with an optional minimum roll. Only mods that can still roll
+    today are listed; old legacy mods are left out.
+  - **Match** any 1 / any 2 / any 3 / all of them. **Search on trade ↗** opens it for the
+    selected league, and **Check price** shows listings here.
+  - **Price each pair** runs one search per pair of ticked mods (up to 7 mods), paced for the
+    trade site, and lists the cheapest of each. Click it again to stop.
+- **Forbidden Flame & Flesh**:
+  - Pick your ascendancy (your build's is pre-selected) to see the notables a pair can give
+    you, marked when you already have them.
+  - **Price pair** prices the Flame (Crimson Jewel) and Flesh (Cobalt Jewel) for that notable
+    and adds them up. **Price all I don't have** prices every notable you don't have.
+- **Thread of Hope**: the five ring sizes, each with a trade link. **Price every size** prices
+  all five.
+
+## 5g. 🔤 Search text (stash and vendor search)
+
+Tools → **Search text** builds the text you type into the game's search box (Ctrl+F), like
+poe.re:
+
+- **Maps**: mark mods **✗ avoid** or **✓ want**. Each mod is searched by the shortest piece of
+  its text that no other map mod (or map name) has, so every roll matches. You can also add
+  **Item quantity ≥** a number, and choose whether the wanted mods are *any* or *all*.
+- **Your own words**: one word or phrase per line, matching any, all or none of them.
+- The box counts characters against the game's limit of 50.
+- **Copy** the text, or **Paste into game**: one press, with your stash or a vendor open,
+  does Ctrl+F and pastes. Nothing is sent and your clipboard is put back.
+- **Save preset** keeps a search for next time.
+
+## 5h. Learned filters
+
+When you price a pasted or Ctrl+D item, the app notes which mods you switch on or off
+yourself (not presets). After you've switched the same mod the same way twice, that becomes
+its default and it shows **learned**. **Settings → In game → Forget learned filters** starts
+over.
+
+## 5i. Zone notes
+
+With the trade helper on, entering an area that has a note shows a small card with it, next
+to the trade cards. It starts with the Act 1–3 Trials of Ascendancy. Add your own (or edit
+or delete them) in **Trade helper → Setup → Zone notes**. This only reads the chat log and
+shows text; it never does anything in the game.
+
 ## 6b. Compare with your character
 
 Click **⚖ Compare with character…** in the sidebar, enter your account name
