@@ -252,6 +252,10 @@ STUB_JS = r"""
     quit_app: function () { return { ok: true }; },
     overlay_visible: function () { return { ok: true }; },
     overlay_reset_pos: function () { return { ok: true }; },
+    trade_test: function () { return { ok: true }; },
+    overlay_toggle_sheet: function () { return { ok: true }; },
+    pick_sheet_image: function () { return { ok: true, file: 'data/cheatsheets/e2e.png', name: 'route.png' }; },
+    delete_sheet_image: function () { return { ok: true }; },
     set_price_hotkey: function (spec) { return { ok: true, hotkey: spec, label: spec, running: false, active: false, error: null }; }
   };
   // every bridge method exists; unknown ones resolve to a soft failure and are recorded.
@@ -490,6 +494,10 @@ Object.assign(out, {
   tableRows: page.querySelectorAll('.mk-table tbody tr').length,
   watch0: watchRows(), chartTitle: H.text('.mk-title', page), chartSvg: !!page.querySelector('.mk-chart svg'),
   conv: H.text('.mk-conv-out', page),
+  // 7-day chip (second .pct in the row) carries the chaos/divine amount too
+  amtDivine: H.text('.pct', [...rowFor('Divine Orb').querySelectorAll('td')].filter(td => td.querySelector('.pct'))[1]),
+  amtMirror: H.text('.pct', [...rowFor('Mirror of Kalandra').querySelectorAll('td')].filter(td => td.querySelector('.pct'))[1]),
+  moverAmt: !!page.querySelector('.mk-mover .pct-amt'),
 });
 // star an unwatched item, then un-star it
 let star = rowFor('Orb of Alchemy').querySelector('.mk-star');
@@ -1004,6 +1012,9 @@ def scenario_market(s, tag):
           and r["emptyHidden"], r)
     check(tag + " movers: rising and falling", r["rising"] >= 1 and r["falling"] >= 1, (r["rising"], r["falling"]))
     check(tag + " table lists every item", r["tableRows"] == 8, r["tableRows"])
+    check(tag + " change shows chaos amount under a divine", "+20c" in (r["amtDivine"] or ""), r["amtDivine"])
+    check(tag + " change shows divines once worth one", "+50 div" in (r["amtMirror"] or ""), r["amtMirror"])
+    check(tag + " movers show the amount", r["moverAmt"])
     check(tag + " chart shows Divine Orb", r["chartTitle"] == "Divine Orb" and r["chartSvg"], r["chartTitle"])
     check(tag + " default watchlist (4)", r["watch0"] == 4, r["watch0"])
     check(tag + " star adds to watchlist", r["starBefore"] == "☆" and r["starAfter"] == "★" and r["watch1"] == 5
@@ -2437,6 +2448,149 @@ def scenario_chardiff(s, tag):
     check(tag + " Skill tree compare reuses the passives already read", r["reuse"] == "MyChar", r["reuse"])
 
 
+S30_TESTCARDS = r"""
+const H = window.__e2e;
+const out = {};
+const card = name => [...document.querySelectorAll('.trade-card')].find(c => c.querySelector('.tc-name').textContent === name);
+// helper OFF: real whispers are ignored (the reader may run only for the cheat sheet), test ones show
+localStorage.setItem('pobtf-trade-prefs', JSON.stringify({ enabled: false, ack: true, sound: 'off' }));
+await window.__tradePrefsChanged();
+out.realIgnored = window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'RealBuyer', text: 'Hi, I would like to buy your x in Standard',
+  trade: { kind: 'item', item: 'x', price: 1, currency: 'chaos', league: 'Standard' } }) === false;
+const T = { kind: 'item', item: 'Tabula Rasa Simple Robe', price: 10, currency: 'chaos', league: 'Standard', tab: 'Test sale', left: 3, top: 5, note: '' };
+window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'PoBTF_TestBuyer', text: 'Hi', trade: T, test: true });
+await H.sleep(30);
+let c = card('PoBTF_TestBuyer');
+out.shown = !!c && !card('RealBuyer');
+out.tag = c && H.text('.tc-test', c);
+H.button(c, 'Invite').click();
+await H.sleep(30);
+out.sendsAfterInvite = H.calls('trade_send').length;
+out.invitedMarked = !!card('PoBTF_TestBuyer');
+window.__tradeEvent({ type: 'joined', name: 'PoBTF_TestBuyer', test: true });
+window.__tradeEvent({ type: 'trade_accepted', test: true });
+await H.sleep(30);
+c = card('PoBTF_TestBuyer');
+const done = [...c.querySelectorAll('.btn')].find(b => b.textContent.startsWith('✓ Completed'));
+out.hasCompleted = !!done;
+const setsBefore = H.calls('storage_set').filter(x => x.args[0] === 'pobtf-buyers').length;
+if (done) done.click();
+await H.sleep(60);
+out.closed = !card('PoBTF_TestBuyer');
+out.sales = JSON.parse(localStorage.getItem('pobtf-sales') || '[]').length;
+out.buyerWrites = H.calls('storage_set').filter(x => x.args[0] === 'pobtf-buyers').length - setsBefore;
+// Clear test cards
+window.__tradeEvent({ type: 'whisper', dir: 'in', name: 'PoBTF_TestBuyer', text: 'Hi', trade: T, test: true });
+window.__tradeEvent({ type: 'whisper', dir: 'out', name: 'PoBTF_TestSeller', text: 'Hi', trade: T, test: true });
+await H.sleep(30);
+out.beforeClear = document.querySelectorAll('.trade-card').length;
+window.__tradeEvent({ type: 'clear_tests', test: true });
+await H.sleep(30);
+out.afterClear = document.querySelectorAll('.trade-card').length;
+return out;
+"""
+
+S30_SETUP = r"""
+const H = window.__e2e;
+const out = {};
+H.button(document, 'Setup').click();
+await H.sleep(40);
+const row = document.querySelector('.trade-test-row');
+out.buttons = row ? [...row.querySelectorAll('.btn')].map(b => b.textContent) : [];
+H.button(row, '▶ Whole trade').click();
+await H.sleep(30);
+H.button(row, 'Clear test cards').click();
+await H.sleep(30);
+out.calls = H.calls('trade_test').map(c => c.args[0]);
+out.sends = H.calls('trade_send').length;
+return out;
+"""
+
+S30_SHEET = r"""
+const H = window.__e2e;
+const out = {};
+out.page = document.body.classList.contains('sheet-ov') && !!document.getElementById('sheet-root');
+out.hiddenFirst = (H.calls('overlay_visible')[0] || { args: [] }).args.slice(0, 2);
+window.__sheetToggle();
+await H.sleep(30);
+out.title = H.text('.sheet-title');
+// a real area line is ignored until "follow my act" is on; test-mode ones always count
+out.realIgnored = window.__sheetEvent({ type: 'area', act: 6, id: '2_6_town', level: 45 }) === false;
+window.__sheetEvent({ type: 'area', act: 6, id: '2_6_town', level: 45, test: true });
+window.__sheetEvent({ type: 'zone', area: 'The Prison', test: true });
+await H.sleep(30);
+out.titleAfter = H.text('.sheet-title');
+out.here = H.text('.sheet-li.is-here');
+out.text = H.text('.sheet-content');
+out.shapes = (H.calls('overlay_shape').slice(-1)[0] || { args: [] }).args;
+return out;
+"""
+
+S30_VIEW = r"""
+const H = window.__e2e;
+const out = {};
+document.getElementById('open-sheets').click();
+await H.sleep(40);
+out.view = document.body.dataset.view;
+out.act1 = H.text('#view-sheets .sheet-content');
+H.button(document, '+ New sheet').click();
+await H.sleep(30);
+const ed = document.querySelector('.sheet-editor');
+ed.querySelector('.sheet-title-input').value = 'My route';
+ed.querySelector('select').value = '2';
+ed.querySelector('.sheet-textarea').value = 'Kill Hillock';
+H.button(ed, '🖼 Add picture…').click();
+await H.sleep(40);
+H.button(document.querySelector('.sheet-editor'), 'Save').click();
+await H.sleep(40);
+out.saved = JSON.parse(localStorage.getItem('pobtf-sheets') || '[]');
+out.preview = H.text('#view-sheets .sheet-content');
+out.persisted = H.calls('storage_set').some(c => c.args[0] === 'pobtf-sheets');
+out.followConsent = null;
+return out;
+"""
+
+
+def scenario_testmode(s, tag):
+    s.fresh("?cards=1")
+    r = s.run(S30_TESTCARDS, timeout=60)
+    check(tag + " helper off: real whispers ignored, test ones shown", r["realIgnored"] and r["shown"], r)
+    check(tag + " test card is marked TEST", (r["tag"] or "").lower() == "test", r["tag"])
+    check(tag + " test card buttons send nothing to the game", r["sendsAfterInvite"] == 0 and r["invitedMarked"], r)
+    check(tag + " closing a test trade saves no sale and no buyer", r["hasCompleted"] and r["closed"] and
+          r["sales"] == 0 and r["buyerWrites"] == 0, r)
+    check(tag + " Clear test cards removes them", r["beforeClear"] == 2 and r["afterClear"] == 0, r)
+    s.fresh("?trades=1")
+    r = s.run(S30_SETUP, timeout=60)
+    check(tag + " Setup → Test mode buttons", r["buttons"][:3] == ["▶ Whole trade", "Buyer whispers", "Bulk whisper"]
+          and "Clear test cards" in r["buttons"], r["buttons"])
+    check(tag + " test buttons ask gui.py for made-up events, nothing sent", r["calls"] == ["full", "clear"] and
+          r["sends"] == 0, r)
+
+
+def scenario_sheets(s, tag):
+    s.fresh("?sheet=1")
+    r = s.run(S30_SHEET, timeout=60)
+    check(tag + " sheet overlay page, hidden until its hotkey", r["page"] and r["hiddenFirst"] == ["sheet", False], r)
+    check(tag + " hotkey shows Act 1", (r["title"] or "").startswith("Act 1"), r["title"])
+    check(tag + " area lines only count with follow on (test ones always)", r["realIgnored"] and
+          (r["titleAfter"] or "").startswith("Act 6"), r)
+    check(tag + " Act 6: quests, respec, trial you're in", "The Cloven One" in (r["text"] or "") and
+          "Fallen from Grace" in r["text"] and "The Prison" in (r["here"] or ""), r["here"])
+    check(tag + " window clipped to the sheet", len(r["shapes"]) == 2 and r["shapes"][0] == "sheet" and
+          len(r["shapes"][1]) == 1, r["shapes"])
+    s.fresh()
+    r = s.run(S30_VIEW, timeout=60)
+    check(tag + " Settings → Cheat sheets opens the view with Act 1", r["view"] == "sheets" and
+          "The Dweller of the Deep" in (r["act1"] or "") and "A Dirty Job" in r["act1"], r["act1"])
+    sv = (r["saved"] or [{}])[0]
+    check(tag + " your sheet saved (title, act, text, picture) and shared with the overlay", sv.get("title") == "My route"
+          and sv.get("act") == 2 and sv.get("text") == "Kill Hillock" and sv.get("images") == ["data/cheatsheets/e2e.png"]
+          and r["persisted"], sv)
+    check(tag + " preview turns to the sheet's act and shows it", "Kill Hillock" in (r["preview"] or "") and
+          "Through Sacred Ground" in r["preview"], r["preview"])
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -2467,6 +2621,8 @@ SCENARIOS = [
     ("27 tree", scenario_tree),
     ("28 stages", scenario_stages),
     ("29 chardiff", scenario_chardiff),
+    ("30 testmode", scenario_testmode),
+    ("31 sheets", scenario_sheets),
 ]
 
 

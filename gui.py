@@ -16,6 +16,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 import webbrowser
 import zipfile
 
@@ -74,10 +75,13 @@ OVERLAYS = {
              "default": (0.55, 0.006), "size": (60, 48)},
     "cards": {"title": "PoB Trade Finder - Trade cards", "query": "?cards=1", "pos": "pobtf-ov-cards-pos",
               "default": (0.5, 0.80), "size": (380, 60)},  # centred, above the skill bar / XP bar
+    # leveling cheat sheet (js/app/24-cheatsheets.js): shown / hidden by its hotkey
+    "sheet": {"title": "PoB Trade Finder - Cheat sheet", "query": "?sheet=1", "pos": "pobtf-ov-sheet-pos",
+              "default": (0.74, 0.12), "size": (320, 120)},
 }
 # Hotkeys (Settings → In game): each held only while the game (or our overlay) is focused.
-HOTKEY_DEFAULTS = {"price": "ctrl+d", "app": "shift+space", "trades": "alt+t"}
-HOTKEY_PREFS = {"price": "hotkey", "app": "hotkeyApp", "trades": "hotkeyTrades"}
+HOTKEY_DEFAULTS = {"price": "ctrl+d", "app": "shift+space", "trades": "alt+t", "sheet": "alt+c"}
+HOTKEY_PREFS = {"price": "hotkey", "app": "hotkeyApp", "trades": "hotkeyTrades", "sheet": "hotkeySheet"}
 CHAT_KEY_NAMES = {13: "Enter", 9: "Tab", 32: "Space", 192: "` (backtick)", 222: "' (quote)", 191: "/ (slash)"}
 
 
@@ -157,7 +161,8 @@ class Api:
         # trade helper (wired up by main()): Client.txt tail, chat sender, stash outline
         self._trades = None
         self._overlay_windows = {}  # name -> pywebview window (OVERLAYS)
-        self._ov = {n: {"content": True, "placed": None, "placed_at": 0.0, "dragging": False, "replace": False}
+        # the cheat sheet starts hidden (its hotkey shows it); the others report once their page loads
+        self._ov = {n: {"content": n != "sheet", "placed": None, "placed_at": 0.0, "dragging": False, "replace": False}
                     for n in OVERLAYS}
         self._app_overlay = False   # main window brought over the game by the app hotkey
         self._main_was_hidden = False
@@ -1441,6 +1446,9 @@ class Api:
     def _on_trades_hotkey(self, hwnd):
         self.overlay_toggle_cards()
 
+    def _on_sheet_hotkey(self, hwnd):
+        self.overlay_toggle_sheet()
+
     def _hotkey_target(self):
         """Hotkeys work while the game, one of our overlays, or the app over the game is in front."""
         fg = price_hotkey.foreground_game_window()
@@ -1456,7 +1464,8 @@ class Api:
     def _start_hotkey(self):
         if sys.platform != "win32" or self._hotkeys:
             return
-        fire = {"price": self._on_price_hotkey, "app": self._on_app_hotkey, "trades": self._on_trades_hotkey}
+        fire = {"price": self._on_price_hotkey, "app": self._on_app_hotkey, "trades": self._on_trades_hotkey,
+                "sheet": self._on_sheet_hotkey}
         for name, fn in fire.items():
             try:
                 w = price_hotkey.HotkeyWatcher(fn, self._hotkey_specs[name], log=_debug_log,
@@ -1550,8 +1559,40 @@ class Api:
     # in-game overlay. GGG's rules: game commands go out only from a button press
     # (trade_send, one command per call), never from a log event or a timer.
     def _on_trade_event(self, ev):
-        # cards live in the in-game overlay, which shows whenever the game is focused
+        # cards live in the in-game overlay, which shows whenever the game is focused; the
+        # cheat sheet follows the act from the area / zone lines
         self._eval_in(self._overlay_windows.get("cards"), "window.__tradeEvent && window.__tradeEvent(%s)" % json.dumps(ev))
+        if ev.get("type") in ("area", "zone"):
+            self._eval_in(self._overlay_windows.get("sheet"), "window.__sheetEvent && window.__sheetEvent(%s)" % json.dumps(ev))
+
+    def trade_test(self, kind, league=None, act=None):
+        """Trade helper → Setup → Test mode: made-up log lines through the real parser, shown
+        in the overlays as test events (their buttons send nothing, nothing is saved).
+        'full' plays a whole trade over ~12 s; 'clear' removes the test cards."""
+        try:
+            league = str(league or "Standard")[:60]
+            if kind == "clear":
+                self._on_trade_event({"type": "clear_tests", "test": True})
+                return {"ok": True}
+            steps = ([(0, "whisper"), (3, "joined"), (8, "accepted"), (11, "left")] if kind == "full"
+                     else [(0, kind)])
+            if any(k not in trade_helper.TEST_SCENARIOS for _, k in steps):
+                return {"ok": False, "error": "unknown test"}
+
+            def play():
+                start = time.time()
+                for at, k in steps:
+                    time.sleep(max(0, at - (time.time() - start)))
+                    for line in trade_helper.test_lines(k, league, act):
+                        ev = trade_helper.parse_line(line)
+                        if ev:
+                            ev["test"] = True
+                            self._on_trade_event(ev)
+
+            threading.Thread(target=play, name="trade-test", daemon=True).start()
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def _eval_in(self, win, js):
         if not win:
@@ -1831,6 +1872,11 @@ class Api:
         self._eval_in(self._overlay_windows.get("cards"), "window.__ovToggle && window.__ovToggle()")
         return {"ok": True}
 
+    def overlay_toggle_sheet(self):
+        """The cheat sheet hotkey (or "Show in game" in the Cheat sheets view): show / hide it."""
+        self._eval_in(self._overlay_windows.get("sheet"), "window.__sheetToggle && window.__sheetToggle()")
+        return {"ok": True}
+
     def overlay_reset_pos(self, name=None):
         """Setup → Reset position: back to the default spot on the next show."""
         for n in ([name] if name in OVERLAYS else OVERLAYS):
@@ -1842,7 +1888,8 @@ class Api:
     def trade_prefs_changed(self):
         """Settings changed in the Trade helper window: the overlays re-read them."""
         for win in self._overlay_windows.values():
-            self._eval_in(win, "window.__tradePrefsChanged && window.__tradePrefsChanged()")
+            self._eval_in(win, "window.__tradePrefsChanged && window.__tradePrefsChanged();"
+                               "window.__sheetPrefsChanged && window.__sheetPrefsChanged()")
         return {"ok": True}
 
     def open_main(self, settings=False):
@@ -2021,6 +2068,45 @@ class Api:
             # relative to index.html (data/ sits next to it); ?v= so a replaced file isn't cached
             return {"ok": True, "file": "data/sounds/%s%s?v=%d" % (kind, ext, int(time.time())),
                     "name": os.path.basename(src)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    SHEET_IMAGE_TYPES = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+    SHEET_IMAGE_MAX = 8 << 20
+
+    def pick_sheet_image(self):
+        """Cheat sheets → your sheet → Add image: copied into data/cheatsheets/ so the overlay
+        page can show it (relative to index.html)."""
+        try:
+            win = self._main or webview.windows[0]
+            res = win.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=False,
+                                         file_types=("Images (*.png;*.jpg;*.jpeg;*.gif;*.webp)",))
+            src = res[0] if res else None
+            if not src:
+                return {"ok": True, "file": None}
+            ext = os.path.splitext(src)[1].lower()
+            if ext not in self.SHEET_IMAGE_TYPES:
+                return {"ok": False, "error": "use a png, jpg, gif or webp image"}
+            if os.path.getsize(src) > self.SHEET_IMAGE_MAX:
+                return {"ok": False, "error": "that image is over 8 MB"}
+            folder = os.path.join(DATA_DIR, "cheatsheets")
+            os.makedirs(folder, exist_ok=True)
+            name = "%d-%s%s" % (int(time.time() * 1000), uuid.uuid4().hex[:6], ext)
+            shutil.copyfile(src, os.path.join(folder, name))
+            return {"ok": True, "file": "data/cheatsheets/" + name, "name": os.path.basename(src)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def delete_sheet_image(self, file):
+        """Remove an image this app copied for a cheat sheet (only inside data/cheatsheets/)."""
+        try:
+            name = os.path.basename(str(file or "").split("?")[0])
+            if not re.fullmatch(r"[\w.\-]+", name) or os.path.splitext(name)[1].lower() not in self.SHEET_IMAGE_TYPES:
+                return {"ok": False, "error": "not a cheat sheet image"}
+            path = os.path.join(DATA_DIR, "cheatsheets", name)
+            if os.path.isfile(path):
+                os.remove(path)
+            return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 

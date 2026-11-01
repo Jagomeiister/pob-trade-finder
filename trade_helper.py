@@ -73,6 +73,10 @@ _JOINED = re.compile(r"^: ([^\s:]+) has joined the area\.$")
 _LEFT = re.compile(r"^: ([^\s:]+) has left the area\.$")
 _MODE = re.compile(r"^: (AFK|DND) mode is now (ON|OFF)\b")
 _ZONE = re.compile(r"^: You have entered (.+?)\.$")
+# [DEBUG Client] Generating level 13 area "1_1_town" with seed 1 — campaign ids carry the act
+# as their second number ("2_6_1" = Act 6); "2_11_..." is the epilogue / endgame
+_AREA_GEN = re.compile(r'^Generating level (\d+) area "([^"]+)"')
+_ACT_ID = re.compile(r"^\d+_(\d+)_")
 
 _ITEM = "Hi, I would like to buy your "
 _BULK = "Hi, I'd like to buy your "
@@ -175,9 +179,53 @@ def parse_line(line):
         m = _ZONE.match(msg)
         if m:
             return {"type": "zone", "time": t, "area": m.group(1)}
+        m = _AREA_GEN.match(msg)
+        if m:
+            a = _ACT_ID.match(m.group(2))
+            act = int(a.group(1)) if a else None
+            return {"type": "area", "time": t, "level": int(m.group(1)), "id": m.group(2),
+                    "act": act if act and 1 <= act <= 10 else None}
     except Exception:
         pass
     return None
+
+
+# -- test mode: made-up log lines -------------------------------------------------
+# Trade helper → Setup → Test mode shows what trades look like in game without a real
+# buyer. The lines go through parse_line like the real log, and every event gets
+# "test": True so the overlay never sends a command for it.
+TEST_BUYER = "PoBTF_TestBuyer"
+TEST_SELLER = "PoBTF_TestSeller"
+TEST_SCENARIOS = ("whisper", "bulk", "joined", "accepted", "left", "buying", "zone", "act")
+
+
+def test_lines(kind, league="Standard", act=1):
+    """kind (TEST_SCENARIOS) -> raw Client.txt lines, stamped now. 'whisper' and 'buying'
+    point at stash tab cells, so the outline can be tried too."""
+    stamp = time.strftime("%Y/%m/%d %H:%M:%S") + " 1 abc [INFO Client 1] "
+    if kind == "whisper":
+        msg = ['@From %s: Hi, I would like to buy your Tabula Rasa Simple Robe listed for 10 chaos in %s '
+               '(stash tab "Test sale"; position: left 3, top 5)' % (TEST_BUYER, league)]
+    elif kind == "bulk":
+        msg = ["@From %s: Hi, I'd like to buy your 20 Chaos Orb for my 1 Divine Orb in %s." % (TEST_BUYER, league)]
+    elif kind == "joined":
+        msg = [": %s has joined the area." % TEST_BUYER]
+    elif kind == "accepted":
+        msg = [": Trade accepted."]
+    elif kind == "left":
+        msg = [": %s has left the area." % TEST_BUYER]
+    elif kind == "buying":
+        msg = ['@To %s: Hi, I would like to buy your Goldrim Leather Cap listed for 1 chaos in %s '
+               '(stash tab "Shop"; position: left 1, top 1)' % (TEST_SELLER, league)]
+    elif kind == "zone":
+        msg = [": You have entered The Lower Prison."]
+    elif kind == "act":
+        a = max(1, min(10, int(act or 1)))
+        area = "1_%d_town" % a if a <= 5 else "2_%d_town" % a
+        msg = ['Generating level %d area "%s" with seed 1' % (a * 7, area)]
+    else:
+        raise ValueError("unknown test")
+    return [stamp.replace("[INFO", "[DEBUG") + m if kind == "act" else stamp + m for m in msg]
 
 
 # -- log tailing ----------------------------------------------------------------

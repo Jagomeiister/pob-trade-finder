@@ -86,5 +86,36 @@ for t in ts:
     t.join()
 check("concurrent closes of one window close it once", w.destroys == 1, w.destroys)
 
+
+# Trade helper → Setup → Test mode: made-up events reach the overlays marked test, nothing else
+class EvalWindow:
+    def __init__(self):
+        self.js = []
+
+    def evaluate_js(self, js):
+        self.js.append(js)
+
+
+api = make_api()
+cards, sheet = EvalWindow(), EvalWindow()
+api._overlay_windows = {"cards": cards, "sheet": sheet}
+api._sender = None
+r = api.trade_test("whisper", "Mercenaries")
+for t in threading.enumerate():
+    if t.name == "trade-test":
+        t.join(5)
+check("test whisper reaches the cards overlay as a test event", r["ok"] and len(cards.js) == 1 and
+      '"test": true' in cards.js[0] and "PoBTF_TestBuyer" in cards.js[0] and "Mercenaries" in cards.js[0], cards.js)
+check("test whisper doesn't reach the cheat sheet", not sheet.js, sheet.js)
+check("test mode never makes a chat sender", api._sender is None)
+api.trade_test("act", None, 6)
+for t in threading.enumerate():
+    if t.name == "trade-test":
+        t.join(5)
+check("test act goes to the cheat sheet too", sheet.js and '"act": 6' in sheet.js[-1] and '"test": true' in sheet.js[-1], sheet.js)
+cards.js[:] = []
+check("clear asks the cards overlay to drop test cards", api.trade_test("clear")["ok"] and "clear_tests" in cards.js[0], cards.js)
+check("unknown test refused", not api.trade_test("kick")["ok"])
+
 print("\n%d FAILED" % failures if failures else "\nALL TESTS PASSED")
 sys.exit(1 if failures else 0)

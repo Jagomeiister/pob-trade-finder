@@ -82,9 +82,10 @@ function refreshHotkeyStatus(promise) {
   }, function () { /* bridge gone */ });
 }
 
-// Settings → In game: the other two hotkeys (gui.py HOTKEY_DEFAULTS) and close-to-tray
+// Settings → In game: the other hotkeys (gui.py HOTKEY_DEFAULTS) and close-to-tray
 var EXTRA_HOTKEYS = [['pref-hotkey-app', 'app', 'hotkeyApp', 'shift+space'],
-                     ['pref-hotkey-trades', 'trades', 'hotkeyTrades', 'alt+t']];
+                     ['pref-hotkey-trades', 'trades', 'hotkeyTrades', 'alt+t'],
+                     ['pref-hotkey-sheet', 'sheet', 'hotkeySheet', 'alt+c']];
 function wireExtraHotkeys() {
   EXTRA_HOTKEYS.forEach(function (h) {
     var sel = document.getElementById(h[0]);

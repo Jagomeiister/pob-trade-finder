@@ -342,6 +342,7 @@ Trade helper → Setup pins them):
 | Ctrl+D | Price the item under your cursor |
 | Shift+Space | Brings this whole app over the game as an overlay (no title bar): builds, gear, the Trade helper and settings without alt-tabbing. Resize it from its edges or with − / + on the banner, and drag the banner to move it; it remembers both. Press the key again, Esc, **Back to the game** or click in the game to put it away. Settings → In game can make it see-through or keep it open when you click the game |
 | Alt+T | Show or hide the trade cards |
+| Alt+C | Show or hide the cheat sheet (see 5i2) |
 
 **Tray**: closing the window keeps the app running in the tray (bottom right of the taskbar).
 Click the icon to open it; right-click it for Open, Trade helper, Settings or **Quit**. You can
@@ -405,6 +406,13 @@ icon, or the tray menu), not another window. Over the game it opens with the app
 
 If Path of Exile runs as administrator and the app doesn't, Windows blocks the buttons from
 typing; Setup warns you. Run both the same way.
+
+**Test mode** (Setup → Test mode) shows what trades look like over the game without a real
+buyer. It makes up a buyer's whisper, a bulk whisper, the buyer arriving, "Trade accepted",
+the buyer leaving, your own buying whisper, or entering a zone. **▶ Whole trade** plays a
+complete trade over 12 seconds. These cards are marked **TEST**: their buttons send nothing
+to the game, and closing them saves nothing to Sales or Buyers. **Clear test cards** removes
+them. It works with the trade helper on or off.
 
 ## 5d. ⏳ Timeless jewels
 
@@ -531,6 +539,24 @@ With the trade helper on, entering an area that has a note shows a small card wi
 to the trade cards. It starts with the Act 1–3 Trials of Ascendancy. Add your own (or edit
 or delete them) in **Trade helper → Setup → Zone notes**. This only reads the chat log and
 shows text; it never does anything in the game.
+
+## 5i2. 📜 Cheat sheets
+
+Tools → **Cheat sheets** (or ⚙ Settings → In game → Cheat sheets…) has a sheet for each act,
+and **Alt+C** shows it over the game. Use ‹ › to change act; drag it by ⠿.
+
+- **Ready-made**, for Acts 1–10: the quests that give a passive skill point or respec points,
+  the Trials of Ascendancy (and which Labyrinth they open, with its area level), the bandit
+  rewards in Act 2, and the resistance penalty after Acts 5 and 10. The data comes from the
+  community Path of Exile Wiki (CC BY-NC-SA), credited on the sheet. Tick what you want shown.
+- **Your sheets**: your own notes and pictures (a route, a guide screenshot, a crafting
+  recipe) for one act or for every act. Pictures are copied into the app's `data\cheatsheets`
+  folder; nothing leaves your PC.
+- **Follow my act** (asks first) reads the game's log file to see which act you're in and turns
+  the sheet to it. It also marks the trial you're standing in. **Open it when a new act
+  starts** pops it up for you.
+- Width, size, opacity, 📌 Lock and Reset position are on the same page. **Pretend I entered
+  it** tries an act change without playing.
 
 ## 5j. 🃏 Div cards
 

@@ -315,7 +315,7 @@ body:not(.gui) .btn.act-search { background: var(--accent); border-color: var(--
 
 /* ---- mod colours (official trade-site hues via tokens) ---- */
 .lmod, .lmod.implicit { color: var(--magic); }
-.lmod.enchant, .lmod.crafted, .mod-text.crafted { color: var(--crafted); }
+.lmod.enchant, .lmod.crafted, .mod-text.crafted { color: var(--crafted); font-weight: 600; }
 .lmod.fractured, .mod-text.fractured { color: var(--fractured); }
 .lmod.veiled { color: var(--veiled); font-style: italic; }
 .lmod.exarch-tint { color: var(--exarch); }
@@ -686,6 +686,7 @@ body.gui .settings-section.gui-only { display: flex; }
 .pct.up { color: var(--success); }
 .pct.down { color: var(--danger); }
 .pct.flat { color: var(--text-3); }
+.pct-amt { margin-left: 0.4em; font-weight: 500; opacity: 0.85; }
 /* movers */
 .mk-mover-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .mk-mover-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; align-content: start; }

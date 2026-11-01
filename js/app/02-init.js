@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
     startArtCache(); // both windows load art from the on-disk cache
     if (OVERLAY) { overlayReady(hydrateFromBridge); return; } // price-check overlay: see block at the end
     if (TRADES) { tradesReady(hydrateFromBridge); return; } // in-game overlays (19-trades.js)
+    if (typeof SHEET_OV !== 'undefined' && SHEET_OV) { sheetReady(hydrateFromBridge); return; } // cheat sheet overlay (24-cheatsheets.js)
     window.hydrateFromBridge = hydrateFromBridge; // the Trade helper view re-reads what the overlay saved
     document.body.classList.add('gui');
     checkForUpdates();

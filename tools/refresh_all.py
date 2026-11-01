@@ -29,6 +29,7 @@ STEPS = [
     [sys.executable, "tools/make_jeweldata.py", "--fetch"],  # tree export + gems
     [sys.executable, "tools/make_timeless.py", "--update"],  # re-pin PoB timeless data (after jeweldata: needs tree)
     [sys.executable, "tools/make_treeview.py"],  # Skill tree view layout (after jeweldata: needs tree)
+    [sys.executable, "tools/make_cheatsheets.py"],  # leveling cheat sheets (Path of Exile Wiki)
     ["node", "test/test.js"],
     [sys.executable, "test/test_currency_feed.py"],
     ["node", "test/test_craft.js"],

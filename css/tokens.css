@@ -28,7 +28,7 @@
   --rare: #f0e070;
   --magic: #9a9aff;
   --normal: #d0ccc4;
-  --crafted: #b8b8ff;
+  --crafted: #38c6ff; /* crafted + enchant: light blue, clearly apart from the --magic mod text */
   --fractured: #c4b37e;
   --veiled: #a99cc8;
   --exarch: #ff9a76;
@@ -146,7 +146,7 @@
   --rare: #7a6200;
   --magic: #4646b0;
   --normal: #4a4338;
-  --crafted: #4b4bb8;
+  --crafted: #005b8f;
   --fractured: #6b5928;
   --veiled: #5e4f8a;
   --exarch: #a8401c;

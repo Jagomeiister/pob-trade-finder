@@ -97,6 +97,39 @@ for msg, want in cases:
     got = th.parse_line(P + msg)
     check("system line: " + want["type"] + (" " + str(want.get("on")) if "on" in want else ""), got == want, got)
 
+D = "2026/11/01 13:01:03 6845859 1186a886 [DEBUG Client 34424] "
+areas = [
+    ('Generating level 2 area "1_1_2" with seed 1977765330', {"level": 2, "id": "1_1_2", "act": 1}),
+    ('Generating level 45 area "2_6_town" with seed 1', {"level": 45, "id": "2_6_town", "act": 6}),
+    ('Generating level 68 area "2_10_1" with seed 5', {"level": 68, "id": "2_10_1", "act": 10}),
+    ('Generating level 67 area "2_11_endgame_town" with seed 1', {"level": 67, "id": "2_11_endgame_town", "act": None}),
+    ('Generating level 83 area "MapWorldsDunes" with seed 9', {"level": 83, "id": "MapWorldsDunes", "act": None}),
+]
+for msg, want in areas:
+    got = th.parse_line(D + msg)
+    check("area line -> act " + str(want["act"]), got == dict(want, type="area", time="2026/11/01 13:01:03"), got)
+
+# test mode: made-up lines go through the real parser
+want_types = {"whisper": "whisper", "bulk": "whisper", "joined": "joined", "accepted": "trade_accepted",
+              "left": "left", "buying": "whisper", "zone": "zone", "act": "area"}
+for kind in th.TEST_SCENARIOS:
+    evs = [th.parse_line(l) for l in th.test_lines(kind, "Mercenaries", 7)]
+    check("test line '%s' parses as %s" % (kind, want_types[kind]), evs and all(e and e["type"] == want_types[kind]
+          for e in evs), evs)
+w = th.parse_line(th.test_lines("whisper", "Mercenaries")[0])
+check("test whisper: trade with league and stash spot", w["dir"] == "in" and w["name"] == th.TEST_BUYER and
+      w["trade"]["league"] == "Mercenaries" and (w["trade"]["left"], w["trade"]["top"]) == (3, 5), w)
+check("test buying whisper goes out", th.parse_line(th.test_lines("buying")[0])["dir"] == "out")
+check("test bulk whisper is a bulk trade", th.parse_line(th.test_lines("bulk")[0])["trade"]["kind"] == "bulk")
+check("test act lines give acts 1-10", [th.parse_line(th.test_lines("act", act=a)[0])["act"] for a in (1, 5, 6, 10, 99)]
+      == [1, 5, 6, 10, 10])
+check("test zone has a starter zone note area", th.parse_line(th.test_lines("zone")[0])["area"] == "The Lower Prison")
+try:
+    th.test_lines("kick")
+    check("unknown test kind refused", False)
+except ValueError:
+    check("unknown test kind refused", True)
+
 garbage = ["", None, "random text", P, P + "#Global: hi", P + "$Trade: wtb stuff", P + "Local: SomeGuy has joined the area.",
            "2026/11/01 13:01:03 nonsense", P + "@From : x", P + "@From <x> : y", b"bytes", 12345,
            P + "[SCENE] Set Source [Lioneye's Watch]", P + ": Trade accepted. extra", "\x00\xff" * 50]

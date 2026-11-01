@@ -133,6 +133,18 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
   matters, or support both with a toggle.
 - [ ] **Overlay for the price-check pop-up (Ctrl+D)**: it's still a normal window. Consider
       the same borderless, clipped style as the other overlays.
+- [ ] **Gem setups: compare with your character** (asked 2026-11-01). The Gems view gets the
+      same "you have / missing" marks as the gear compare. It reads the socketed gems from the
+      imported character (`get-items`, `socketedItems`), already fetched by the gear compare.
+  - Match each PoB skill group by its gems, **not by slot**. Players put links in other items
+    than the PoB lists (e.g. the 6-link in the helmet, auras in the boots), so search every
+    item and report where each group actually is ("in your Helmet").
+  - Per gem: present / missing, level and quality vs the PoB, and awakened / transfigured /
+    Vaal variants counted as the same gem (with a note).
+  - Per group: are the gems linked together? Socket groups come from `sockets[].group`.
+    Report "5 of 6 linked" when one is in another link group.
+  - Disabled groups in the PoB (e.g. swap sets) only shown as info; the weapon swap counts as
+    its own place.
 
 ## 3b. Cheat sheets + what Scalpel has that we don't (compared 2026-11-01)
 
@@ -140,17 +152,24 @@ Source: Scalpel's README and repo (github.com/scalpelpoe/scalpel, AGPL-3.0). We 
 it works, but we can't copy its code or data files into this MIT project. Use original
 sources, or ask the author.
 
-- [ ] **Cheat sheets** (you asked for these 2026-11-01). An overlay sheet you open with a hotkey
-      or the PoB icon, showing:
-  - ready-made sheets: leveling per act (Acts 1–10: quests, skill points, trials,
-    layout tips) and league mechanics;
-  - your own sheets: text and images (e.g. a screenshot of a map-device setup or crafting
-    steps);
-  - optionally, the act sheet switching itself when Client.txt says you entered a new area
-    (display only, like zone notes).
-
-  Scalpel ships prefabs (`cheat-sheet-prefabs/`: acts, leagues, "simple" act sheets), but
-  we'd need our own content or a source we may use. Our zone notes are the start of this.
+- [x] **Cheat sheets** (built 2026-11-01, not released yet). Tools → Cheat sheets, plus an
+      overlay with its own hotkey (Alt+C):
+  - Ready-made per act 1–10, all from the PoE Wiki via `tools/make_cheatsheets.py` (CC BY-NC-SA,
+    credited on the sheet): skill point and respec quests, trials and which labyrinth they
+    open, bandit rewards, resistance penalties after Acts 5 and 10.
+  - Your own sheets: text + pictures, for one act or every act.
+  - "Follow my act" (asks first): reads Client.txt's `Generating level N area "2_6_town"` lines
+    and turns the sheet to that act; marks the trial you're standing in.
+  - Still to do: league mechanic sheets; layout tips per zone (needs a source we may use).
+  - [ ] In game: Alt+C shows / hides it; it follows the game window; drag, lock, opacity,
+        size and width work; "Follow my act" turns it when you change act.
+- [x] **Trade helper test mode** (built 2026-11-01, not released yet): Setup → Test mode makes up
+      whispers / arrivals / trade accepted / leaving / your own buy / a zone, through the real
+      log parser, as TEST cards in the overlay. Their buttons send nothing and nothing is saved.
+      "Whole trade" plays one out over 12 s; "Clear test cards" removes them.
+  - [ ] In game: try every test button and look at the cards over the game.
+- [x] Crafted / enchanted mods are bright light blue (and semi-bold), clearly apart from normal
+      mods (asked 2026-11-01).
 - [ ] **Dust explorer** (was parked as impossible; it isn't):
   - Scalpel's dust formula: dust = base × 125 × (20 − (84 − ilvl)), with ilvl clamped to
     65–84, × (1 + (2 × quality + 50 × influences) / 100).

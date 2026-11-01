@@ -116,6 +116,7 @@ function buyerFor(card) {
   return all[buyerKey(card)] || null;
 }
 function updateBuyer(card, fn) {
+  if (card.test) return; // test mode: nothing about made-up buyers is kept
   var all = loadBuyers(), k = buyerKey(card);
   if (!k) return;
   var b = all[k] || { name: card.name, account: card.account || null, names: [], completed: 0, spent: 0,
@@ -167,6 +168,16 @@ function priceText(price, currency) {
 window.__tradeEvent = function (ev) {
   if (!TRADE_CARDS || !ev) return false;
   if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch (e) { return false; } }
+  // the log reader may be running only for the cheat sheet: trades need the helper switched on
+  // (test mode's made-up events always show)
+  if (!ev.test && !tradePrefs().enabled) return false;
+  if (ev.type === 'clear_tests') {
+    tradeCards = tradeCards.filter(function (c) { return !c.test; });
+    if (zoneNote && zoneNote.test) zoneNote = null;
+    renderTrades();
+    return true;
+  }
+  if (ev.test && ev.type === 'whisper') overlayOpen = true;
   handleTradeEvent(ev);
   return true;
 };
@@ -189,8 +200,8 @@ function handleTradeEvent(ev) {
       } else {
         card = { id: ++tradeSeq, dir: dir, name: ev.name, guild: ev.guild || null, trade: ev.trade, text: ev.text,
                  lastText: null, at: now, time: ev.time, repeats: 1, joined: false, left: false,
-                 invitedAt: null, acceptHint: false, sent: {} };
-        var b = dir === 'in' ? buyerFor(card) : null;
+                 invitedAt: null, acceptHint: false, sent: {}, test: !!ev.test };
+        var b = dir === 'in' && !ev.test ? buyerFor(card) : null;
         card.hidden = !!(b && b.hidden);
         tradeCards.unshift(card);
         var autoOpen = tradePrefs().autoOpen;
@@ -225,7 +236,7 @@ function handleTradeEvent(ev) {
   } else if (ev.type === 'zone') {
     // zone notes: display only, from "You have entered <area>." in the log
     var note = tradePrefs().zoneNotes === false ? null : zoneNoteFor(ev.area);
-    zoneNote = note ? { area: ev.area, text: note } : null;
+    zoneNote = note ? { area: ev.area, text: note, test: !!ev.test } : null;
   } else {
     return;
   }
@@ -309,6 +320,13 @@ function playCustomSound(kind, p, vol) {
 
 // ---- one press = one chat command --------------------------------------------------
 async function tradeSend(card, action, text, btn) {
+  if (card.test) { // test mode: show what would happen, send nothing to the game
+    UI.toast('Test card: nothing sent (would send ' + action + (text ? ': "' + text + '"' : '') + ')', 'info');
+    card.sent[action + (text ? ':' + text : '')] = Date.now();
+    if (action === 'invite') card.invitedAt = card.invitedAt || Date.now();
+    renderTrades();
+    return true;
+  }
   if (!isGui() || !window.pywebview.api.trade_send) return false;
   if (btn) btn.disabled = true;
   var r;
@@ -332,6 +350,7 @@ function fillMsg(tpl, card) {
 // ---- outcomes --------------------------------------------------------------------------
 async function recordOutcome(card, outcome, opts) {
   opts = opts || {};
+  if (card.test) { UI.toast('Test card closed: not saved to your sales', 'info'); closeCard(card); return; }
   var t = card.trade || {};
   var league = t.league || document.getElementById('league').value;
   var price = opts.price != null ? opts.price : t.price;
@@ -378,6 +397,7 @@ function renderTradeCard(card) {
   var who = UI.el('b', 'tc-name', card.name);
   if (card.guild) who.title = '<' + card.guild + '>';
   head.appendChild(who);
+  if (card.test) head.appendChild(UI.chip('test', 'warn', 'tc-test'));
   if (card.dir === 'in') { var bb = buyerBadge(buyerFor(card)); if (bb) head.appendChild(bb); }
   if (card.joined && !card.left) head.appendChild(UI.chip('In your hideout', 'success', 'tc-here'));
   if (card.left) head.appendChild(UI.chip('Left', 'warn'));
@@ -548,9 +568,10 @@ function overlayLook(root, p) {
 // Drag: the grip reports how far the mouse moved and gui.py moves the window (pywebview's own
 // drag region leaves a white patch on see-through windows). Re-renders wait until it's dropped.
 var ovDrag = null;
-function overlayGrip(p, what) {
+function overlayGrip(p, what, name, rerender) {
   if (p.locked) return null; // 📌 Lock in Setup pins it where it is
-  var name = TRADE_ICON ? 'icon' : 'cards';
+  name = name || (TRADE_ICON ? 'icon' : 'cards');
+  rerender = rerender || renderTrades;
   var grip = UI.el('span', 'ov-grip', '⠿');
   grip.title = 'Drag to move ' + what + ' (lock it in Trade helper → Setup)';
   var pending = null, sending = false;
@@ -582,7 +603,7 @@ function overlayGrip(p, what) {
     ovDrag = null;
     pending = null;
     window.pywebview.api.overlay_drag(name, 'end', dx, dy);
-    renderTrades();
+    rerender();
   }
   grip.addEventListener('pointerup', drop);
   grip.addEventListener('pointercancel', drop);
@@ -683,10 +704,10 @@ window.__ovCount = function (n, cardsShowing) {
   return true;
 };
 
-function fitOverlay(name) {
+function fitOverlay(name, rootId) {
   if (!isGui() || !window.pywebview.api.overlay_fit) return;
   requestAnimationFrame(function () {
-    var root = document.getElementById('trades-root');
+    var root = document.getElementById(rootId || 'trades-root');
     if (!root) return;
     var r = root.getBoundingClientRect();
     window.pywebview.api.overlay_fit(name, Math.ceil(r.width) + 2, Math.ceil(r.height) + 2);
@@ -719,7 +740,9 @@ async function refreshOverlayStatus() {
 window.__tradePrefsChanged = async function () {
   if (!TRADE_OVERLAY) return false;
   if (tradeHydrate) { try { await tradeHydrate(); } catch (e) { /* keep */ } }
-  tradeCards.forEach(function (c) { var b = c.dir === 'in' ? buyerFor(c) : null; c.hidden = !!(b && b.hidden); });
+  // the cheat sheet's "follow my act" was switched on / off: start or stop the log reader
+  if (TRADE_CARDS && tradeReaderOn !== null && logReaderWanted() !== tradeReaderOn) startTradeHelper();
+  tradeCards.forEach(function (c) { var b = c.dir === 'in' && !c.test ? buyerFor(c) : null; c.hidden = !!(b && b.hidden); });
   overlayWanted = null;
   refreshOverlayStatus();
   renderTrades();
@@ -991,6 +1014,46 @@ function renderBuyersPage(body) {
   });
 }
 
+// ---- Setup → Test mode: made-up trades in the in-game overlay -----------------------------
+// gui.py runs made-up Client.txt lines through the real parser and hands the events to the
+// overlays marked test: buttons on those cards send nothing and nothing is saved.
+var TRADE_TESTS = [
+  ['whisper', 'Buyer whispers', 'An item trade from the trade site, with a stash tab spot'],
+  ['bulk', 'Bulk whisper', 'A currency exchange whisper'],
+  ['joined', 'Buyer arrives', 'The buyer joins your hideout (needs a buyer card)'],
+  ['accepted', 'Trade accepted', 'The trade window was accepted'],
+  ['left', 'Buyer leaves', 'The buyer left your hideout'],
+  ['buying', 'You buy', 'Your own whisper to a seller'],
+  ['zone', 'Enter a zone', 'Shows the zone note for The Lower Prison']
+];
+function renderTradeTestMode(sec) {
+  if (!isGui() || !window.pywebview.api.trade_test) return;
+  sec.appendChild(UI.el('h3', 'trade-h3', 'Test mode'));
+  sec.appendChild(UI.el('p', 'finder-sub', 'See what trades look like over the game without a real buyer: these make up ' +
+    'trade events and show them as cards marked TEST. Their buttons send nothing to the game and nothing is saved. ' +
+    'Works with the trade helper on or off. Switch to the game to look at them.'));
+  var row = UI.el('div', 'trade-row trade-test-row');
+  function run(kind, btn) {
+    btn.disabled = true;
+    var league = (document.getElementById('league') || {}).value || 'Standard';
+    Promise.resolve(window.pywebview.api.trade_test(kind, league)).then(function (r) {
+      btn.disabled = false;
+      if (!r || !r.ok) UI.toast('Test failed: ' + ((r && r.error) || 'no answer'), 'danger');
+      else if (kind === 'full') UI.toast('Playing a whole trade over 12 s: switch to the game', 'info');
+    }, function () { btn.disabled = false; });
+  }
+  var full = UI.button('primary', { size: 'sm', label: '▶ Whole trade', title: 'Whisper, arrives, accepts, leaves (12 s)',
+    onClick: function () { run('full', full); } });
+  row.appendChild(full);
+  TRADE_TESTS.forEach(function (t) {
+    var b = UI.button('ghost', { size: 'sm', label: t[1], title: t[2], onClick: function () { run(t[0], b); } });
+    row.appendChild(b);
+  });
+  var clear = UI.button('ghost', { size: 'sm', label: 'Clear test cards', onClick: function () { run('clear', clear); } });
+  row.appendChild(clear);
+  sec.appendChild(row);
+}
+
 // ---- Setup -----------------------------------------------------------------------------
 function renderTradeSetup(body) {
   var p = tradePrefs();
@@ -1020,6 +1083,7 @@ function renderTradeSetup(body) {
       'the buttons from typing in the game. Run both the same way.'));
   }
   if (st.chatKeyName) sec.appendChild(UI.el('p', 'finder-sub', 'Chat key (from your game settings): ' + st.chatKeyName));
+  renderTradeTestMode(sec);
 
   function setPref(k, v) { var q = tradePrefs(); q[k] = v; saveTradePrefs(q); }
   function toggle(label, on, onChange) {
@@ -1217,10 +1281,17 @@ async function setTradeEnabled(on) {
   await startTradeHelper();
 }
 
+// one log reader for both users of Client.txt: the trade helper and the cheat sheet's
+// "follow my act" (24-cheatsheets.js); each was switched on by the user with its own consent
+var tradeReaderOn = null;
+function logReaderWanted() {
+  return !!tradePrefs().enabled || (typeof sheetWantsLog === 'function' && sheetWantsLog());
+}
 async function startTradeHelper() {
   if (!isGui() || !window.pywebview.api.trade_enable) return;
   var p = tradePrefs();
-  try { tradeStatus = await window.pywebview.api.trade_enable(!!p.enabled, p.logPath || null); }
+  tradeReaderOn = logReaderWanted();
+  try { tradeStatus = await window.pywebview.api.trade_enable(tradeReaderOn, p.logPath || null); }
   catch (e) { tradeStatus = { ok: false, error: String(e) }; }
   if (TRADE_OVERLAY) refreshOverlayStatus();
   renderTrades();
@@ -1324,6 +1395,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var opener = document.getElementById('open-trades');
   if (opener) opener.addEventListener('click', function () { closeSettings(); openTradesWindow(); });
   if (!TRADES) { // the main window: the Trade helper is one of its views
+    if (typeof SHEET_OV !== 'undefined' && SHEET_OV) return; // the cheat sheet overlay (24-cheatsheets.js)
     var view = document.getElementById('view-trades');
     if (view) mountTradeHelper(view, true);
     return;

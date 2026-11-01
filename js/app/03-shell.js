@@ -185,10 +185,10 @@ var VIEW_ORDER = ['gear', 'jewels', 'flasks', 'gems', 'timeless', 'finder', 'uni
 var MASTER_DETAIL = { gear: true, jewels: true, flasks: true };
 var VIEW_LABELS = { gear: 'Gear', jewels: 'Jewels & clusters', flasks: 'Flasks', gems: 'Gems',
                     timeless: 'Timeless jewels', finder: 'Jewel finder', uniques: 'Watcher\'s Eye & co.', search: 'Search text', divcards: 'Div cards', tree: 'Skill tree', pasted: 'Pasted item',
-                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper' };
+                    planner: 'Upgrade planner', market: 'Market', stash: 'Stash value', trades: 'Trade helper', sheets: 'Cheat sheets' };
 // icons carry the narrow-window rail, where labels are hidden (labels stay as tooltips)
 var VIEW_ICONS = { gear: '⚔', jewels: '◈', flasks: '⚗', gems: '◆', pasted: '📋', planner: '🛒',
-                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝' };
+                   timeless: '⏳', finder: '🔍', uniques: '👁', search: '🔤', divcards: '🃏', tree: '🌳', market: '📈', stash: '💰', trades: '🤝', sheets: '📜' };
 
 function viewSection(k) { return document.querySelector('#results > .tab-section[data-tab="' + k + '"]'); }
 
@@ -199,6 +199,7 @@ function setView(k) {
   if (k === 'divcards') loadDivcardsView(); // drop data + prices load on first open
   if (k === 'tree') showTreeView(); // the canvas is sized and drawn once it's visible
   if (k === 'trades') showTradeHelperView(); // re-reads what the overlay saved
+  if (k === 'sheets') renderSheetsView(); // cheat sheets: built-in acts + your own
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
     if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -238,10 +239,10 @@ function renderNav() {
   var items = ['gear', 'jewels', 'flasks', 'gems', 'pasted'].filter(viewSection);
   if (items.length) { nav.appendChild(UI.el('div', 'nav-group', 'Items')); items.forEach(item); }
   nav.appendChild(UI.el('div', 'nav-group', 'Tools'));
-  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'market', 'stash', 'trades'].filter(function (k) {
+  ['planner', 'tree', 'timeless', 'finder', 'uniques', 'search', 'divcards', 'sheets', 'market', 'stash', 'trades'].filter(function (k) {
     if (k === 'stash') return OAUTH.signedIn; // official login only
     if (k === 'trades') return isGui();
-    return k === 'planner' || k === 'market' || viewSection(k);
+    return k === 'planner' || k === 'market' || k === 'sheets' || viewSection(k);
   }).forEach(item);
   setView(document.body.dataset.view || 'gear');
 }

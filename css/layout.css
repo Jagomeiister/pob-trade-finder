@@ -246,9 +246,11 @@ body[data-view="flasks"] .tab-section.master-detail[data-tab="flasks"] { display
 body[data-view="planner"] #view-planner,
 body[data-view="market"] #view-market,
 body[data-view="stash"] #view-stash,
-body[data-view="trades"] #view-trades { display: block; }
-/* the Trade helper works without a build: it takes the landing's place */
-body:not(.has-build)[data-view="trades"] #input-panel { display: none; }
+body[data-view="trades"] #view-trades,
+body[data-view="sheets"] #view-sheets { display: block; }
+/* the Trade helper and cheat sheets work without a build: they take the landing's place */
+body:not(.has-build)[data-view="trades"] #input-panel,
+body:not(.has-build)[data-view="sheets"] #input-panel { display: none; }
 #view-trades .trades-root { display: block; }
 /* a pasted item without a loaded build still shows under the landing */
 body:not(.has-build) .tab-section[data-tab="pasted"] { display: block; margin-top: 16px; }
@@ -460,6 +462,55 @@ body.trade-cards .trades-root:hover { opacity: 1; }
   border: 1px solid var(--border); border-left: 3px solid var(--info); border-radius: var(--r-md); box-shadow: 0 4px 14px var(--shadow); }
 .ov-zone-area { color: var(--info); white-space: nowrap; }
 .ov-zone-text { flex: 1; min-width: 0; color: var(--text-2); font-size: var(--fs-sm); }
+/* cheat sheets (js/app/24-cheatsheets.js): the overlay (?sheet=1) and the Tools → Cheat sheets page */
+.sheet-root { display: inline-block; padding: 2px; opacity: var(--ov-opacity, .92); transition: opacity .15s; }
+.sheet-root:hover { opacity: 1; }
+.sheet-panel { background: var(--s1); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--r-md); box-shadow: 0 4px 14px var(--shadow); overflow: hidden; }
+.sheet-head { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 6px; background: var(--s2);
+  border-bottom: 1px solid var(--border); }
+.sheet-title { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600;
+  font-size: var(--fs-sm); }
+.sheet-follow-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.sheet-body { padding: 8px 10px; }
+.sheet-content { display: flex; flex-direction: column; gap: 8px; }
+.sheet-sec-title { color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: 2px; }
+.sheet-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.sheet-li { display: flex; align-items: baseline; gap: 6px; color: var(--text); font-size: var(--fs-sm); line-height: 1.45; }
+.sheet-li.is-here { color: var(--success); font-weight: 600; }
+.sheet-li.sheet-sub { color: var(--text-2); font-style: italic; }
+.sheet-tag { flex: none; min-width: 4.6em; text-align: center; padding: 0 4px; border-radius: var(--r-sm);
+  font-size: var(--fs-xs); font-weight: 600; color: var(--c, var(--text-2)); border: 1px solid var(--c, var(--border)); }
+.sheet-tag.is-point { --c: var(--success); }
+.sheet-tag.is-respec { --c: var(--info); }
+.sheet-tag.is-trial { --c: var(--warn); }
+.sheet-user-text { color: var(--text); font-size: var(--fs-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sheet-img { display: block; max-width: 100%; margin-top: 6px; border-radius: var(--r-sm); }
+.sheet-empty { color: var(--text-3); font-style: italic; font-size: var(--fs-sm); }
+.sheet-foot { color: var(--text-3); font-size: var(--fs-xs); border-top: 1px solid var(--border); padding-top: 4px; }
+.sheets-page { display: flex; flex-direction: column; gap: 10px; }
+.sheet-controls { display: flex; flex-direction: column; gap: 8px; }
+.sheets-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .sheets-cols { grid-template-columns: minmax(0, 1fr); } }
+.sheets-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sheet-acts { display: flex; flex-wrap: wrap; gap: 4px; }
+.sheet-act-btn { min-width: 34px; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--s2); color: var(--text-2); font: inherit; cursor: pointer; }
+.sheet-act-btn:hover { color: var(--text); border-color: var(--border-strong, var(--border)); }
+.sheet-act-btn[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.sheet-panel.is-preview { padding: 8px 10px; }
+.sheet-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.sheet-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sheet-editor { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--s1);
+  border: 1px solid var(--border); border-radius: var(--r-md); }
+.sheet-title-input { width: 100%; }
+.sheet-textarea { width: 100%; font: inherit; color: var(--text); background: var(--s2); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 8px; resize: vertical; }
+.sheet-pics { display: flex; flex-wrap: wrap; gap: 8px; }
+.sheet-pic { position: relative; }
+.sheet-pic .sheet-img { height: 72px; width: auto; margin: 0; border: 1px solid var(--border); }
+.sheet-pic .btn-icon { position: absolute; top: 2px; right: 2px; background: var(--s2); }
 .zone-notes { display: flex; flex-direction: column; gap: 4px; }
 .zone-row { display: flex; align-items: center; gap: 8px; }
 .zone-area { min-width: 190px; font-size: var(--fs-sm); }

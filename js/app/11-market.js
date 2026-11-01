@@ -309,6 +309,8 @@ function marketStats(it) {
   return { now: last[1], vol: med, thin: med < THIN_MARKET_CHAOS,
            ch24: dayAgo && dayAgo[1] ? (last[1] - dayAgo[1]) / dayAgo[1] : null,
            ch7: s.length > 1 && s[0][1] ? (last[1] - s[0][1]) / s[0][1] : null,
+           d24: dayAgo && dayAgo[1] ? last[1] - dayAgo[1] : null,
+           d7: s.length > 1 && s[0][1] ? last[1] - s[0][1] : null,
            lo: Math.min.apply(null, vals), hi: Math.max.apply(null, vals) };
 }
 
@@ -321,13 +323,24 @@ function marketPoints(code) {
 
 // "▲ 12.3%": arrow + number, never colour alone
 // costly: a rise is bad news (build cost), so it takes the "down" colour
-function pctChip(x, costly) {
+// amt: the same change in chaos, shown after the % as "+45c" or "+1.4 div"
+function pctChip(x, costly, amt) {
   var span = UI.el('span', 'pct');
   if (x === null || x === undefined || !isFinite(x)) { span.textContent = '—'; return span; }
   var p = x * 100;
   span.textContent = Math.abs(p) < 0.05 ? '±0.0%' : (p > 0 ? '▲ ' : '▼ ') + Math.abs(p).toFixed(1) + '%';
   span.classList.add(Math.abs(p) < 0.05 ? 'flat' : (p > 0) !== !!costly ? 'up' : 'down');
+  var a = Math.abs(p) < 0.05 ? '' : amtText(amt);
+  if (a) span.appendChild(UI.el('span', 'pct-amt', a));
   return span;
+}
+
+// signed chaos change → "+45c", or "+1.4 div" once it is worth a divine or more
+function amtText(chaos) {
+  if (chaos === null || chaos === undefined || !isFinite(chaos) || chaos === 0) return '';
+  var dr = market && RATES[market.league] && RATES[market.league].divine;
+  var sign = chaos > 0 ? '+' : '−', v = Math.abs(chaos);
+  return sign + (dr && v >= dr ? fmtCompact(v / dr) + ' div' : fmtCompact(v) + 'c');
 }
 
 function mPrice(chaos) {
@@ -532,7 +545,7 @@ function renderMovers() {
       t.appendChild(UI.el('span', 'mk-name', it.name));
       t.appendChild(UI.el('span', 'mk-sub', mPrice(it.st.now)));
       b.appendChild(t);
-      b.appendChild(pctChip(it.st[key]));
+      b.appendChild(pctChip(it.st[key], false, it.st[key === 'ch24' ? 'd24' : 'd7']));
       b.addEventListener('click', function () { selectMarketItem(c, true); });
       col.appendChild(b);
     });
@@ -683,7 +696,7 @@ async function renderChartCard() {
   if (pts.length > 1) {
     var vals = pts.map(function (p) { return p.v; });
     var first = pts[0].v, lastV = pts[pts.length - 1].v;
-    [['Change', pctChip(first ? (lastV - first) / first : null)],
+    [['Change', pctChip(first ? (lastV - first) / first : null, false, first ? lastV - first : null)],
      ['Low', document.createTextNode(fmtCompact(Math.min.apply(null, vals)) + 'c')],
      ['High', document.createTextNode(fmtCompact(Math.max.apply(null, vals)) + 'c')],
      ['Typical volume', document.createTextNode(fmtCompact(it.st.vol) + 'c / hour')]].forEach(function (s) {
@@ -716,7 +729,7 @@ function renderWatch() {
     if (alerts[c]) bell.title = 'Price alert set';
     b.appendChild(bell);
     b.appendChild(UI.el('span', 'mk-num', mPrice(it.st.now)));
-    b.appendChild(pctChip(it.st.ch24));
+    b.appendChild(pctChip(it.st.ch24, false, it.st.d24));
     b.title = it.name + ' — 24h change' + (alerts[c] ? ' · price alert set' : '');
     b.addEventListener('click', function () { selectMarketItem(c); renderWatch(); });
     list.appendChild(b);
@@ -821,9 +834,9 @@ function renderMarketTable() {
     } },
     { key: 'now', label: 'Price', num: true, sort: function (r) { return r.it.st.now; }, render: function (r) { return mPrice(r.it.st.now); } },
     { key: 'ch24', label: '24h', num: true, sort: function (r) { return r.it.st.ch24 === null ? -Infinity : r.it.st.ch24; },
-      render: function (r) { return pctChip(r.it.st.ch24); } },
+      render: function (r) { return pctChip(r.it.st.ch24, false, r.it.st.d24); } },
     { key: 'ch7', label: '7 days', num: true, sort: function (r) { return r.it.st.ch7 === null ? -Infinity : r.it.st.ch7; },
-      render: function (r) { return pctChip(r.it.st.ch7); } },
+      render: function (r) { return pctChip(r.it.st.ch7, false, r.it.st.d7); } },
     { key: 'range', label: '7-day range', num: true, sort: function (r) { return r.it.st.hi; },
       render: function (r) { return fmtCompact(r.it.st.lo) + ' – ' + fmtCompact(r.it.st.hi) + 'c'; } },
     { key: 'vol', label: 'Volume / h', num: true, sort: function (r) { return r.it.st.vol; }, render: function (r) {

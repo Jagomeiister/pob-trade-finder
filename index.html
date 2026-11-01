@@ -161,6 +161,15 @@
             <option value="off">Off</option>
           </select>
         </label>
+        <label class="field">
+          <span class="field-label">Show / hide the cheat sheet</span>
+          <select id="pref-hotkey-sheet" title="Shows or hides your cheat sheet over the game (Tools → Cheat sheets)">
+            <option value="alt+c">Alt+C</option>
+            <option value="ctrl+shift+c">Ctrl+Shift+C</option>
+            <option value="f7">F7</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
         <div id="hotkey-status" class="hotkey-status"></div>
         <label class="field">
           <span class="field-label">App over the game: see-through</span>
@@ -178,6 +187,7 @@
         </div>
         <div class="input-row">
           <button id="open-trades" class="btn btn-secondary btn-sm" title="Cards for trade whispers, your sales and buyer notes (reads Client.txt once you switch it on)">🤝 Trade helper…</button>
+          <button id="open-sheets" class="btn btn-secondary btn-sm" title="Leveling cheat sheets over the game: skill points, trials, bandits per act, and your own notes">📜 Cheat sheets…</button>
         </div>
       </section>
       <section class="settings-section gui-only">
@@ -293,6 +303,7 @@
 
     <!-- views (body[data-view]) -->
     <div id="view-trades" class="view-panel"></div>
+    <div id="view-sheets" class="view-panel"></div>
     <div id="view-planner" class="view-panel">
       <div id="planner-empty" class="empty-state">
         <div class="empty-title">Nothing priced yet</div>
@@ -389,9 +400,9 @@
   // js/app/: one program split by feature — order matters (docs/DEVELOPER.md)
   var APP = ['01-state', '02-init', '03-shell', '04-library', '05-craft', '06-jewels', '07-history-gems',
              '08-cards', '09-query', '10-character', '11-market', '12-cost', '13-builds-tracking',
-             '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade', '19-trades', '20-unique-jewels', '21-search-text', '22-divcards', '23-tree'];
+             '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade', '19-trades', '20-unique-jewels', '21-search-text', '22-divcards', '23-tree', '24-cheatsheets'];
   ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
-   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/watcherseye.js', 'data/forbidden.js', 'data/mapmods.js', 'data/treeview.js','data/sample.js',
+   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/watcherseye.js', 'data/forbidden.js', 'data/mapmods.js', 'data/treeview.js', 'data/cheatsheets.js', 'data/sample.js',
    'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js'].concat(APP.map(function (n) {
     return 'js/app/' + n + '.js';
   })).forEach(function (src) {
