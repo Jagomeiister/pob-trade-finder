@@ -24,6 +24,8 @@ STEPS = [
     [sys.executable, "tools/make_watcherseye.py"],
     [sys.executable, "tools/make_forbidden.py"],
     [sys.executable, "tools/make_mapmods.py"],
+    [sys.executable, "tools/make_searchdata.py"],  # search text: scarabs, tattoos, gems, Heist, Gwennen bases
+    [sys.executable, "tools/make_itemmods.py"],    # search text: item mods per base group
     [sys.executable, "tools/make_divcards.py"],
     [sys.executable, "tools/make_currencymap.py"],  # after make_baseicons (needs base_items)
     [sys.executable, "tools/make_craftdata.py", "--fetch"],  # after currencymap + ranges

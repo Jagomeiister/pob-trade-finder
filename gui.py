@@ -1075,6 +1075,24 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    def beast_prices(self, league):
+        """Search text → Beasts: every captured beast poe.ninja prices, from the backend's
+        snapshot: [[name, chaos, listings], ...], plus chaos per divine."""
+        try:
+            data = self._ninja_prices(league)
+            lines = (((data or {}).get("types") or {}).get("Beast") or {}).get("lines") or []
+            best = {}
+            for l in lines:
+                n = l.get("n")
+                if n and (n not in best or (l.get("c") or 0) < (best[n].get("c") or 0)):
+                    best[n] = l
+            div_id = (self._currency_map.get("divine") or {}).get("id")
+            rates, _ = self._feed.rates(league, [div_id]) if div_id else ({}, None)
+            return {"ok": True, "divine": rates.get(div_id) if div_id else None,
+                    "items": [[n, l.get("c", 0), l.get("lc")] for n, l in best.items()]}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     @staticmethod
     def _ninja_match(data, item):
         """Best poe.ninja line for a pasted item: uniques by name (+ links), gems by name,
