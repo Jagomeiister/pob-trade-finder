@@ -42,6 +42,8 @@ index.html + js/*  ──────────────►  any browser   
 | Method | Purpose |
 |---|---|
 | `fetch_pob_link(url)` | Fetch a PoB code from pobb.in/pastebin/poe.ninja (host-allowlisted) |
+| `guides_data()` | Mechanic guides from the app's server (`server/public/guides.json`), cached to `data/guides_cache.json`; the page keeps whichever of it and the shipped `data/guides.js` has the newer `version` |
+| `open_url(url)` | Opens allow-listed sites, or an http(s) URL that exactly matches a source listed in the guide data (Read more links) |
 | `trade_search(league, payloadJson, background=False)` | POST search; returns first 10 listings + up to 100 ids. `background` (saved-build daily re-pricing) paces at `BG_INTERVAL` and is refused during any cooldown |
 | `trade_fetch(searchId, idsJson)` | One further page (≤10 ids, ids validated) |
 | `exchange_rates(league, currenciesJson)` | Median chaos rate per currency from GGG bulk exchange, 30-min cache |
@@ -452,3 +454,19 @@ type scale, radii; themes are `data-theme` / `data-accent` / `data-contrast` att
 `<html>`), `base.css`, `components.css`, `layout.css`. Add new colours as tokens, never
 inline. Legacy variable names (`--panel`, `--gold`, `--dim`…) alias the new tokens until
 the v2.0 redesign finishes migrating components — see `docs/UI-PLAN.md`.
+
+
+## Mechanic guides (Cheat sheets)
+
+- `tools/guides/guides-<patch>.json` is the raw research: 21 guides, each claim checked by three
+  verifiers against its source and the patch notes (the `poe-mechanic-guides` workflow). Keep it
+  as the record; never hand-edit it.
+- `tools/guides/corrections-<patch>.json` fixes what a later review found (removed maps, outdated
+  advice…). Each entry has a reason and, for new facts, a source. A `match` that no longer hits
+  exactly one place stops the build.
+- `tools/make_guides.py` applies the corrections and writes `data/guides.js` +
+  `server/public/guides.json`; `tools/make_syndicate.py` builds the Syndicate planner data
+  (`data/syndicate.js`) from the same input. Run both, then `test/test_guides.py`.
+- Each league: re-run the research workflow (or add corrections from the patch notes), bump the
+  file names to the new patch, regenerate, push to main: the server serves the new guides without
+  an app release.

@@ -690,6 +690,30 @@ and **Alt+C** shows it over the game. Use ‹ › to change act; drag it by ⠿.
   **Pretend I entered it** tries an act change, and **Pretend I entered its area** a
   mechanic's suggestion, without playing.
 
+## 5i3. 📖 Mechanic guides and the Syndicate planner
+
+Every league mechanic sheet (Betrayal, Blight, Delve, Incursion, Expedition, Heist, Sanctum,
+Ultimatum, Ritual, Harvest, Breach, Legion, Abyss, Delirium, Bestiary, Eldritch altars, Essences,
+Kingsmarch, vendor recipes, Mercenaries, Atlas strategies) now has a full guide above its tables.
+
+- **As of 3.29**: the guides were researched from written community guides (Maxroll, poe-vault,
+  Mobalytics, the PoE Wiki and others) and GGG's patch notes, every point checked against its
+  source. Each guide says when it was checked; things can change with the next league.
+- **Your stage**: pick All, League start, Mid, Late or SSF and only the advice for that stage shows.
+- **Sections**: how to run it, strategies (investment, steps, atlas passives, scarabs), dangers,
+  what to sell, rough community profit estimates (with who reported them and when), changes by
+  patch, and **Read more** links to the written guides. **Jump to** at the top goes straight to a
+  section or to the reference tables.
+- **In game** (Alt+C): a short quick card and the strategy names; **Reference** shows the tables
+  (and Blight's anoint helper).
+- **Syndicate planner** (Betrayal sheet): set up your board as it is in game (each member's
+  division and rank, leaders, unassigned or away), pick a goal (Research benches, Intervention
+  scarabs, Aisling, Vorici, Catarina, or the 2-2-5-5 currency board) and it lists the next moves:
+  who to execute, interrogate, betray or release, which safehouse to run or leave, and why. Your
+  board is saved.
+- The guides update from the app's server, so fixes and the next league's changes arrive without
+  a new download.
+
 ## 5j. 🃏 Div cards
 
 Tools → **Div cards** shows where each divination card drops and what it's worth.
