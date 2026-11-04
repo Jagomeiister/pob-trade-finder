@@ -754,6 +754,20 @@ body.gui .settings-section.gui-only { display: flex; }
 }
 /* Search text builder (js/app/21-search-text.js) */
 .st > .segmented { align-self: flex-start; }
+.st-tabs { flex-wrap: wrap; max-width: 100%; }
+.st-help { margin: 0; }
+.st-section { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); }
+.st-section > summary { padding: 6px 10px; cursor: pointer; color: var(--text); font-size: var(--fs-sm); font-weight: 600; }
+.st-section > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.st-section > :not(summary) { padding: 4px 10px 10px; }
+.st-section .st-list { max-height: 40vh; }
+.st-sub { display: block; color: var(--text-3); font-size: var(--fs-xs); }
+.st-wrap .toggle { min-width: 9.5em; }
+.st-opts { font-size: var(--fs-sm); }
+.st-status:empty { display: none; }
+.st-bases { margin: 0; }
+.st-combos { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.st-combos > .btn { align-self: flex-start; }
 .st-body { display: flex; flex-direction: column; gap: 6px; }
 .st-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .st-list { display: flex; flex-direction: column; max-height: 55vh; overflow-y: auto; border: 1px solid var(--border);

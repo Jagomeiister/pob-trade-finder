@@ -217,6 +217,7 @@ STUB_JS = r"""
     notify: function () { return { ok: true }; },
     open_url: function () { return { ok: true }; },
     unique_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },  // dust explorer
+    beast_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },   // search text: beasts
     // loot filter: no filter files unless a scenario provides some
     filter_list: function () { return { ok: true, dir: 'C:\\Users\\me\\Documents\\My Games\\Path of Exile', exists: true, filters: [] }; },
     filter_read: function () { return { ok: false, error: 'stub: no filter' }; },
@@ -2059,15 +2060,125 @@ def scenario_search(s, tag):
     r = s.run(S22_SEARCH, timeout=60)
     check(tag + " Search text view visible with the map mods", r["visible"] and r["mods"] > 60, (r["visible"], r["mods"]))
     t = r["tokens"]
-    want = '"!%s|%s" "%s" "m q.*(\d{3}|[6-9]\d)%%"' % (t["regen"], t["vuln"], t["pen"])
+    want = '"!%s|%s" "%s" "m q.*([6-9]\d|\d{3})%%"' % (t["regen"], t["vuln"], t["pen"])
     check(tag + " avoid + want + quantity build one search string", r["text"] == want, (r["text"], want))
-    check(tag + " length shown against the 50 limit", r["count"] == "%d / 50" % len(want), r["count"])
+    check(tag + " length shown against the 250 limit", r["count"] == "%d / 250" % len(want), r["count"])
     check(tag + " filter narrows the list", 0 < r["filtered"] < 15, r["filtered"])
     check(tag + " Copy puts it on the clipboard", r["clip"] == want, r["clip"])
     check(tag + " Paste into game sends that text (one press)", r["paste"] == want, r["paste"])
     check(tag + " presets save and load", r["cleared"] == "" and r["loaded"] == want, (r["cleared"], r["loaded"]))
     check(tag + " own words: any / none", r["anyWords"] == '"movement speed|r-g-b"' and
           r["noneWords"] == '"!movement speed|r-g-b"', (r["anyWords"], r["noneWords"]))
+
+
+S46_REGEX = r"""
+const H = window.__e2e;
+await H.loadBuild();
+const out = {};
+const D = await ensureSearchData();
+const SC = D.scarabs.slice(0, 3);
+// prices: three scarabs (cx feed), three beasts, three uniques on two bases
+const cx = { divine: { name: 'Divine Orb', cat: 'Currency', img: '', s: [[1, 200, 100]] } };
+SC.forEach((s, i) => { cx['sc' + i] = { name: s.n, cat: 'Fragments, Scarabs & Mapping', img: '', s: [[1, [40, 15, 2][i], 50]] }; });
+window.__stubOverrides.cx_overview = { ok: true, hour: 1, items: cx };
+window.__stubOverrides.beast_prices = { ok: true, divine: 200, items: [['Vivid Vulture', 60, 20], ['Wild Bristle Matron', 30, 15],
+  ['Fenumal Plagued Arachnid', 2, 30]] };
+const belt = D.gwennen.find(b => b.n === 'Leather Belt'), heavy = D.gwennen.find(b => b.n === 'Heavy Belt');
+window.__stubOverrides.unique_prices = { ok: true, divine: 200, items: [['Headhunter', 'Leather Belt', 8000, 40, 'UniqueAccessory'],
+  ['Mageblood', 'Heavy Belt', 30000, 50, 'UniqueAccessory'], ['Goldrim', 'Leather Cap', 1, 100, 'UniqueArmour']] };
+setView('search');
+await H.sleep(30);
+const sec = document.querySelector('.tab-section[data-tab="search"]');
+const text = () => sec.querySelector('.st-text').value;
+const tab = async id => { sec.querySelector('.st-tabs [data-value="' + id + '"]').click(); await H.sleep(40); };
+const num = (label, v) => { const i = sec.querySelector('input[aria-label="' + label + '"]'); i.value = v; i.dispatchEvent(new Event('input')); };
+out.tabs = [...sec.querySelectorAll('.st-tabs [data-value]')].map(b => b.textContent);
+// vendor: 4 linked + R-G-B in any order + boots
+await tab('vendor');
+[...sec.querySelectorAll('label.toggle')].find(l => l.textContent === '4 linked').querySelector('input').click();
+H.button(sec, 'Chromatic recipe (R-G-B)').click(); await H.sleep(10);
+[...sec.querySelectorAll('label.toggle')].find(l => l.textContent === 'Boots').querySelector('input').click();
+await H.sleep(10);
+out.vendor = text();
+// scarabs: price from 10 -> the two dearer ones
+await tab('scarabs');
+await H.waitFor(() => /Prices for/.test(H.text('.st-status', sec)), 4000, 'scarab prices');
+num('Lowest price in chaos', '10'); await H.sleep(10);
+H.button(sec, 'Pick the dearest in range').click(); await H.sleep(20);
+out.scarabs = text();
+out.scarabToks = SC.map(s => s.t || ('^' + s.n.toLowerCase() + '$'));
+out.scarabChips = [...sec.querySelectorAll('.st-mod .badge')].map(b => b.textContent);
+// beasts: tokens made here, unique among the priced beasts
+await tab('beasts');
+await H.waitFor(() => sec.querySelectorAll('.st-mod').length === 3, 4000, 'beasts');
+num('Lowest price in chaos', '20'); await H.sleep(10);
+H.button(sec, 'Pick the dearest in range').click(); await H.sleep(20);
+out.beasts = text();
+// Gwennen: bases priced by their dearest unique
+await tab('gwennen');
+await H.waitFor(() => sec.querySelectorAll('.st-mod').length >= 2, 4000, 'gwennen');
+out.gwennenRows = [...sec.querySelectorAll('.st-mod .st-mod-text')].map(e => e.textContent);
+num('Lowest price in chaos', '1000'); await H.sleep(10);
+H.button(sec, 'Pick the dearest in range').click(); await H.sleep(20);
+out.gwennen = text();
+out.beltToks = [belt && belt.t, heavy && heavy.t];
+// gems: the build's gems + level 20
+await tab('gems');
+await H.waitFor(() => sec.querySelectorAll('.st-mod').length > 50, 4000, 'gems');
+H.button(sec, "Add my build's gems").click(); await H.sleep(20);
+num('Minimum gem level', '20'); await H.sleep(10);
+out.gems = text();
+// heist: Gianna preset
+await tab('heist');
+await H.waitFor(() => H.button(sec, 'Gianna (Deception, Perception, Counter-Thaumaturgy)'), 4000, 'heist');
+H.button(sec, 'Gianna (Deception, Perception, Counter-Thaumaturgy)').click(); await H.sleep(30);
+out.heist = text();
+// items: rings, life 70+ (rare), then magic names
+await tab('items');
+await H.waitFor(() => sec.querySelector('select[aria-label="Base group"]'), 6000, 'item mods');
+const gs = sec.querySelector('select[aria-label="Base group"]');
+const ring = [...gs.options].find(o => o.textContent === 'Ring') || [...gs.options].find(o => /ring/i.test(o.textContent));
+gs.value = ring.value; gs.dispatchEvent(new Event('change')); await H.sleep(30);
+const lifeRow = () => [...sec.querySelectorAll('.st-mod')].find(r => /to maximum Life$/.test(r.querySelector('.st-mod-text').firstChild.textContent));
+out.ring = ring.textContent;
+const lr = lifeRow();
+out.lifeFound = !!lr;
+if (lr) { const mn = lr.querySelector('input[type=number]'); mn.value = '70'; mn.dispatchEvent(new Event('input')); await H.sleep(10); }
+out.itemsRare = text();
+sec.querySelector('.segmented[aria-label="Rarity"] [data-value="magic"]').click(); await H.sleep(30);
+out.itemsMagic = text();
+// the result box: limit, custom text
+out.count = H.text('.st-result .badge', sec);
+return out;
+"""
+
+
+def scenario_regex(s, tag):
+    s.fresh()
+    r = s.run(S46_REGEX, timeout=90)
+    check(tag + " every poe.re-style tab is there", r["tabs"] == ["Maps", "Vendor", "Items", "Flasks", "Gems", "Scarabs", "Tattoos",
+          "Beasts", "Gwennen", "Heist", "Your own words"], r["tabs"])
+    check(tag + " vendor: 4 linked or R-G-B, on boots", r["vendor"].startswith('"ts:.*(\\w-){3}\\w|ts:.*(') and
+          'r-g-b' in r["vendor"] and r["vendor"].endswith('"ss: (boots)"'), r["vendor"])
+    t = r["scarabToks"]
+    check(tag + " scarabs: the two in range, dearest first", r["scarabs"] == '"%s|%s"' % (t[0], t[1]), (r["scarabs"], t))
+    check(tag + " scarab prices shown", "40c" in r["scarabChips"] and "15c" in r["scarabChips"], r["scarabChips"])
+    b = r["beasts"].strip('"').split("|")
+    check(tag + " beasts: the two dear ones, each a unique piece of its name", len(b) == 2 and
+          b[0] in "vivid vulture" and b[1] in "wild bristle matron" and b[0] not in "wild bristle matron", r["beasts"])
+    check(tag + " Gwennen: only priced bases, dearest first", r["gwennenRows"][:2] == ["Heavy Belt", "Leather Belt"] or
+          [x.split("best")[0] for x in r["gwennenRows"][:2]] == ["Heavy Belt", "Leather Belt"], r["gwennenRows"])
+    check(tag + " Gwennen: bases with a unique worth 1000c+", r["gwennen"] == '"%s|%s"' % (r["beltToks"][1], r["beltToks"][0]),
+          (r["gwennen"], r["beltToks"]))
+    check(tag + " gems: the build's gems and level 20+", r["gems"].count("|") >= 2 and
+          r["gems"].endswith('"level: ([2-9]\\d|\\d{3})"'), r["gems"])
+    check(tag + " heist: Gianna's jobs with levels", r["heist"].startswith('"') and ".*[1-2]" in r["heist"] and
+          ".*[1-3]" in r["heist"] and r["heist"].count("|") == 2, r["heist"])
+    check(tag + " items: ring life 70+ as the rolled value", r["lifeFound"] and
+          r["itemsRare"].startswith('"([7-9]\\d|\\d{3})\\(.*') , (r["ring"], r["itemsRare"]))
+    check(tag + " items: magic picks the affix names", r["itemsMagic"].startswith('"^(') and r["itemsMagic"].endswith(') "'),
+          r["itemsMagic"])
+    check(tag + " limit shown as 250", r["count"].endswith("/ 250"), r["count"])
 
 
 S23_HABITS = r"""
@@ -2929,7 +3040,7 @@ want('Bleeding immunity').click(); await H.sleep(10);
 want('Instant recovery').click(); await H.sleep(10);
 out.flaskText = sec.querySelector('.st-text').value;
 tab('Vendor').click(); await H.sleep(10);
-want('Chromatic recipe (R, G and B linked)').click(); await H.sleep(10);
+H.button(sec, 'Chromatic recipe (R-G-B)').click(); await H.sleep(10);
 out.vendorText = sec.querySelector('.st-text').value;
 tab('Flasks').click(); await H.sleep(10);
 out.flaskKept = sec.querySelector('.st-text').value;
@@ -2993,7 +3104,7 @@ def scenario_quickwins(s, tag):
           in r["gemUrl"], (r["gemUrl"], r["gemName"]))
     check(tag + " flasks tab builds the search", r["flaskRows"] >= 15 and r["flaskText"] == '"bleed|nt recovery|d instantly"',
           r["flaskText"])
-    check(tag + " vendor tab builds the search", r["vendorText"] == '"r-g-b|r-b-g|g-r-b|g-b-r|b-r-g|b-g-r"', r["vendorText"])
+    check(tag + " vendor tab builds the search", r["vendorText"] == '"ts:.*(r-g-b|r-b-g|g-r-b|g-b-r|b-r-g|b-g-r)"', r["vendorText"])
     check(tag + " each tab keeps its picks", r["flaskKept"] == r["flaskText"], r["flaskKept"])
     check(tag + " default macros (no /hideout)", r["macroDefaults"] == ["/kingsmarch", "/menagerie", "/delve", "/exit"],
           r["macroDefaults"])
@@ -4725,6 +4836,7 @@ SCENARIOS = [
     ("43 lootfilter", scenario_lootfilter),
     ("44 settingstabs", scenario_settings_tabs),
     ("45 patchnotes", scenario_patch_notes),
+    ("46 regex", scenario_regex),
     ("47 filtereditor", scenario_filter_editor),
 ]
 

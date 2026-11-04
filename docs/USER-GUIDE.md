@@ -586,19 +586,51 @@ Tools → **Search text** builds the text you type into the game's search box (C
 poe.re:
 
 - **Maps**: mark mods **✗ avoid** or **✓ want**. Each mod is searched by the shortest piece of
-  its text that no other map mod (or map name) has, so every roll matches. You can also add
-  **Item quantity ≥** a number, and choose whether the wanted mods are *any* or *all*.
+  its text that no other map mod (or map name) has, so every roll matches. Wanted mods can be
+  *any* or *all* of them.
+  - **Totals**: at least this much item quantity, pack size, item rarity, more maps, more
+    currency, more scarabs or more div cards. They must all be met, or tick *Any one of these
+    is enough*. **Shorter numbers** rounds each minimum down to tens for a shorter search.
+  - **Quality**: plain quality or a quality type (pack size, rarity, currency, div cards,
+    scarabs).
+  - **Rarity, corrupted, map type**: normal / magic / rare / unique, corrupted or not,
+    unidentified or not, and Shaper / Elder / Originator / Blighted / Blight-ravaged maps.
+  - **Price note**: maps in a premium tab priced between two numbers.
+- **Vendor**, for levelling:
+  - 2 to 6 linked sockets, 6 sockets, and linked colours in any order (e.g. Red-Red-Any, or the
+    chromatic recipe R-G-B).
+  - At least N sockets of a colour in one linked group.
+  - Mods: movement speed (any, or 15%+), + level of socketed or spell gems, added damage to
+    spells or attacks, spell / physical damage, attack / cast speed, life, resistances, energy
+    shield.
+  - Item type (boots, wands…) and rarity narrow everything down.
+- **Items**: pick a base group (e.g. Ring, Body Armour (Armour/Evasion), Life Flask, Jewel) and
+  the mods it can roll.
+  - **Rare**: give a minimum for a mod's first number. It's matched on the rolled value, not the
+    tier range. Items need *all* the picks, *any* of them, or a ticked prefix and a ticked
+    suffix.
+  - **Magic**: matches the affix names in the item's name, for alteration crafting. Pick the
+    lowest tier you'd keep for each mod.
 - **Flasks**: tick the mods you want (bleeding / freeze / shock / ignite / poison immunity,
   increased effect, reduced charges per use, instant recovery…). Each is searched by a piece of
   the mod's own text, so every tier matches, and each was checked against every flask mod so
   it finds only the one it names.
-- **Vendor**: for levelling vendors: the chromatic recipe (R, G and B linked), 3 / 4 / 5 linked
-  sockets, movement speed, + level of socketed gems, added spell damage, life.
+- **Gems**: tick gems, filter by kind or colour, or **Add my build's gems**. You can also ask for
+  at least a level or quality, and corrupted or not. For Lilly and other vendors, or your gem
+  tab.
+- **Scarabs**, **Tattoos** (and runegrafts), **Beasts** and **Gwennen** are priced from the
+  league's markets. Set a price range and **Pick the dearest in range**: it ticks the dearest
+  first until the search box is full. You can also tick them by hand.
+  - Gwennen ranks each base by the dearest unique on it, so you can buy her best gambles.
+  - Beasts are the ones poe.ninja prices. A rare beast with a similar name may light up too.
+- **Heist**: contracts by job and level range (with a Gianna preset), and by target. A contract
+  can need both a job and a target, or either.
 - **Your own words**: one word or phrase per line, matching any, all or none of them.
-- The box counts characters against the game's limit of 50.
+- The box counts characters against the game's limit of 250. **Add my own text** puts your own
+  text after the search, and **Copy automatically** copies it on every change.
 - **Copy** the text, or **Paste into game**: one press, with your stash or a vendor open,
   does Ctrl+F and pastes. Nothing is sent and your clipboard is put back.
-- **Save preset** keeps a search for next time.
+- **Save preset** keeps every tab's picks for next time.
 
 ## 5h. Learned filters
 

@@ -9,6 +9,10 @@ checksums in `data/timeless.json`. The lookup tables are downloaded on first use
 from that commit. `timeless.py` reads them the same way PoB's
 `DataLegionLookUpTableHelper` does.
 
+Search text (`tools/make_searchdata.py`) takes each tattoo's and runegraft's stat
+text and each unique's base type from Path of Building's data as exported by
+RePoE (`repoe-fork.github.io/pob-data/poe1`).
+
 ```
 Copyright (c) 2016 David Gowor
 
