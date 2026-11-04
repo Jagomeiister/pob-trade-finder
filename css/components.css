@@ -965,6 +965,15 @@ body.gui .settings-section.gui-only { display: flex; }
 .guide-bar-label { color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
 .guide-stage-seg .seg { font-size: var(--fs-sm); }
 .guide-hidden-count { color: var(--text-3); font-size: var(--fs-xs); }
+/* the jump bar under the as-of note: a link per section, then Reference data */
+.guide-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.guide-jump .guide-bar-label { margin-right: 2px; }
+.guide-jump-link { padding: 2px 9px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--s1);
+  color: var(--text-2); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; }
+.guide-jump-link:hover { color: var(--text); border-color: var(--border-strong); background: var(--s2); }
+.guide-jump-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.guide-jump-link.is-ref { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); color: var(--text); }
+.guide-sec, .guide-ref { scroll-margin-top: 72px; }
 .guide-summary { display: block; max-width: 92ch; color: var(--text); font-size: var(--fs-md); line-height: 1.55; }
 /* sections: one bordered row each, the summary is the click target */
 .guide-sec { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); }
@@ -1054,13 +1063,21 @@ body.gui .settings-section.gui-only { display: flex; }
 .guide-ref-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .guide-ref-title { margin: 0; color: var(--text); font-size: var(--fs-lg); font-weight: 700; }
 .guide-ref-head .sheet-filter { flex: 1; max-width: 320px; }
-/* over the game: quick card + strategy names */
+/* over the game: a Quick card | Reference tab switch; the quick card, the strategy names folded */
+.guide-ov [hidden] { display: none !important; }
+.guide-ov-tabs { align-self: flex-start; }
+.guide-ov-pane { display: flex; flex-direction: column; gap: 8px; }
+.guide-ov-toggle { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer;
+  color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.guide-ov-toggle:hover { color: var(--text); }
+.guide-ov-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r-sm); }
+.guide-ov-toggle-n { padding: 0 6px; border-radius: var(--r-pill); background: var(--s3); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.guide-ov-strats { margin-top: 4px; }
 .guide-ov .sheet-li { align-items: baseline; flex-wrap: wrap; gap: 2px 6px; }
 .guide-ov .guide-stages { margin-left: 0; }
 .guide-quick-text { min-width: 0; }
 .guide-quick .sheet-li::before { content: '•'; color: var(--accent); flex: none; }
 .guide-ov-more { color: var(--text-3); font-size: var(--fs-xs); font-style: italic; }
-.guide-ov-ref { border-top: 1px solid var(--border); padding-top: 6px; }
 .reduce-motion .guide-src { transition: none; }
 
 /* ---- syndicate planner (js/app/34-syndicate.js): inside the Syndicate mechanic sheet ---- */
@@ -1076,8 +1093,14 @@ body.gui .settings-section.gui-only { display: flex; }
 .synd-goal-rules { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: var(--fs-xs); line-height: 1.45; }
 .synd-note { margin: 6px 0 0; color: var(--text-3); font-size: var(--fs-xs); }
 .synd-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: start; }
-.synd-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-@container (min-width: 1240px) { .synd-main { grid-template-columns: minmax(0, 1fr) 380px; } }
+.synd-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; container-type: inline-size; }
+/* Next moves beside the board. The planner sits in the mechanic sheet panel (max 1120px, about
+   1065px inside), so the breakpoint has to be below that; the board and pools then size to the
+   left column (.synd-left is their container). The list scrolls on its own and stays in view. */
+@container (min-width: 880px) {
+  .synd-main { grid-template-columns: minmax(0, 1fr) 320px; }
+  .synd-side { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow-y: auto; }
+}
 /* the board: one column per division, rows by rank, like the game's */
 .synd-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 @container (max-width: 720px) { .synd-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -1102,6 +1125,15 @@ body.gui .settings-section.gui-only { display: flex; }
 .synd-row.is-leader-row { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .synd-row-label { padding-top: 5px; color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
 .synd-slot { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* four narrow columns (the board beside Next moves): rank labels go above the cards so the
+   cards get the column's full width, and long house names wrap their chip under them.
+   (After the base rules: a container query adds no specificity.) */
+@container (min-width: 721px) and (max-width: 860px) {
+  .synd-row { grid-template-columns: minmax(0, 1fr); gap: 2px; min-height: 0; }
+  .synd-row-label { padding-top: 0; }
+  .synd-col-title { flex-wrap: wrap; }
+  .synd-col-name { flex-basis: 100%; }
+}
 .synd-empty { align-self: center; color: var(--text-3); font-size: var(--fs-xs); font-style: italic; }
 .synd.is-picking .synd-row, .synd.is-picking .synd-pool { cursor: pointer; }
 .synd.is-picking .synd-row:hover, .synd.is-picking .synd-pool:hover, .synd-row.is-drop, .synd-pool.is-drop {
@@ -1158,7 +1190,7 @@ body.gui .settings-section.gui-only { display: flex; }
 .synd-side { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); }
 .synd-side-title { margin-bottom: 6px; color: var(--text); font-weight: 700; font-size: var(--fs-md); }
 .synd-moves { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; margin: 0; padding: 0; list-style: none; }
-@container (min-width: 900px) and (max-width: 1239px) { .synd-moves { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (min-width: 640px) and (max-width: 879px) { .synd-moves { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .synd-move { padding: 5px 8px; border-left: 3px solid var(--border-strong); border-radius: var(--r-sm); background: var(--s2); }
 .synd-move.is-run { border-left-color: var(--success); }
 .synd-move.is-warn { border-left-color: var(--warn); }

@@ -4,7 +4,13 @@ cheat sheet, drawn by js/app/33-guides.js inside the sheet.
 
 Input: tools/guides/guides-<patch>.json, the result of a verified research run
 ({asOf, guides: [...], verifiedCounts, criticGaps}). Every line in it cites written sources
-(guide.readMore, by index). This script only checks and reshapes it; it writes nothing of its own:
+(guide.readMore, by index). The research file is the record and is never edited by hand: content
+errors found after the run are fixed in tools/guides/corrections-<patch>.json, which this script
+(and tools/make_syndicate.py) applies before anything else. Each correction names a guide, a path,
+an action (replace / delete / add), the exact text it expects to find, a reason, and a source URL
+when it changes or adds a fact; one that no longer matches stops the build (see apply_corrections).
+Apart from the corrections, this script only checks and reshapes the research; it writes nothing of
+its own:
 - guide ids become cheat sheet ids (betrayal -> syndicate); a guide with no sheet yet gets a sheet
   entry in "sheets" (the page adds it to the sheet list, with no wiki tables)
 - the internal "gaps" lists are dropped, and so are empty fields and the Betrayal "planner" (the
@@ -16,8 +22,12 @@ Input: tools/guides/guides-<patch>.json, the result of a verified research run
 The version is a YYYYMMDDHHMM stamp; it only moves when the content changes, and the page keeps
 whichever copy (shipped or server) has the higher one.
 
+data/syndicate.js (tools/make_syndicate.py) is built from the same research + corrections; this
+script refuses to write when that file is for another patch (asOf) or another research file.
+
   python tools/make_guides.py [tools/guides/guides-3.29.json] [--checked YYYY-MM-DD]
 """
+import copy
 import datetime
 import glob
 import json
@@ -30,6 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_JS = os.path.join(ROOT, "data", "guides.js")
 OUT_JSON = os.path.join(ROOT, "server", "public", "guides.json")
 SHEETS_JS = os.path.join(ROOT, "data", "cheatsheets.js")
+SYNDICATE_JS = os.path.join(ROOT, "data", "syndicate.js")
 CURRENCYMAP = os.path.join(ROOT, "data", "currencymap.json")
 
 STAGES = ("league-start", "mid", "late", "ssf", "all")
@@ -99,6 +110,218 @@ def check_stage(where, stage):
 def patch_key(p):
     m = re.match(r"(\d+)\.(\d+)(?:\.(\d+))?", p or "")
     return tuple(int(x or 0) for x in m.groups()) if m else (-1, 0, 0)
+
+
+# -- corrections ----------------------------------------------------------------------------------
+# tools/guides/corrections-<patch>.json: {"research": "guides-<patch>.json", "corrections": [...]}.
+# Each correction:
+#   id      unique name (shown in errors)
+#   guide   research guide id ("betrayal", not the sheet id "syndicate")
+#   path    where in that guide: keys and [index] / [text] steps, e.g. "howTo", "summary",
+#           "strategies[Cache farming].steps", "tables[S tier].rows". [text] picks the one list
+#           element whose text / name / title / goal / url (or, for a table row, its cells) contains it
+#   action  replace: path is a string -> `match` (found exactly once) becomes `value`;
+#                    path is a list   -> the one element containing `match` is changed: a string
+#                    `value` replaces `match` inside it, any other `value` replaces the whole element
+#           delete:  path is a list -> the one element containing `match` is removed
+#           add:     path is a list -> `value` is appended (or inserted after the one element
+#                    containing `match`, when given). A source added to readMore must be new.
+#   value   new text / element. A "cite" list in it may name sources by URL (they must be in the
+#           guide's readMore; add them first), and an add to a "cite" list may be a URL too.
+#   reason  why (required)
+#   source  https URL or list of URLs backing the change (required for replace and add)
+# A correction whose path or match no longer fits (0 or 2+ hits) is an error, so a research update
+# can't silently leave a stale fix behind.
+ACTIONS = ("replace", "delete", "add")
+SOURCE_RE = re.compile(r"^https://[^\s/]+\.[^\s/]+\S*$")
+PATH_TOKEN = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_]*)|\[([^\]]+)\]")
+LABEL_KEYS = ("text", "name", "title", "goal", "url")
+
+
+def corrections_path(research_path):
+    """tools/guides/guides-3.29.json -> tools/guides/corrections-3.29.json"""
+    folder, base = os.path.split(research_path)
+    return os.path.join(folder, re.sub(r"^guides-", "corrections-", base))
+
+
+def load_corrections(research_path):
+    """(corrections list, file path) for a research file; ([], None) when it has no corrections file."""
+    path = corrections_path(research_path)
+    if not os.path.exists(path):
+        return [], None
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    need(isinstance(doc, dict) and isinstance(doc.get("corrections"), list), "%s: no corrections list" % path)
+    need(doc.get("research") == os.path.basename(research_path),
+         "%s is for %r, not %s" % (os.path.basename(path), doc.get("research"), os.path.basename(research_path)))
+    return doc["corrections"], path
+
+
+def label(x):
+    """The text a list element is picked by."""
+    if isinstance(x, str):
+        return x
+    if isinstance(x, dict):
+        return next((x[k] for k in LABEL_KEYS if isinstance(x.get(k), str)), "")
+    if isinstance(x, list):
+        return " | ".join(c for c in x if isinstance(c, str))
+    return ""
+
+
+def pick(items, needle, where):
+    hits = [i for i, x in enumerate(items) if needle in label(x)]
+    need(len(hits) == 1, "%s: %d elements contain %r (need exactly 1)" % (where, len(hits), needle))
+    return hits[0]
+
+
+def walk_path(guide, path, where):
+    """(parent, key) of the value a correction path addresses."""
+    tokens, pos = [], 0
+    while pos < len(path):
+        m = PATH_TOKEN.match(path, pos)
+        need(m and m.end() > pos, "%s: bad path %r" % (where, path))
+        tokens.append(m.group(1) if m.group(1) is not None else ("[]", m.group(2)))
+        pos = m.end()
+    need(tokens, "%s: empty path" % where)
+    parent, key, cur = None, None, guide
+    for t in tokens:
+        if isinstance(t, tuple):
+            need(isinstance(cur, list), "%s: %r: not a list before [%s]" % (where, path, t[1]))
+            if re.match(r"^\d+$", t[1]):
+                key = int(t[1])
+                need(key < len(cur), "%s: %r: index %d out of range" % (where, path, key))
+            else:
+                key = pick(cur, t[1], "%s %r" % (where, path))
+        else:
+            need(isinstance(cur, dict) and t in cur, "%s: %r: no %r" % (where, path, t))
+            key = t
+        parent, cur = cur, cur[key]
+    return parent, key
+
+
+def cite_index(guide, c, where):
+    """A cite given as a readMore URL -> its index."""
+    if isinstance(c, int) and not isinstance(c, bool):
+        return c
+    urls = [r.get("url") for r in guide.get("readMore", [])]
+    need(isinstance(c, str) and urls.count(c) == 1, "%s: cite %r is not a readMore source (add it first)" % (where, c))
+    return urls.index(c)
+
+
+def with_cites(value, guide, where):
+    if isinstance(value, dict) and isinstance(value.get("cite"), list):
+        return dict(value, cite=[cite_index(guide, c, where) for c in value["cite"]])
+    return value
+
+
+def replace_once(text, match, value, where):
+    need(text.count(match) == 1, "%s: %r appears %d times (need exactly 1)" % (where, match, text.count(match)))
+    need(isinstance(value, str), "%s: replacing text needs a text value" % where)
+    return text.replace(match, value)
+
+
+def apply_one(guide, c, where):
+    action, match, value = c.get("action"), c.get("match"), c.get("value")
+    need(action in ACTIONS, "%s: action must be one of %s" % (where, ", ".join(ACTIONS)))
+    need(is_text(c.get("reason")), "%s: no reason" % where)
+    src = c.get("source")
+    srcs = src if isinstance(src, list) else ([src] if src is not None else [])
+    need(all(isinstance(s, str) and SOURCE_RE.match(s) for s in srcs), "%s: source must be https URL(s)" % where)
+    need(srcs or action == "delete", "%s: a %s needs a source URL" % (where, action))
+    need(is_text(c.get("path")), "%s: no path" % where)
+    need(action == "add" or is_text(match), "%s: no match" % where)
+    need(action == "delete" or value is not None, "%s: no value" % where)
+    parent, key = walk_path(guide, c["path"], where)
+    target = parent[key]
+    if action == "replace" and isinstance(target, str):
+        parent[key] = replace_once(target, match, value, where)
+        return
+    need(isinstance(target, list), "%s: %r is not a list" % (where, c["path"]))
+    if action == "add":
+        if key == "cite":
+            idx = cite_index(guide, value, where)
+            need(idx not in target, "%s: already cites %r" % (where, value))
+            target.append(idx)
+            return
+        if key == "readMore":
+            need(isinstance(value, dict) and value.get("url") not in [r.get("url") for r in target],
+                 "%s: readMore already lists %r" % (where, value.get("url") if isinstance(value, dict) else value))
+        value = with_cites(copy.deepcopy(value), guide, where)
+        if is_text(match):
+            target.insert(pick(target, match, where) + 1, value)
+        else:
+            target.append(value)
+        return
+    i = pick(target, match, where)
+    if action == "delete":
+        del target[i]
+        return
+    el = target[i]
+    if not isinstance(value, str):  # the whole element
+        need(type(value) is type(el), "%s: value is a %s, the element a %s" % (where, type(value).__name__, type(el).__name__))
+        target[i] = with_cites(copy.deepcopy(value), guide, where)
+    elif isinstance(el, str):
+        target[i] = replace_once(el, match, value, where)
+    elif isinstance(el, dict):
+        k = next(k for k in LABEL_KEYS if isinstance(el.get(k), str))
+        el[k] = replace_once(el[k], match, value, where)
+    else:  # a table row: the one cell holding the text
+        cells = [j for j, x in enumerate(el) if isinstance(x, str) and match in x]
+        need(len(cells) == 1, "%s: %d cells contain %r" % (where, len(cells), match))
+        el[cells[0]] = replace_once(el[cells[0]], match, value, where)
+
+
+def apply_corrections(research, corrections):
+    """Apply the corrections to the research (in place, in file order). Returns ({guide id: count},
+    [problems]); any problem means the corrections no longer fit the research."""
+    guides = {g.get("id"): g for g in research.get("guides", [])}
+    counts, problems, ids = {}, [], set()
+    for n, c in enumerate(corrections):
+        where = "correction %d (%s)" % (n, c.get("id") if isinstance(c, dict) else "?")
+        try:
+            need(isinstance(c, dict) and is_text(c.get("id")), "%s: no id" % where)
+            need(c["id"] not in ids, "%s: duplicate id" % where)
+            ids.add(c["id"])
+            need(c.get("guide") in guides, "%s: no guide %r" % (where, c.get("guide")))
+            apply_one(guides[c["guide"]], c, where)
+            counts[c["guide"]] = counts.get(c["guide"], 0) + 1
+        except Bad as e:
+            problems.append(str(e))
+    return counts, problems
+
+
+def corrected_research(path):
+    """(research with its corrections applied, corrections file or None, {guide: count}).
+    Raises Bad when a correction does not apply."""
+    with open(path, encoding="utf-8") as f:
+        research = json.load(f)
+    corrections, cpath = load_corrections(path)
+    counts, problems = apply_corrections(research, corrections)
+    if problems:
+        raise Bad("%d correction(s) in %s no longer apply:\n    %s"
+                  % (len(problems), os.path.basename(cpath), "\n    ".join(problems)))
+    return research, cpath, counts
+
+
+def check_syndicate(asof, research_path, cpath):
+    """data/syndicate.js must come from the same research file, corrections and patch."""
+    try:
+        with open(SYNDICATE_JS, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return "data/syndicate.js is missing: run python tools/make_syndicate.py"
+    m = re.search(r"window\.POE_SYNDICATE\s*=\s*(\{.*\})\s*;\s*$", text, re.S)
+    if not m:
+        return "data/syndicate.js does not parse"
+    syn = json.loads(m.group(1))
+    source = syn.get("source") or ""
+    if str(syn.get("asOf")) != asof:
+        return "data/syndicate.js is as of %r but the research is as of %r: run python tools/make_syndicate.py" % (
+            syn.get("asOf"), asof)
+    for name in [os.path.basename(research_path)] + ([os.path.basename(cpath)] if cpath else []):
+        if name not in source:
+            return "data/syndicate.js was not built from %s (source %r): run python tools/make_syndicate.py" % (name, source)
+    return None
 
 
 def clean_line(item, keys):
@@ -259,11 +482,12 @@ def main(argv):
         checked = argv[i + 1] if i + 1 < len(argv) else None
         args = [a for a in args if a != checked]
     path = args[0] if args else default_input()
-    with open(path, encoding="utf-8") as f:
-        research = json.load(f)
+    research, cpath, fixed = corrected_research(path)  # the record stays untouched on disk
     if not checked:  # the day the research run was saved
         checked = datetime.date.fromtimestamp(os.path.getmtime(path)).isoformat()
     need(re.match(r"^\d{4}-\d{2}-\d{2}$", checked or ""), "--checked must be YYYY-MM-DD")
+    syndicate = check_syndicate(str(research.get("asOf") or "").strip(), path, cpath)
+    need(not syndicate, syndicate)
     sheets = load_sheet_ids()
     guides, extra, problems = {}, {}, []
     for g in research.get("guides", []):
@@ -300,8 +524,9 @@ def main(argv):
     data = dict({"version": stamp}, **data)
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     with open(OUT_JS, "w", encoding="utf-8", newline="\n") as f:
-        f.write("// generated by tools/make_guides.py from %s: strategy guides for the mechanic cheat sheets\n"
-                % os.path.relpath(path, ROOT).replace("\\", "/"))
+        f.write("// generated by tools/make_guides.py from %s%s: strategy guides for the mechanic cheat sheets\n"
+                % (os.path.relpath(path, ROOT).replace("\\", "/"),
+                   " + " + os.path.basename(cpath) if cpath else ""))
         f.write("// (community research summary; every line cites the written sources in its guide's readMore)\n")
         f.write("window.POE_GUIDES = " + payload + ";\n")
     with open(OUT_JSON, "w", encoding="utf-8", newline="\n") as f:
@@ -315,6 +540,8 @@ def main(argv):
           % (stamp, data["asOf"], checked))
     print("  %d guides (%s), %d extra sheet(s): %s" % (len(guides), ", ".join(order), len(extra),
                                                        ", ".join(extra) or "none"))
+    print("  %d corrections from %s (%s)" % (sum(fixed.values()), os.path.basename(cpath) if cpath else "no corrections file",
+                                            ", ".join("%s %d" % kv for kv in sorted(fixed.items())) or "none"))
     print("  " + ", ".join("%s %d" % (k, v) for k, v in counts.items()) + ", icons %d" % len(data["icons"]))
     print("  size %.1f KB (largest: %s)" % (size / 1024.0, ", ".join("%s %.0f KB" % (s, b / 1024.0) for b, s in per[:4])))
     if size > SIZE_WARN:

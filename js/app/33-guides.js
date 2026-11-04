@@ -7,17 +7,20 @@
 // sheet id a summary, how to run it, strategies, dangers, what to sell, rough profit, changes by
 // patch, tables and the written sources (readMore) every line cites by index. mechanicContent()
 // (24-cheatsheets.js) hands a sheet that has a guide to guideContent():
-// - in the app (Tools → Cheat sheets): the whole guide with a stage filter, collapsible sections,
-//   [n] cite markers that jump to Read more, GGG icons for currency / scarab names; the sheet's wiki
-//   tables follow under "Reference data"
-// - in the game overlay (?sheet=1): only the quick card and the strategy names (click-only, short),
-//   then the same reference tables
+// - in the app (Tools → Cheat sheets): the whole guide with a jump bar to each section, a stage
+//   filter, collapsible sections, [n] cite markers that jump to Read more, GGG icons for currency /
+//   scarab names; the sheet's wiki tables follow under "Reference data"
+// - in the game overlay (?sheet=1): click-only and short, two tabs: "Quick card" (the card and the
+//   strategy names folded into one line) and "Reference" (the same tables; Blight's anoint helper)
 // Like the sheets, the guides update from the app's server between releases (guides_data in gui.py).
 var GUIDE_STAGE_KEY = 'pobtf-guide-stage';
 var GUIDE_STAGES = [['all', 'All'], ['league-start', 'League start'], ['mid', 'Mid'], ['late', 'Late'], ['ssf', 'SSF']];
 var GUIDE_STAGE_NAME = { 'league-start': 'League start', mid: 'Mid', late: 'Late', ssf: 'SSF', all: 'Any stage' };
 var GUIDE_CDN = 'https://web.poecdn.com'; // + the icon path ("/gen/image/..."): the art cache (08-cards.js) keeps a copy
-var GUIDE_OPEN = { extra: true, howTo: true, strategies: true }; // open at first; your clicks are kept while the app runs
+// open at first; your clicks are kept while the app runs. Strategies start folded: its cards are the
+// longest block (18 for the Atlas) and pushed Dangers, What to sell and Reference data screens down;
+// its header shows the count and the jump bar opens it in one click.
+var GUIDE_OPEN = { extra: true, howTo: true };
 
 function guideData() {
   var d = window.POE_GUIDES;
@@ -194,6 +197,10 @@ function guideContent(m, opts) {
   nt.appendChild(document.createTextNode(' A summary of community guides: each line\'s [n] names its source under Read more.'));
   note.appendChild(nt);
   root.appendChild(note);
+  // the jump bar: filled at the end, once every section is drawn
+  var jump = UI.el('nav', 'guide-jump');
+  jump.setAttribute('aria-label', 'Jump to a section of this guide');
+  root.appendChild(jump);
 
   var bar = UI.el('div', 'guide-bar');
   bar.appendChild(UI.el('span', 'guide-bar-label', 'Stage'));
@@ -388,8 +395,51 @@ function guideContent(m, opts) {
     ref.appendChild(mechanicContent(m, Object.assign({}, opts, { plain: true })));
     root.appendChild(ref);
   }
+  guideFillJump(jump, root);
   guideApplyStage(root, guideStage());
   return root;
+}
+
+// the jump bar: a link per section (it opens a folded one) and one to Reference data (its filter
+// box, or Blight's anoint search, gets the focus, so a player can type a fossil or anoint name
+// straight away)
+var GUIDE_JUMP_LABEL = { changes: 'Changes' };
+function guideJumpTo(root, target, focusEl) {
+  if (!target) return;
+  target.scrollIntoView({ block: 'start', behavior: PREFS.motion ? 'auto' : 'smooth' });
+  if (focusEl) focusEl.focus({ preventScroll: true });
+}
+function guideFillJump(jump, root) {
+  function link(label, cls, onClick) {
+    var b = UI.el('button', 'guide-jump-link' + (cls ? ' ' + cls : ''), label);
+    b.type = 'button';
+    b.addEventListener('click', onClick);
+    jump.appendChild(b);
+    return b;
+  }
+  root.querySelectorAll('.guide-sec').forEach(function (det) {
+    var key = det.dataset.key;
+    var title = det.querySelector('.guide-sec-title');
+    var b = link(GUIDE_JUMP_LABEL[key] || (title ? title.textContent : key), null, function () {
+      det.open = true;
+      guideJumpTo(root, det, det.querySelector('.guide-sec-head'));
+    });
+    b.dataset.key = key;
+    b.title = 'Go to ' + (title ? title.textContent : key);
+  });
+  var ref = root.querySelector('.guide-ref');
+  if (ref) {
+    var rb = link('Reference data', 'is-ref', function () {
+      var head = ref.querySelector('.guide-ref-title');
+      head.tabIndex = -1;
+      guideJumpTo(root, ref, ref.querySelector('.guide-ref-head .sheet-filter') ||
+        ref.querySelector('input.anoint-search, .anoint-search input') || head);
+    });
+    rb.dataset.key = 'ref';
+    rb.title = 'Go to the wiki tables' + (ref.querySelector('.anoint') ? ' and the anoint helper' : '') + ' under the guide';
+  }
+  if (!jump.childNodes.length) jump.remove();
+  else jump.insertBefore(UI.el('span', 'guide-bar-label', 'Jump to'), jump.firstChild);
 }
 
 // hide what isn't tagged for the stage; empty sections say so; the counts follow
@@ -414,9 +464,57 @@ function guideApplyStage(root, stage) {
   if (hc) hc.textContent = hid ? hid + ' line' + (hid === 1 ? '' : 's') + ' for other stages hidden' : '';
 }
 
-// ---- the guide over the game: quick card + strategy names, nothing to type ---------------------
+// ---- the guide over the game: short, click-only, nothing to type --------------------------------
+// Two tabs: "Quick card" (the card, then the strategy names folded into one line) and "Reference"
+// (the sheet's wiki tables; for Blight the anoint helper first). The tab you pick is remembered per
+// sheet, so a player who opens Blight for anoints lands on them next time. Every change re-fits the
+// overlay window (fitSheetOverlay).
+var GUIDE_OV_TAB_KEY = 'pobtf-guide-ov-tab';
+var guideOvStratsOpen = {}; // the strategy names, unfolded, per sheet (while the overlay runs)
+function guideOvTabs() {
+  var v = null;
+  try { v = JSON.parse(localStorage.getItem(GUIDE_OV_TAB_KEY) || 'null'); } catch (e) { /* none */ }
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+function guideOvTab(id) { return guideOvTabs()[id] === 'ref' ? 'ref' : 'quick'; }
+function guideOvSetTab(id, tab) {
+  var all = guideOvTabs();
+  all[id] = tab;
+  persist(GUIDE_OV_TAB_KEY, JSON.stringify(all));
+}
+function guideOvFit() { if (typeof fitSheetOverlay === 'function') fitSheetOverlay(); }
+
 function guideOverlay(m, g, opts) {
   var box = UI.el('div', 'sheet-content guide-ov');
+  var hasRef = (m.sections || []).length > 0 || m.id === 'blight';
+  var quick = UI.el('div', 'guide-ov-pane');
+  quick.dataset.tab = 'quick';
+  var ref = null;
+  if (hasRef) {
+    ref = UI.el('div', 'guide-ov-pane guide-ov-ref');
+    ref.dataset.tab = 'ref';
+    var tab = guideOvTab(m.id);
+    var tabs = UI.segmented([['quick', 'Quick card'], ['ref', 'Reference']], tab, {
+      ariaLabel: 'Show the quick card or the reference tables',
+      titles: { quick: 'The quick card and the strategy names',
+        ref: m.id === 'blight' ? 'The anoint helper and the wiki tables' : 'The wiki tables' },
+      onChange: function (v) {
+        guideOvSetTab(m.id, v);
+        quick.hidden = v !== 'quick';
+        ref.hidden = v !== 'ref';
+        guideOvFit();
+      } });
+    tabs.classList.add('guide-ov-tabs');
+    box.appendChild(tabs);
+    quick.hidden = tab !== 'quick';
+    ref.hidden = tab !== 'ref';
+  }
+  box.appendChild(quick);
+  if (ref) {
+    ref.appendChild(mechanicContent(m, Object.assign({}, opts, { plain: true })));
+    box.appendChild(ref);
+  }
+
   var qs = UI.el('div', 'sheet-sec');
   qs.appendChild(UI.el('div', 'sheet-sec-title', 'Quick card'));
   var ql = UI.el('ul', 'sheet-list guide-quick');
@@ -430,11 +528,21 @@ function guideOverlay(m, g, opts) {
     ql.appendChild(li);
   });
   qs.appendChild(ql);
-  box.appendChild(qs);
+  quick.appendChild(qs);
+  // the strategy names: one folded line ("Strategies · 8 ▸"); a click lists them
   if ((g.strategies || []).length) {
-    var ss = UI.el('div', 'sheet-sec');
-    ss.appendChild(UI.el('div', 'sheet-sec-title', 'Strategies'));
+    var ss = UI.el('div', 'sheet-sec guide-ov-strat-sec');
+    var open = !!guideOvStratsOpen[m.id];
+    var tog = UI.el('button', 'guide-ov-toggle');
+    tog.type = 'button';
+    tog.appendChild(UI.el('span', 'guide-ov-toggle-label', 'Strategies'));
+    tog.appendChild(UI.el('span', 'guide-ov-toggle-n', String(g.strategies.length)));
+    var arrow = UI.el('span', 'guide-ov-toggle-arrow', open ? '▾' : '▸');
+    tog.appendChild(arrow);
+    tog.setAttribute('aria-expanded', open ? 'true' : 'false');
+    tog.title = 'Show or hide the ' + g.strategies.length + ' strategy names';
     var sl = UI.el('ul', 'sheet-list guide-ov-strats');
+    sl.hidden = !open;
     g.strategies.forEach(function (s) {
       var li = UI.el('li', 'sheet-li');
       li.appendChild(UI.el('span', 'guide-quick-text', s.name));
@@ -442,16 +550,20 @@ function guideOverlay(m, g, opts) {
       if (tg) li.appendChild(tg);
       sl.appendChild(li);
     });
+    tog.addEventListener('click', function () {
+      var on = sl.hidden;
+      guideOvStratsOpen[m.id] = on;
+      sl.hidden = !on;
+      arrow.textContent = on ? '▾' : '▸';
+      tog.setAttribute('aria-expanded', on ? 'true' : 'false');
+      guideOvFit();
+    });
+    ss.appendChild(tog);
     ss.appendChild(sl);
-    box.appendChild(ss);
+    quick.appendChild(ss);
   }
-  box.appendChild(UI.el('div', 'guide-ov-more', 'More in the app: Tools → Cheat sheets → ' + m.title +
+  quick.appendChild(UI.el('div', 'guide-ov-more', 'More in the app: Tools → Cheat sheets → ' + m.title +
     ' (steps, dangers, what to sell, sources).'));
-  if ((m.sections || []).length || m.id === 'blight') {
-    var ref = UI.el('div', 'guide-ov-ref');
-    ref.appendChild(mechanicContent(m, Object.assign({}, opts, { plain: true })));
-    box.appendChild(ref);
-  }
   return box;
 }
 // ==== end mechanic guides ===========================================================

@@ -137,7 +137,8 @@ function syndPlan(D, st) {
   // Research) counts where it already sits, else the first one listed.
   var needs = [];
   goal.targets.forEach(function (t) {
-    if (!t.alt) needs.push({ division: t.division, options: t.members.slice(), leaderFree: t.leaderFree, note: t.note, alsoOk: [] });
+    if (!t.alt) needs.push({ division: t.division, options: t.members.slice(), leaderFree: t.leaderFree, note: t.note,
+                             text: t.text, alsoOk: [] });
   });
   var single = {};
   needs.forEach(function (n) { if (n.options.length === 1) (single[n.options[0]] = single[n.options[0]] || []).push(n); });
@@ -148,15 +149,32 @@ function syndPlan(D, st) {
     list.forEach(function (n) { if (n !== keep) { n.dropped = true; keep.alsoOk.push(n.division); } });
   });
   needs = needs.filter(function (n) { return !n.dropped; });
+  var targetDivs = [];
+  needs.forEach(function (n) { if (targetDivs.indexOf(n.division) === -1) targetDivs.push(n.division); });
+  // A member in a target house that no target there lists has to leave it anyway (R.move), so
+  // sending it on to its own target costs nothing extra: it goes before an unassigned option.
+  var mustLeave = function (o) {
+    var d = M[o].d;
+    return targetDivs.indexOf(d) !== -1 &&
+      !goal.targets.some(function (t) { return t.division === d && t.members.indexOf(o) !== -1; });
+  };
+  var cost = function (o) { return M[o].d === 'away' ? 9 : M[o].d === null ? 0 : mustLeave(o) ? -1 : 1 + M[o].r; };
+  // One member, one division: single-option targets pick first, a member is never used twice, and a
+  // target whose every option is already used stays unmet (flagged below) instead of reusing one.
   var taken = {};
-  needs.forEach(function (n) {
+  needs.slice().sort(function (a, b) { return (a.options.length > 1) - (b.options.length > 1); }).forEach(function (n) {
     var free = n.options.filter(function (o) { return !taken[o]; });
     var here = free.filter(function (o) { return M[o].d === n.division; })
       .sort(function (a, b) { return M[b].r - M[a].r; });
-    var cost = function (o) { return M[o].d === 'away' ? 9 : M[o].d === null ? 0 : 1 + M[o].r; };
-    n.member = here[0] || free.slice().sort(function (a, b) { return cost(a) - cost(b); })[0] || n.options[0];
-    taken[n.member] = 1;
+    n.member = here[0] || free.slice().sort(function (a, b) { return cost(a) - cost(b); })[0] || null;
+    if (n.member) taken[n.member] = 1;
   });
+  needs.filter(function (n) { return !n.member; }).forEach(function (n) {
+    add(15, 'warn', 'No free member for ' + n.options.join(' or ') + ' in ' + syndDivName(D, n.division),
+      syndList(n.options) + (n.options.length > 1 ? ' already fill' : ' already fills') +
+      ' another target of this goal, and a member sits in one division at a time.', [n.text], n.options);
+  });
+  needs = needs.filter(function (n) { return n.member; });
 
   var wanted = {}, wantedAny = {}, keep = {}, removeSet = {};
   D.divisions.forEach(function (x) { wanted[x[0]] = {}; });
@@ -170,8 +188,6 @@ function syndPlan(D, st) {
   });
   goal.keep.forEach(function (k) { keep[k] = 1; });
   goal.remove.forEach(function (k) { removeSet[k] = 1; });
-  var targetDivs = [];
-  needs.forEach(function (n) { if (targetDivs.indexOf(n.division) === -1) targetDivs.push(n.division); });
   var fillerDivs = goal.fillerDivisions || [];
   var fillerSize = goal.fillerSize || 0;
   var inPlace = function (n) { return M[n.member].d === n.division || n.alsoOk.indexOf(M[n.member].d) !== -1; };
@@ -182,7 +198,9 @@ function syndPlan(D, st) {
     var o = M[n], s = '';
     if (o.d && o.d !== 'away' && wanted[o.d][n]) s = 'ok';
     else if (needs.some(function (x) { return x.member === n; })) s = 'want';
-    else if (o.d && targetDivs.indexOf(o.d) !== -1 && !keep[n]) s = 'out';
+    // 'keep' means "don't remove it from the Syndicate", not "never move it": a kept member in a
+    // target house that doesn't want it is still out of place
+    else if (o.d && targetDivs.indexOf(o.d) !== -1) s = 'out';
     else if (removeSet[n]) s = 'remove';
     else if (fillerDivs.indexOf(o.d) !== -1) s = 'filler';
     status[n] = s;
@@ -312,22 +330,35 @@ function syndPlan(D, st) {
     }
   });
 
-  // 4. members in a target house that the goal doesn't want there: out (interrogate, then execute elsewhere)
+  // 4. members in a target house that the goal doesn't want there: out (interrogate, then execute elsewhere).
+  // Targets on their way to another house are step 1's. Each move counts toward its destination, so
+  // the evictions spread over the least-loaded houses and never push a filler house past fillerSize.
   var sizeOf = function (d) { return inDiv(d).length; };
   var dests = fillerDivs.length ? fillerDivs.slice() : D.divisions.map(function (x) { return x[0]; })
     .filter(function (d) { return targetDivs.indexOf(d) === -1; });
+  var houseLoad = {};
+  dests.forEach(function (d) { houseLoad[d] = sizeOf(d); });
+  var roomIn = function (d) { return !fillerSize || fillerDivs.indexOf(d) === -1 || houseLoad[d] < fillerSize; };
   targetDivs.forEach(function (d) {
     inDiv(d).forEach(function (who) {
       var o = M[who];
-      if (wanted[d][who] || keep[who] || o.l) return;
-      var dest = dests.slice().sort(function (a, b) { return sizeOf(a) - sizeOf(b); })[0];
+      if (wanted[d][who] || wantTo[who] || o.l) return;
+      var why = who + ' isn\'t a target in ' + dn(d) + (removeSet[who] ? ' and is on this goal\'s remove list' : '') + '.' +
+        (keep[who] ? ' This goal keeps ' + who + ' in the Syndicate: move it, don\'t remove it.' : '');
+      var dest = dests.filter(roomIn).sort(function (a, b) { return houseLoad[a] - houseLoad[b]; })[0];
+      if (!dest && fillerDivs.length && !keep[who]) {
+        add(40, 'remove', 'Remove ' + who + ' when an encounter offers it: the filler houses are full',
+          why + ' ' + fillerDivs.map(function (x) { return dn(x) + ' ' + houseLoad[x] + '/' + fillerSize; }).join(', ') + '.',
+          [R.remove, (goal.removeText || [])[0]], [who]);
+        return;
+      }
+      if (dest) houseLoad[dest]++;
       var to = dest ? syndIn(dn(dest)) : ' in another division\'s encounter';
       var text = o.r > 0 ? 'Interrogate ' + who + ' out of ' + dn(d) + ' (-1 rank' + (o.r > 1 ? ', ' + o.r + ' times to rank 0' : '') + '), then execute ' + who + to
         : 'Execute ' + who + to + ': at rank 0 it moves there';
       add(40, o.r > 0 ? 'interrogate' : 'execute', text,
-        who + ' isn\'t a target in ' + dn(d) + (removeSet[who] ? ' and is on this goal\'s remove list' : '') + '.' +
-        (o.r > 0 && st.unbreaking ? ' Unbreaking can keep the rank (50%).' : ''),
-        [o.r > 0 ? R.move : R.recruit], [who]);
+        why + (o.r > 0 && st.unbreaking ? ' Unbreaking can keep the rank (50%).' : ''),
+        [o.r > 0 ? R.move : R.recruit, dest && fillerDivs.length ? (goal.removeText || [])[0] : null], [who]);
     });
   });
 
@@ -342,11 +373,12 @@ function syndPlan(D, st) {
   // 6. 2-2-5-5: unassigned non-targets fill the filler houses; full fillers with nobody unassigned can lock
   if (fillerDivs.length) {
     var spare = names.filter(function (n) { return M[n].d === null && !wantedAny[n]; });
-    var open = fillerDivs.filter(function (d) { return !fillerSize || sizeOf(d) < fillerSize; });
+    // room left after the step-4 moves above
+    var open = fillerDivs.filter(function (d) { return !fillerSize || houseLoad[d] < fillerSize; });
     if (spare.length && open.length) {
       add(45, 'execute', 'Execute ' + syndList(spare) + syndIn(open.map(dn).join(' or ')) + ': filler',
         fillerDivs.map(function (d) { return dn(d) + ' ' + sizeOf(d) + (fillerSize ? '/' + fillerSize : ''); }).join(', ') + '.',
-        [R.recruit, goal.removeText[0]], spare);
+        [R.recruit, (goal.removeText || [])[0]], spare);
     }
     var unassigned = names.filter(function (n) { return M[n].d === null; }).length;
     if (fillerSize && fillerDivs.every(function (d) { return sizeOf(d) >= fillerSize; }) && !unassigned) {
@@ -354,8 +386,9 @@ function syndPlan(D, st) {
     }
   }
 
-  // 7. Betray: link each target with an unwanted member as Rivals
-  if (needs.length) {
+  // 7. Betray: link each target with an unwanted member as Rivals. Only for a goal whose research
+  // asks for it (linkRivals: the 2-2-5-5 board); R.betray's "4 targets with the 10 unwanted" is that board.
+  if (needs.length && goal.linkRivals) {
     var pool = names.filter(function (n) { return !wantedAny[n] && !keep[n] && M[n].d !== 'away'; });
     var load = {}; // rivals each unwanted member has, counting the pairs suggested here (spreads the picks)
     pool.forEach(function (n) { load[n] = M[n].riv.length; });
@@ -390,6 +423,11 @@ var SYND_KINDS = {
   execute: ['Execute', 'accent'], interrogate: ['Interrogate', 'magic'], remove: ['Remove', 'neutral'],
   betray: ['Betray', 'exarch'], release: ['Release', 'neutral'], bargain: ['Bargain', 'neutral'], info: ['Note', 'neutral']
 };
+
+// member status in words (card chips and tooltips), so it never rests on the border colour alone
+var SYND_STATUS = { ok: 'target here', out: 'not wanted here', want: 'wanted in %s', remove: 'remove (least wanted for this goal)',
+                    filler: 'filler' };
+var SYND_SEQ = 0; // unique editor ids when more than one planner is mounted
 
 // plain-text copy of the board and the moves
 function syndBoardText(D, st) {
@@ -430,7 +468,31 @@ function syndicatePlanner(container) {
   D.members.forEach(function (x) { byName[x.name] = x; });
 
   function save() { syndSave(st); }
-  function change() { save(); render(); }
+  // render() rebuilds the board and the editor, which destroys the focused control. Rebuilt controls
+  // carry data-fk (a stable key); change() puts focus back on the same one, so keyboard users keep
+  // their place (and arrow keys keep working in the Rank group).
+  function focusKey() {
+    var a = document.activeElement;
+    var k = a && root.contains(a) ? a.closest('[data-fk]') : null;
+    return k ? k.dataset.fk : null;
+  }
+  function refocus(key) {
+    var n = key ? root.querySelector('[data-fk="' + CSS.escape(key) + '"]') : null;
+    if (!n || n.disabled) return false;
+    n.focus();
+    return true;
+  }
+  // the picked member's editor: its current place (division or pool), else the first division
+  function focusEditor() {
+    var n = editor.querySelector('.synd-ed-places [aria-pressed="true"]') || editor.querySelector('.synd-ed-place');
+    if (n) n.focus();
+  }
+  function change() {
+    var k = focusKey();
+    save();
+    render();
+    if (!refocus(k) && k && sel) focusEditor();
+  }
 
   // -- top bar: goal, passives, copy, reset
   var top = UI.el('div', 'synd-top');
@@ -464,6 +526,8 @@ function syndicatePlanner(container) {
   var board = UI.el('div', 'synd-board');
   var pools = UI.el('div', 'synd-pools');
   var editor = UI.el('div', 'synd-editor');
+  editor.id = 'synd-editor-' + (++SYND_SEQ);
+  editor.setAttribute('role', 'group');
   var side = UI.el('div', 'synd-side');
   left.appendChild(board);
   left.appendChild(pools);
@@ -480,6 +544,24 @@ function syndicatePlanner(container) {
   foot.appendChild(UI.el('p', 'synd-note', 'Patch ' + D.asOf + ' research. Value hints: ' + D.priceSource + ', ' + D.priceDate +
     ' (rough). Each move names the rule it follows.'));
   root.appendChild(foot);
+
+  // Esc while a member is picked cancels the pick (and returns to its card) instead of closing the
+  // Cheat sheets page: caught on the way down (capture), so it works wherever focus is, and
+  // defaultPrevented makes the page's own Esc handler skip it. A dialog's Esc is left alone.
+  // (The guide view rebuilds the planner on each render: an old one, once out of the page, unhooks.)
+  var wasShown = false;
+  document.addEventListener('keydown', function onEsc(e) {
+    if (root.isConnected) wasShown = true;
+    else { if (wasShown) document.removeEventListener('keydown', onEsc, true); return; }
+    if (e.key !== 'Escape' || !sel || e.defaultPrevented || document.querySelector('dialog[open]') ||
+        !root.getClientRects().length) return; // a hidden view's planner leaves Esc alone
+    e.preventDefault();
+    e.stopPropagation();
+    var name = sel;
+    sel = null;
+    render();
+    refocus('card:' + name);
+  }, true);
 
   function copyBoard() {
     var text = syndBoardText(D, st);
@@ -509,19 +591,23 @@ function syndicatePlanner(container) {
       node.classList.remove('is-drop');
       var n = dragName || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
       dragName = null;
-      if (n && st.m[n]) { place(n); sel = null; change(); }
+      if (n && st.m[n]) { place(n); sel = null; save(); render(); refocus('card:' + n); }
     });
     // click: with a member picked, put it here
     node.addEventListener('click', function (e) {
       if (!sel || e.target.closest('.synd-card') || e.target.closest('input')) return;
-      place(sel);
+      var n = sel;
+      place(n);
       sel = null;
-      change();
+      save();
+      render();
+      refocus('card:' + n);
     });
   }
 
   function pips(r) {
     var p = UI.el('span', 'synd-pips');
+    p.setAttribute('role', 'img');
     p.setAttribute('aria-label', 'rank ' + r);
     for (var i = 1; i <= SYND_MAX_RANK; i++) p.appendChild(UI.el('span', 'synd-pip' + (i <= r ? ' on' : '')));
     return p;
@@ -533,8 +619,11 @@ function syndicatePlanner(container) {
       (o.l ? ' is-leader' : '') + (sel === name ? ' is-sel' : ''));
     c.type = 'button';
     c.dataset.name = name;
+    c.dataset.fk = 'card:' + name;
     c.draggable = true;
-    c.setAttribute('aria-pressed', sel === name ? 'true' : 'false');
+    // the card opens the member's editor
+    c.setAttribute('aria-expanded', sel === name ? 'true' : 'false');
+    c.setAttribute('aria-controls', editor.id);
     var head = UI.el('span', 'synd-card-head');
     head.appendChild(UI.el('span', 'synd-card-name', name));
     if (o.l) head.appendChild(UI.el('span', 'synd-crown', 'Leader'));
@@ -548,21 +637,27 @@ function syndicatePlanner(container) {
       var tags = UI.el('span', 'synd-card-tags');
       if (hint) tags.appendChild(UI.chip(hint.split(' ')[0], 'unique', 'synd-hint')).title = hint + ' (' + D.priceDate + ')';
       else if (m.ssf && m.good.indexOf(o.d) !== -1) tags.appendChild(UI.chip('top SSF pick', 'gem', 'synd-hint'));
-      if (s === 'ok') tags.appendChild(UI.chip('target', 'success'));
-      else if (s === 'out') tags.appendChild(UI.chip('not wanted here', 'warn'));
-      else if (s === 'want') tags.appendChild(UI.chip('→ ' + syndDivName(D, P.wantTo[name]), 'accent'));
+      // status in words as well as the border colour
+      if (s === 'ok') tags.appendChild(UI.chip('target', 'success', 'synd-status'));
+      else if (s === 'out') tags.appendChild(UI.chip('not wanted here', 'warn', 'synd-status'));
+      else if (s === 'want') tags.appendChild(UI.chip('→ ' + syndDivName(D, P.wantTo[name]), 'accent', 'synd-status'));
+      else if (s === 'remove') tags.appendChild(UI.chip('remove', 'danger', 'synd-status'));
       if (o.riv.length) tags.appendChild(UI.chip('⚔ ' + o.riv.length, 'neutral')).title = 'Rivals: ' + o.riv.join(', ');
       if (tags.childNodes.length) c.appendChild(tags);
     } else if (P.wantTo[name]) {
-      c.appendChild(UI.chip('→ ' + syndDivName(D, P.wantTo[name]), 'accent', 'synd-want'));
+      c.appendChild(UI.chip('→ ' + syndDivName(D, P.wantTo[name]), 'accent', 'synd-want synd-status'));
+    } else if (s === 'remove') {
+      c.appendChild(UI.chip('remove', 'danger', 'synd-status'));
     }
+    var word = SYND_STATUS[s] ? SYND_STATUS[s].replace('%s', syndDivName(D, P.wantTo[name] || '')) : '';
+    if (word) tip.push('Status: ' + word);
     c.title = tip.join('\n');
     c.addEventListener('click', function (e) {
       e.stopPropagation();
       sel = sel === name ? null : name;
       render();
-      var again = root.querySelector('.synd-card[data-name="' + name.replace(/"/g, '') + '"]');
-      if (again) again.focus();
+      // picked: straight to its editor; unpicked: back to the card
+      if (sel) focusEditor(); else refocus('card:' + name);
     });
     c.addEventListener('dragstart', function (e) {
       dragName = name;
@@ -674,16 +769,22 @@ function syndicatePlanner(container) {
     editor.hidden = !sel;
     if (!sel) return;
     var name = sel, o = st.m[name], m = byName[name];
+    editor.setAttribute('aria-label', 'Edit ' + name);
     var head = UI.el('div', 'synd-ed-head');
     head.appendChild(UI.el('span', 'synd-ed-name', name));
     head.appendChild(UI.el('span', 'synd-ed-best', m.best));
-    head.appendChild(UI.iconButton('✕', 'Close', { size: 'sm', onClick: function () { sel = null; render(); } }));
+    head.appendChild(UI.iconButton('✕', 'Close', { size: 'sm', onClick: function () {
+      sel = null;
+      render();
+      refocus('card:' + name);
+    } }));
     editor.appendChild(head);
     var places = UI.el('div', 'synd-ed-places');
     D.divisions.forEach(function (x) {
       var b = UI.el('button', 'synd-ed-place' + (o.d === x[0] ? ' is-on' : ''));
       b.type = 'button';
       b.dataset.div = x[0];
+      b.dataset.fk = 'place:' + x[0];
       b.setAttribute('aria-pressed', o.d === x[0] ? 'true' : 'false');
       b.appendChild(UI.el('span', 'synd-ed-div', x[1]));
       b.appendChild(UI.el('span', 'synd-ed-reward', m.rewards[x[0]]));
@@ -696,6 +797,7 @@ function syndicatePlanner(container) {
       var b = UI.button(o.d === p[0] ? 'primary' : 'secondary', { label: p[1], size: 'sm', cls: 'synd-ed-pool',
         onClick: function () { syndPlace(D, st, name, p[0]); change(); } });
       b.setAttribute('aria-pressed', o.d === p[0] ? 'true' : 'false');
+      b.dataset.fk = 'pool:' + (p[0] || 'none');
       places.appendChild(b);
     });
     editor.appendChild(places);
@@ -704,10 +806,19 @@ function syndicatePlanner(container) {
     var rank = UI.segmented([['0', '0'], ['1', '1'], ['2', '2'], ['3', '3']], String(o.r), {
       ariaLabel: 'Rank', onChange: function (v) { syndPlace(D, st, name, o.d, Number(v), o.l); change(); }
     });
-    if (!inDivision) rank.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
-    ctl.appendChild(UI.field('Rank', rank));
+    rank.querySelectorAll('button').forEach(function (b) {
+      b.dataset.fk = 'rank:' + b.dataset.value;
+      if (!inDivision) b.disabled = true;
+    });
+    // Not UI.field: a <label> forwards clicks on its caption to its first button ("0") and would
+    // reset the rank. A plain wrapper; the group's name comes from its own aria-label.
+    var rankField = UI.el('div', 'field synd-ed-rank');
+    rankField.appendChild(UI.el('span', 'field-label', 'Rank'));
+    rankField.appendChild(rank);
+    ctl.appendChild(rankField);
     var lw = UI.el('label', 'synd-check');
     var lc = UI.el('input');
+    lc.dataset.fk = 'leader';
     lc.type = 'checkbox';
     lc.checked = o.l;
     lc.disabled = !inDivision;
@@ -717,6 +828,8 @@ function syndicatePlanner(container) {
     ctl.appendChild(lw);
     editor.appendChild(ctl);
     var rv = UI.el('div', 'synd-ed-rivals');
+    rv.setAttribute('role', 'group');
+    rv.setAttribute('aria-label', 'Rivals of ' + name);
     rv.appendChild(UI.el('span', 'field-label', 'Rivals'));
     D.members.forEach(function (x) {
       if (x.name === name) return;
@@ -724,6 +837,7 @@ function syndicatePlanner(container) {
       var b = UI.el('button', 'synd-rival' + (on ? ' is-on' : ''), x.name);
       b.type = 'button';
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.dataset.fk = 'rival:' + x.name;
       b.addEventListener('click', function () { syndToggleRival(st, name, x.name); change(); });
       rv.appendChild(b);
     });

@@ -1,0 +1,527 @@
+{
+  "research": "guides-3.29.json",
+  "about": "Content fixes applied on top of the verified 3.29 research (guides-3.29.json stays the untouched record). tools/make_guides.py and tools/make_syndicate.py apply these in order before building; the format is documented in make_guides.py (apply_corrections). Map list checked 2026-11-04 against the 3.29.0 patch notes ('The following Maps have been removed from the Atlas: ...') and the PoE Wiki atlas_nodes table for the 3.29 series (Deepwater), which agree.",
+  "checked": "2026-11-04",
+  "corrections": [
+    {
+      "id": "betrayal-removed-map",
+      "finding": "#5",
+      "guide": "betrayal",
+      "path": "howTo",
+      "action": "replace",
+      "match": "Use small, fast maps (Ashen Wood, Dunes, Strand).",
+      "value": "Use small, fast maps (Dunes, Strand).",
+      "reason": "Ashen Wood was removed from the Atlas in 3.29.0. Dunes and Strand are still on the 3.29 Atlas.",
+      "source": ["https://poedb.tw/us/Version_3.29.0", "https://www.poewiki.net/w/index.php?title=Special:CargoQuery&tables=atlas_nodes%2Careas&join_on=atlas_nodes.area_id%3Dareas.id&fields=areas.name&where=atlas_nodes.series_id%3D%22Deepwater%22+AND+atlas_nodes.is_off_atlas%3D0+AND+atlas_nodes.tier_0%3E0&limit=200"]
+    },
+    {
+      "id": "betrayal-kirac-mod",
+      "finding": "#6 (same kind)",
+      "guide": "betrayal",
+      "path": "howTo",
+      "action": "replace",
+      "match": ", and no Kirac mod helps.",
+      "value": ". (Map Device crafts, Kirac's included, were removed in 3.28.)",
+      "reason": "The line implied Kirac map mods still exist. 3.28.0 removed all Map Device crafting options.",
+      "source": "https://poedb.tw/us/Version_3.28.0"
+    },
+    {
+      "id": "blight-carcass-3.28-only",
+      "finding": "#5",
+      "guide": "blight",
+      "path": "strategies[League-start map Blight].steps",
+      "action": "replace",
+      "match": "Run T16 Carcass. Its narrow layout means fewer tendrils, so you hold more lanes.",
+      "value": "3.28 only: run T16 Carcass, whose narrow layout means fewer tendrils, so you hold more lanes. Carcass left the Atlas in 3.29; there, use Toxic Sewer, the best 3.29 Map Blight map in this guide.",
+      "reason": "Carcass was removed from the Atlas in 3.29.0, so the first step of this 3.28 strategy can't be followed in 3.29. Toxic Sewer is on the 3.29 Atlas and is this guide's own top 3.29 Map Blight pick ('Map Blight on regular maps (3.29)').",
+      "source": ["https://poedb.tw/us/Version_3.29.0", "https://www.poewiki.net/w/index.php?title=Special:CargoQuery&tables=atlas_nodes%2Careas&join_on=atlas_nodes.area_id%3Dareas.id&fields=areas.name&where=atlas_nodes.series_id%3D%22Deepwater%22+AND+atlas_nodes.is_off_atlas%3D0+AND+atlas_nodes.tier_0%3E0&limit=200"]
+    },
+    {
+      "id": "blight-waste-pool",
+      "finding": "#5 (same kind)",
+      "guide": "blight",
+      "path": "strategies[Map Blight on regular maps].steps",
+      "action": "replace",
+      "match": "Best map is Toxic Sewer, then Waste Pool.",
+      "value": "Best map is Toxic Sewer. (Waste Pool, the old runner-up, has been off the Atlas since 3.28.)",
+      "reason": "Waste Pool was removed from the Atlas in 3.28.0 and did not come back in 3.29.0 (not in the 3.29 add-back list, not on the 3.29 Atlas).",
+      "source": ["https://poedb.tw/us/Version_3.28.0", "https://poedb.tw/us/Version_3.29.0"]
+    },
+    {
+      "id": "incursion-removed-maps",
+      "finding": "#5",
+      "guide": "incursion",
+      "path": "howTo",
+      "action": "replace",
+      "match": "such as City Square, Mesa, Toxic Sewer, Ashen Wood and Canyon.",
+      "value": "such as City Square, Mesa and Toxic Sewer.",
+      "reason": "Ashen Wood and Canyon were removed from the Atlas in 3.29.0. City Square, Mesa and Toxic Sewer are on the 3.29 Atlas.",
+      "source": ["https://www.pathofexile.com/forum/view-thread/3985332", "https://www.poewiki.net/w/index.php?title=Special:CargoQuery&tables=atlas_nodes%2Careas&join_on=atlas_nodes.area_id%3Dareas.id&fields=areas.name&where=atlas_nodes.series_id%3D%22Deepwater%22+AND+atlas_nodes.is_off_atlas%3D0+AND+atlas_nodes.tier_0%3E0&limit=200"]
+    },
+    {
+      "id": "incursion-chisel",
+      "finding": "#6 (same kind: Map Device / chisel crafts)",
+      "guide": "incursion",
+      "path": "howTo",
+      "action": "replace",
+      "match": "On T11+, also chisel to 20% quality and Vaal them.",
+      "value": "On T11+, also Vaal them. (Cartographer's Chisels can no longer be obtained since 3.28, so the old chisel-to-20% step is gone.)",
+      "reason": "3.28.0: 'Cartographer's Chisels can no longer be obtained'. The guide's own Incursion changes already say chisel advice is out of date.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "delirium-crimson-temple",
+      "finding": "#5",
+      "guide": "delirium",
+      "path": "strategies[Orb layering rules].steps",
+      "action": "replace",
+      "match": "Caldera and Crimson Temple are alternatives.",
+      "value": "Caldera is an alternative. (This 2024 guide also named Crimson Temple, which left the Atlas in 3.29.)",
+      "reason": "Crimson Temple was removed from the Atlas in 3.29.0; Caldera is on the 3.29 Atlas.",
+      "source": ["https://poedb.tw/us/Version_3.29.0", "https://www.poewiki.net/w/index.php?title=Special:CargoQuery&tables=atlas_nodes%2Careas&join_on=atlas_nodes.area_id%3Dareas.id&fields=areas.name&where=atlas_nodes.series_id%3D%22Deepwater%22+AND+atlas_nodes.is_off_atlas%3D0+AND+atlas_nodes.tier_0%3E0&limit=200"]
+    },
+    {
+      "id": "atlas-map-removal-cite",
+      "finding": "#5",
+      "guide": "atlas",
+      "path": "changes[28 maps were added and 28 removed].cite",
+      "action": "add",
+      "value": "https://www.pathofexile.com/forum/view-thread/3985332",
+      "reason": "The 3.29 map add/remove line cited only pohx.net; the official 3.29.0 patch notes list both sets of maps.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3985332"
+    },
+
+    {
+      "id": "heist-kirac-howto",
+      "finding": "#6",
+      "guide": "heist",
+      "path": "howTo",
+      "action": "delete",
+      "match": "Kirac's Heist map-device craft costs 5 Chaos",
+      "reason": "3.28.0 removed all Map Device crafting options, so Kirac's Heist and Imbued Heist crafts no longer exist.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "heist-kirac-investment",
+      "finding": "#6",
+      "guide": "heist",
+      "path": "strategies[Cache farming].investment",
+      "action": "replace",
+      "match": " Optional Kirac Heist craft (5c).",
+      "value": "",
+      "reason": "Kirac's Heist craft was removed in 3.28.0 with the other Map Device crafts.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "heist-kirac-step",
+      "finding": "#6",
+      "guide": "heist",
+      "path": "strategies[Cache farming].steps",
+      "action": "delete",
+      "match": "Optionally add Kirac's Heist craft",
+      "reason": "Kirac's Heist craft (+3 caches) and the Imbued version (+5) were removed in 3.28.0 with the other Map Device crafts.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "heist-kirac-3.27-history",
+      "finding": "#6",
+      "guide": "heist",
+      "path": "changes",
+      "action": "replace",
+      "match": "and an Imbued Heist craft (+5 caches) was added.",
+      "value": "and an Imbued Heist craft (+5 caches) was added. 3.28 removed both.",
+      "reason": "Keeps the 3.27 history but says the crafts are gone, as the Ritual guide does for its Kirac mod.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "heist-kirac-3.28-change",
+      "finding": "#6",
+      "guide": "heist",
+      "path": "changes",
+      "action": "add",
+      "value": {"patch": "3.28", "text": "Map Device crafting options were removed and Cartographer's Chisels can no longer be obtained, so Kirac's Heist craft (+3 caches) and the Imbued Heist craft (+5) are gone.", "cite": ["https://www.pathofexile.com/forum/view-thread/3913392"]},
+      "reason": "The Heist guide had no entry for the 3.28 removal its cache strategy depended on.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "expedition-kirac-history",
+      "finding": "#6",
+      "guide": "expedition",
+      "path": "changes",
+      "action": "replace",
+      "match": "Not changed in 3.28 or 3.29.",
+      "value": "3.28 removed it with the rest of the Map Device crafts.",
+      "reason": "3.28.0 removed all Map Device crafting options, including Kirac's Expedition mod.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "ultimatum-add-3.28-notes",
+      "finding": "#6",
+      "guide": "ultimatum",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://www.pathofexile.com/forum/view-thread/3913392", "title": "Content Update 3.28.0 - Path of Exile: Mirage (patch notes)", "publisher": "Grinding Gear Games", "date": "2026-02-27", "patch": "3.28.0"},
+      "reason": "Source for the 3.28 Map Device craft removal (Kirac's Ultimatum mod).",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "ultimatum-kirac-danger",
+      "finding": "#6",
+      "guide": "ultimatum",
+      "path": "dangers",
+      "action": "replace",
+      "match": "Outdated guide: Maxroll's 2024 guide prices Kirac's Ultimatum mod at 5c.",
+      "value": {"text": "Outdated guide: Maxroll's 2024 guide uses Kirac's Ultimatum map-device mod (5c). 3.26 cut it to 4c, and 3.28 removed all Map Device crafts, so it no longer exists.", "stage": ["league-start", "mid"], "cite": [19, 8, "https://www.pathofexile.com/forum/view-thread/3913392"]},
+      "reason": "The line priced a mod that 3.28.0 removed, as if it still existed at 4c.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "ultimatum-kirac-3.28-change",
+      "finding": "#6",
+      "guide": "ultimatum",
+      "path": "changes",
+      "action": "add",
+      "value": {"patch": "3.28", "text": "Map Device crafting was removed, so Kirac's Ultimatum map mod is gone.", "cite": ["https://www.pathofexile.com/forum/view-thread/3913392"]},
+      "reason": "The Ultimatum changes stopped at the 3.26 price cut and never said the mod was removed.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+
+    {
+      "id": "expedition-logbook-split",
+      "finding": "#7",
+      "guide": "expedition",
+      "path": "howTo",
+      "action": "replace",
+      "match": "You can roll Logbooks like maps, and split one into two with a Fenumal Plagued Arachnid at the Beastcrafting altar.",
+      "value": "You can roll Logbooks like maps. They can no longer be split: 3.29 replaced the Beastcrafting split recipes with fracture crafts on Rare Talismans.",
+      "reason": "3.29.0: 'The Beastcrafting option to Split an item into two has been replaced with a new option that Fractures a Modifier on a Rare Talisman'. The Bestiary and Delve guides already say so.",
+      "source": "https://poedb.tw/us/Version_3.29.0"
+    },
+
+    {
+      "id": "ritual-reserve-howto",
+      "finding": "#8",
+      "guide": "ritual",
+      "path": "howTo",
+      "action": "replace",
+      "match": "After your last reroll, keep at least 2,000 Tribute. That is enough to defer the priciest rewards (about 20,000 at original cost).",
+      "value": "After your last reroll, keep about 3,000 Tribute. Deferring costs 15% of the original price, so the priciest rewards (about 20,000) need about 3,000; 2,000 only covers items up to about 13,300.",
+      "reason": "The guide's own deferral cost is 15% (10% plus a 5% fee); 15% of 20,000 is 3,000. The 2,000 figure dropped the fee.",
+      "source": "https://www.poewiki.net/wiki/Ritual"
+    },
+    {
+      "id": "ritual-reserve-strategy",
+      "finding": "#8",
+      "guide": "ritual",
+      "path": "strategies[0].steps",
+      "action": "replace",
+      "match": "Keep 2,000 Tribute after your last reroll so you can still defer.",
+      "value": "Keep about 3,000 Tribute after your last reroll so you can still defer the priciest rewards (15% of about 20,000).",
+      "reason": "Same 15% deferral arithmetic as the how-to line.",
+      "source": "https://www.poewiki.net/wiki/Ritual"
+    },
+    {
+      "id": "ritual-reserve-quickcard",
+      "finding": "#8",
+      "guide": "ritual",
+      "path": "quickCard",
+      "action": "replace",
+      "match": "Reroll is 2,000. Keep 2,000 spare to defer.",
+      "value": "Reroll is 2,000. Keep ~3,000 spare to defer.",
+      "reason": "Same 15% deferral arithmetic as the how-to line.",
+      "source": "https://www.poewiki.net/wiki/Ritual"
+    },
+
+    {
+      "id": "atlas-add-3.28-notes",
+      "finding": "#9",
+      "guide": "atlas",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://www.pathofexile.com/forum/view-thread/3913392", "title": "Content Update 3.28.0 - Path of Exile: Mirage (patch notes)", "publisher": "Grinding Gear Games", "date": "2026-02-27", "patch": "3.28.0"},
+      "reason": "Source for the 3.28 Horned Scarab of Awakening rework.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3913392"
+    },
+    {
+      "id": "atlas-horned-awakening",
+      "finding": "#9",
+      "guide": "atlas",
+      "path": "changes",
+      "action": "replace",
+      "match": "Horned Scarab of Awakening was removed (per AOEAH).",
+      "value": {"patch": "3.28", "text": "Horned Scarab of Awakening was reworked, not removed: it now makes T16+ maps contain the bosses of a random Maven Invitation. The 3.29 notes still name it.", "cite": ["https://www.pathofexile.com/forum/view-thread/3913392", "https://www.pathofexile.com/forum/view-thread/3985332"]},
+      "reason": "3.28.0: 'The Horned Scarab of Awakening now grants Tier 16+ Areas contain the Bosses from a random Maven Invitation'; 3.29.0 still refers to it. The 'removed' claim came only from a currency seller and contradicted the Delirium and Ritual guides.",
+      "source": ["https://www.pathofexile.com/forum/view-thread/3913392", "https://poedb.tw/us/Version_3.29.0"]
+    },
+
+    {
+      "id": "atlas-s-tier-harvest",
+      "finding": "#10",
+      "guide": "atlas",
+      "path": "tables[Maxroll S tier].rows",
+      "action": "replace",
+      "match": "Cornucopia Harvest",
+      "value": ["Harvest (Fruiting Astrolabe)", "mid/late", "not stated", "not stated", "not stated", "Any map you put a Fruiting Astrolabe on"],
+      "reason": "Maxroll's S-tier Harvest entry is plain Harvest with the Fruiting Astrolabe; Cornucopia Harvest is its own B-tier entry, as the Harvest guide says. The S-tier entry has an atlas tree but no guide page, so no ratings are stated.",
+      "source": "https://maxroll.gg/poe/tierlists/endgame-farming-tier-list"
+    },
+    {
+      "id": "atlas-cornucopia-b-tier",
+      "finding": "#10",
+      "guide": "atlas",
+      "path": "strategies",
+      "action": "replace",
+      "match": "Cornucopia Harvest",
+      "value": "Cornucopia Harvest (Maxroll B tier)",
+      "reason": "Label the Cornucopia strategy with its Maxroll tier so it isn't read as the S-tier Harvest farm.",
+      "source": "https://maxroll.gg/poe/tierlists/endgame-farming-tier-list"
+    },
+
+    {
+      "id": "atlas-s-tier-ultimatum-profit",
+      "finding": "#11",
+      "guide": "atlas",
+      "path": "tables[Maxroll S tier].rows",
+      "action": "replace",
+      "match": "Inscribed Ultimatum",
+      "value": ["Inscribed Ultimatum", "late", "High", "Excellent", "Extreme", "T16 Jungle Valley"],
+      "reason": "Maxroll's Ultimatum Farming Strategy page rates Profitability 'Excellent' (Difficulty Extreme, Investment High); the table said 'not stated', the Ultimatum guide said 'Excellent'.",
+      "source": "https://maxroll.gg/poe/currency/ultimatum-currency-strategy"
+    },
+    {
+      "id": "ultimatum-add-expcarry",
+      "finding": "#11",
+      "guide": "ultimatum",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://expcarry.com/poe-1-atlas-farming-strategies-mechanics-scarabs-maps-budget", "title": "PoE 1 Atlas Farming 3.29: Best Strategies by Budget", "publisher": "ExpCarry", "date": "2026-09-01 (dateModified)", "patch": "3.29.3"},
+      "reason": "Source of the 3.29 Inscribed Ultimatum div/hour test the Atlas guide already cites.",
+      "source": "https://expcarry.com/poe-1-atlas-farming-strategies-mechanics-scarabs-maps-budget"
+    },
+    {
+      "id": "ultimatum-profit-maxroll",
+      "finding": "#11",
+      "guide": "ultimatum",
+      "path": "profit",
+      "action": "replace",
+      "match": "No independently tracked div/hour exists for 3.29 Ultimatum.",
+      "value": {"text": "Maxroll rates Ultimatum profitability 'Excellent' (Extreme difficulty, High investment) but gives no div/hour.", "who": "Maxroll", "date": "2026-07-24", "cite": [7]},
+      "reason": "A tracked 3.29 figure does exist (ExpCarry, added below), so the 'none exists' claim is dropped; the Maxroll rating is kept and now matches the Atlas guide.",
+      "source": "https://maxroll.gg/poe/currency/ultimatum-currency-strategy"
+    },
+    {
+      "id": "ultimatum-profit-expcarry",
+      "finding": "#11",
+      "guide": "ultimatum",
+      "path": "profit",
+      "action": "add",
+      "match": "Maxroll rates Ultimatum profitability",
+      "value": {"text": "Rough, 3.29: Inscribed Ultimatum on white T16 Jungle Valley made about 5.3 div/h net after about 1.2 div/h input (one community test).", "who": "ExpCarry", "date": "2026-09-01", "cite": ["https://expcarry.com/poe-1-atlas-farming-strategies-mechanics-scarabs-maps-budget"]},
+      "reason": "The Atlas guide cites this 3.29 test; the Ultimatum guide now carries it too, with who and when.",
+      "source": "https://expcarry.com/poe-1-atlas-farming-strategies-mechanics-scarabs-maps-budget"
+    },
+
+    {
+      "id": "essences-croaker",
+      "finding": "#12",
+      "guide": "essences",
+      "path": "sell",
+      "action": "replace",
+      "match": "Craicic Chimeral and Fenumal Plagued Arachnid",
+      "value": "Craicic Croaker (formerly Chimeral) and Fenumal Plagued Arachnid",
+      "reason": "3.29.0: 'The Craicic Chimeral Beast has been renamed to Craicic Croaker'. Searching for Chimeral finds nothing.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3985332"
+    },
+
+    {
+      "id": "heist-socket-enchants",
+      "finding": "#13",
+      "guide": "heist",
+      "path": "changes",
+      "action": "replace",
+      "match": "The Timeless Splinter duplication gear mod was removed, along with white-socket and single-colour-socket enchants on rewards and Tailoring/Tempering Orbs.",
+      "value": "The Timeless Splinter duplication gear mod was removed. White-socket and single-colour-socket enchantments no longer appear on Heist rewards or from Tailoring and Tempering Orbs; the orbs themselves remain.",
+      "reason": "3.29.0 only stops those enchantments from appearing on Heist rewards or from the orbs; the old wording read as if the orbs were removed, while the guide tells players to sell them.",
+      "source": "https://www.pathofexile.com/forum/view-thread/3985332"
+    },
+
+    {
+      "id": "ultimatum-add-ninja-currency",
+      "finding": "#14",
+      "guide": "ultimatum",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency", "title": "poe.ninja Currency Exchange overview: Currency (Allflame league)", "publisher": "poe.ninja", "date": "2026-11-04 (live snapshot)", "patch": "3.29"},
+      "reason": "The poe.ninja Divine rate the other guides use for the 4 Nov snapshot.",
+      "source": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"
+    },
+    {
+      "id": "ultimatum-add-ninja-scarabs",
+      "finding": "#14",
+      "guide": "ultimatum",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Scarab", "title": "poe.ninja Currency Exchange overview: Scarabs (Allflame league)", "publisher": "poe.ninja", "date": "2026-11-04 (live snapshot)", "patch": "3.29"},
+      "reason": "The poe.ninja Catalysing price (~456c) the Betrayal and Eldritch guides use for the 4 Nov snapshot.",
+      "source": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Scarab"
+    },
+    {
+      "id": "ultimatum-divine-rate",
+      "finding": "#14",
+      "guide": "ultimatum",
+      "path": "sell",
+      "action": "replace",
+      "match": "Price conversion: 1 Divine = 422c (4 Nov 2026).",
+      "value": {"text": "Price conversion: this guide's div figures use 1 Divine = 422c from Out of Games (4 Nov 2026). poe.ninja read 412c the same day, the rate most other guides use.", "stage": ["all"], "cite": [29, "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]},
+      "reason": "Same-day snapshots disagreed (422c here, 412c in Betrayal, Breach, Delirium and others) with no source named; both values now show their source.",
+      "source": ["https://outof.games/realms/pathofexile/economy/currency/", "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]
+    },
+    {
+      "id": "ultimatum-catalysing-price",
+      "finding": "#14",
+      "guide": "ultimatum",
+      "path": "strategies[Gruelling Gauntlet Inscribed].investment",
+      "action": "replace",
+      "match": "about 445c (about 1.05 div)",
+      "value": "about 445c on Out of Games (about 1.05 div); poe.ninja read about 456c the same day",
+      "reason": "Betrayal and Eldritch show the same scarab at ~456c (poe.ninja) for the same date; both values now show their source.",
+      "source": ["https://outof.games/realms/pathofexile/economy/scarabs/", "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Scarab"]
+    },
+    {
+      "id": "ultimatum-catalysing-table",
+      "finding": "#14",
+      "guide": "ultimatum",
+      "path": "tables[Scarabs].rows",
+      "action": "replace",
+      "match": "~445c (~1.05 div)",
+      "value": "~445c (~1.05 div) on Out of Games; ~456c on poe.ninja",
+      "reason": "Same as the strategy line: name both same-day sources.",
+      "source": ["https://outof.games/realms/pathofexile/economy/scarabs/", "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Scarab"]
+    },
+    {
+      "id": "ultimatum-catalysing-table-cite",
+      "finding": "#14",
+      "guide": "ultimatum",
+      "path": "tables[Scarabs].cite",
+      "action": "add",
+      "value": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Scarab",
+      "reason": "Cite the poe.ninja value the table now shows.",
+      "source": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Scarab"
+    },
+    {
+      "id": "heist-add-ninja-currency",
+      "finding": "#14",
+      "guide": "heist",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency", "title": "poe.ninja Currency Exchange overview: Currency (Allflame league)", "publisher": "poe.ninja", "date": "2026-11-04 (live snapshot)", "patch": "3.29"},
+      "reason": "The poe.ninja Divine rate the other guides use for the 4 Nov snapshot.",
+      "source": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"
+    },
+    {
+      "id": "heist-divine-rate",
+      "finding": "#14",
+      "guide": "heist",
+      "path": "sell",
+      "action": "replace",
+      "match": "Allflame now: Tailoring about 1,242c, Tempering about 801c, Divine about 422c.",
+      "value": {"text": "Allflame now (Out of Games, 4 Nov 2026): Tailoring about 1,242c, Tempering about 801c, Divine about 422c. poe.ninja read the Divine at 412c the same day.", "stage": ["mid", "late"], "cite": [25, "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]},
+      "reason": "Same-day Divine snapshots disagreed across guides (422c vs 412c); both values now show their source.",
+      "source": ["https://outof.games/realms/pathofexile/economy/currency/", "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]
+    },
+    {
+      "id": "heist-divine-table",
+      "finding": "#14",
+      "guide": "heist",
+      "path": "tables[Allflame prices].rows",
+      "action": "replace",
+      "match": "Divine Orb",
+      "value": ["Divine Orb", "~422c (Out of Games; poe.ninja ~412c)"],
+      "reason": "Same as the sell line: name both same-day sources.",
+      "source": ["https://outof.games/realms/pathofexile/economy/currency/", "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]
+    },
+    {
+      "id": "heist-divine-table-cite",
+      "finding": "#14",
+      "guide": "heist",
+      "path": "tables[Allflame prices].cite",
+      "action": "add",
+      "value": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency",
+      "reason": "Cite the poe.ninja value the table now shows.",
+      "source": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"
+    },
+    {
+      "id": "blight-add-ninja-currency",
+      "finding": "#14",
+      "guide": "blight",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency", "title": "poe.ninja Currency Exchange overview: Currency (Allflame league)", "publisher": "poe.ninja", "date": "2026-11-04 (live snapshot)", "patch": "3.29"},
+      "reason": "The poe.ninja Divine rate the other guides use for the 4 Nov snapshot.",
+      "source": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"
+    },
+    {
+      "id": "blight-divine-rate",
+      "finding": "#14",
+      "guide": "blight",
+      "path": "profit",
+      "action": "replace",
+      "match": "Rough value check: at 422c per divine, Golden Oil is about 0.45 div and Silver about 0.26 div.",
+      "value": {"text": "Rough value check: at 422c per divine (Out of Games; poe.ninja read 412c the same day), Golden Oil is about 0.45 div and Silver about 0.26 div.", "who": "Out of Games (poe.ninja data)", "date": "2026-11-04", "cite": [30, 31, "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]},
+      "reason": "Same-day Divine snapshots disagreed across guides (422c vs 412c); both values now show their source.",
+      "source": ["https://outof.games/realms/pathofexile/economy/", "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]
+    },
+    {
+      "id": "harvest-add-ninja-currency",
+      "finding": "#14",
+      "guide": "harvest",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency", "title": "poe.ninja Currency Exchange overview: Currency (Allflame league)", "publisher": "poe.ninja", "date": "2026-11-04 (live snapshot)", "patch": "3.29"},
+      "reason": "The poe.ninja Sacred Crystallised Lifeforce price the Atlas guide uses for the 4 Nov snapshot.",
+      "source": "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"
+    },
+    {
+      "id": "harvest-sacred-price",
+      "finding": "#14",
+      "guide": "harvest",
+      "path": "sell",
+      "action": "replace",
+      "match": "Sacred Crystallised Lifeforce reads as about 88c each on PoEDB (4 Nov 2026), but the page does not state the direction.",
+      "value": {"text": "Sacred Crystallised Lifeforce reads as about 88c each on PoEDB (4 Nov 2026), but the page does not state the direction. poe.ninja's Currency Exchange read about 137c the same day.", "stage": ["late"], "cite": [49, "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]},
+      "reason": "Harvest (88c) and Atlas (137c) gave different Sacred prices for the same day without naming each other's source; both values now show their source.",
+      "source": ["https://poedb.tw/us/Economy_sacred-lifeforce", "https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency"]
+    },
+    {
+      "id": "atlas-add-poedb-sacred",
+      "finding": "#14",
+      "guide": "atlas",
+      "path": "readMore",
+      "action": "add",
+      "value": {"url": "https://poedb.tw/us/Economy_sacred-lifeforce", "title": "Sacred Crystallised Lifeforce economy", "publisher": "PoEDB", "date": "live data, fetched 2026-11-04 (no timestamp shown)", "patch": "unknown (Allflame 3.29 likely)"},
+      "reason": "The PoEDB Sacred price the Harvest guide uses for the 4 Nov snapshot.",
+      "source": "https://poedb.tw/us/Economy_sacred-lifeforce"
+    },
+    {
+      "id": "atlas-sacred-price",
+      "finding": "#14",
+      "guide": "atlas",
+      "path": "sell",
+      "action": "replace",
+      "match": "Sacred is about 137c and Sandswept about 699c.",
+      "value": "Sacred is about 137c on poe.ninja (PoEDB read about 88c the same day) and Sandswept about 699c.",
+      "reason": "Same as the Harvest line: name both same-day sources.",
+      "source": ["https://poe.ninja/poe1/api/economy/exchange/current/overview?league=Allflame&type=Currency", "https://poedb.tw/us/Economy_sacred-lifeforce"]
+    },
+    {
+      "id": "atlas-sacred-price-cite",
+      "finding": "#14",
+      "guide": "atlas",
+      "path": "sell[Sacred is about 137c].cite",
+      "action": "add",
+      "value": "https://poedb.tw/us/Economy_sacred-lifeforce",
+      "reason": "Cite the PoEDB value the line now shows.",
+      "source": "https://poedb.tw/us/Economy_sacred-lifeforce"
+    }
+  ]
+}

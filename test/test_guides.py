@@ -4,7 +4,16 @@ Checks the generated data/guides.js (tools/make_guides.py) without touching the 
 schema, stage tags, cite indexes in range, that every guide maps to a cheat sheet (or brings its own
 sheet entry), that the internal research fields are gone, that the icon names point at GGG art paths,
 that server/public/guides.json is the same payload, and the bridge's validation and Read-more URL
-allowance in gui.py."""
+allowance in gui.py.
+
+Also the content corrections (tools/guides/corrections-<patch>.json): they apply cleanly to the
+untouched research, none is stale (re-applying one to the corrected text fails), and their text is in
+the shipped data; and content checks for the error kinds the 3.29 review found: maps that are not on
+the 3.29 Atlas, Kirac missions / map-device crafts, Logbook splitting, Chimeral, chisel advice, lab
+enchants, working Breachstones, Catalysts outside Ultimatum, the Ritual Tribute reserve, Horned
+Scarab of Awakening, the Atlas S-tier table, Ultimatum profit, same-day price snapshots; and that
+data/syndicate.js is from the same research, corrections and patch."""
+import copy
 import json
 import os
 import re
@@ -166,6 +175,178 @@ with open(os.path.join(ROOT, "server", "public", "guides.json"), encoding="utf-8
 check("server/public/guides.json is the same payload", server_raw == raw)
 size = len(raw.encode("utf-8"))
 check("payload size reasonable (< 800 KB)", size < 800 * 1024, "%.0f KB" % (size / 1024.0))
+
+# -- corrections layer ------------------------------------------------------------------------
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import make_guides  # noqa: E402
+
+research_path = make_guides.default_input()
+with open(research_path, encoding="utf-8") as f:
+    research_raw = json.load(f)
+corrections, corr_path = make_guides.load_corrections(research_path)
+check("corrections file exists for the research", corr_path and os.path.basename(corr_path) ==
+      os.path.basename(research_path).replace("guides-", "corrections-"), corr_path)
+with open(os.path.join(ROOT, "data", "guides.js"), encoding="utf-8") as f:
+    header = f.readline()
+check("guides.js header names the research and corrections",
+      os.path.basename(research_path) in header and os.path.basename(corr_path or "?") in header, header.strip())
+fixed = copy.deepcopy(research_raw)
+counts, cproblems = make_guides.apply_corrections(fixed, corrections)
+check("every correction applies cleanly to the untouched research", not cproblems and sum(counts.values()) == len(corrections),
+      "; ".join(cproblems[:4]))
+check("every correction has an id, a guide, a reason and https sources",
+      all(c.get("id") and c.get("guide") and (c.get("reason") or "").strip() and
+          all(str(s).startswith("https://") for s in (c["source"] if isinstance(c.get("source"), list) else [c.get("source")]))
+          for c in corrections if c.get("action") != "delete" or c.get("source")),
+      [c.get("id") for c in corrections if not (c.get("reason") or "").strip()])
+check("replace and add corrections carry a source URL",
+      all(c.get("source") for c in corrections if c.get("action") in ("replace", "add")),
+      [c.get("id") for c in corrections if c.get("action") in ("replace", "add") and not c.get("source")])
+
+# no stale corrections: the text each replace / delete expected is gone after it ran, so applying it a
+# second time fails (adds of a source or a cite fail as duplicates); adds of lines are skipped
+stale = []
+for c in corrections:
+    if c["action"] == "add" and not c["path"].endswith(("readMore", "cite")):
+        continue
+    if c["action"] == "replace" and c["match"] in json.dumps(c["value"], ensure_ascii=False):
+        continue
+    again = copy.deepcopy(fixed)
+    _, p = make_guides.apply_corrections(again, [c])
+    if not p:
+        stale.append(c["id"])
+check("no stale corrections (each one's old text is gone once applied)", not stale, stale)
+check("the research record itself still holds the original text (fixes live in the corrections file)",
+      all(c["match"] in json.dumps(next(g for g in research_raw["guides"] if g["id"] == c["guide"]), ensure_ascii=False)
+          for c in corrections if c["action"] in ("replace", "delete")))
+
+
+def shipped_text(v):
+    if isinstance(v, str):
+        return [v]
+    if isinstance(v, dict):
+        return [v[k] for k in ("text", "name") if isinstance(v.get(k), str)]
+    if isinstance(v, list):
+        return [x for x in v if isinstance(x, str)]
+    return []
+
+
+missing = [c["id"] for c in corrections if c["action"] in ("replace", "add") and not c["path"].endswith(("readMore", "cite"))
+           and not all(t in raw for t in (json.dumps(x, ensure_ascii=False)[1:-1] for x in shipped_text(c["value"])) if t)]
+check("corrected text is in the shipped data", not missing, missing)
+
+# -- content checks (3.29) ------------------------------------------------------------------------
+
+
+def prose(g, with_changes=False):
+    """(where, text) for every line a player reads, the readMore titles excluded."""
+    yield "summary", g.get("summary", "")
+    for key in ("howTo", "dangers", "sell"):
+        for i, it in enumerate(g.get(key, [])):
+            yield "%s[%d]" % (key, i), it["text"]
+    for i, s in enumerate(g.get("strategies", [])):
+        for k in ("name", "investment"):
+            if s.get(k):
+                yield "strategies[%d].%s" % (i, k), s[k]
+        for k in ("steps", "atlasPassives", "scarabs"):
+            for j, x in enumerate(s.get(k, [])):
+                yield "strategies[%d].%s[%d]" % (i, k, j), x
+    for i, p in enumerate(g.get("profit", [])):
+        yield "profit[%d]" % i, p["text"]
+    for i, t in enumerate(g.get("tables", [])):
+        for j, r in enumerate(t["rows"]):
+            yield "tables[%d].rows[%d]" % (i, j), " | ".join(r)
+    for i, q in enumerate(g.get("quickCard", [])):
+        yield "quickCard[%d]" % i, q
+    if with_changes:
+        for i, c in enumerate(g.get("changes", [])):
+            yield "changes[%d]" % i, c["text"]
+
+
+def lines_matching(pattern, with_changes=False, flags=0):
+    rx = re.compile(pattern, flags)
+    return [(gid, w, t) for gid, g in guides.items() for w, t in prose(g, with_changes) if rx.search(t)]
+
+
+# Not on the 3.29 Atlas: the 28 maps the 3.29.0 notes remove, plus earlier removals that did not come
+# back (3.28.0 notes; PoE Wiki atlas_nodes for the 3.29 series). Checked 2026-11-04.
+REMOVED_MAPS = ["Acid Caverns", "Arena", "Ashen Wood", "Bog", "Canyon", "Carcass", "Castle Ruins", "Courtyard", "Coves",
+                "Crimson Temple", "Crimson Township", "Cursed Crypt", "Defiled Cathedral", "Dig", "Dry Sea", "Dungeon",
+                "Lava Chamber", "Lighthouse", "Maze", "Moon Temple", "Mud Geyser", "Necropolis", "Pen", "Racecourse",
+                "Sepulchre", "Underground Sea", "Wasteland", "Wharf",
+                "Waste Pool", "Thicket", "Academy", "Bone Crypt", "Precinct", "Shore", "Spider Forest", "Glacier", "Villa",
+                "Underground River"]
+MAP_RX = re.compile(r"(?<!Grand )(?<!Sanctum )\b(%s)\b(?! of the Minotaur)" % "|".join(re.escape(m) for m in REMOVED_MAPS))
+MAP_OK = re.compile(r"3\.28 only|left the Atlas|off the Atlas|removed|no longer on the Atlas")
+bad_maps = []
+for gid, g in guides.items():
+    for w, t in prose(g):
+        hits = [m for m in MAP_RX.findall(t) if not (gid == "sanctum" and m == "Necropolis")]  # a Sanctum floor
+        if hits and not MAP_OK.search(t):
+            bad_maps.append("%s.%s: %s" % (gid, w, ", ".join(hits)))
+check("no maps that are off the 3.29 Atlas (unless marked 3.28 only / removed)", not bad_maps, bad_maps[:6])
+check("the 3.29 map list is used where guides named removed maps",
+      "Dunes, Strand" in json.dumps(guides["syndicate"]["howTo"]) and "City Square, Mesa and Toxic Sewer" in raw)
+
+kirac = [(gid, w) for gid, w, t in lines_matching(r"Kirac")
+         if not re.search(r"removed|gone|no longer|Invitation|Outdated|[Oo]lder guides|[Oo]ld guides", t)]
+check("no Kirac mission or map-device craft advice", not kirac, kirac[:6])
+check("no Kirac craft costs or optional Kirac steps",
+      not lines_matching(r"Kirac's \w+ (map-device )?craft (costs|adds)|Optional(ly)? (add )?Kirac", True))
+check("no 'Kirac mod not changed in 3.28' history", not lines_matching(r"Kirac.*Not changed in 3\.28", True))
+check("Heist and Ultimatum record the 3.28 Map Device craft removal",
+      all(any(c["patch"].startswith("3.28") and "Map Device crafting" in c["text"] for c in guides[x]["changes"])
+          for x in ("heist", "ultimatum")))
+check("no Logbook splitting", not [x for x in lines_matching(r"split.{0,60}(Logbook|Plagued Arachnid)|Logbooks?.{0,60}split")
+                                   if not re.search(r"no longer|gone|removed|replaced", x[2])],
+      lines_matching(r"split.{0,60}(Logbook|Plagued Arachnid)|Logbooks?.{0,60}split"))
+check("Chimeral only as the old name of Craicic Croaker",
+      not [x for x in lines_matching(r"Chimeral", True) if not re.search(r"Croaker", x[2])],
+      lines_matching(r"Chimeral", True))
+check("no chisel-to-quality advice (Cartographer's Chisels are gone since 3.28)",
+      not [x for x in lines_matching(r"chisel to \d+%", flags=re.I) if not re.search(r"no longer|gone|out of date", x[2])])
+check("no lab enchants as rewards", not lines_matching(r"\b(lab|Labyrinth|helmet) enchant", True, re.I))
+check("Breachstones only as vendor fodder",
+      not [x for x in lines_matching(r"Breachstone") if not re.search(r"no longer|[Vv]endor|Hivebrain|out of date", x[2])],
+      lines_matching(r"Breachstone"))
+check("Catalysts only from Ultimatum",
+      not [x for x in lines_matching(r"\bCatalysts?\b") if x[0] != "ultimatum" and
+           not re.search(r"Ultimatum|no longer|gone|removed|older guides", x[2])],
+      [x for x in lines_matching(r"\bCatalysts?\b") if x[0] != "ultimatum"][:4])
+ritual_text = json.dumps(guides["ritual"], ensure_ascii=False)
+check("Ritual: the Tribute reserve covers the 15% deferral cost (about 3,000, not 2,000)",
+      not re.search(r"[Kk]eep (at least )?2,000", ritual_text) and
+      any("Keep ~3,000 spare to defer." in q for q in guides["ritual"]["quickCard"]))
+check("Horned Scarab of Awakening is reworked, not removed",
+      not lines_matching(r"Horned Scarab of Awakening was removed", True) and
+      any("Horned Scarab of Awakening was reworked" in c["text"] for c in guides["atlas"]["changes"]))
+stier = next(t for t in guides["atlas"]["tables"] if "S tier" in t["title"])
+check("Atlas S-tier table: Fruiting Astrolabe Harvest, not the B-tier Cornucopia",
+      [r[0] for r in stier["rows"] if "Harvest" in r[0]] == ["Harvest (Fruiting Astrolabe)"], [r[0] for r in stier["rows"]])
+check("Atlas and Ultimatum agree on Maxroll's Ultimatum profit rating (Excellent)",
+      [r[3] for r in stier["rows"] if r[0] == "Inscribed Ultimatum"] == ["Excellent"] and
+      any("'Excellent'" in p["text"] for p in guides["ultimatum"]["profit"]))
+check("Ultimatum profit carries the 3.29 ExpCarry test, not 'no tracked div/hour'",
+      not lines_matching(r"No independently tracked") and
+      any(p.get("who") == "ExpCarry" and "5.3 div/h" in p["text"] for p in guides["ultimatum"]["profit"]))
+# same-day price snapshot (4 Nov 2026): Out of Games read the Divine at 422c, poe.ninja at 412c. A line
+# that uses 422c must say so and give the poe.ninja value; likewise for Sacred lifeforce (PoEDB 88c, poe.ninja 137c)
+div422 = lines_matching(r"422c")
+check("every 422c Divine rate names its source and poe.ninja's 412c",
+      div422 and all("Out of Games" in t and "412c" in t for _, _, t in div422), div422)
+sacred = lines_matching(r"Sacred( Crystallised Lifeforce| lifeforce)? (is|reads as) about")
+check("Sacred lifeforce prices show both same-day sources", sacred and all("88c" in t and "137c" in t for _, _, t in sacred), sacred)
+
+# -- syndicate data comes from the same research ----------------------------------------------------
+syn, _ = load_js(os.path.join(ROOT, "data", "syndicate.js"), "POE_SYNDICATE")
+check("data/syndicate.js parses", isinstance(syn, dict))
+check("data/syndicate.js has the guides' asOf", isinstance(syn, dict) and syn.get("asOf") == data["asOf"],
+      (syn or {}).get("asOf"))
+check("data/syndicate.js is built from the same research and corrections",
+      isinstance(syn, dict) and os.path.basename(research_path) in syn.get("source", "") and
+      os.path.basename(corr_path or "?") in syn.get("source", ""), (syn or {}).get("source"))
+check("make_guides' syndicate check passes", make_guides.check_syndicate(data["asOf"], research_path, corr_path) is None,
+      make_guides.check_syndicate(data["asOf"], research_path, corr_path))
 
 # -- bridge (gui.py): validation + Read more links ----------------------------------------
 import gui  # noqa: E402

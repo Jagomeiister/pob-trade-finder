@@ -3902,6 +3902,10 @@ const H = window.__e2e;
 const out = {};
 window.__sheetOpen('blight');
 await H.waitFor(() => document.querySelector('.anoint-row'), 3000, 'overlay rows');
+// the overlay opens on Quick card unless Reference was picked before: the anoint helper is on Reference
+const refTab = [...document.querySelectorAll('.sheet-panel button')].find(b => b.textContent.trim() === 'Reference');
+if (refTab) { refTab.click(); await H.sleep(30); }
+out.helperVisible = H.visible(document.querySelector('.anoint-oil-btn'));
 out.noSearch = !document.querySelector('.anoint-search') && !document.querySelector('.sheet-panel input, .sheet-panel select');
 ['Clear', 'Black'].forEach(n => [...document.querySelectorAll('.anoint-oil-btn')].find(b => b.textContent.startsWith(n)).click());
 await H.sleep(30);
@@ -4170,7 +4174,8 @@ def scenario_anoints(s, tag):
     check(tag + " oil prices asked once (exchange feed)", r["calls"] == 1, r["calls"])
     s.fresh("?sheet=1")
     r = s.run(S40_ANOINT_OV, timeout=60)
-    check(tag + " over the game: click oils, no typing", r["noSearch"] and r["rowsHaveBoth"] and r["fits"], r)
+    check(tag + " over the game: the helper is on the Reference tab; click oils, no typing", r["helperVisible"] and
+          r["noSearch"] and r["rowsHaveBoth"] and r["fits"], r)
 
 
 S43_LOOTFILTER = r"""
@@ -4860,6 +4865,107 @@ await H.waitFor(() => window.__clip, 3000, 'board text on the clipboard');
 out.clip = window.__clip;
 out.persisted = H.calls('storage_set').some(c => c.args[0] === 'pobtf-syndicate');
 out.stored = H.calls('storage_set').filter(c => c.args[0] === 'pobtf-syndicate').slice(-1)[0].args[1];
+
+// ---- review regressions: the plan itself (syndPlan on a given board) ----
+const D = window.POE_SYNDICATE;
+const plan = (goal, m, d) => syndPlan(d || D, syndNormalize(d || D, { goal: goal, m: m }));
+// #0 Betray / Rivals only for the goal that links Rivals (2-2-5-5)
+out.betrayBy = ['research', 'vorici', 'intervention', 'general'].map(g =>
+  plan(g, {}).suggestions.filter(x => x.kind === 'betray').length);
+out.linkRivals = D.goals.filter(g => g.linkRivals).map(g => g.id);
+// #1 evictions: both filler houses at 4/5, three unwanted members in target houses
+const ev = plan('general', { 'It That Fled': { d: 'transportation', r: 3 }, Vorici: { d: 'transportation', r: 3 },
+  Haku: { d: 'intervention', r: 3 }, Leo: { d: 'intervention', r: 3 },
+  Aisling: { d: 'fortification', r: 1 }, Guff: { d: 'fortification', r: 1 }, Janus: { d: 'fortification', r: 1 }, Riker: { d: 'fortification', r: 1 },
+  Cameria: { d: 'research', r: 1 }, Elreon: { d: 'research', r: 1 }, Hillock: { d: 'research', r: 1 }, Jorgin: { d: 'research', r: 1 },
+  Tora: { d: 'transportation', r: 1 }, Korell: { d: 'intervention', r: 1 }, Rin: { d: 'intervention', r: 0 } });
+const evTo = { fortification: 0, research: 0 };
+ev.suggestions.filter(x => x.prio === 40).forEach(x => {
+  const m = x.text.match(/in an? (Fortification|Research) encounter/);
+  if (m) evTo[m[1].toLowerCase()]++;
+});
+out.evict = { to: evTo, full: ev.suggestions.filter(x => x.prio === 40 && x.kind === 'remove').map(x => x.who[0]),
+  over: ev.suggestions.some(x => / has \d+ members; this board wants/.test(x.text)) };
+// #2 a kept member (Vorici) in the wrong target house: he becomes the Transportation target and moves
+const kp = plan('general', { Vorici: { d: 'intervention', r: 2 }, Haku: { d: 'intervention', r: 1 }, Leo: { d: 'intervention', r: 1 } });
+out.keep1 = [kp.wantTo.Vorici, kp.wantTo.Gravicius || null, kp.status.Vorici,
+  kp.suggestions.filter(x => x.who.indexOf('Vorici') !== -1 && /^Interrogate Vorici out of Intervention/.test(x.text)).length];
+// the mirror: Vorici already in Transportation, Gravicius (also kept) sits in Intervention
+const kp2 = plan('general', { Vorici: { d: 'transportation', r: 1 }, Gravicius: { d: 'intervention', r: 1 },
+  Haku: { d: 'intervention', r: 1 }, Leo: { d: 'intervention', r: 1 } });
+out.keep2 = [kp2.status.Gravicius, kp2.suggestions.filter(x => /^Interrogate Gravicius out of Intervention/.test(x.text)).map(x => x.text)];
+// #3 one member, one division: 'Vorici or Gravicius in Transportation' + 'Vorici in Fortification'
+const g0 = D.goals.find(g => g.id === 'vorici');
+const T = (ms, d) => ({ members: ms, division: d, alt: false, leaderFree: false, note: '', text: ms.join(' or ') + ' in ' + d });
+const withGoal = targets => Object.assign({}, D, { goals: [Object.assign({}, g0, { id: 'x', targets: targets })] });
+const D2 = withGoal([T(['Vorici', 'Gravicius'], 'transportation'), T(['Vorici'], 'fortification')]);
+const p2 = plan('x', { Vorici: { d: 'transportation', r: 1 } }, D2);
+out.twice = p2.needs.map(n => n.division + ':' + n.member);
+out.twiceVorici = p2.suggestions.filter(x => /Vorici/.test(x.text)).map(x => x.text);
+const D3 = withGoal([T(['Vorici'], 'transportation'), T(['Vorici', 'Gravicius'], 'fortification'), T(['Gravicius'], 'research')]);
+const p3 = plan('x', {}, D3);
+out.unmet = [p3.needs.map(n => n.division + ':' + n.member), p3.suggestions.filter(x => x.text.startsWith('No free member')).map(x => x.text)];
+// #22 a remove-list member shows the status in words, also on a compact pool card
+gs.value = 'research'; gs.dispatchEvent(new Event('change'));
+out.removeChip = [H.text('.synd-pool[data-pool="none"] .synd-card[data-name="Riker"] .synd-status', host),
+  (card('Riker').title || '').includes('Status: remove')];
+out.betrayUi = moves().filter(t => t.startsWith('Betray'));
+gs.value = 'general'; gs.dispatchEvent(new Event('change'));
+return out;
+"""
+
+# Review regressions, UI side: inside the real Cheat sheets view (its Esc closes the page)
+S49_UI = r"""
+const H = window.__e2e;
+const out = {};
+document.getElementById('open-sheets').click();
+await H.sleep(80);
+[...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => b.textContent === mechanicById('syndicate').title).click();
+await H.sleep(80);
+const host = document.querySelector('#view-sheets .synd');
+const card = n => host.querySelector('.synd-card[data-name="' + n + '"]');
+const ed = () => host.querySelector('.synd-editor');
+const st = () => JSON.parse(localStorage.getItem('pobtf-syndicate') || 'null');
+const active = () => { const a = document.activeElement; return a ? (a.dataset.fk || a.tagName) : null; };
+const esc = () => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+out.mounted = !!host;
+// #17 picking a member moves focus into its editor (card says it controls the editor)
+card('Haku').focus();
+card('Haku').click();
+out.pickFocus = [active(), ed().contains(document.activeElement), card('Haku').getAttribute('aria-expanded'),
+  card('Haku').getAttribute('aria-controls') === ed().id];
+// #16 focus kept after editor actions
+const place = ed().querySelector('.synd-ed-place[data-div="intervention"]');
+place.focus(); place.click();
+out.afterPlace = active();
+const rival = () => [...ed().querySelectorAll('.synd-rival')].find(b => b.textContent === 'Korell');
+rival().focus(); rival().click();
+out.afterRival = [active(), st().m.Haku.riv];
+const seg = v => ed().querySelector('.segmented button[data-value="' + v + '"]');
+seg('1').focus(); seg('1').click();
+// arrow keys keep working: two presses in a row
+document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+out.afterArrows = [active(), st().m.Haku.r];
+const lc = ed().querySelector('.synd-ed-ctl input[type=checkbox]');
+lc.focus(); lc.click();
+out.afterLeader = [active(), st().m.Haku.l];
+ed().querySelector('.synd-ed-ctl input[type=checkbox]').click();
+// #18 clicking the Rank caption leaves the rank alone
+const before = st().m.Haku.r;
+const cap = ed().querySelector('.synd-ed-rank .field-label');
+out.capText = cap && cap.textContent;
+cap.click();
+ed().querySelector('.synd-ed-rank').click();
+out.rankAfterCaption = [before, st().m.Haku.r, !ed().querySelector('label .segmented')];
+// #15 Esc cancels the pick and stays on the Cheat sheets page
+esc();
+await H.sleep(30);
+out.esc = [ed().hidden, !host.querySelector('.synd-card.is-sel'), document.body.dataset.view, active()];
+// a second Esc (nothing picked) is the page's again
+esc();
+await H.sleep(30);
+out.esc2 = document.body.dataset.view;
 return out;
 """
 
@@ -4937,7 +5043,40 @@ def scenario_syndicate(s, tag):
     check(tag + " copy board as text", "Syndicate board (goal: General currency (2-2-5-5))" in clip and
           "Intervention: Haku R3, Leo R2, Guff R1" in clip and "Away / dead: Gravicius" in clip and "Next moves:" in clip, clip)
     check(tag + " saved through the bridge (pobtf-syndicate)", r["persisted"], r["persisted"])
-    s.fresh("?e2eStore=" + urllib.parse.quote(json.dumps({"pobtf-syndicate": r["stored"]})))
+    r_stored = r["stored"]
+    # review regressions (plan)
+    check(tag + " Betray moves only for the goal that links Rivals (none for research, vorici, intervention)",
+          r["betrayBy"][:3] == [0, 0, 0] and r["betrayBy"][3] > 0 and r["linkRivals"] == ["general"] and not r["betrayUi"],
+          (r["betrayBy"], r["linkRivals"], r["betrayUi"]))
+    ev = r["evict"]
+    check(tag + " evictions spread over both filler houses, never past 5; the rest are removed",
+          ev["to"] == {"fortification": 1, "research": 1} and len(ev["full"]) == 1 and not ev["over"], ev)
+    check(tag + " kept member in the wrong target house becomes the target and moves (Vorici)",
+          r["keep1"] == ["transportation", None, "want", 1], r["keep1"])
+    check(tag + " kept member not picked, in a target house -> flagged and moved out (Gravicius)",
+          r["keep2"][0] == "out" and len(r["keep2"][1]) == 1 and "Fortification" in r["keep2"][1][0], r["keep2"])
+    check(tag + " need matching uses a member once (Vorici -> Fortification, Gravicius -> Transportation)",
+          r["twice"] == ["transportation:Gravicius", "fortification:Vorici"] and
+          not any(t.startswith("Execute Vorici in a Transportation") for t in r["twiceVorici"]), (r["twice"], r["twiceVorici"]))
+    check(tag + " no member counted twice: a target with every option taken is flagged unmet",
+          r["unmet"][0] == ["transportation:Vorici", "research:Gravicius"] and
+          r["unmet"][1] == ["No free member for Vorici or Gravicius in Fortification"], r["unmet"])
+    check(tag + " remove-list member: 'remove' chip on the pool card and in the tooltip",
+          r["removeChip"] == ["remove", True], r["removeChip"])
+    s.fresh()
+    r = s.run(S49_UI, timeout=60)
+    check(tag + " picking a member focuses its editor (aria-expanded/controls)",
+          r["mounted"] and r["pickFocus"][1:] == [True, "true", True], r["pickFocus"])
+    check(tag + " focus kept after editor actions (place, rival, rank arrows, leader)",
+          r["afterPlace"] == "place:intervention" and r["afterRival"] == ["rival:Korell", ["Korell"]] and
+          r["afterArrows"] == ["rank:3", 3] and r["afterLeader"] == ["leader", True],
+          (r["afterPlace"], r["afterRival"], r["afterArrows"], r["afterLeader"]))
+    check(tag + " clicking the Rank caption doesn't change the rank", r["capText"] == "Rank" and
+          r["rankAfterCaption"][0] == r["rankAfterCaption"][1] and r["rankAfterCaption"][0] > 0 and r["rankAfterCaption"][2],
+          (r["capText"], r["rankAfterCaption"]))
+    check(tag + " Esc cancels the pick, stays on Cheat sheets, focus back on the card; next Esc closes the page",
+          r["esc"] == [True, True, "sheets", "card:Haku"] and r["esc2"] != "sheets", (r["esc"], r["esc2"]))
+    s.fresh("?e2eStore=" + urllib.parse.quote(json.dumps({"pobtf-syndicate": r_stored})))
     r = s.run(S49_RELOAD, timeout=60)
     check(tag + " reload: board, goal, intel and away come back from storage",
           r["goal"] == "general" and r["haku"] and r["intel"] == "90" and r["away"], r)
@@ -5016,16 +5155,48 @@ out.wantUrl = G.syndicate.readMore[parseInt(out.citeText.slice(1), 10) - 1].url;
 out.sources = g.querySelectorAll('.guide-src').length;
 out.wantSources = G.syndicate.readMore.length;
 out.tableCount = H.text('.guide-sec[data-key="tables"] .guide-sec-count', g);
+// the jump bar under the as-of note: a link per section, then Reference data
+const jump = g.querySelector('.guide-jump');
+out.jumpAfterNote = !!jump && jump.previousElementSibling === g.querySelector('.guide-asof');
+out.jumpKeys = jump ? [...jump.querySelectorAll('.guide-jump-link')].map(b => b.dataset.key) : [];
+out.secKeys = [...g.querySelectorAll('.guide-sec')].map(d => d.dataset.key).concat(['ref']);
+window.scrollTo(0, 0);
+await H.sleep(30);
+const refEl = g.querySelector('.guide-ref');
+out.refBelow = refEl.getBoundingClientRect().top > window.innerHeight;
+jump.querySelector('.guide-jump-link[data-key="ref"]').click();
+// a smooth scroll (slow headless): wait until it lands at its top, or as far as the page scrolls
+const atEnd = () => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 2;
+const landed = (el) => { const t = el.getBoundingClientRect().top; return t >= -2 && (t < 120 || (atEnd() && t < window.innerHeight - 60)); };
+for (let i = 0; i < 60 && !landed(refEl); i++) await H.sleep(50);
+out.refTop = [Math.round(refEl.getBoundingClientRect().top), window.innerHeight];
+out.refInView = landed(refEl);
+out.refFocus = document.activeElement === g.querySelector('.guide-ref-head .sheet-filter');
+// a folded section opens when its link is clicked
+const strSec = g.querySelector('.guide-sec[data-key="strategies"]');
+strSec.open = false;
+jump.querySelector('.guide-jump-link[data-key="strategies"]').click();
+for (let i = 0; i < 60 && !landed(strSec); i++) await H.sleep(50);
+out.stratJump = strSec.open && landed(strSec);
+window.scrollTo(0, 0);
 // Blight: guide + the anoint helper and tables under Reference data
 pick(mechanicById('blight').title);
 await H.sleep(60);
 out.blight = !!panel().querySelector('.guide') && !!panel().querySelector('.guide-ref .anoint') &&
   H.text('.guide-summary', panel()) === G.blight.summary;
+const bref = panel().querySelector('.guide-jump-link[data-key="ref"]');
+out.blightJump = !!bref && /anoint helper/.test(bref.title);
+if (bref) bref.click();
+await H.sleep(30);
+const ae = document.activeElement;
+out.blightFocus = !!ae && ae.tagName === 'INPUT' && !!ae.closest('.guide-ref .anoint') && (ae.matches('.anoint-search') || !!ae.closest('.anoint-search'));
+window.scrollTo(0, 0);
 // Mercenaries: a guide-only sheet, no reference data
 pick('Mercenaries of Trarthus');
 await H.sleep(60);
 out.merc = !!panel().querySelector('.guide') && !panel().querySelector('.guide-ref') &&
   panel().querySelectorAll('.guide-strat').length === G.mercenaries.strategies.length;
+out.mercJump = [...panel().querySelectorAll('.guide-jump-link')].map(b => b.dataset.key);
 // a sheet without a guide works as before
 pick(mechanicById('scarabs').title);
 await H.sleep(60);
@@ -5049,14 +5220,54 @@ out.quickTags = p.querySelectorAll('.guide-quick .guide-stage').length;
 out.strats = [...p.querySelectorAll('.guide-ov-strats .guide-quick-text')].map(e => e.textContent);
 out.wantStrats = G.syndicate.strategies.map(s => s.name);
 out.more = H.text('.guide-ov-more', p);
-out.long = p.querySelectorAll('.guide-sec, .guide-asof, .guide-summary, .guide-strat, .guide-src, .guide-cite').length;
-out.sections = [...p.querySelectorAll('.guide-ov > .sheet-sec > .sheet-sec-title')].map(e => e.textContent);
-out.inputs = p.querySelectorAll('input, select, textarea').length;
-out.refRows = p.querySelectorAll('.guide-ov-ref .sheet-table tbody tr').length;
+out.long = p.querySelectorAll('.guide-sec, .guide-asof, .guide-summary, .guide-strat, .guide-src, .guide-cite, .guide-jump').length;
+out.sections = [...p.querySelectorAll('.guide-ov-pane[data-tab="quick"] > .sheet-sec > .sheet-sec-title')].map(e => e.textContent);
+out.inputs = p.querySelectorAll('input, select, textarea, [contenteditable="true"]').length;
+const shown = (el) => !!el && el.getClientRects().length > 0;
+// tabs: Quick card (default) | Reference; the quick card is first, the strategy names fold to one line
+out.tabs = [...p.querySelectorAll('.guide-ov-tabs .seg')].map(b => b.textContent);
+out.tabFirst = p.querySelector('.guide-ov').firstElementChild.classList.contains('guide-ov-tabs');
+out.quickOn = shown(p.querySelector('.guide-quick')) && !shown(p.querySelector('.guide-ov-ref'));
+const tog = p.querySelector('.guide-ov-toggle');
+out.togText = tog ? tog.textContent : null;
+out.stratsFolded = !shown(p.querySelector('.guide-ov-strats')) && tog.getAttribute('aria-expanded') === 'false';
+let fits = H.calls('overlay_fit').length;
+tog.click();
+await H.sleep(40);
+out.stratsOpen = shown(p.querySelector('.guide-ov-strats')) && tog.getAttribute('aria-expanded') === 'true';
+out.togFit = H.calls('overlay_fit').length > fits;
+fits = H.calls('overlay_fit').length;
+[...p.querySelectorAll('.guide-ov-tabs .seg')].find(b => b.textContent === 'Reference').click();
+await H.sleep(40);
+out.refOn = shown(p.querySelector('.guide-ov-ref')) && !shown(p.querySelector('.guide-quick'));
+out.tabFit = H.calls('overlay_fit').length > fits;
+out.refRows = [...p.querySelectorAll('.guide-ov-ref .sheet-table tbody tr')].filter(shown).length;
+out.tabSaved = JSON.parse(localStorage.getItem('pobtf-guide-ov-tab') || '{}').syndicate;
+[...p.querySelectorAll('.guide-ov-tabs .seg')].find(b => b.textContent === 'Quick card').click();
+await H.sleep(40);
+out.backQuick = shown(p.querySelector('.guide-quick'));
+// Blight: the anoint helper one click away, under Reference; the tab is remembered per sheet
+window.__sheetOpen('blight');
+await H.sleep(60);
+const bp = () => document.querySelector('.sheet-panel');
+out.blightQuick = shown(bp().querySelector('.guide-quick')) && !shown(bp().querySelector('.anoint'));
+[...bp().querySelectorAll('.guide-ov-tabs .seg')].find(b => b.textContent === 'Reference').click();
+await H.sleep(40);
+const an = bp().querySelector('.guide-ov-ref .anoint');
+out.blightHelper = shown(an) && an.classList.contains('is-overlay') &&
+  bp().querySelector('.guide-ov-ref .sheet-sec-title').textContent === 'Anoint helper';
+out.blightInputs = bp().querySelectorAll('input, select, textarea, [contenteditable="true"]').length;
+window.__sheetOpen('pantheon');
+await H.sleep(40);
+window.__sheetOpen('blight');
+await H.sleep(60);
+out.blightKept = shown(bp().querySelector('.guide-ov-ref .anoint'));
+out.synKept = JSON.parse(localStorage.getItem('pobtf-guide-ov-tab') || '{}').syndicate;
 window.__sheetOpen('mercenaries');
 await H.sleep(60);
 out.mercTitle = H.text('.sheet-title');
 out.mercQuick = document.querySelectorAll('.sheet-panel .guide-quick .sheet-li').length;
+out.mercNoTabs = !document.querySelector('.sheet-panel .guide-ov-tabs');
 window.__sheetOpen('pantheon');
 await H.sleep(60);
 out.pantheon = !document.querySelector('.sheet-panel .guide-ov') &&
@@ -5099,9 +5310,14 @@ def scenario_guides(s, tag):
     check(tag + " Mercenaries listed as a sheet", "Mercenaries of Trarthus" in r["listed"], r["listed"])
     check(tag + " Betrayal guide renders with the 3.29 disclaimer", r["has"] and
           "Information as of 3.29 — checked " in (r["asof"] or "") and "may change with 3.30" in r["asof"], r["asof"])
-    check(tag + " summary, sections in order, How to + Strategies open", r["summary"] and r["secs"] ==
+    check(tag + " summary, sections in order, How to open, Strategies folded", r["summary"] and r["secs"] ==
           ["How to run it", "Strategies", "Dangers", "What to sell", "Profit", "Changes by patch", "Tables", "Read more"]
-          and r["openSecs"] == ["howTo", "strategies"], (r["secs"], r["openSecs"]))
+          and r["openSecs"] == ["howTo"], (r["secs"], r["openSecs"]))
+    check(tag + " jump bar under the as-of note: every section, then Reference data", r["jumpAfterNote"] and
+          r["jumpKeys"] == r["secKeys"] and r["jumpKeys"][-1] == "ref", (r["jumpKeys"], r["secKeys"]))
+    check(tag + " jump bar scrolls to Reference data and focuses its filter", r["refBelow"] and r["refInView"] and
+          r["refFocus"], (r["refBelow"], r["refTop"], r["refFocus"]))
+    check(tag + " jump bar opens a folded section", r["stratJump"], r["stratJump"])
     check(tag + " the mechanic's own tool (__mechanicExtras) mounts first, open, app only", r["extra"], r["extra"])
     check(tag + " strategy cards with investment", r["strats"] == r["wantStrats"] and r["inv"] == len(r["wantStrats"]), r["strats"])
     check(tag + " profit labelled rough community estimates", "Rough community estimates" in (r["profitNote"] or ""), r["profitNote"])
@@ -5121,8 +5337,10 @@ def scenario_guides(s, tag):
     check(tag + " Read more opens the source via open_url", r["opened"] == r["wantUrl"] and r["sources"] == r["wantSources"],
           (r["opened"], r["wantUrl"]))
     check(tag + " section counts for tables stay", r["tableCount"] and r["tableCount"] != "0", r["tableCount"])
-    check(tag + " Blight guide with the anoint helper under Reference data", r["blight"], r)
-    check(tag + " Mercenaries: guide-only sheet, no reference data", r["merc"], r)
+    check(tag + " Blight guide with the anoint helper under Reference data (jump link names it, focuses its search)",
+          r["blight"] and r["blightJump"] and r["blightFocus"], (r["blight"], r["blightJump"], r["blightFocus"]))
+    check(tag + " Mercenaries: guide-only sheet, no reference data, no Reference link", r["merc"] and
+          r["mercJump"] and "ref" not in r["mercJump"], r)
     check(tag + " a sheet without a guide still works (tables, filter, credit)", r["noGuide"] and
           "CC BY-NC-SA" in (r["noGuideFoot"] or ""), r["noGuideFoot"])
     s.fresh("?sheet=1")
@@ -5131,10 +5349,21 @@ def scenario_guides(s, tag):
           r["quick"])
     check(tag + " overlay: strategy names + More in the app", r["strats"] == r["wantStrats"] and
           (r["more"] or "").startswith("More in the app"), (r["strats"], r["more"]))
-    check(tag + " overlay: only quick card + strategies, no long sections, no inputs", r["long"] == 0 and
-          r["sections"] == ["Quick card", "Strategies"] and r["inputs"] == 0, (r["long"], r["sections"], r["inputs"]))
-    check(tag + " overlay: reference tables still below", r["refRows"] > 10, r["refRows"])
-    check(tag + " overlay: Mercenaries sheet opens", r["mercTitle"] == "Mercenaries of Trarthus" and r["mercQuick"] > 0, r)
+    check(tag + " overlay: only the quick card, no long sections, no inputs", r["long"] == 0 and
+          r["sections"] == ["Quick card"] and r["inputs"] == 0, (r["long"], r["sections"], r["inputs"]))
+    check(tag + " overlay: Quick card | Reference tabs first, Quick card shown", r["tabs"] == ["Quick card", "Reference"] and
+          r["tabFirst"] and r["quickOn"], (r["tabs"], r["tabFirst"], r["quickOn"]))
+    check(tag + " overlay: strategy names folded to one line, a click lists them, re-fits", r["stratsFolded"] and
+          (r["togText"] or "").startswith("Strategies%d" % len(r["wantStrats"])) and r["stratsOpen"] and r["togFit"],
+          (r["togText"], r["stratsFolded"], r["stratsOpen"], r["togFit"]))
+    check(tag + " overlay: Reference tab shows the tables, re-fits, remembered", r["refOn"] and r["refRows"] > 10 and
+          r["tabFit"] and r["tabSaved"] == "ref" and r["backQuick"], (r["refOn"], r["refRows"], r["tabFit"], r["tabSaved"]))
+    check(tag + " overlay: Blight's anoint helper one click away under Reference, no inputs", r["blightQuick"] and
+          r["blightHelper"] and r["blightInputs"] == 0, (r["blightQuick"], r["blightHelper"], r["blightInputs"]))
+    check(tag + " overlay: the tab is remembered per sheet", r["blightKept"] and r["synKept"] == "quick",
+          (r["blightKept"], r["synKept"]))
+    check(tag + " overlay: Mercenaries sheet opens (no tabs: nothing to reference)", r["mercTitle"] == "Mercenaries of Trarthus" and
+          r["mercQuick"] > 0 and r["mercNoTabs"], r)
     check(tag + " overlay: a sheet without a guide is unchanged", r["pantheon"], r)
     s.fresh()
     r = s.run(S48_SYNC, timeout=60, NEWER=False)
