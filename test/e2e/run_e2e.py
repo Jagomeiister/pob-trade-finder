@@ -218,6 +218,12 @@ STUB_JS = r"""
     open_url: function () { return { ok: true }; },
     unique_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },  // dust explorer
     beast_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },   // search text: beasts
+    // mechanic tools (40-43): every item of the asked groups, with the price main() gave it (mech_data)
+    mech_prices: function (league, groupsJson) {
+      var g = JSON.parse(groupsJson), items = {};
+      Object.keys(D.mech).forEach(function (code) { if (g.indexOf(D.mech[code].group) !== -1) items[code] = D.mech[code]; });
+      return { ok: true, hour: 1762300800, divine: 200, items: items };
+    },
     // loot filter: no filter files unless a scenario provides some
     filter_list: function () { return { ok: true, dir: 'C:\\Users\\me\\Documents\\My Games\\Path of Exile', exists: true, filters: [] }; },
     filter_read: function () { return { ok: false, error: 'stub: no filter' }; },
@@ -5429,6 +5435,46 @@ SCENARIOS = [
 ]
 
 
+def mech_data():
+    """mech_prices' answer for every group, through the real gui.Api.mech_prices: the real
+    currencymap names and icons (no image loads offline), and a fixed price per item, 1-12c
+    from the name, with a few round ones scenarios can count on."""
+    import types
+    cm = json.load(open(os.path.join(ROOT, "data", "currencymap.json"), encoding="utf-8"))
+    fixed = {"Divine Orb": 200, "Ambush Scarab of Containment": 30, "Horned Scarab of Bloodlines": 50,
+             "Primal Crystallised Lifeforce": 0.5, "Sacred Crystallised Lifeforce": 40}
+
+    class Feed:
+        def rates(self, league, ids):
+            return {i: 1 + (sum(map(ord, i)) % 12) for i in ids}, 1762300800
+
+    fake = types.SimpleNamespace(_currency_map=cm, _feed=Feed(), _art=None, MECH_GROUPS=gui.Api.MECH_GROUPS)
+    r = gui.Api.mech_prices(fake, "Standard", json.dumps(list(gui.Api.MECH_GROUPS)))
+    items = r.get("items") or {}
+    for it in items.values():
+        it["img"] = None  # no CDN offline: tools must show names without icons
+        if it["name"] in fixed:
+            it["chaos"] = fixed[it["name"]]
+    return items
+
+
+def _extra_scenarios():
+    """test/e2e/scen_*.py: one scenario per file (TAG = "60 scarabhub", run(s, tag, check)), so
+    separate features add their tests without editing this file."""
+    import glob
+    import importlib.util
+    out = []
+    for path in sorted(glob.glob(os.path.join(HERE, "scen_*.py"))):
+        spec = importlib.util.spec_from_file_location(os.path.basename(path)[:-3], path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        out.append((mod.TAG, (lambda m: lambda s, tag: m.run(s, tag, check))(mod)))
+    return out
+
+
+SCENARIOS += _extra_scenarios()
+
+
 def main():
     build_code = read("test/fixture-realbuild.txt").strip()
     edited_code, other_code = build_variants(build_code)
@@ -5441,6 +5487,7 @@ def main():
         "rates": RATES,
         "buildCode": build_code,
         "diagText": DIAG_TEXT,
+        "mech": mech_data(),
     }
     stub = STUB_JS.replace("__DATA__", json.dumps(data))
     only = sys.argv[1:]  # optional: run scenarios whose tag contains any argument

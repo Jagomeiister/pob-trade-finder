@@ -247,6 +247,15 @@ function guideContent(m, opts) {
     try { extra(host); } catch (e) { host.appendChild(UI.el('div', 'sheet-empty', 'This planner could not load.')); }
     section('extra', extra.guideTitle || 'Planner', host, null);
   }
+  // the interactive tools for this mechanic (40-mechtools.js registry): open at first, each its
+  // own section so the jump bar lists it
+  if (typeof mechToolsFor === 'function') {
+    mechToolsFor(m.id, false).forEach(function (t) {
+      var key = 'tool-' + t.id;
+      if (!(key in GUIDE_OPEN)) GUIDE_OPEN[key] = true;
+      section(key, t.title, mechMount(t, { overlay: false, sheet: m.id, onChange: null }), null);
+    });
+  }
 
   if ((g.howTo || []).length) section('howTo', 'How to run it', list('ol', g.howTo, 'is-steps'), g.howTo.length);
 
@@ -392,7 +401,7 @@ function guideContent(m, opts) {
     var rh = UI.el('div', 'guide-ref-head');
     rh.appendChild(UI.el('h4', 'guide-ref-title', 'Reference data'));
     ref.appendChild(rh);
-    ref.appendChild(mechanicContent(m, Object.assign({}, opts, { plain: true })));
+    ref.appendChild(mechanicContent(m, Object.assign({}, opts, { plain: true, noTools: true })));
     root.appendChild(ref);
   }
   guideFillJump(jump, root);
@@ -476,7 +485,7 @@ function guideOvTabs() {
   try { v = JSON.parse(localStorage.getItem(GUIDE_OV_TAB_KEY) || 'null'); } catch (e) { /* none */ }
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
-function guideOvTab(id) { return guideOvTabs()[id] === 'ref' ? 'ref' : 'quick'; }
+function guideOvTab(id) { var t = guideOvTabs()[id]; return t === 'ref' || t === 'tools' ? t : 'quick'; }
 function guideOvSetTab(id, tab) {
   var all = guideOvTabs();
   all[id] = tab;
@@ -487,31 +496,53 @@ function guideOvFit() { if (typeof fitSheetOverlay === 'function') fitSheetOverl
 function guideOverlay(m, g, opts) {
   var box = UI.el('div', 'sheet-content guide-ov');
   var hasRef = (m.sections || []).length > 0 || m.id === 'blight';
+  // the click-only checkers made for the overlay (40-mechtools.js): a third tab, "Tools"
+  var ovTools = typeof mechToolsFor === 'function' ? mechToolsFor(m.id, true) : [];
   var quick = UI.el('div', 'guide-ov-pane');
   quick.dataset.tab = 'quick';
-  var ref = null;
-  if (hasRef) {
-    ref = UI.el('div', 'guide-ov-pane guide-ov-ref');
-    ref.dataset.tab = 'ref';
+  var ref = null, tools = null;
+  if (hasRef || ovTools.length) {
+    var opts3 = [['quick', 'Quick card']];
+    var titles = { quick: 'The quick card and the strategy names' };
+    if (ovTools.length) {
+      tools = UI.el('div', 'guide-ov-pane guide-ov-tools');
+      tools.dataset.tab = 'tools';
+      opts3.push(['tools', 'Tools']);
+      titles.tools = ovTools.map(function (t) { return t.title; }).join(', ');
+    }
+    if (hasRef) {
+      ref = UI.el('div', 'guide-ov-pane guide-ov-ref');
+      ref.dataset.tab = 'ref';
+      opts3.push(['ref', 'Reference']);
+      titles.ref = m.id === 'blight' ? 'The anoint helper and the wiki tables' : 'The wiki tables';
+    }
     var tab = guideOvTab(m.id);
-    var tabs = UI.segmented([['quick', 'Quick card'], ['ref', 'Reference']], tab, {
-      ariaLabel: 'Show the quick card or the reference tables',
-      titles: { quick: 'The quick card and the strategy names',
-        ref: m.id === 'blight' ? 'The anoint helper and the wiki tables' : 'The wiki tables' },
-      onChange: function (v) {
-        guideOvSetTab(m.id, v);
-        quick.hidden = v !== 'quick';
-        ref.hidden = v !== 'ref';
-        guideOvFit();
-      } });
+    if ((tab === 'ref' && !ref) || (tab === 'tools' && !tools)) tab = 'quick';
+    var show = function (v) {
+      quick.hidden = v !== 'quick';
+      if (ref) ref.hidden = v !== 'ref';
+      if (tools) tools.hidden = v !== 'tools';
+    };
+    var tabs = UI.segmented(opts3, tab, {
+      ariaLabel: 'Show the quick card, the tools or the reference tables',
+      titles: titles,
+      onChange: function (v) { guideOvSetTab(m.id, v); show(v); guideOvFit(); } });
     tabs.classList.add('guide-ov-tabs');
     box.appendChild(tabs);
-    quick.hidden = tab !== 'quick';
-    ref.hidden = tab !== 'ref';
+    show(tab);
   }
   box.appendChild(quick);
+  if (tools) {
+    ovTools.forEach(function (t) {
+      var sec = UI.el('div', 'sheet-sec');
+      sec.appendChild(UI.el('div', 'sheet-sec-title', t.title));
+      sec.appendChild(mechMount(t, { overlay: true, sheet: m.id, onChange: guideOvFit }));
+      tools.appendChild(sec);
+    });
+    box.appendChild(tools);
+  }
   if (ref) {
-    ref.appendChild(mechanicContent(m, Object.assign({}, opts, { plain: true })));
+    ref.appendChild(mechanicContent(m, Object.assign({}, opts, { plain: true, noTools: true })));
     box.appendChild(ref);
   }
 

@@ -887,6 +887,66 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    # Mechanic tools (Cheat sheets → scarab hub, price boards, profit calculator): which
+    # currency-exchange items each group covers, matched on the currencymap name and category.
+    MECH_GROUPS = {
+        "scarabs": lambda n, c: c == "Fragments, Scarabs & Mapping" and "Scarab" in n and "Chisel" not in n,
+        "fossils": lambda n, c: c == "Fossils & Resonators",
+        "essences": lambda n, c: c == "Essences",
+        "lifeforce": lambda n, c: n.endswith("Crystallised Lifeforce"),
+        "oils": lambda n, c: c == "Oils & Extractor",
+        "catalysts": lambda n, c: c == "Catalysts",
+        "delirium": lambda n, c: c == "Delirium Orbs",
+        "fragments": lambda n, c: c == "Fragments, Scarabs & Mapping" and "Scarab" not in n,
+        "expedition": lambda n, c: c == "Expedition Currency",
+        "embers": lambda n, c: c == "Allflame Embers",
+        "currency": lambda n, c: c == "Currency",
+    }
+
+    def mech_prices(self, league, groups_json):
+        """Icons and chaos prices for whole item groups (MECH_GROUPS keys), from GGG's hourly
+        exchange feed only — no trade-site calls. {'ok', 'hour', 'divine', 'items': {code: {name,
+        cat, group, img, chaos}}}. img is the local art-cache copy when there is one, else the CDN
+        URL (the rest are cached in the background, so the next open works offline); chaos is
+        None when the feed has no price for it this hour."""
+        try:
+            groups = [g for g in json.loads(groups_json or "[]") if g in self.MECH_GROUPS][:12]
+            seen, picked = set(), {}
+            for code, m in sorted(self._currency_map.items(), key=lambda kv: len(kv[0])):
+                name, cat, mid = m.get("name") or "", m.get("cat") or "", m.get("id")
+                if not mid or mid in seen:
+                    continue  # duplicate rows for one item: keep the shortest code
+                for g in groups:
+                    if self.MECH_GROUPS[g](name, cat):
+                        seen.add(mid)
+                        picked[code] = (m, g)
+                        break
+            div_id = (self._currency_map.get("divine") or {}).get("id")
+            want = [m["id"] for m, _ in picked.values()] + ([div_id] if div_id else [])
+            try:
+                rates, hour = self._feed.rates(league, want)
+            except Exception:
+                rates, hour = {}, None  # offline: icons still show, prices don't
+            try:
+                manifest = self._art.manifest() if getattr(self, "_art", None) else {}
+            except Exception:
+                manifest = {}
+            items, missing = {}, []
+            for code, (m, g) in picked.items():
+                img = m.get("img") or ""
+                url = ("https://web.poecdn.com" + img) if img.startswith("/") else None
+                if url and url not in manifest:
+                    missing.append(url)
+                items[code] = {"name": m["name"], "cat": m.get("cat", ""), "group": g,
+                               "img": (manifest.get(url) or url) if url else None,
+                               "chaos": rates.get(m["id"])}
+            if missing and getattr(self, "_art", None):
+                threading.Thread(target=self._art.cache, args=(missing[:300],), daemon=True).start()
+            return {"ok": True, "hour": hour, "divine": rates.get(div_id) if div_id else None,
+                    "items": items}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     def cx_overview(self, league):
         """Every currency-exchange item priced in the latest hour, with 7 days of
         6-hourly history: {'ok', 'hour', 'items': {code: {name, cat, img, s: [[unix hour,

@@ -145,6 +145,17 @@ function mechanicContent(m, opts) {
     hs.appendChild(anointHelper({ overlay: SHEET_OV, onChange: SHEET_OV ? function () { fitSheetOverlay(); } : null }));
     box.appendChild(hs);
   }
+  // a sheet without a guide (Scarabs, Corruption ...): its interactive tools (40-mechtools.js)
+  // first; under a guide, the guide shows them itself (opts.noTools)
+  if (!opts.noTools && typeof mechToolsFor === 'function') {
+    mechToolsFor(m.id, !!SHEET_OV).forEach(function (t) {
+      var ts = UI.el('div', 'sheet-sec mech-tool-sec');
+      ts.appendChild(UI.el('div', 'sheet-sec-title', t.title));
+      ts.appendChild(mechMount(t, { overlay: !!SHEET_OV, sheet: m.id,
+        onChange: SHEET_OV ? function () { fitSheetOverlay(); } : null }));
+      box.appendChild(ts);
+    });
+  }
   (m.sections || []).forEach(function (s) {
     if (helper && /^(Amulet|Ring|Blighted map) anoints/i.test(s.title || '')) return; // in the helper
     var sec = UI.el('div', 'sheet-sec');

@@ -1,0 +1,37 @@
+/* css/mechtools.css — shared pieces of the interactive mechanic tools (js/app/40-mechtools.js):
+   item icon + name + price, rating pills, the "my build uses" chips, search box, source line.
+   Each tool's own layout lives in css/mech-*.css. Colours come from css/tokens.css only. */
+
+.mech-tool { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.mech-tool-sec .sheet-sec-title { margin-bottom: 6px; }
+
+/* an item: icon, name, price */
+.mech-item { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--text);
+  font-size: var(--fs-sm); }
+.mech-item-img { width: 28px; height: 28px; object-fit: contain; flex: none; }
+.mech-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mech-item-n { color: var(--text-2); font-variant-numeric: tabular-nums; font-weight: 600; }
+.mech-item-price { color: var(--price); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* icon only: the name is the tooltip, still read by screen readers */
+.mech-item.icon-only .mech-item-name { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; }
+
+/* ratings: colour plus words (UI.chip tones) */
+.mech-rating { white-space: nowrap; }
+
+/* "my build uses ..." toggle chips */
+.mech-build { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.mech-build-label { color: var(--text-2); font-size: var(--fs-sm); }
+.mech-build-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.mech-tag { padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--s2); color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.mech-tag:hover { border-color: var(--accent); color: var(--text); }
+.mech-tag[aria-pressed="true"] { border-color: var(--accent); color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, var(--s2)); }
+
+.mech-search { min-width: 0; width: 100%; max-width: 320px; }
+
+.mech-foot { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.5; }
+.mech-src { color: var(--text-2); }
+.mech-src:hover { color: var(--accent); }
+.mech-empty { color: var(--text-3); font-size: var(--fs-sm); }
