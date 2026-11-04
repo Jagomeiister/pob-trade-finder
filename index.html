@@ -8,7 +8,7 @@
 // Cache-busted stylesheets (same reason as the scripts at the end of <body>).
 (function () {
   var v = Date.now();
-  ['css/tokens.css', 'css/base.css', 'css/components.css', 'css/layout.css', 'css/navicons.css'].forEach(function (href) {
+  ['css/tokens.css', 'css/base.css', 'css/components.css', 'css/layout.css', 'css/navicons.css', 'css/filter-editor.css'].forEach(function (href) {
     document.write('<link rel="stylesheet" href="' + href + '?v=' + v + '">');
   });
   // theme before first paint (app.js applyPrefs owns it afterwards)
@@ -178,6 +178,16 @@
             <option value="off">Off</option>
           </select>
         </label>
+        <label class="field">
+          <span class="field-label">Edit the hovered item in your loot filter</span>
+          <select id="pref-hotkey-filter" title="Opens the filter editor for the item under the cursor: move it between tiers, hide it, change how its tier looks">
+            <option value="ctrl+shift+d">Ctrl+Shift+D</option>
+            <option value="alt+f">Alt+F</option>
+            <option value="f8">F8</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label class="toggle"><input type="checkbox" id="pref-filter-reload" checked> Saving a filter edit reloads the filter in game (sends /reloaditemfilter once per save)</label>
         <div id="hotkey-status" class="hotkey-status"></div>
         <div class="macros">
           <span class="field-label">Chat macros</span>
@@ -446,10 +456,10 @@
   // js/app/: one program split by feature — order matters (docs/DEVELOPER.md)
   var APP = ['01-state', '02-init', '03-shell', '04-library', '05-craft', '06-jewels', '07-history-gems',
              '08-cards', '09-query', '10-character', '11-market', '12-cost', '13-builds-tracking',
-             '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade', '19-trades', '20-unique-jewels', '21-search-text', '22-divcards', '23-tree', '24-cheatsheets', '25-trade-ledger', '26-dust', '27-anoints', '28-atlas', '29-lootfilter', '30-patchnotes'];
-  ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js',
+             '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade', '19-trades', '20-unique-jewels', '21-search-text', '22-divcards', '23-tree', '24-cheatsheets', '25-trade-ledger', '26-dust', '27-anoints', '28-atlas', '29-lootfilter', '30-patchnotes', '32-filter-editor'];
+  ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js', 'data/filtericons.js',
    'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/watcherseye.js', 'data/forbidden.js', 'data/mapmods.js', 'data/treeview.js', 'data/cheatsheets.js', 'data/gemcolours.js', 'data/dust.js', 'data/atlasview.js', 'data/divweights.js', 'data/patchnotes.js', 'data/sample.js',
-   'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/filter.js'].concat(APP.map(function (n) {
+   'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/filter.js', 'js/filter-edit.js'].concat(APP.map(function (n) {
     return 'js/app/' + n + '.js';
   })).forEach(function (src) {
     document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');

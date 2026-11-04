@@ -93,6 +93,29 @@ def overlay_position(cursor_x, game_rect, size, margin=16):
     return int(x), int(y)
 
 
+# the inventory (right) and stash (left) panels are this many game heights wide (PoE 1:
+# 634 px at 1080p, the same at any resolution because the UI scales with the height)
+PANEL_RATIO = 634 / 1080.0
+
+
+def dock_position(cursor_x, game_rect, size, margin=8):
+    """Top-left corner for the filter editor: beside the panel the hovered item is in. Item on
+    the right half (the inventory): just left of the inventory. Left half (stash, vendor):
+    just right of the stash. Clamped inside the game window."""
+    left, top, right, bottom = game_rect
+    w, h = size
+    panel = (bottom - top) * PANEL_RATIO
+    if cursor_x >= (left + right) / 2:
+        x = right - panel - w - margin
+    else:
+        x = left + panel + margin
+    x = max(left, min(x, right - w))
+    y = top + margin
+    if y + h > bottom:
+        y = max(top, bottom - h)
+    return int(x), int(y)
+
+
 # -- Win32 plumbing (lazily bound; private WinDLL instances so the argtypes set
 #    here never leak into ctypes.windll, which pywebview also uses) ------------
 WM_HOTKEY, WM_QUIT, PM_REMOVE, QS_ALLINPUT = 0x0312, 0x0012, 0x0001, 0x04FF
@@ -230,28 +253,32 @@ def _key(vk, up=False):
     u.keybd_event(vk, u.MapVirtualKeyW(vk, 0) & 0xFF, KEYEVENTF_KEYUP if up else 0, 0)
 
 
-def send_copy():
-    """A clean Ctrl+C to the foreground window. The user may still be holding
-    the hotkey's modifiers: release them first, so Alt doesn't turn it into the
-    'advanced' Ctrl+Alt+C copy and Ctrl gets a fresh down/up edge."""
+def send_copy(advanced=False):
+    """A clean Ctrl+C (advanced: Ctrl+Alt+C, the copy with affix names and tiers) to the
+    foreground window. The user may still be holding the hotkey's modifiers: release them
+    first, so a stray Alt doesn't change the kind of copy and Ctrl gets a fresh down/up edge."""
     u, _, _ = _win()
     for vk in (VK_SHIFT, VK_MENU, VK_CONTROL):
         if u.GetAsyncKeyState(vk) & 0x8000:
             _key(vk, up=True)
     time.sleep(0.03)
     _key(VK_CONTROL)
+    if advanced:
+        _key(VK_MENU)
     _key(VK_C)
     _key(VK_C, up=True)
+    if advanced:
+        _key(VK_MENU, up=True)
     _key(VK_CONTROL, up=True)
 
 
-def copy_item_text(timeout=0.6):
-    """Ctrl+C the hovered item, return its text (None if nothing item-like was
-    copied). The previous clipboard text is put back afterwards."""
+def copy_item_text(timeout=0.6, advanced=False):
+    """Ctrl+C (advanced: Ctrl+Alt+C) the hovered item, return its text (None if nothing
+    item-like was copied). The previous clipboard text is put back afterwards."""
     u, _, _ = _win()
     prev = get_clipboard_text()
     seq = u.GetClipboardSequenceNumber()
-    send_copy()
+    send_copy(advanced)
     deadline = time.time() + timeout
     changed = False
     time.sleep(0.12)  # the client usually answers within ~100ms

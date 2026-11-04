@@ -763,6 +763,55 @@ Tabs:
 The **Ctrl+D price check** (and a pasted item) shows the same line: which block of your filter
 catches the item, with **Hide it** / **Highlight it**. Both add a rule and save straight away.
 
+### Edit the hovered item in your filter (Ctrl+Shift+D)
+
+Hover an item in game and press **Ctrl+Shift+D** (Settings → Hotkeys to change it). The
+price-check window turns into the filter editor for that item, next to your inventory (or
+your stash, for an item on the left). Unlike the Tools page, this edits **the filter's own
+blocks**, like Scalpel does. The hotkey uses the game's advanced copy (Ctrl+Alt+C), so rules
+on affix names work too.
+- **Top bar**: your filter (click it to pick another; picking one switches the game to it),
+  **Check for Filter Updates** / **Update** for an online filter, and **History**.
+- **The item**: its art, name, price (exchange / poe.ninja), item level, stack, and **Use Zone
+  Level** (on a map: AreaLevel from the zone you're in instead of the item level, at least 83).
+  **Save** turns gold when you have unsaved look changes, then shows **Saved**.
+- **Retier**: **Switch Tier** opens a list of every tier of the same kind, each drawn the way
+  the game draws it. Pick one: the base moves there and the filter saves. Tiers that can't take
+  the item aren't listed. The **Hide** row at the bottom says what hiding will do, then does it.
+- **Uniques on this base** (unique tiers): a row of cards with prices. Click one to look at it.
+- **Thresholds** (stack size, quality, memory strands): a bar coloured by Show / Hide with a
+  pill per range. Pick a range to edit the tier that shows it; change a boundary with its box
+  or ‹ › (only in that kind of tier; saved with Save).
+- **Edit Tier**:
+  - **Items in this Tier**: the tier's icons; **Expand** shows every base with its price (click
+    one to look at it). **Run Economy Audit** opens the audit.
+  - **Tier Visibility**: Show / Hide the whole tier.
+  - **Additional Tier Details**: the tier's other conditions.
+  - **Tier Label**: the label preview, the font size slider and **Text / Border / Background**:
+    click one for a colour picker with your filter's most used colours and hex / RGBA input.
+  - **Effects**: minimap icon (size, colour, shape), light beam (colour, Temp) and the drop
+    sound (built-in or your own sound files; picking one plays it).
+  - Look changes wait for **Save** (or Ctrl+S). In a chain of Continue blocks, each change goes
+    to the block that sets it.
+- **Economy audit**: slide a price (log scale; a dust slider too on unique tiers): the items
+  above go green, below red. **Move the N items above / below to [tier] · Retier Items** moves
+  them and saves. The tier always keeps one base; unpriced items never move. **Show / Hide
+  Tier** flips the tier.
+- **History**: your edits this session (**Undo** the newest, or Ctrl+Z; the last 30), saved
+  versions with **Restore** and **Create Checkpoint**, and the recorded filter changes.
+- Every write sends **/reloaditemfilter** so the game uses it at once (one command per save;
+  turn it off in Settings → Hotkeys). **Ctrl+D** goes back to the price check.
+- The game's label font and the 16 built-in sounds are downloaded once from Scalpel's GitHub
+  (into data/filter_assets/) the first time they're needed.
+
+**Online filters** (followed on the PoE site / FilterBlade) can't be edited in place: the game
+replaces them. Import one from the filter list: that makes `<name>-local.filter` and switches
+the game to it. Your edits are recorded. **Check for Filter Updates** sends
+`/itemfilter <online name>` so the game downloads the newest version; when there is one the bar
+says **Filter Update Available** and **Update** puts your edits onto the new version, saves it
+and sends `/itemfilter <local copy>`. One game command per click. Edits whose tier or base is
+gone are skipped and listed.
+
 ## 5k. 🌳 Skill tree
 
 Tools → **Skill tree** is a small Path of Building: the build's passive tree, so you can see

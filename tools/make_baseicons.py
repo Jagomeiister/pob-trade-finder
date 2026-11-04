@@ -65,6 +65,26 @@ def main():
         f.write(";\n")
     print("wrote", dest, "-", len(out), "bases")
 
+    # the classes left out above (currency, cards, fragments, ...) are most of a loot filter's
+    # BaseType lines: their art for the in-game filter editor's base chips (js/app/32-filter-editor.js)
+    extra = {}
+    for b in bases.values():
+        name, cls = b.get("name"), b.get("item_class", "")
+        dds = (b.get("visual_identity") or {}).get("dds_file", "")
+        if not name or not dds or cls not in SKIP_CLASSES or name in out:
+            continue
+        if b.get("release_state") not in ("released", "legacy"):
+            continue
+        png = dds.replace(".dds", ".png")
+        if name not in extra or len(png) < len(extra[name]):
+            extra[name] = png
+    dest = os.path.join(DATA, "filtericons.js")
+    with open(dest, "w", encoding="utf-8") as f:
+        f.write("window.POE_FILTER_ICONS = ")
+        json.dump(dict(sorted(extra.items())), f, separators=(",", ":"))
+        f.write(";\n")
+    print("wrote", dest, "-", len(extra), "currency / card / fragment bases")
+
     # base -> [trade weapon category or "", defence types] for "Search by"
     types = {}
     for b in bases.values():

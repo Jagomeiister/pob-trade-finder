@@ -118,7 +118,8 @@ function refreshHotkeyStatus(promise) {
 // Settings → Hotkeys: the other hotkeys (gui.py HOTKEY_DEFAULTS) and close-to-tray
 var EXTRA_HOTKEYS = [['pref-hotkey-app', 'app', 'hotkeyApp', 'shift+space'],
                      ['pref-hotkey-trades', 'trades', 'hotkeyTrades', 'alt+t'],
-                     ['pref-hotkey-sheet', 'sheet', 'hotkeySheet', 'alt+c']];
+                     ['pref-hotkey-sheet', 'sheet', 'hotkeySheet', 'alt+c'],
+                     ['pref-hotkey-filter', 'filter', 'hotkeyFilter', 'ctrl+shift+d']];
 function wireExtraHotkeys() {
   EXTRA_HOTKEYS.forEach(function (h) {
     var sel = document.getElementById(h[0]);
@@ -148,6 +149,11 @@ function wireExtraHotkeys() {
   if (tray) {
     tray.checked = PREFS.closeToTray !== false;
     tray.addEventListener('change', function () { PREFS.closeToTray = this.checked; savePrefs(); });
+  }
+  var fr = document.getElementById('pref-filter-reload');
+  if (fr) {
+    fr.checked = PREFS.filterReload !== false;
+    fr.addEventListener('change', function () { PREFS.filterReload = this.checked; savePrefs(); });
   }
 }
 
@@ -260,6 +266,7 @@ function syncInGameSettings() {
   var op = document.getElementById('pref-over-opacity'); if (op) op.value = String(PREFS.overGameOpacity || 100);
   var cog = document.getElementById('pref-close-on-game'); if (cog) cog.checked = PREFS.closeOnGameClick !== false;
   var tray = document.getElementById('pref-close-tray'); if (tray) tray.checked = PREFS.closeToTray !== false;
+  var fr = document.getElementById('pref-filter-reload'); if (fr) fr.checked = PREFS.filterReload !== false;
   var auto = document.getElementById('char-auto'); if (auto) auto.checked = PREFS.autoCompare !== false;
   renderMacros();
 }

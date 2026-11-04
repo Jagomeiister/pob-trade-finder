@@ -14,7 +14,8 @@
 
   // ---- lexing --------------------------------------------------------------
 
-  var ACTION_RE = /^(Set[A-Z]\w*|PlayAlertSound\w*|CustomAlertSound\w*|MinimapIcon|PlayEffect|DisableDropSound\w*|EnableDropSound\w*)$/i;
+  // PlaySound is the legacy name of PlayAlertSound: an action, not an (unknown) condition
+  var ACTION_RE = /^(Set[A-Z]\w*|PlayAlertSound\w*|PlaySound|CustomAlertSound\w*|MinimapIcon|PlayEffect|DisableDropSound\w*|EnableDropSound\w*)$/i;
   var OP_RE = /^\s*(==|!=|<=|>=|=|!|<|>)/;
   var NUM_RE = /^[+-]?\d+(\.\d+)?$/;
   var BLOCK_RE = /^(show|hide|minimal)(?=\s|#|$)/i;
@@ -27,7 +28,7 @@
     var tokens = [], i = 0, n = str.length, comment = null, codeEnd = n;
     while (i < n) {
       var c = str.charAt(i);
-      if (c === ' ' || c === '\t' || c === '\r') { i++; continue; }
+      if (/\s/.test(c)) { i++; continue; } // any whitespace (a no-break space too: it ends a token below)
       if (c === '#') { comment = str.slice(i + 1).trim(); codeEnd = i; break; }
       var start = i, val, quoted = false;
       if (c === '"') {
@@ -168,7 +169,9 @@
     scourged: 'scourged', foulborn: 'foulborn', imbued: 'imbued', vestigial: 'vestigial',
     shapedmap: 'shapedMap', eldermap: 'elderMap', blightedmap: 'blightedMap',
     uberblightedmap: 'uberBlightedMap', hascruciblepassivetree: 'hasCruciblePassiveTree',
-    anyenchantment: 'enchanted'
+    anyenchantment: 'enchanted',
+    // short spellings the game accepts too
+    synthesised: 'synthesised', fractured: 'fractured', blighted: 'blightedMap', uberblighted: 'uberBlightedMap'
   };
   var INFLUENCE_FLAG = { shaperitem: 'shaper', elderitem: 'elder', crusaderitem: 'crusader',
                          hunteritem: 'hunter', redeemeritem: 'redeemer', warlorditem: 'warlord' };
@@ -176,7 +179,8 @@
   // assuming false beats flagging every item as uncertain (opts.strict turns it off).
   var DEFAULT_FALSE = { mirrored: 1, fractureditem: 1, synthesiseditem: 1, replica: 1, alternatequality: 1,
     transfiguredgem: 1, zanamemory: 1, scourged: 1, foulborn: 1, imbued: 1, vestigial: 1, shapedmap: 1,
-    eldermap: 1, blightedmap: 1, uberblightedmap: 1, hascruciblepassivetree: 1 };
+    eldermap: 1, blightedmap: 1, uberblightedmap: 1, hascruciblepassivetree: 1,
+    synthesised: 1, fractured: 1, blighted: 1, uberblighted: 1 };
   var MOD_LIST = { hasexplicitmod: 'explicitMods', hasimplicitmod: 'implicitMods',
                    hasenchantment: 'enchantments', enchantmentpassivenode: 'enchantmentPassiveNodes' };
 
@@ -308,8 +312,10 @@
         var b = it.base != null ? it.base : it.name;
         if (typeof b !== 'string') return null;
         var cands = [norm(b)];
-        // a magic item's base is buried in its name ("Hale Vaal Regalia of the Whale")
-        if (op !== '==' && op !== '!=' && typeof it.name === 'string' && /^(normal|magic)$/i.test(it.rarity || '')) {
+        // a magic item whose base couldn't be told apart from its name ("Hale Vaal Regalia
+        // of the Whale" as both): the base is somewhere inside the name
+        if (op !== '==' && op !== '!=' && typeof it.name === 'string' && /^(normal|magic)$/i.test(it.rarity || '') &&
+            norm(it.name) === norm(b)) {
           cands.push(norm(it.name));
         }
         return strHit(op, cands, vals);
@@ -333,6 +339,12 @@
 
     if (MOD_LIST.hasOwnProperty(key)) {
       var list = it[MOD_LIST[key]];
+      // "HasImplicitMod True": the item has any implicit at all
+      if (key === 'hasimplicitmod' && vals.length === 1 && /^(true|false)$/i.test(String(vals[0]))) {
+        if (!Array.isArray(list)) return null;
+        var anyImp = (list.length > 0) === (String(vals[0]).toLowerCase() === 'true');
+        return op === '!' || op === '!=' ? !anyImp : anyImp;
+      }
       if (!Array.isArray(list) && !strict) {
         if (key === 'hasexplicitmod' && /^normal$/i.test(it.rarity || '')) list = [];
         else if ((key === 'hasenchantment' || key === 'enchantmentpassivenode') && it.enchanted === false) list = [];
@@ -383,14 +395,19 @@
     return it;
   }
 
+  // A block matches when none of its conditions fails AND at least one actually passes
+  // (a block with no conditions at all matches everything). A block whose conditions are
+  // all unknown is only `possible`: it can't take the item.
   function evalBlock(block, it, opts) {
-    var unknown = [];
+    var unknown = [], passed = 0;
     for (var i = 0; i < block.conditions.length; i++) {
       var r = evalCondition(block.conditions[i], it, opts);
-      if (r === false) return { ok: false, unknown: unknown };
+      if (r === false) return { ok: false, possible: false, unknown: unknown };
       if (r === null) unknown.push(block.conditions[i].key);
+      else passed++;
     }
-    return { ok: true, unknown: unknown };
+    if (block.conditions.length && !passed) return { ok: false, possible: true, unknown: unknown };
+    return { ok: true, possible: false, unknown: unknown };
   }
 
   // Actions that survive the Continue chain: later blocks override earlier ones per key.
@@ -406,22 +423,31 @@
     return out;
   }
 
-  /* matchItem(parsed, item[, opts]) -> { block, index, certain, unknown, trail, actions, visibility }
-   * First block whose KNOWN conditions all pass wins; Continue blocks that match
-   * go to `trail` and matching goes on. `certain` is false when the winner only
-   * got there because some condition needed a field the item doesn't have
-   * (`unknown` lists those keys). opts.strict: no assumed defaults for missing flags. */
+  /* matchItem(parsed, item[, opts]) -> { block, index, certain, unknown, trail, possible, actions, visibility }
+   * First block with no failing condition and at least one passing one wins (see
+   * evalBlock); Continue blocks that match go to `trail` and matching goes on.
+   * `possible` lists the blocks passed over because every condition was unknown
+   * ({ block, index, unknown }). `certain` is false when the winner only got there
+   * because some condition needed a field the item doesn't have (`unknown` lists those
+   * keys), or when a non-Continue block before it was only `possible`.
+   * opts.strict: no assumed defaults for missing flags. */
   function matchItem(parsed, item, opts) {
-    var it = prep(item || {}, opts), trail = [], blocks = parsed.blocks || [];
+    var it = prep(item || {}, opts), trail = [], possible = [], blocks = parsed.blocks || [];
+    var doubt = false;
     for (var i = 0; i < blocks.length; i++) {
       var b = blocks[i], r = evalBlock(b, it, opts);
+      if (r.possible) {
+        possible.push({ block: b, index: i, unknown: r.unknown });
+        if (!b.continue) doubt = true;
+        continue;
+      }
       if (!r.ok) continue;
       if (b.continue) { trail.push({ block: b, index: i, certain: !r.unknown.length, unknown: r.unknown }); continue; }
-      return { block: b, index: i, certain: !r.unknown.length, unknown: r.unknown, trail: trail,
-               visibility: b.visibility,
+      return { block: b, index: i, certain: !r.unknown.length && !doubt, unknown: r.unknown, trail: trail,
+               possible: possible, visibility: b.visibility,
                actions: mergeActions(trail.map(function (t) { return t.block; }).concat([b])) };
     }
-    return { block: null, index: -1, certain: true, unknown: [], trail: trail, visibility: 'Show',
+    return { block: null, index: -1, certain: !doubt, unknown: [], trail: trail, possible: possible, visibility: 'Show',
              actions: mergeActions(trail.map(function (t) { return t.block; })) };
   }
 
@@ -622,10 +648,20 @@
 
   /* fromAppItem(it) -> the item shape matchItem wants, from js/pob.js's
    * parseGameItem / parseItemText output. Fields the app doesn't know stay unset. */
+  // item flags / numbers copied as they are when the app knows them (unset = unknown)
+  var APP_FLAGS = ['mirrored', 'fractured', 'synthesised', 'replica', 'foulborn', 'imbued', 'zanaMemory',
+                   'transfiguredGem', 'scourged', 'vestigial', 'blightedMap', 'uberBlightedMap',
+                   'alternateQuality', 'shapedMap', 'elderMap', 'hasCruciblePassiveTree'];
+  var APP_NUMBERS = ['memoryStrands', 'searingExarchImplicits', 'eaterOfWorldsImplicits', 'corruptedMods',
+                     'width', 'height', 'dropLevel', 'baseArmour', 'baseEvasion', 'baseEnergyShield', 'baseWard'];
+  // the Searing Exarch / Eater of Worlds "influence" lines are eldritch implicits to a filter
+  var ELDRITCH = { searingexarch: 1, eaterofworlds: 1 };
+
   function fromAppItem(it) {
     var o = {};
     if (!it) return o;
     var cls = it.itemClass || it['class'];
+    if (cls === 'DivinationCard') cls = 'Divination Cards';     // how some copies spell the class
     if (cls) o['class'] = cls;
     if (it.base || it.name) o.base = it.base || it.name;
     if (it.name) o.name = it.name;
@@ -636,7 +672,11 @@
     if (it.gemLevel > 0) o.gemLevel = it.gemLevel;
     if (it.mapTier > 0) o.mapTier = it.mapTier;
     if (typeof it.corrupted === 'boolean') o.corrupted = it.corrupted;
-    if (Array.isArray(it.influences)) o.influences = it.influences.slice();
+    if (Array.isArray(it.influences)) {
+      o.influences = it.influences.filter(function (x) { return !ELDRITCH[normInfluence(x)]; });
+    }
+    APP_FLAGS.forEach(function (k) { if (typeof it[k] === 'boolean') o[k] = it[k]; });
+    APP_NUMBERS.forEach(function (k) { if (isNum(it[k])) o[k] = it[k]; });
 
     var mods = Array.isArray(it.mods) ? it.mods : [];
     var game = it.itemClass !== undefined;      // a pasted game item carries the whole item text
@@ -644,10 +684,27 @@
     else if (game) o.identified = !mods.some(function (m) { return /^unidentified$/i.test(m.line || ''); });
     if (typeof it.enchanted === 'boolean') o.enchanted = it.enchanted;
     else if (game) o.enchanted = mods.some(function (m) { return m.kind === 'implicit' && m.crafted; });
-    var names = mods.filter(function (m) { return m.kind === 'explicit' && (m.affix || m.affixName); })
-                    .map(function (m) { return m.affix || m.affixName; });
+    // affix names for HasExplicitMod: one per mod (a hybrid mod's two lines share a header)
+    var names = [], seenSeq = {};
+    mods.forEach(function (m) {
+      var nm = m.affix || m.affixName;
+      if (m.kind !== 'explicit' || !nm) return;
+      if (m.affixSeq != null) {
+        if (seenSeq[m.affixSeq]) return;
+        seenSeq[m.affixSeq] = 1;
+      }
+      names.push(nm);
+    });
     if (Array.isArray(it.explicitMods)) o.explicitMods = it.explicitMods.slice();
     else if (names.length) o.explicitMods = names;
+    // an identified magic/rare advanced copy names every affix it has, so "none named" is known
+    else if (game && it.advanced && o.identified === true && /^(Magic|Rare)$/.test(o.rarity)) o.explicitMods = [];
+    // implicits for HasImplicitMod (enchants are implicit + crafted in the app's model)
+    if (Array.isArray(it.implicitMods)) o.implicitMods = it.implicitMods.slice();
+    else if (game) {
+      o.implicitMods = mods.filter(function (m) { return m.kind === 'implicit' && !m.crafted && !m.enchant; })
+                           .map(function (m) { return m.line; });
+    }
 
     if (typeof it.sockets === 'string') {
       var groups = it.sockets.trim().split(/\s+/).filter(Boolean)

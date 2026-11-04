@@ -89,8 +89,12 @@ OVERLAYS = {
 CENTRED_OVERLAYS = ("cards", "hint")  # their default x is the centre, not the left edge
 HIDDEN_AT_START = ("sheet", "hint")   # shown only when their page asks (hotkey, a suggestion)
 # Hotkeys (Settings → In game): each held only while the game (or our overlay) is focused.
-HOTKEY_DEFAULTS = {"price": "ctrl+d", "app": "shift+space", "trades": "alt+t", "sheet": "alt+c"}
-HOTKEY_PREFS = {"price": "hotkey", "app": "hotkeyApp", "trades": "hotkeyTrades", "sheet": "hotkeySheet"}
+HOTKEY_DEFAULTS = {"price": "ctrl+d", "app": "shift+space", "trades": "alt+t", "sheet": "alt+c",
+                   "filter": "ctrl+shift+d"}
+HOTKEY_PREFS = {"price": "hotkey", "app": "hotkeyApp", "trades": "hotkeyTrades", "sheet": "hotkeySheet",
+                "filter": "hotkeyFilter"}
+# hotkeys that only fire while Path of Exile itself is the foreground window (they copy the hovered item)
+GAME_ONLY_HOTKEYS = ("price", "filter")
 CHAT_KEY_NAMES = {13: "Enter", 9: "Tab", 32: "Space", 192: "` (backtick)", 222: "' (quote)", 191: "/ (slash)"}
 
 
@@ -194,8 +198,11 @@ class Api:
                 price_hotkey.parse_hotkey(spec)
             except Exception:
                 spec = default
+            if spec not in price_hotkey.OFF and spec in self._hotkey_specs.values():
+                spec = "off"  # e.g. the price check already set to Ctrl+Shift+D: that one keeps it
             self._hotkey_specs[name] = spec
         self._hotkey_spec = self._hotkey_specs["price"]
+        self._zone = None  # last "Generating level N area" from Client.txt (filter editor's zone level)
         self._macro_watchers = []
         try:
             self._macros = self._clean_macros(prefs.get("macros") or [])[0]
@@ -1733,11 +1740,11 @@ class Api:
         if sys.platform != "win32" or self._hotkeys:
             return
         fire = {"price": self._on_price_hotkey, "app": self._on_app_hotkey, "trades": self._on_trades_hotkey,
-                "sheet": self._on_sheet_hotkey}
+                "sheet": self._on_sheet_hotkey, "filter": self._on_filter_hotkey}
         for name, fn in fire.items():
             try:
                 w = price_hotkey.HotkeyWatcher(fn, self._hotkey_specs[name], log=_debug_log,
-                                               is_target=None if name == "price" else self._hotkey_target)
+                                               is_target=None if name in GAME_ONLY_HOTKEYS else self._hotkey_target)
                 w.start()
                 self._hotkeys[name] = w
             except Exception as e:
@@ -1865,14 +1872,65 @@ class Api:
         game = price_hotkey.window_rect(game_hwnd)
         own = price_hotkey.window_rect(hwnd)
         if hwnd and game and own:
-            x, y = price_hotkey.overlay_position(price_hotkey.cursor_x(), game,
-                                                 (own[2] - own[0], own[3] - own[1]))
-            price_hotkey.place_window(hwnd, x, y)
+            size = (own[2] - own[0], own[3] - own[1])
+            if getattr(self, "_filter_mode", False) and getattr(self, "_price_size", None):
+                size = self._price_size  # back from the filter editor: the price check's own size
+            x, y = price_hotkey.overlay_position(price_hotkey.cursor_x(), game, size)
+            if size != (own[2] - own[0], own[3] - own[1]):
+                self._resize_window(hwnd, x, y, size)
+            else:
+                price_hotkey.place_window(hwnd, x, y)
+        self._filter_mode = False
         ov.show()
         # the hotkey press gives this process foreground rights; claim them so
         # Esc works straight away (on_top keeps it visible even if this fails)
         price_hotkey.focus_window(hwnd)
         return True
+
+    # -- in-game loot filter editor (js/app/32-filter-editor.js) -------------------------
+    # Ctrl+Shift+D over an item: the price-check window switches to the filter editor for that
+    # item, docked beside the inventory (item on the right half) or the stash (left half).
+    def _on_filter_hotkey(self, game_hwnd):
+        # the advanced copy (Ctrl+Alt+C): affix names for HasExplicitMod, like Scalpel; a plain copy if that fails
+        text = price_hotkey.copy_item_text(advanced=True) or price_hotkey.copy_item_text()
+        if text:
+            self._show_filter_editor(text, game_hwnd)
+
+    def _show_filter_editor(self, text, game_hwnd=None):
+        ov = self._overlay
+        if not ov:
+            return False
+        # JSON-encoded: the item text and zone reach JS as literals, never as code
+        ov.evaluate_js("window.__filterEditItem ? (window.__filterEditItem(%s, %s), true) : false"
+                       % (json.dumps(text), json.dumps(self._zone)))
+        self._price_frameless()
+        hwnd = self._price_hwnd()
+        game = price_hotkey.window_rect(game_hwnd)
+        own = price_hotkey.window_rect(hwnd)
+        if hwnd and game and own:
+            size = (own[2] - own[0], own[3] - own[1])
+            if not getattr(self, "_filter_mode", False):
+                self._price_size = size  # the price check gets its own size back afterwards
+            # Scalpel's panel: as tall as the game (8 px margins), the price check's width
+            size = (size[0], max(300, (game[3] - game[1]) - 16))
+            x, y = price_hotkey.dock_position(price_hotkey.cursor_x(), game, size)
+            self._resize_window(hwnd, x, y, size)
+        self._filter_mode = True
+        ov.show()
+        price_hotkey.focus_window(hwnd)
+        return True
+
+    @staticmethod
+    def _resize_window(hwnd, x, y, size):
+        try:
+            import ctypes
+            ctypes.windll.user32.SetWindowPos(hwnd, -1, int(x), int(y), int(size[0]), int(size[1]), 0x0010)  # TOPMOST, NOACTIVATE
+        except Exception:
+            price_hotkey.place_window(hwnd, x, y)
+
+    def filter_zone(self):
+        """The zone the editor uses for AreaLevel (None until Client.txt shows one)."""
+        return {"ok": True, "zone": self._zone}
 
     def _hide_overlay(self):
         ov = self._overlay
@@ -1903,6 +1961,8 @@ class Api:
         # cards live in the in-game overlay, which shows whenever the game is focused; the
         # cheat sheet follows the act from the area / zone lines
         self._eval_in(self._overlay_windows.get("cards"), "window.__tradeEvent && window.__tradeEvent(%s)" % json.dumps(ev))
+        if ev.get("type") == "area" and not ev.get("test"):
+            self._zone = {"level": ev.get("level"), "id": ev.get("id"), "time": ev.get("time")}
         if ev.get("type") in ("area", "zone"):
             for name in ("sheet", "hint"):  # the hint suggests a mechanic's sheet for the area
                 self._eval_in(self._overlay_windows.get(name), "window.__sheetEvent && window.__sheetEvent(%s)" % json.dumps(ev))
@@ -3059,6 +3119,146 @@ class Api:
             return {"ok": True, "dir": folder}
         except Exception as e:
             return self._filter_error(e)
+
+    # online filters (OnlineFilters\, written by the game): read only; edits go to a -local copy
+    def filter_online_list(self):
+        import filter_files
+        try:
+            return {"ok": True, "filters": filter_files.list_online(data_dir=DATA_DIR)}
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_online_read(self, id):
+        import filter_files
+        try:
+            r = filter_files.read_online(id)
+            r.update(ok=True, id=id)
+            return r
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_online_import(self, id, overwrite=False):
+        import filter_files
+        try:
+            r = filter_files.import_online(id, overwrite=bool(overwrite), data_dir=DATA_DIR)
+            _debug_log("filter: imported online filter %s as %s" % (id, r.get("local")))
+            r.update(ok=True)
+            return r
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_online_status(self, name):
+        import filter_files
+        try:
+            r = filter_files.online_status(name, data_dir=DATA_DIR)
+            r.update(ok=True, name=name)
+            return r
+        except Exception as e:
+            return self._filter_error(e)
+
+    def filter_online_mark(self, name, id, version):
+        """The local copy now holds this online version (after an update was replayed + saved)."""
+        import filter_files
+        try:
+            b = filter_files.set_baseline(name, id, version, data_dir=DATA_DIR)
+            return {"ok": True, "name": name, "baseline": b}
+        except Exception as e:
+            return self._filter_error(e)
+
+    # game commands for the filter editor: each is one chat command for one button press
+    # (Save sends /reloaditemfilter when Settings → In game says so)
+    FILTER_NAME_RE = re.compile(r"^[^\r\n\x00-\x1f/\\]{1,120}$")
+
+    def _chat(self, cmd):
+        if not self._sender:
+            self._sender = trade_helper.ChatSender(find_game=self._find_poe_window)
+        return self._sender.send(cmd)
+
+    def filter_reload(self):
+        try:
+            return self._chat("/reloaditemfilter")
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def filter_switch(self, name):
+        """/itemfilter <name>: a local filter's file name without .filter, or an online filter's name."""
+        name = str(name or "").strip()
+        if name.lower().endswith(".filter"):
+            name = name[:-7]
+        if not self.FILTER_NAME_RE.fullmatch(name):
+            return {"ok": False, "error": "not a filter name: %r" % name[:40]}
+        try:
+            return self._chat("/itemfilter " + name)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # the filter editor's game-like extras, fetched once into data/filter_assets/ (not shipped):
+    # the Fontin SmallCaps label font and the 16 built-in alert sounds for preview playback
+    FILTER_ASSET_URL = "https://raw.githubusercontent.com/scalpelpoe/scalpel/main/src/renderer/src/assets/"
+    FILTER_ASSETS = {"font": {"Fontin-SmallCaps.woff"},
+                     "sound": {"AlertSound_%02d.ogg" % i for i in range(1, 17)}}
+    SOUND_EXT = (".mp3", ".wav", ".ogg")
+
+    def filter_asset(self, kind, name):
+        try:
+            if kind not in self.FILTER_ASSETS or name not in self.FILTER_ASSETS[kind]:
+                return {"ok": False, "error": "unknown asset"}
+            folder = os.path.join(DATA_DIR, "filter_assets")
+            path = os.path.join(folder, name)
+            if not os.path.isfile(path):
+                os.makedirs(folder, exist_ok=True)
+                url = self.FILTER_ASSET_URL + ("fonts/" if kind == "font" else "sounds/") + name
+                req = urllib.request.Request(url, headers={"User-Agent": UA})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    data = r.read(2 * 1024 * 1024 + 1)
+                if len(data) > 2 * 1024 * 1024:
+                    return {"ok": False, "error": "asset too big"}
+                tmp = path + ".tmp"
+                with open(tmp, "wb") as f:
+                    f.write(data)
+                os.replace(tmp, path)
+            return {"ok": True, "path": "data/filter_assets/" + name}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def _filter_sounds(self):
+        import filter_files
+        folder = filter_files.filter_dir()
+        out = []
+        for sub in ("", "sounds"):
+            d = os.path.join(folder, sub) if sub else folder
+            try:
+                names = sorted(os.listdir(d), key=str.lower)
+            except OSError:
+                continue
+            for n in names:
+                if n.lower().endswith(self.SOUND_EXT) and os.path.isfile(os.path.join(d, n)):
+                    out.append((sub + "/" + n) if sub else n)
+        return out
+
+    def filter_sound_list(self):
+        """Custom alert sounds a filter can name: .mp3 / .wav / .ogg in the filter folder and sounds/."""
+        try:
+            return {"ok": True, "files": self._filter_sounds()}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def filter_sound_file(self, name):
+        """One custom sound as a data URL for the preview button (only names filter_sound_list gives)."""
+        import base64
+        import filter_files
+        try:
+            if name not in self._filter_sounds():
+                return {"ok": False, "error": "no such sound"}
+            path = os.path.join(filter_files.filter_dir(), *name.split("/"))
+            if os.path.getsize(path) > 4 * 1024 * 1024:
+                return {"ok": False, "error": "sound file too big"}
+            with open(path, "rb") as f:
+                data = f.read()
+            mime = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg"}[os.path.splitext(name)[1].lower()]
+            return {"ok": True, "url": "data:%s;base64,%s" % (mime, base64.b64encode(data).decode("ascii"))}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     # -- open in system browser --------------------------------------------------
     OPEN_URL_PREFIXES = ("https://www.pathofexile.com/",

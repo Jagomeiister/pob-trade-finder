@@ -58,6 +58,23 @@
   --dc-bg: #0d0c0a; --dc-frame: #8c6b3e; --dc-frame-in: #2a2218; --dc-rule: #3a2f22;
   --dc-title-hi: #e3d5b2; --dc-title-lo: #c7b48b; --on-dc-title: #1a140c;
   --dc-stack-bg: rgba(0, 0, 0, .78); --dc-stack: #e6dcc6; --dc-shadow: rgba(0, 0, 0, .55);
+  /* the in-game loot filter editor (js/app/32-filter-editor.js): always dark, over the game */
+  --fe-bg: rgba(23, 24, 33, .99); --fe-solid: #171821; --fe-card: #23232e; --fe-hover: #2c2c3a;
+  --fe-border: rgba(56, 56, 77, .5); --fe-text: #e0d8cc; --fe-dim: #9e9480; --fe-gold: #c8a96e;
+  --fe-gold-hover: #e0bd7b; --fe-gold-dim: rgba(200, 169, 110, .3); --fe-gold-soft: rgba(200, 169, 110, .1);
+  --fe-gold-line: rgba(200, 169, 110, .15); --fe-on-gold: #171821; --fe-show: #4caf50; --fe-hide: #ef5350;
+  --fe-minimal: #7e57c2; --fe-on-solid: #ffffff; --fe-sub: rgba(0, 0, 0, .2); --fe-sub2: rgba(0, 0, 0, .25);
+  --fe-pill: rgba(0, 0, 0, .3); --fe-pill2: rgba(0, 0, 0, .35); --fe-btn: rgba(255, 255, 255, .08);
+  --fe-btn-faint: rgba(255, 255, 255, .04); --fe-btn-hover: rgba(255, 255, 255, .06); --fe-zebra: rgba(255, 255, 255, .02);
+  --fe-row-hover: rgba(255, 255, 255, .07); --fe-track: rgba(255, 255, 255, .12); --fe-ghost-text: rgba(255, 255, 255, .15);
+  --fe-cond-key: #7ec8e3; --fe-cond-val: #f0c27f; --fe-chip: rgba(40, 60, 90, .6); --fe-chip-hover: rgba(45, 70, 105, .7);
+  --fe-shadow: rgba(0, 0, 0, .7); --fe-shadow-2: rgba(0, 0, 0, .4); --fe-label-dark: rgba(0, 0, 0, .85);
+  --fe-label-shadow-dark: rgba(0, 0, 0, .9); --fe-label-shadow-light: rgba(255, 255, 255, .35);
+  --fe-hidden-text: rgba(200, 200, 200, .25); --fe-hidden-line: rgba(200, 200, 200, .1); --fe-swatch-line: rgba(255, 255, 255, .15);
+  --fe-up: rgba(40, 90, 40, .15); --fe-up-odd: rgba(40, 90, 40, .08); --fe-up-line: rgba(80, 180, 80, .6); --fe-up-bar: rgba(80, 180, 80, .25);
+  --fe-down: rgba(90, 40, 40, .15); --fe-down-odd: rgba(90, 40, 40, .08); --fe-down-line: rgba(200, 80, 80, .6); --fe-down-bar: rgba(200, 80, 80, .25);
+  --fe-fill-price: rgba(200, 160, 80, .5); --fe-fill-dust: rgba(110, 120, 190, .5);
+  --fe-r-normal: #c8c8c8; --fe-r-magic: #8888ff; --fe-r-rare: #ffff77; --fe-r-unique: #af6025; --fe-r-gem: #1ba29b; --fe-r-div: #00bafe;
   --dc-unique: #af6025; --dc-currency: #aa9e82; --dc-divination: #0ebaff; --dc-gem: #1ba29b;
   --dc-magic: #8888ff; --dc-rare: #ffff77; --dc-normal: #c8c8c8; --dc-corrupted: #d20000;
   --dc-fractured: #a29162; --dc-enchanted: #b8daf2; --dc-default: #7f7f7f;

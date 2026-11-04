@@ -255,6 +255,65 @@ try:
     check("bridge restore: bad id -> ok False", r["ok"] is False and "checkpoint id" in r["error"], r)
     check("bridge debug log went to the temp data dir", os.path.isfile(os.path.join(DDIR, "debug.log")))
 
+    # -- online filters: OnlineFilters\ is read only, edits go to "<name>-local.filter" -----
+    ODIR = os.path.join(FDIR, "OnlineFilters")
+    check("online list: no folder -> empty", ff.list_online() == [])
+    os.makedirs(ODIR)
+    online = "#Online Item Filter\r\n#name: Neversink Strict\r\n#version:3.29\r\n#hash:aaa111\r\n#=====\r\nShow\r\n"
+    with open(os.path.join(ODIR, "f00d1234"), "wb") as f:
+        f.write(online.encode("utf-8"))
+    with open(os.path.join(ODIR, "notes.txt"), "wb") as f:
+        f.write(b"\xff\xfe not utf-8")  # skipped, not an error
+    lst = api.filter_online_list()
+    check("online list: one filter, name + version from its header", lst["ok"] and len(lst["filters"]) == 1
+          and lst["filters"][0]["name"] == "Neversink Strict" and lst["filters"][0]["version"] == "aaa111"
+          and lst["filters"][0]["local"] == "Neversink Strict-local.filter"
+          and lst["filters"][0]["imported"] is False, lst)
+    check("online read: bad id refused", api.filter_online_read("..\\gui.py")["ok"] is False)
+    check("online read: path refused", api.filter_online_read("sub/x")["ok"] is False)
+    check("status: not imported", api.filter_online_status("rs.filter") == {"ok": True, "imported": False,
+                                                                           "name": "rs.filter"})
+    imp = api.filter_online_import("f00d1234")
+    local = "Neversink Strict-local.filter"
+    check("import: local copy written, header renamed, CRLF kept", imp["ok"] and imp["local"] == local
+          and raw(local) == online.replace("#name: Neversink Strict", "#name: Neversink Strict-local").encode(), imp)
+    check("import: the online file is untouched", open(os.path.join(ODIR, "f00d1234"), "rb").read() == online.encode())
+    check("import again without overwrite -> conflict", api.filter_online_import("f00d1234").get("conflict") is True)
+    st = api.filter_online_status(local)
+    check("status: imported, not changed", st["ok"] and st["imported"] and st["changed"] is False
+          and st["online"] == "f00d1234", st)
+    with open(os.path.join(ODIR, "f00d1234"), "wb") as f:
+        f.write(online.replace("aaa111", "bbb222").encode("utf-8"))
+    st = api.filter_online_status(local)
+    check("status: the game downloaded a new version -> changed", st["changed"] and st["current"] == "bbb222", st)
+    check("mark: baseline moves to the new version", api.filter_online_mark(local, "f00d1234", "bbb222")["ok"]
+          and api.filter_online_status(local)["changed"] is False)
+    check("mark: bad online id refused", api.filter_online_mark(local, "../x", "v")["ok"] is False)
+    os.remove(os.path.join(ODIR, "f00d1234"))
+    check("status: online file gone -> missing", api.filter_online_status(local)["missing"] is True)
+    check("local name: unsafe characters replaced", ff.local_name_for('a:b/c?') == "a_b_c_-local.filter")
+    check("local name: no double -local", ff.local_name_for("Main-local") == "Main-local.filter")
+    check("local name: reserved name made safe", ff.local_name_for("CON") == "_CON-local.filter")
+
+    # -- game commands: one chat command per call, names validated --------------------------
+    class FakeSender:
+        def __init__(self):
+            self.sent = []
+
+        def send(self, cmd):
+            self.sent.append(cmd)
+            return {"ok": True}
+    api._sender = FakeSender()
+    check("reload: one /reloaditemfilter", api.filter_reload()["ok"] and api._sender.sent == ["/reloaditemfilter"])
+    check("switch: /itemfilter <name>, .filter dropped", api.filter_switch("Main-local.filter")["ok"]
+          and api._sender.sent[-1] == "/itemfilter Main-local")
+    check("switch: online names with spaces", api.filter_switch("Neversink Strict")["ok"]
+          and api._sender.sent[-1] == "/itemfilter Neversink Strict")
+    for bad in ["", "a\nb", "a\r/kick x", "..\\x", "a/b", "x" * 200]:
+        n = len(api._sender.sent)
+        check("switch refused: %r" % bad[:12], api.filter_switch(bad)["ok"] is False and len(api._sender.sent) == n)
+    api._sender = None
+
     opened = []
     real_startfile = getattr(os, "startfile", None)
     os.startfile = lambda p, *a, **k: opened.append(p)

@@ -405,3 +405,187 @@ def restore_checkpoint(name, id, keep=KEEP_DEFAULT, dir=None, data_dir=None):
             raise FileNotFoundError("the filter folder doesn't exist: %s" % os.path.dirname(path))
         _atomic_write(path, old)
         return {"mtime": _mtime(path), "checkpoint": cp, "restored": id}
+
+
+# -- online filters (FilterBlade / the PoE site) -----------------------------------------
+# The game keeps filters followed on the PoE website in OnlineFilters\ (no extension, a
+# "#name:" header). The game owns that folder and replaces those files on its own, so they
+# are never edited: Import copies one to "<name>-local.filter" next to the other filters
+# (the copy edits are made to) and records which online file and version it came from in
+# data/filter_baselines/. When the online file changes, the app replays the recorded edits
+# onto the new version (js/filter-edit.js) and saves the local copy again.
+ONLINE_DIR = "OnlineFilters"
+BASELINES = "filter_baselines"
+_HEADER_RE = re.compile(r"^#\s*([A-Za-z]+)\s*:(.*)$")
+
+
+def online_dir(dir=None):
+    return os.path.join(dir or filter_dir(), ONLINE_DIR)
+
+
+def _check_online_id(oid):
+    """An online filter's file name: plain, no extension needed, no paths."""
+    if not isinstance(oid, str) or not oid or len(oid) > 255:
+        raise FilterError("not an online filter: %r" % (oid,))
+    if _BAD_CHARS.search(oid) or ".." in oid or oid != oid.strip() or oid.startswith("."):
+        raise FilterError("not an online filter: %r" % (oid,))
+    if oid.split(".")[0].rstrip(" ").upper() in _RESERVED:
+        raise FilterError("not an online filter: %r" % (oid,))
+    return oid
+
+
+def _online_path(oid, dir=None):
+    _check_online_id(oid)
+    folder = os.path.abspath(online_dir(dir))
+    path = os.path.abspath(os.path.join(folder, oid))
+    if os.path.dirname(path) != folder or os.path.basename(path) != oid:
+        raise FilterError("not an online filter: %r" % (oid,))
+    return path
+
+
+def header_fields(text):
+    """The "#key:value" lines at the top of an online filter ({"name": ..., "hash": ...})."""
+    out = {}
+    for line in text.splitlines()[:40]:
+        m = _HEADER_RE.match(line.strip())
+        if not m:
+            if line.strip() and not line.startswith("#"):
+                break
+            continue
+        key = m.group(1).lower()
+        if key not in out:
+            out[key] = m.group(2).strip()
+    return out
+
+
+def _decode(data, label):
+    if data.startswith(BOM):
+        data = data[len(BOM):]
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise FilterError("%s is not UTF-8 text (byte %d)" % (label, e.start))
+
+
+def _version(text, data):
+    """The online filter's version: its "#hash:" header, or a hash of the bytes."""
+    return header_fields(text).get("hash") or _sha1(data)
+
+
+def local_name_for(name):
+    """"<online name>-local.filter", made a safe file name."""
+    stem = _BAD_CHARS.sub("_", str(name or "").strip()).strip(" .") or "online"
+    stem = stem[:200]
+    if stem.split(".")[0].upper() in _RESERVED:
+        stem = "_" + stem
+    if not stem.lower().endswith("-local"):
+        stem += "-local"
+    return _check_name(stem + FILTER_EXT)
+
+
+def list_online(dir=None, data_dir=None):
+    """[{id, name, version, mtime, size, local, imported}] for the online filters, newest first.
+    imported: a "-local" copy of it exists in the filter folder."""
+    folder = online_dir(dir)
+    out = []
+    try:
+        names = os.listdir(folder)
+    except FileNotFoundError:
+        return out
+    for oid in names:
+        try:
+            path = _online_path(oid, dir)
+            if not os.path.isfile(path):
+                continue
+            data = _read_bytes(path)
+            text = _decode(data, oid)
+        except (FilterError, OSError):
+            continue
+        name = header_fields(text).get("name") or oid
+        local = local_name_for(name)
+        out.append({"id": oid, "name": name, "version": _version(text, data), "mtime": _mtime(path),
+                    "size": len(data), "local": local,
+                    "imported": os.path.isfile(os.path.join(dir or filter_dir(), local))})
+    out.sort(key=lambda f: (-f["mtime"], f["name"].lower()))
+    return out
+
+
+def read_online(oid, dir=None):
+    """{text, name, version, mtime, eol}: an online filter, read only."""
+    path = _online_path(oid, dir)
+    if not os.path.isfile(path):
+        raise FileNotFoundError("no online filter %s in %s" % (oid, os.path.dirname(path)))
+    data = _read_bytes(path)
+    text = _decode(data, oid)
+    return {"text": text, "name": header_fields(text).get("name") or oid, "version": _version(text, data),
+            "mtime": _mtime(path), "eol": "\r\n" if "\r\n" in text else "\n"}
+
+
+def localise_text(text, local):
+    """The online text with its "#name:" header renamed to the local copy (so the game's
+    filter list shows which one is which). Everything else is kept as it is."""
+    stem = local[:-len(FILTER_EXT)]
+    lines = text.split("\n")
+    for i, line in enumerate(lines[:40]):
+        m = _HEADER_RE.match(line.strip())
+        if m and m.group(1).lower() == "name":
+            lines[i] = "#name: " + stem + ("\r" if line.endswith("\r") else "")
+            return "\n".join(lines)
+    return text
+
+
+def _baseline_path(local, data_dir=None):
+    _check_name(local)
+    return os.path.join(_data_dir(data_dir), BASELINES, local[:-len(FILTER_EXT)] + ".json")
+
+
+def get_baseline(local, data_dir=None):
+    """{online, name, version, time} for a "-local" copy, or None (not imported by the app)."""
+    try:
+        with open(_baseline_path(local, data_dir), "r", encoding="utf-8") as f:
+            b = json.load(f)
+        return b if isinstance(b, dict) and b.get("online") else None
+    except (OSError, ValueError):
+        return None
+
+
+def set_baseline(local, oid, version, name=None, data_dir=None):
+    _check_online_id(oid)
+    path = _baseline_path(local, data_dir)
+    b = {"online": oid, "name": str(name or "")[:200], "version": str(version or "")[:200], "time": time.time()}
+    with _lock:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        _atomic_write(path, json.dumps(b).encode("utf-8"))
+    return b
+
+
+def import_online(oid, overwrite=False, keep=KEEP_DEFAULT, dir=None, data_dir=None):
+    """Copy an online filter to "<name>-local.filter" and remember where it came from.
+    An existing local copy is only replaced with overwrite=True (it is checkpointed first).
+    {local, version, mtime, checkpoint}."""
+    src = read_online(oid, dir)
+    local = local_name_for(src["name"])
+    path = _safe_path(local, dir)
+    if os.path.isfile(path) and not overwrite:
+        raise FilterConflict("%s already exists: open it, or import again to replace it" % local)
+    r = write_filter(local, localise_text(src["text"], local), keep=keep, label="before import", dir=dir,
+                     data_dir=data_dir)
+    set_baseline(local, oid, src["version"], src["name"], data_dir)
+    return {"local": local, "version": src["version"], "mtime": r["mtime"], "checkpoint": r["checkpoint"]}
+
+
+def online_status(local, dir=None, data_dir=None):
+    """Is there a newer online version than the one this local copy was made from?
+    {imported, online, name, version, current, changed, missing}."""
+    b = get_baseline(local, data_dir)
+    if not b:
+        return {"imported": False}
+    out = {"imported": True, "online": b["online"], "name": b.get("name") or "", "version": b.get("version") or "",
+           "current": None, "changed": False, "missing": False}
+    try:
+        cur = read_online(b["online"], dir)
+        out["current"] = cur["version"]
+        out["changed"] = cur["version"] != out["version"]
+    except (FileNotFoundError, FilterError):
+        out["missing"] = True
+    return out

@@ -227,8 +227,53 @@ console.log('== matching: Continue and unknown fields ==');
   check('missing field: block is a possible match, certain:false', unk.certain === false && unk.block.comment === 'needs-area' && eq(unk.unknown, ['AreaLevel']));
   check('a known failing condition still rules the block out', hit(u, { class: 'Belts' }).block.comment === 'fallback' && hit(u, { class: 'Belts' }).certain === true);
   check('known-false beats unknown: area too low skips the block', hit(u, { class: 'Rings', areaLevel: 60 }).block.comment === 'fallback');
-  check('an unknown on an earlier block makes the answer uncertain', hit(mf(['Show # a', '\tQuality > 0', 'Show # b', '\tClass "Rings"']), { class: 'Rings' }).certain === false);
+  const early = hit(mf(['Show # a', '\tQuality > 0', 'Show # b', '\tClass "Rings"']), { class: 'Rings' });
+  check('an unknown-only block before the winner makes the answer uncertain', early.certain === false && early.block.comment === 'b', j({ c: early.certain, b: early.block && early.block.comment }));
   check('Hide result reports visibility', hit(mf(['Hide', '\tClass "Rings"']), { class: 'Rings' }).visibility === 'Hide');
+}
+
+console.log('== matching: a block needs one condition that really passes ==');
+{
+  const f = mf(['Show # all-unknown', '\tAreaLevel >= 68', '\tQuality > 0', 'Show # rings', '\tClass "Rings"', 'Hide # fallback']);
+  const r = hit(f, { class: 'Rings' });
+  check('all conditions unknown -> the block never takes the item', r.block.comment === 'rings', r.block && r.block.comment);
+  check('...it is listed in possible, with its unknown keys', r.possible.length === 1 && r.possible[0].index === 0 && eq(r.possible[0].unknown, ['AreaLevel', 'Quality']), j(r.possible.map(p => [p.index, p.unknown])));
+  check('...and the winner is marked uncertain', r.certain === false);
+  check('the same block matches once one condition is known and passes', hit(f, { class: 'Rings', areaLevel: 70 }).block.comment === 'all-unknown' &&
+        hit(f, { class: 'Rings', areaLevel: 70 }).certain === false && hit(f, { class: 'Rings', areaLevel: 70, quality: 5 }).certain === true);
+  check('a known failure still rules it out (not possible)', hit(f, { class: 'Rings', areaLevel: 60 }).possible.length === 0);
+  check('a block with no conditions matches everything, certainly', hit(mf(['Show # any']), {}).block.comment === 'any' && hit(mf(['Show # any']), {}).certain === true);
+  check('unknown condition keys alone never match', hit(mf(['Show # odd', '\tFrobnicate 3', 'Hide # rest']), { class: 'Rings' }).block.comment === 'rest');
+  check('nothing matches but a possible block was seen -> block null, uncertain', (() => {
+    const x = hit(mf(['Show # odd', '\tHasEnchantment "Blah"']), { class: 'Rings' });
+    return x.block === null && x.certain === false && x.possible.length === 1;
+  })());
+  const cont = hit(mf(['Show # deco', '\tAreaLevel >= 68', '\tSetFontSize 45', '\tContinue', 'Show # rings', '\tClass "Rings"']), { class: 'Rings' });
+  check('an unknown-only Continue block: not in the trail, possible, winner still certain', cont.trail.length === 0 && cont.possible.length === 1 && cont.certain === true &&
+        !cont.actions.some(a => a.key === 'SetFontSize'), j({ trail: cont.trail.length, possible: cont.possible.length, certain: cont.certain }));
+  const st = hit(mf(['Show # m', '\tMirrored False', 'Show # rest', '\tClass "Rings"']), { class: 'Rings' }, { strict: true });
+  check('strict mode: an assumed-default-only block becomes unknown-only and is skipped', st.block.comment === 'rest' && st.possible.length === 1);
+  check('non-strict: the assumed default counts as a pass', hit(mf(['Show # m', '\tMirrored False', 'Show # rest']), { class: 'Rings' }).block.comment === 'm');
+}
+
+console.log('== actions / aliases / HasImplicitMod ==');
+{
+  const p = LF.parse('Show\n\tClass "Rings"\n\tPlaySound 3 200\n');
+  check('legacy PlaySound is an action, not a condition', p.blocks[0].actions.length === 1 && p.blocks[0].actions[0].key === 'PlaySound' &&
+        p.blocks[0].conditions.length === 1 && hit(p, { class: 'Rings' }).certain === true);
+  const T = (cond, item, opts) => LF.testCondition(LF.parse('Show\n\t' + cond + '\n').blocks[0].conditions[0], item, opts);
+  check('Synthesised / Fractured are SynthesisedItem / FracturedItem', T('Synthesised True', { synthesised: true }) === true && T('Fractured True', { fractured: true }) === true &&
+        T('Fractured True', { fractured: false }) === false && T('Synthesised True', {}) === false && T('Fractured True', {}, { strict: true }) === null);
+  check('Blighted / UberBlighted are BlightedMap / UberBlightedMap', T('Blighted True', { blightedMap: true }) === true && T('UberBlighted True', { uberBlightedMap: false }) === false &&
+        T('UberBlighted False', {}) === true);
+  check('HasImplicitMod True/False: any implicit at all', T('HasImplicitMod True', { implicitMods: ['+12% to Fire Resistance'] }) === true &&
+        T('HasImplicitMod True', { implicitMods: [] }) === false && T('HasImplicitMod False', { implicitMods: [] }) === true && T('HasImplicitMod True', {}) === null);
+  check('HasImplicitMod "text": substring of an implicit, as before', T('HasImplicitMod "Fire Resistance"', { implicitMods: ['+12% to Fire Resistance'] }) === true &&
+        T('HasImplicitMod "Cold"', { implicitMods: ['+12% to Fire Resistance'] }) === false);
+  const bt = (cond, item) => T(cond, Object.assign({ rarity: 'Magic' }, item));
+  check('BaseType: a cleaned magic base is matched on the base, not on words of the name', bt('BaseType "Penguin"', { name: 'Hale Vaal Regalia of the Penguin', base: 'Vaal Regalia' }) === false &&
+        bt('BaseType == "Vaal Regalia"', { name: 'Hale Vaal Regalia of the Penguin', base: 'Vaal Regalia' }) === true);
+  check('BaseType: an uncleaned magic name (base = name) still finds the base inside it', bt('BaseType "Vaal Regalia"', { name: 'Hale Vaal Regalia of the Penguin', base: 'Hale Vaal Regalia of the Penguin' }) === true);
 }
 
 // --------------------------------------------------------------- ruleBlock
@@ -387,6 +432,90 @@ console.log('== fromAppItem ==');
   check('fromAppItem output goes straight into matchItem', tagOf(chaosHit) === 'cur' && chaosHit.certain === true);
 }
 
+// ------------------------------------------------- pasted items -> filter fields
+console.log('== pasted items through fromAppItem ==');
+{
+  const G = (lines) => LF.fromAppItem(PoB.parseGameItem(lines.join('\n')));
+  const T = (cond, item, opts) => LF.testCondition(LF.parse('Show\n\t' + cond + '\n').blocks[0].conditions[0], item, opts);
+  const magic = G(['Item Class: Body Armours', 'Rarity: Magic', 'Hale Vaal Regalia of the Penguin', '--------', 'Energy Shield: 233 (augmented)', '--------',
+    'Item Level: 79', '--------', '{ Prefix Modifier "Hale" (Tier: 9) — Life }', '+22(20-29) to maximum Life',
+    '{ Suffix Modifier "of the Penguin" (Tier: 6) — Elemental, Cold, Resistance }', '+15(12-17)% to Cold Resistance']);
+  check('magic: base is the real base type, name kept', magic.base === 'Vaal Regalia' && magic.name === 'Hale Vaal Regalia of the Penguin' && magic.rarity === 'Magic', j(magic));
+  check('magic: affix names -> explicitMods, HasExplicitMod known', eq(magic.explicitMods, ['Hale', 'of the Penguin']) && T('HasExplicitMod "Hale"', magic) === true &&
+        T('HasExplicitMod "of the Whale"', magic) === false && T('HasExplicitMod >=2 "Hale" "Penguin"', magic) === true);
+  const magicF = LF.parse(['Show # exact', '\tBaseType == "Vaal Regalia"', '\tRarity Magic', 'Hide # rest'].join('\n'));
+  check('magic: BaseType == "Vaal Regalia" now matches, certainly', tagOf(hit(magicF, magic)) === 'exact' && hit(magicF, magic).certain === true);
+  check('magic, no affix on an implicit-only advanced copy: HasExplicitMod known empty', eq(G(['Item Class: Rings', 'Rarity: Rare', 'Grim Loop', 'Ruby Ring', '--------',
+    'Item Level: 80', '--------', '{ Implicit Modifier — Elemental, Fire, Resistance }', '+25(20-30)% to Fire Resistance (implicit)']).explicitMods, []));
+  const hybrid = G(['Item Class: Body Armours', 'Rarity: Rare', 'Doom Shell', 'Vaal Regalia', '--------', 'Item Level: 86', '--------',
+    '{ Prefix Modifier "Seraphim\'s" (Tier: 2) — Defences, Energy Shield }', '+42(39-42)% increased Energy Shield', '+13(12-13)% increased Stun and Block Recovery']);
+  check('hybrid mod (two lines, one header) counts once', eq(hybrid.explicitMods, ["Seraphim's"]) && T('HasExplicitMod >=2 "Seraphim"', hybrid) === false, j(hybrid.explicitMods));
+
+  const sup = G(['Item Class: Body Armours', 'Rarity: Normal', 'Superior Vaal Regalia', '--------', 'Quality: +12% (augmented)', '--------', 'Item Level: 84']);
+  check('Superior normal: base "Vaal Regalia", == matches', sup.base === 'Vaal Regalia' && T('BaseType == "Vaal Regalia"', sup) === true && sup.quality === 12);
+  const un = G(['Item Class: Two Hand Swords', 'Rarity: Rare', 'You cannot use this item. Its stats will be ignored', '--------', 'Havoc Edge', 'Reaver Sword',
+    '--------', 'Requirements:', 'Level: 66', 'Str: 121 (unmet)', '--------', 'Item Level: 75']);
+  check('unusable item: base/name/class right for the filter', un.base === 'Reaver Sword' && un.name === 'Havoc Edge' && un['class'] === 'Two Hand Swords' && un.itemLevel === 75, j(un));
+
+  const map = G(['Item Class: Maps', 'Rarity: Rare', 'Grim Halls', 'Strand Map', '--------', 'Map Tier: 14', 'Item Quantity: +72% (augmented)', '--------',
+    'Item Level: 81', '--------', 'Area has patches of Burning Ground']);
+  const mapF = LF.parse(['Show # t16', '\tClass == "Maps"', '\tMapTier >= 16', 'Show # t11', '\tClass == "Maps"', '\tMapTier >= 11', 'Show # maps', '\tClass == "Maps"'].join('\n'));
+  check('map: MapTier carried, NeverSink-style tier block picked certainly', map.mapTier === 14 && tagOf(hit(mapF, map)) === 't11' && hit(mapF, map).certain === true, j(map));
+  const bl = G(['Item Class: Maps', 'Rarity: Normal', 'Blighted Strand Map', '--------', 'Map Tier: 11', '--------', 'Item Level: 78', '--------',
+    'Area is infested with Fungal Growths (implicit)']);
+  check('blighted map: BlightedMap / Blighted True, not uber, base "Strand Map"', bl.blightedMap === true && bl.uberBlightedMap === false && bl.base === 'Strand Map' &&
+        T('BlightedMap True', bl) === true && T('Blighted True', bl) === true && T('UberBlightedMap True', bl) === false && T('BaseType == "Strand Map"', bl) === true);
+
+  const elText = ['Item Class: Body Armours', 'Rarity: Rare', 'Doom Shell', 'Vaal Regalia', '--------', 'Item Level: 86', '--------',
+    '{ Searing Exarch Implicit Modifier (Grand) — Mana }', '12(11-13)% increased Mana Regeneration Rate (implicit)',
+    '{ Eater of Worlds Implicit Modifier (Exquisite) — Damage }', '9(8-10)% increased Global Damage (implicit)', '--------',
+    '{ Suffix Modifier "of Bameth" (Tier: 1) — Chaos, Resistance }', '+33(31-35)% to Chaos Resistance', '--------', 'Searing Exarch Item', 'Eater of Worlds Item'];
+  const el = G(elText);
+  check('eldritch: not influences to the filter -> HasInfluence None passes', eq(el.influences, []) && T('HasInfluence None', el) === true &&
+        T('HasInfluence Shaper', el) === false && T('ShaperItem False', el) === true, j(el.influences));
+  check('eldritch: tiers for HasSearingExarchImplicit / HasEaterOfWorldsImplicit', T('HasSearingExarchImplicit >= 3', el) === true && T('HasSearingExarchImplicit >= 4', el) === false &&
+        T('HasEaterOfWorldsImplicit 5', el) === true && T('HasEaterOfWorldsImplicit >= 1', G(['Item Class: Rings', 'Rarity: Rare', 'A', 'Ruby Ring', '--------', 'Item Level: 80'])) === false);
+  check('eldritch: implicits known -> HasImplicitMod True; explicit names known', T('HasImplicitMod True', el) === true && eq(el.explicitMods, ['of Bameth']) &&
+        el.implicitMods.length === 2);
+  const elInf = G(elText.concat(['Shaper Item']));
+  check('a real influence next to eldritch lines is kept', eq(elInf.influences, ['Shaper']) && T('HasInfluence None', elInf) === false && T('ShaperItem True', elInf) === true);
+
+  const fr = G(['Item Class: Rings', 'Rarity: Rare', 'Rune Turn', 'Two-Stone Ring', '--------', 'Item Level: 84', '--------',
+    '+14% to Cold and Lightning Resistances (implicit)', '--------', '+42% to Fire Resistance (fractured)', '+70 to maximum Life', '--------', 'Fractured Item']);
+  check('fractured: FracturedItem / Fractured True; not mirrored, not synthesised (known)', fr.fractured === true && T('FracturedItem True', fr, { strict: true }) === true &&
+        T('Fractured True', fr) === true && T('Mirrored False', fr, { strict: true }) === true && T('SynthesisedItem False', fr, { strict: true }) === true);
+  const mir = G(['Item Class: Rings', 'Rarity: Rare', 'Corpse Bite', 'Steel Ring', '--------', 'Item Level: 84', '--------', '+68 to maximum Life', '--------', 'Mirrored']);
+  check('mirrored: Mirrored True; the old assumed-false no longer hides it', mir.mirrored === true && T('Mirrored True', mir) === true &&
+        tagOf(hit(LF.parse('Show # mirror\n\tMirrored True\nShow # rest\n\tClass "Rings"\n'), mir)) === 'mirror');
+  check('mirrored: the marker line is no explicit-mod text', mir.explicitMods === undefined && T('HasExplicitMod "Mirrored"', mir) === null);
+
+  global.window = {};
+  ['basetypes', 'baseicons', 'filtericons', 'gemtypes'].forEach(n => require('../data/' + n + '.js'));
+  const tg = G(['Item Class: Skill Gems', 'Rarity: Gem', 'Kinetic Bolt of Fragmentation', '--------', 'Projectile, Attack', 'Level: 20 (Max)',
+    'Quality: +20% (augmented)', '--------', 'Requirements:', 'Level: 70']);
+  check('transfigured gem: TransfiguredGem True, base is the full gem name', tg.transfiguredGem === true && T('TransfiguredGem True', tg, { strict: true }) === true &&
+        tg.base === 'Kinetic Bolt of Fragmentation' && tg.gemLevel === 20);
+  const plainMagic = G(['Item Class: Life Flasks', 'Rarity: Magic', 'Saturated Divine Life Flask of Staunching', '--------', 'Item Level: 84', '--------',
+    '50% increased Amount Recovered']);
+  check('magic flask without headers: base from the lookup', plainMagic.base === 'Divine Life Flask' && T('BaseType == "Divine Life Flask"', plainMagic) === true, plainMagic.base);
+  delete global.window;
+  const ms = G(['Item Class: Body Armours', 'Rarity: Rare', 'Grim Shell', 'Vaal Regalia', '--------', 'Item Level: 84', '--------', 'Memory Strands: 37',
+    '--------', '+90 to maximum Life']);
+  check('memory strands: MemoryStrands >= 30 / >= 60', ms.memoryStrands === 37 && T('MemoryStrands >= 30', ms) === true && T('MemoryStrands >= 60', ms) === false &&
+        T('MemoryStrands >= 1', mir) === false);
+  const sy = G(['Item Class: Rings', 'Rarity: Rare', 'Blood Loop', 'Synthesised Two-Stone Ring', '--------', 'Item Level: 84', '--------', '+60 to maximum Life',
+    '--------', 'Synthesised Item']);
+  check('synthesised: SynthesisedItem True, base without the prefix', sy.synthesised === true && T('SynthesisedItem True', sy) === true && sy.base === 'Two-Stone Ring');
+  const fb = G(['Item Class: Belts', 'Rarity: Unique', 'Foulborn Headhunter', 'Leather Belt', '--------', 'Item Level: 84', '--------', '+45 to Dexterity (mutated)']);
+  check('foulborn unique: Foulborn True; Replica False', T('Foulborn True', fb) === true && T('Replica False', fb, { strict: true }) === true);
+  const card = LF.fromAppItem({ itemClass: 'DivinationCard', rarity: 'DIVINATION', name: 'The Doctor', base: 'The Doctor', mods: [], influences: [] });
+  check('"DivinationCard" class is read as "Divination Cards"', card['class'] === 'Divination Cards' && T('Class == "Divination Cards"', card) === true);
+  check('PoB items (not pasted) leave the new fields unset', (() => {
+    const pobItem = LF.fromAppItem({ rarity: 'RARE', name: 'X', base: 'Vaal Regalia', mods: [], influences: ['Searing Exarch'], sockets: '' });
+    return pobItem.mirrored === undefined && pobItem.implicitMods === undefined && pobItem.memoryStrands === undefined && eq(pobItem.influences, []);
+  })());
+}
+
 // ----------------------------------------------------------- tierBlocks
 console.log('== tierBlocks ==');
 {
@@ -460,6 +589,11 @@ if (!fs.existsSync(REAL)) {
   const bomText = '\uFEFF' + text;
   check('BOM + CRLF real file: add/remove byte-identical, BOM kept', LF.applyManaged(LF.applyManaged(bomText, section), '') === bomText && LF.applyManaged(bomText, section).charCodeAt(0) === 0xFEFF);
 }
+
+// a no-break space between tokens used to loop forever in lex()
+var nbsp = LF.parse('Show\n\tBaseType "A" "B"\f"C"\n');
+check('no-break space / form feed between tokens: parsed, no hang', nbsp.blocks.length === 1 &&
+  JSON.stringify(nbsp.blocks[0].conditions[0].values) === '["A","B","C"]', JSON.stringify(nbsp.blocks[0].conditions));
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL TESTS PASSED');
 process.exit(failures ? 1 : 0);

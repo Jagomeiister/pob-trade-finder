@@ -451,15 +451,120 @@
     return /^Item Class:/m.test(text) && /^--------$/m.test(text);
   }
 
+  // ---- base type of a pasted item --------------------------------------------
+
+  // Name tables the page loads (data/basetypes.js, baseicons.js, filtericons.js,
+  // gemtypes.js). Read when needed; in Node a test sets global.window and requires them.
+  function gameTables() {
+    var w = typeof window !== 'undefined' && window ? window : null;
+    if (!w) return { bases: [], gems: null };
+    var bases = [w.POE_BASE_TYPES, w.POE_BASE_ICONS, w.POE_FILTER_ICONS].filter(function (t) {
+      return t && typeof t === 'object';
+    });
+    return { bases: bases, gems: w.POE_GEM_TYPES && typeof w.POE_GEM_TYPES === 'object' ? w.POE_GEM_TYPES : null };
+  }
+
+  function has(obj, k) { return Object.prototype.hasOwnProperty.call(obj, k); }
+
+  function knownBase(tables, s) {
+    for (var i = 0; i < tables.length; i++) if (has(tables[i], s)) return true;
+    return false;
+  }
+
+  // "Hale Vaal Regalia of the Whale" -> "Vaal Regalia": the longest known base made of
+  // whole words that starts after at most two prefix words and ends where an "of …"
+  // suffix starts (or at the end). Case-sensitive, so "of the Wolf" is never "The Wolf".
+  function baseInName(name, tables) {
+    if (!tables.length || !name) return null;
+    var words = name.split(/\s+/), best = null;
+    for (var s = 0; s <= 2 && s < words.length; s++) {
+      if (words[s] === 'of') break;
+      for (var e = words.length; e > s; e--) {
+        if (e < words.length && words[e] !== 'of') continue;
+        var cand = words.slice(s, e).join(' ');
+        if ((!best || cand.length > best.length) && knownBase(tables, cand)) best = cand;
+      }
+    }
+    return best;
+  }
+
+  // Take the advanced-copy affix names off a magic name: "Hale " in front, " of the Whale" behind.
+  function peelAffixes(name, prefixes, suffixes) {
+    var out = name, i;
+    for (i = 0; i < prefixes.length; i++) {
+      var p = prefixes[i] + ' ';
+      if (prefixes[i] && out.indexOf(p) === 0 && out.length > p.length) { out = out.slice(p.length); break; }
+    }
+    for (i = 0; i < suffixes.length; i++) {
+      var sx = ' ' + suffixes[i];
+      if (suffixes[i] && out.length > sx.length && out.slice(-sx.length) === sx) { out = out.slice(0, -sx.length); break; }
+    }
+    return out;
+  }
+
+  // Words the game puts in front of the base type that aren't part of it.
+  var BASE_PREFIX_RE = /^(Superior|Synthesised|Vestigial) (?=\S)/;
+  // On maps "Blighted Strand Map" is still a Strand Map; "Blighted Incubator" is a real base.
+  var MAP_BLIGHT_RE = /^(Blighted|Blight-ravaged) (?=\S)/;
+
+  // Eldritch implicit tiers as the filter's HasSearingExarchImplicit / HasEaterOfWorldsImplicit count them.
+  var ELDRITCH_TIER = { lesser: 1, greater: 2, grand: 3, exceptional: 4, exquisite: 5, perfect: 6 };
+
+  /* modHeader(line) -> what an advanced-copy header says about the mod lines under it:
+   * { Fractured Prefix Modifier "Hale" (Tier: 7) — Life }
+   * { Searing Exarch Implicit Modifier (Grand) — Mana } */
+  function modHeader(line) {
+    var h = { implicit: /Implicit Modifier/i.test(line), crafted: /Crafted/i.test(line),
+              fractured: /Fractured/i.test(line), enchant: /Enchant/i.test(line),
+              tier: (line.match(/\(Tier: (\d+)\)/) || [])[1],
+              affixType: '', affix: '', eldritch: '', eldritchTier: 0,
+              foulborn: /Foulborn/i.test(line) };
+    var m = /\b(Prefix|Suffix|Implicit|Unique)\s+Modifier\b(?:\s*"([^"]*)")?/i.exec(line);
+    if (m) {
+      h.affixType = m[1].toLowerCase();
+      if (m[2] && (h.affixType === 'prefix' || h.affixType === 'suffix')) h.affix = m[2];
+    }
+    if (/Searing Exarch/i.test(line)) h.eldritch = 'Searing Exarch';
+    else if (/Eater of Worlds/i.test(line)) h.eldritch = 'Eater of Worlds';
+    if (h.eldritch) {
+      var t = /\((Lesser|Greater|Grand|Exceptional|Exquisite|Perfect)\)/i.exec(line);
+      if (t) h.eldritchTier = ELDRITCH_TIER[t[1].toLowerCase()];
+    }
+    return h;
+  }
+
+  var UNUSABLE_RE = /^You cannot use this item/;
+
   /* Parse the in-game Ctrl+C item text into the same item model parseItemText
-   * produces, so the whole matcher/search pipeline applies. */
+   * produces, so the whole matcher/search pipeline applies.
+   * Besides the PoB fields it fills what a loot filter asks about. Each is known from a
+   * full copy (false/0 when its marker is absent) and left unset when the copy can't say:
+   *   identified, mirrored, fractured, synthesised, vestigial, replica, foulborn, imbued,
+   *   zanaMemory, transfiguredGem, scourged, blightedMap, uberBlightedMap, memoryStrands,
+   *   mapTier, searingExarchImplicits / eaterOfWorldsImplicits (eldritch tier 1-6),
+   *   eldritch (["Searing Exarch", …]: also still in influences, which the trade search reads),
+   *   unusable, advanced (the copy had "{ … Modifier … }" headers).
+   * Each advanced-copy mod also gets affix (its prefix/suffix name), affixType, affixSeq
+   * (one number per header) and enchant / eldritch / mutated where they apply. */
   function parseGameItem(text) {
     if (!looksLikeGameItem(text)) return null;
     var sections = text.replace(/\r/g, '').split(/\n--------\n/);
-    var headLines = sections[0].split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    var trimmed = function (sec) { return sec.split('\n').map(function (l) { return l.trim(); }).filter(Boolean); };
+    var headLines = trimmed(sections[0]);
     var item = { rarity: 'RARE', name: '', base: '', sockets: '', maxLinks: 0,
                  corrupted: false, itemLevel: 0, influences: [], mods: [], slotGuess: null,
-                 itemClass: '', stackSize: 0, gemLevel: 0, quality: 0 };
+                 itemClass: '', stackSize: 0, gemLevel: 0, quality: 0, eldritch: [] };
+    // an item you can't use gets "You cannot use this item. Its stats will be ignored"
+    // under Rarity, which pushes its name and base into the next section
+    if (headLines.some(function (l) { return UNUSABLE_RE.test(l); })) {
+      item.unusable = true;
+      headLines = headLines.filter(function (l) { return !UNUSABLE_RE.test(l); });
+      var named = headLines.some(function (l) { return !/^(Item Class|Rarity):/.test(l); });
+      if (!named && sections.length >= 2) {
+        headLines = headLines.concat(trimmed(sections[1]));
+        sections.splice(1, 1);
+      }
+    }
     var itemClass = '';
     var nameLines = [];
     headLines.forEach(function (l) {
@@ -473,24 +578,38 @@
     item.slotGuess = GAME_ITEM_CLASS_SLOT[itemClass] || null;
     item.itemClass = itemClass;
     var isGem = /Gems?$/.test(itemClass);
+    var isMap = itemClass === 'Maps';
+
+    var prefixNames = [], suffixNames = [], headerSeq = 0, monsterLevel = 0;
+    var eldritchTier = { 'Searing Exarch': 0, 'Eater of Worlds': 0 }, eldritchHeader = {};
+    var seen = { unidentified: false, mirrored: false, fractured: false, synthesised: false, transfigured: false,
+                 zana: false, scourged: false, mutated: false, blighted: false, uber: false };
 
     for (var s = 1; s < sections.length; s++) {
-      var lines = sections[s].split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      var lines = trimmed(sections[s]);
       // advanced copy (the default since 3.29): a "{ … Modifier … }" header precedes each
       // mod and says what kind it is; rolls carry their range, "+42(38-45) to …"
       var header = null;
       lines.forEach(function (line) {
         var m;
         if (/^\{.*\}$/.test(line)) {
-          header = { implicit: /Implicit Modifier/i.test(line), crafted: /Crafted/i.test(line),
-                     fractured: /Fractured/i.test(line), enchant: /Enchant/i.test(line),
-                     tier: (line.match(/\(Tier: (\d+)\)/) || [])[1] };
+          header = modHeader(line);
+          header.seq = ++headerSeq;
+          item.advanced = true;
+          if (header.affix) (header.affixType === 'prefix' ? prefixNames : suffixNames).push(header.affix);
+          if (header.eldritch) {
+            eldritchHeader[header.eldritch] = true;
+            if (header.eldritchTier > eldritchTier[header.eldritch]) eldritchTier[header.eldritch] = header.eldritchTier;
+          }
+          if (header.foulborn) seen.mutated = true;
+          if (/Scourge/i.test(line)) seen.scourged = true;
           return;
         }
         if (/^\(.*\)$/.test(line)) return; // reminder text
         line = line.replace(/(\d+(?:\.\d+)?)\((-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\)/g, '$1');
         if ((m = line.match(/^Item Level:\s*(\d+)/))) { item.itemLevel = parseInt(m[1], 10); return; }
-        if ((m = line.match(/^Stack Size:\s*([\d,.]+)/))) { item.stackSize = parseInt(m[1].replace(/[,.]/g, ''), 10); return; }
+        // "1,234/5000"; some locales group thousands with a (no-break) space
+        if ((m = line.match(/^Stack Size:\s*(\d[\d,.\s ]*?)\s*(?:\/|$)/))) { item.stackSize = parseInt(m[1].replace(/[^\d]/g, ''), 10); return; }
         // the gem's own level comes first; "Requirements: Level: 72" later is the character's
         if (isGem && (m = line.match(/^Level:\s*(\d+)/))) { if (!item.gemLevel) item.gemLevel = parseInt(m[1], 10); return; }
         if ((m = line.match(/^Quality(?: \([^)]*\))?:\s*\+?(\d+)%/))) { item.quality = parseInt(m[1], 10); return; }
@@ -505,31 +624,120 @@
         if (line === 'Corrupted') { item.corrupted = true; return; }
         if ((m = line.match(/^(Shaper|Elder|Crusader|Redeemer|Hunter|Warlord|Searing Exarch|Eater of Worlds) Item$/))) {
           item.influences.push(m[1]);
+          if (m[1] === 'Searing Exarch' || m[1] === 'Eater of Worlds') item.eldritch.push(m[1]);
           return;
         }
+        // item markers and numbers a loot filter asks about (none of them is a mod)
+        if ((m = line.match(/^Map Tier:\s*(\d+)/))) { item.mapTier = parseInt(m[1], 10); return; }
+        if ((m = line.match(/^Monster Level:\s*(\d+)/))) { monsterLevel = parseInt(m[1], 10); return; }
+        if ((m = line.match(/^Memory Strands:\s*(\d+)/))) { item.memoryStrands = parseInt(m[1], 10); return; }
+        if (line === 'Mirrored') { seen.mirrored = true; return; }
+        if (line === 'Fractured Item') { seen.fractured = true; return; }
+        if (line === 'Synthesised Item') { seen.synthesised = true; return; }
+        if (line === 'Transfigured') { seen.transfigured = true; return; }
+        if (line === 'Scourged') { seen.scourged = true; return; }
+        if (line === 'Unidentified') seen.unidentified = true;   // stays in mods too: older readers look for it there
+        if (/originator's memories/i.test(line)) seen.zana = true;
+        if (isMap && /blight-ravaged map/i.test(line)) seen.uber = true;
+        else if (isMap && /blighted map/i.test(line)) seen.blighted = true;
         for (var p = 0; p < GAME_META_PREFIXES.length; p++) {
           if (line.indexOf(GAME_META_PREFIXES[p]) === 0) return;
         }
         // mod line — kind comes from the parenthesised suffix
-        var kind = 'explicit', crafted = false, fractured = false;
-        var suffix = line.match(/\s\((implicit|crafted|fractured|enchant|scourge|crucible)\)$/);
+        var kind = 'explicit', crafted = false, fractured = false, enchant = false, mutated = false;
+        var suffix = line.match(/\s\((implicit|crafted|fractured|enchant|scourge|crucible|mutated)\)$/);
         if (suffix) {
           line = line.slice(0, -suffix[0].length);
           if (suffix[1] === 'implicit' || suffix[1] === 'enchant') kind = 'implicit';
-          if (suffix[1] === 'enchant') crafted = true;   // matcher tries enchant section first
+          if (suffix[1] === 'enchant') { crafted = true; enchant = true; }  // matcher tries enchant section first
           if (suffix[1] === 'crafted') crafted = true;
           if (suffix[1] === 'fractured') fractured = true;
+          if (suffix[1] === 'scourge') seen.scourged = true;
+          if (suffix[1] === 'mutated') { mutated = true; seen.mutated = true; }
         }
         if (header) {
           if (header.implicit || header.enchant) kind = 'implicit';
           if (header.crafted || header.enchant) crafted = true;
+          if (header.enchant) enchant = true;
           if (header.fractured) fractured = true;
+          if (header.foulborn) mutated = true;
         }
+        if (fractured) seen.fractured = true;
         var mod = { line: line, raw: line, kind: kind, crafted: crafted, fractured: fractured, ranged: false };
         if (header && header.tier) mod.tier = parseInt(header.tier, 10);
+        if (header && header.affixType) mod.affixType = header.affixType;
+        if (header && header.affix) { mod.affix = header.affix; mod.affixSeq = header.seq; }
+        if (header && header.eldritch) mod.eldritch = header.eldritch;
+        if (enchant) mod.enchant = true;
+        if (mutated) mod.mutated = true;
         item.mods.push(mod);
       });
     }
+
+    // ---- the real base type ----
+    // a magic item's single name line is "<prefix> <base> <suffix>": take the advanced-copy
+    // affix names off, else find the longest known base inside it; then drop the words the
+    // game puts in front of a base (Superior on quality, Synthesised, Vestigial; Blighted on maps)
+    function stripFront(b) {
+      var pm;
+      while ((pm = BASE_PREFIX_RE.exec(b))) {
+        if (pm[1] === 'Synthesised') seen.synthesised = true;
+        if (pm[1] === 'Vestigial') item.vestigial = true;
+        b = b.slice(pm[0].length);
+      }
+      while (isMap && (pm = MAP_BLIGHT_RE.exec(b))) {
+        if (pm[1] === 'Blight-ravaged') seen.uber = true; else seen.blighted = true;
+        b = b.slice(pm[0].length);
+      }
+      return b;
+    }
+    var base = item.base;
+    if (base && item.rarity === 'MAGIC' && nameLines.length === 1) {
+      var tables = gameTables().bases;
+      var peeled = stripFront(peelAffixes(base, prefixNames, suffixNames));
+      base = knownBase(tables, peeled) ? peeled : (baseInName(peeled, tables) || peeled);
+    }
+    if (base) item.base = stripFront(base) || base;
+    if (isMap) {
+      var shown = item.name + ' ' + nameLines.join(' ');
+      if (/(^|\s)Blight-ravaged\s/.test(shown)) seen.uber = true;
+      if (/(^|\s)Blighted\s/.test(shown)) seen.blighted = true;
+    }
+
+    // ---- flags (known from a full copy) ----
+    var unique = item.rarity === 'UNIQUE';
+    item.identified = !seen.unidentified;
+    item.mirrored = seen.mirrored;
+    item.fractured = seen.fractured;
+    item.synthesised = seen.synthesised;
+    if (item.vestigial !== true) item.vestigial = false;
+    item.zanaMemory = seen.zana;
+    item.scourged = seen.scourged;
+    item.uberBlightedMap = isMap && seen.uber;
+    item.blightedMap = isMap && (seen.blighted || seen.uber);
+    if (typeof item.memoryStrands !== 'number') item.memoryStrands = 0;
+    // an unidentified unique shows only its base, so its name can't say Replica / Foulborn
+    var nameKnown = !(unique && seen.unidentified);
+    if (!unique) item.replica = false;
+    else if (nameKnown) item.replica = /^Replica /.test(item.name);
+    if (seen.mutated || (unique && nameKnown && /^Foulborn /.test(item.name))) item.foulborn = true;
+    else if (nameKnown) item.foulborn = false;
+    if (typeof item.foulborn === 'boolean') item.imbued = item.foulborn;
+    if (!isGem) item.transfiguredGem = false;
+    else if (seen.transfigured) item.transfiguredGem = true;
+    else {
+      var gems = gameTables().gems;
+      if (gems) item.transfiguredGem = has(gems, item.name);
+    }
+    // a map's tier: its "Map Tier:" line, else its monster level (tier 1 = level 68)
+    if (isMap && !item.mapTier && monsterLevel >= 68) item.mapTier = monsterLevel - 67;
+    // eldritch implicit tier: from the advanced header; an eldritch item copied without
+    // headers has some tier we can't see (left unset); no "… Item" line means none
+    ['Searing Exarch', 'Eater of Worlds'].forEach(function (e) {
+      var f = e === 'Searing Exarch' ? 'searingExarchImplicits' : 'eaterOfWorldsImplicits';
+      if (eldritchTier[e] > 0) item[f] = eldritchTier[e];
+      else if (item.eldritch.indexOf(e) === -1 && !eldritchHeader[e]) item[f] = 0;
+    });
     return item;
   }
 

@@ -60,6 +60,8 @@ check("PoB export code rejected", not ph.looks_like_item("eNrtfWtz2zgS6Ofkr0B5q-
 check("oversized rejected", not ph.looks_like_item("Item Class: X\n--------\n" + "x" * 30000))
 
 # -- overlay_position -------------------------------------------------------------
+check("dock: item in inventory -> left of the inventory", ph.dock_position(1500, (0, 0, 1920, 1080), (560, 700)) == (1920 - 634 - 560 - 8, 8))
+check("dock: item in stash -> right of the stash", ph.dock_position(300, (0, 0, 1920, 1080), (560, 700)) == (634 + 8, 8))
 GAME = (0, 0, 1920, 1080)
 check("cursor left -> overlay right", ph.overlay_position(300, GAME, (560, 700)) == (1920 - 560 - 16, 16))
 check("cursor right -> overlay left", ph.overlay_position(1500, GAME, (560, 700)) == (16, 16))

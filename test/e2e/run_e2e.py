@@ -224,6 +224,17 @@ STUB_JS = r"""
     filter_checkpoints: function () { return { ok: true, checkpoints: [] }; },
     filter_restore: function () { return { ok: false, error: 'stub' }; },
     filter_checkpoint: function () { return { ok: true, id: null, created: false }; },
+    filter_reload: function () { return { ok: true }; },
+    filter_switch: function () { return { ok: true }; },
+    filter_online_status: function () { return { ok: true, imported: false }; },
+    filter_online_list: function () { return { ok: true, filters: [] }; },
+    filter_online_read: function () { return { ok: false, error: 'stub: no online filter' }; },
+    filter_online_mark: function () { return { ok: true }; },
+    filter_online_import: function () { return { ok: false, error: 'stub' }; },
+    filter_asset: function () { return { ok: false, error: 'stub: offline' }; },
+    filter_sound_list: function () { return { ok: true, files: [] }; },
+    div_cards: function () { return { ok: true, cards: [], areas: [] }; },
+    filter_sound_file: function () { return { ok: false, error: 'stub' }; },
     filter_open_folder: function () { return { ok: true }; },
     unique_icon: function () { return NO_ART; },
     gem_icon: function () { return NO_ART; },
@@ -2300,7 +2311,7 @@ setView('gems');
 openTradesWindow();
 await H.sleep(30);
 out.inNav = [...document.querySelectorAll('#nav .nav-item')].some(b => b.dataset.view === 'trades');
-document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
 await H.sleep(30);
 out.escBack = document.body.dataset.view;
 out.extraWindows = typeof TRADES !== 'undefined' && TRADES;
@@ -2343,7 +2354,7 @@ const cog = document.getElementById('pref-close-on-game');
 out.cogDefault = cog.checked;
 cog.click();
 out.cogSaved = JSON.parse(localStorage.getItem('pobtf-prefs')).closeOnGameClick;
-document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
 await H.sleep(20);
 out.esc = H.calls('app_overlay').map(c => c.args[0]);
 window.__appOverlay(false);
@@ -2886,7 +2897,7 @@ await H.sleep(20);
 out.uniqUrl = urls().pop(); out.uniqCat = ninjaCategory(uniq); out.uniqName = uniq.resolvedName || uniq.item.name;
 items = menuItems(rare);
 out.rareMenu = items.map(b => b.textContent);
-document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
 await H.sleep(10);
 out.cats = [ninjaCategory({ item: { rarity: 'GEM', name: 'x' } }),
   ninjaCategory({ unique: true, slot: 'Ring 1', item: { base: 'Gold Ring' } }),
@@ -3882,7 +3893,7 @@ find.value = 'theme'; find.dispatchEvent(new Event('input')); await H.sleep(20);
 out.findTheme = shown();
 find.value = 'zzzz'; find.dispatchEvent(new Event('input')); await H.sleep(20);
 out.findNone = [shown().length, document.getElementById('settings-none').hidden];
-find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await H.sleep(20);
+find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await H.sleep(20);
 out.cleared = [find.value, shown(), !panel.classList.contains('hidden')];
 document.getElementById('settings-close').click(); await H.sleep(20);
 // "Add POESESSID…" style: open on the tab holding a control, focused
@@ -4001,7 +4012,7 @@ window.POE_PATCH_NOTES = notes; window.APP_VERSION = null; renderPatchNotes();
 const find = document.getElementById('settings-find');
 find.value = 'diagnostics'; find.dispatchEvent(new Event('input')); await H.sleep(20);
 out.find = shown();
-find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await H.sleep(20);
+find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await H.sleep(20);
 out.back = shown();
 document.getElementById('settings-close').click(); await H.sleep(20);
 return out;
@@ -4164,6 +4175,232 @@ def scenario_lootfilter(s, tag):
     check(tag + " checkpoints listed; restore asks first, then restores that one", r["cps"] == ["before save"] and r["asked"]
           and r["restore"] == ["Test.filter", "20261101-100000"], (r["cps"], r["asked"], r["restore"]))
     check(tag + " nothing sent to the game", r["gameInput"] == 0, r["gameInput"])
+
+
+S47_FILTEREDIT = r"""
+const H = window.__e2e;
+const out = {};
+const FILTER = ['#----- [[0100]] Currency',
+  'Show # $type->currency $tier->t1exalted', '\tClass == "Stackable Currency"', '\tBaseType == "Mirror of Kalandra" "Divine Orb" "Chaos Orb"',
+  '\tSetFontSize 45', '\tSetTextColor 255 0 0 255', '\tPlayAlertSound 6 300', '',
+  'Show # $type->currency $tier->t2divine', '\tClass == "Stackable Currency"', '\tBaseType == "Exalted Orb" "Vaal Orb"',
+  '\tSetFontSize 40', '',
+  'Show # $type->currency $tier->t4chaos', '\tClass == "Stackable Currency"', '\tBaseType == "Orb of Alteration" "Orb of Fusing"',
+  '\tSetFontSize 35', '',
+  'Hide # $type->currency $tier->t9hide', '\tClass == "Stackable Currency"', '\tBaseType == "Portal Scroll" "Scroll of Wisdom"', ''].join('\r\n');
+const price = (name, c) => ({ name: name, cat: 'Currency', img: '', s: [[1, c, 100]] });
+window.__stubOverrides.filter_list = { ok: true, dir: 'C:\\x', exists: true, filters: [{ name: 'Test.filter', size: 1, mtime: 100 }] };
+window.__stubOverrides.filter_read = { ok: true, text: FILTER, bom: false, eol: '\r\n', mtime: 100, size: FILTER.length };
+window.__stubOverrides.filter_write = { ok: true, mtime: 101, checkpoint: '20261101-100000' };
+window.__stubOverrides.filter_reload = { ok: true };
+window.__stubOverrides.filter_online_status = { ok: true, imported: false };
+window.__stubOverrides.quick_price = { ok: true, source: 'GGG currency exchange', chaos: 1 };
+window.__stubOverrides.unique_prices = { ok: true, divine: 200, items: [] };
+window.__stubOverrides.cx_overview = { ok: true, hour: 1, items: {
+  mirror: price('Mirror of Kalandra', 30000), divine: price('Divine Orb', 200), chaos: price('Chaos Orb', 1),
+  exalted: price('Exalted Orb', 15), vaal: price('Vaal Orb', 1), alt: price('Orb of Alteration', 0.1), fuse: price('Orb of Fusing', 0.3),
+  wis: price('Scroll of Wisdom', 0.01), port: price('Portal Scroll', 0.02) } };
+try { localStorage.removeItem('pobtf-filter-edits'); localStorage.removeItem('pobtf-filter-tips'); } catch (e) {}
+const ITEM = 'Item Class: Stackable Currency\nRarity: Currency\nChaos Orb\n--------\nStack Size: 3/20';
+const root = () => document.getElementById('fedit');
+const writes = () => H.calls('filter_write');
+const reloads = () => H.calls('filter_reload').length;
+const saveBtn = () => root().querySelector('.fe-hero .fe-save');
+const dd = () => document.getElementById('fe-dd-layer');
+const edits = () => JSON.parse(localStorage.getItem('pobtf-filter-edits') || '{}')['Test.filter'] || [];
+const tierBases = (txt, tier) => (LootFilter.parse(txt).blocks.find(b => b.tags.tier === tier).conditions
+  .find(c => c.key === 'BaseType') || { values: [] }).values;
+async function press() {
+  window.__filterEditItem(ITEM, { level: 68, id: 'MapWorldsStrand', time: 'x' });
+  await H.waitFor(() => document.body.classList.contains('fedit-on') && root().querySelector('.fe-hero'), 4000, 'editor');
+  await H.sleep(50);
+}
+async function settle(n, what) { await H.waitFor(() => reloads() === n && !FE.busy, 3000, what); await H.sleep(40); }
+async function openDropdown() {
+  root().querySelector('.fe-switch').click();
+  await H.waitFor(() => dd(), 2000, 'dropdown');
+}
+await press();
+out.title = H.text('#overlay-bar .ov-title');
+out.priceHidden = getComputedStyle(document.getElementById('results')).display === 'none';
+out.hero = [H.text('.fe-hero-name'), !!root().querySelector('.fe-hero .fe-art img'), H.text('.fe-hero .fe-price')];
+out.switchTier = H.text('.fe-switch-tier');
+out.zone = H.text('.fe-zone');
+out.saveIdle = saveBtn().disabled && !saveBtn().classList.contains('is-dirty');
+// Switch Tier: every tier's label, the current one marked, a Hide row that says what it does
+await openDropdown();
+out.tiers = [...dd().querySelectorAll('.fe-dd-row:not(.fe-dd-hide) .fe-dd-tier')].map(e => e.textContent);
+out.current = H.text('.fe-dd-row.is-current .fe-dd-tier', dd());
+out.hideText = H.text('.fe-dd-hide .fe-dd-explain', dd());
+out.labelPx = getComputedStyle(dd().querySelector('.fe-dd-row.is-current .fe-label')).fontSize;
+let w0 = writes().length;
+[...dd().querySelectorAll('.fe-dd-row')].find(r => r.textContent.includes('T4 Chaos')).click();
+await H.waitFor(() => writes().length > w0, 3000, 'move write');
+let txt = writes()[w0].args[1];
+out.move = { mtime: writes()[w0].args[2], crlf: !/[^\r]\n/.test(txt), t1: tierBases(txt, 't1exalted'), t4: tierBases(txt, 't4chaos') };
+await settle(1, 'move saved');
+out.switchAfter = H.text('.fe-switch-tier');
+out.recorded = edits().map(c => c.kind);
+// History: the newest edit can be undone; undo drops its recorded edit
+H.button(root().querySelector('.fe-banner'), 'History (1)').click();
+await H.sleep(30);
+out.histRow = H.text('.fe-hist-row.is-newest .fe-hist-text');
+w0 = writes().length;
+root().querySelector('.fe-undo').click();
+await H.waitFor(() => writes().length > w0, 3000, 'undo write');
+await settle(2, 'undo saved');
+out.undo = writes()[w0].args[1] === FILTER;
+out.recordedAfterUndo = edits().length;
+H.button(root().querySelector('.fe-banner'), '← Back to item').click();
+await H.sleep(30);
+// a look edit (font 45 -> 40) waits for Save; Save turns gold, then "Saved"
+const fs = root().querySelector('.fe-font input[type=range]');
+fs.value = '40'; fs.dispatchEvent(new Event('change'));
+await H.sleep(30);
+out.dirty = saveBtn().classList.contains('is-dirty') && !saveBtn().disabled;
+out.waits = writes().length === w0 + 1;
+w0 = writes().length;
+saveBtn().click();
+await H.waitFor(() => writes().length > w0, 3000, 'style write');
+txt = writes()[w0].args[1];
+out.font = txt.includes('\tSetFontSize 40\r\n\tSetTextColor 255 0 0 255') && txt.split('SetFontSize 40').length === 3;
+await settle(3, 'style saved');
+out.saved = saveBtn().textContent;
+out.recordedStyle = edits().map(c => c.kind + ':' + (c.action || ''));
+// colour picker: "Most used" text colours from the filter; Escape closes it
+root().querySelectorAll('.fe-swatch')[0].click();
+await H.waitFor(() => document.getElementById('fe-pop-layer'), 2000, 'picker');
+out.freq = [...document.querySelectorAll('#fe-pop-layer .fe-freq-sw')].map(s => s.title);
+document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+await H.sleep(30);
+out.pickerClosed = !document.getElementById('fe-pop-layer') && !saveBtn().classList.contains('is-dirty') &&
+  H.calls('overlay_hide').length === 0;
+// manual hex on the (unset) background keeps its alpha
+root().querySelectorAll('.fe-swatch')[2].click();
+await H.waitFor(() => document.getElementById('fe-pop-layer'), 2000, 'picker 2');
+const hex = document.querySelector('#fe-pop-layer .fe-man-row input');
+hex.value = '102030'; hex.dispatchEvent(new Event('input')); hex.dispatchEvent(new Event('change'));
+await H.sleep(30);
+// effects: minimap Large Star, Blue beam
+root().querySelector('.fe-effects-head').click();
+await H.sleep(30);
+H.button(root().querySelector('.fe-btn-group'), 'Large').click();
+await H.sleep(20);
+root().querySelector('.fe-shape-tile[title="Star"]').click();
+await H.sleep(20);
+root().querySelector('.fe-beam-cell[title="Blue"]').click();
+await H.sleep(20);
+out.shapes = root().querySelectorAll('.fe-shape-tile svg').length;
+w0 = writes().length;
+saveBtn().click();
+await H.waitFor(() => writes().length > w0, 3000, 'effects write');
+txt = writes()[w0].args[1];
+out.effects = { bg: txt.includes('SetBackgroundColor 16 32 48 240'), icon: txt.includes('MinimapIcon 0 Red Star'),
+  beam: txt.includes('PlayEffect Blue') };
+await settle(4, 'effects saved');
+// Hide from the dropdown
+await openDropdown();
+w0 = writes().length;
+dd().querySelector('.fe-dd-hide').click();
+await H.waitFor(() => writes().length > w0, 3000, 'hide write');
+txt = writes()[w0].args[1];
+out.hidden = LootFilter.matchItem(LootFilter.parse(txt), { class: 'Stackable Currency', base: 'Chaos Orb', rarity: 'Normal' }).visibility;
+await settle(5, 'hide saved');
+out.hiddenTag = H.text('.fe-switch .fe-hidden-tag');
+// economy audit of the tier it's in now (t9hide: Portal 0.02, Wisdom 0.01, Chaos 1)
+H.button(root(), 'Run Economy Audit').click();
+await H.sleep(40);
+out.auditRows = root().querySelectorAll('.fe-arow').length;
+out.auditBar = H.text('.fe-mbar.is-up .fe-mbar-tab span');
+w0 = writes().length;
+root().querySelector('.fe-mbar.is-up .fe-mbar-go').click();
+await H.waitFor(() => writes().length > w0, 3000, 'audit write');
+txt = writes()[w0].args[1];
+out.audit = { t4: tierBases(txt, 't4chaos'), t9: tierBases(txt, 't9hide') };
+await settle(6, 'audit saved');
+out.auditMsg = H.text('.fe-audit-list .fe-gold');
+H.button(root().querySelector('.fe-banner'), '← Back to item').click();
+await H.sleep(30);
+// reload in game can be switched off (Ctrl+Z undo here)
+PREFS.filterReload = false;
+w0 = writes().length;
+document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+await H.waitFor(() => writes().length > w0, 3000, 'ctrl+z');
+await H.sleep(80);
+out.noReload = reloads() === 6;
+PREFS.filterReload = true;
+// Ctrl+D afterwards: back to the price check
+window.__overlayItem(ITEM);
+await H.sleep(50);
+out.backToPrice = !document.body.classList.contains('fedit-on') && H.text('#overlay-bar .ov-title') === 'Price check';
+out.gameInput = H.calls('trade_send').length + H.calls('game_search_paste').length + H.calls('filter_switch').length;
+// an imported online filter: "Check for Filter Updates" = /itemfilter <online>; then "Update" replays + switches back
+const ONLINE = '#Online Item Filter\r\n#name: Main\r\n#hash:v2\r\n' + FILTER.replace('"Exalted Orb" "Vaal Orb"', '"Exalted Orb" "Vaal Orb" "Orb of Annulment"');
+window.__stubOverrides.filter_online_status = { ok: true, imported: true, online: 'id1', name: 'Main', version: 'v1', current: 'v1',
+  changed: false, missing: false };
+window.__stubOverrides.filter_online_read = { ok: true, text: ONLINE, name: 'Main', version: 'v2', mtime: 5, eol: '\r\n' };
+window.__stubOverrides.filter_online_mark = { ok: true };
+await press();
+H.button(root().querySelector('.fe-banner'), 'Check for Filter Updates').click();
+await H.waitFor(() => H.calls('filter_switch').length === 1, 3000, 'check');
+out.step1 = H.calls('filter_switch')[0].args;
+window.__stubOverrides.filter_online_status = Object.assign({}, window.__stubOverrides.filter_online_status, { current: 'v2', changed: true });
+await H.waitFor(() => root().querySelector('.fe-banner') && H.text('.fe-banner').includes('Filter Update Available'), 4000, 'update found');
+out.banner = H.text('.fe-banner-name');
+w0 = writes().length;
+H.button(root().querySelector('.fe-banner'), 'Update').click();
+await H.waitFor(() => H.calls('filter_switch').length === 2, 3000, 'update');
+txt = writes()[w0].args[1];
+out.update = { name: txt.startsWith('#Online Item Filter\r\n#name: Test\r\n'), newTier: txt.includes('"Orb of Annulment"'),
+  myFont: txt.includes('\tSetFontSize 40\r\n\tSetTextColor'), myIcon: txt.includes('MinimapIcon 0 Red Star'),
+  mark: H.calls('filter_online_mark')[0].args, back: H.calls('filter_switch')[1].args };
+['filter_list', 'filter_read', 'filter_write', 'filter_reload', 'filter_online_status', 'filter_online_read', 'filter_online_mark',
+ 'quick_price', 'unique_prices', 'cx_overview'].forEach(k => delete window.__stubOverrides[k]);
+return out;
+"""
+
+
+def scenario_filter_editor(s, tag):
+    s.fresh("?overlay=1")
+    r = s.run(S47_FILTEREDIT, timeout=90)
+    check(tag + " Ctrl+Shift+D: the price-check window becomes the filter editor", r["title"] == "Loot filter"
+          and r["priceHidden"], (r["title"], r["priceHidden"]))
+    check(tag + " hero: name, art, price chip", r["hero"][0] == "Chaos Orb" and r["hero"][1] and r["hero"][2], r["hero"])
+    check(tag + " shows the item's tier; zone level offered (map zone)", r["switchTier"] == "T1 Exalted" and "68" in r["zone"],
+          (r["switchTier"], r["zone"]))
+    check(tag + " Save is grey until there's something to save", r["saveIdle"])
+    check(tag + " Switch Tier lists every tier with its label; current marked; game-size label (45 x 0.48)",
+          r["tiers"] == ["T1 Exalted", "T2 Divine", "T4 Chaos", "T9 Hide"] and r["current"] == "T1 Exalted"
+          and r["labelPx"] == "22px", (r["tiers"], r["current"], r["labelPx"]))
+    check(tag + " the Hide row says what hiding will do", "T9 Hide" in (r["hideText"] or ""), r["hideText"])
+    m = r["move"]
+    check(tag + " Switch tier writes at once: base moved t1 -> t4, CRLF kept, mtime checked", m["mtime"] == 100 and m["crlf"]
+          and m["t1"] == ["Mirror of Kalandra", "Divine Orb"] and m["t4"][-1] == "Chaos Orb", m)
+    check(tag + " /reloaditemfilter once; panel on the new tier; move recorded", r["switchAfter"] == "T4 Chaos"
+          and r["recorded"] == ["move-basetype"], (r["switchAfter"], r["recorded"]))
+    check(tag + " History: the edit listed; Undo writes the old file back and drops it", "Moved" in (r["histRow"] or "")
+          and r["undo"] and r["recordedAfterUndo"] == 0, (r["histRow"], r["undo"], r["recordedAfterUndo"]))
+    check(tag + " look edits wait for Save (gold), then change only that line, then Saved", r["dirty"] and r["waits"]
+          and r["font"] and r["saved"] == "Saved", (r["dirty"], r["waits"], r["font"], r["saved"]))
+    check(tag + " the look edit is recorded", r["recordedStyle"] == ["set-action:SetFontSize"], r["recordedStyle"])
+    check(tag + " colour picker offers the filter's most used colours; Esc closes it unchanged",
+          r["freq"] == ["255 0 0 (Stackable Currency)"] and r["pickerClosed"], (r["freq"], r["pickerClosed"]))
+    check(tag + " background (manual hex, alpha kept), minimap icon and beam saved together",
+          r["effects"] == {"bg": True, "icon": True, "beam": True} and r["shapes"] == 12, (r["effects"], r["shapes"]))
+    check(tag + " Hide from the dropdown hides the item", r["hidden"] == "Hide" and r["hiddenTag"] == "[HIDDEN]",
+          (r["hidden"], r["hiddenTag"]))
+    a = r["audit"]
+    check(tag + " economy audit: rows priced, move the dearer bases up a tier (the tier keeps one)", r["auditRows"] == 3
+          and "Move the 2 items above to" in (r["auditBar"] or "") and a["t4"][-2:] == ["Chaos Orb", "Portal Scroll"]
+          and a["t9"] == ["Scroll of Wisdom"] and "Moved 2 items to T4 Chaos" in (r["auditMsg"] or ""), (r["auditRows"], r["auditBar"], a, r["auditMsg"]))
+    check(tag + " reload in game can be switched off", r["noReload"])
+    check(tag + " Ctrl+D afterwards: back to the price check", r["backToPrice"])
+    check(tag + " no other game input", r["gameInput"] == 0, r["gameInput"])
+    check(tag + " Check for Filter Updates: /itemfilter <online name>, nothing else", r["step1"] == ["Main"], r["step1"])
+    u = r["update"]
+    check(tag + " update found -> Update: my edits on the new version, baseline moved, switched back",
+          "Filter Update Available" in (r["banner"] or "") and u["name"] and u["newTier"] and u["myFont"] and u["myIcon"]
+          and u["mark"] == ["Test.filter", "id1", "v2"] and u["back"] == ["Test.filter"], (r["banner"], u))
 
 
 def scenario_sheets2(s, tag):
@@ -4488,6 +4725,7 @@ SCENARIOS = [
     ("43 lootfilter", scenario_lootfilter),
     ("44 settingstabs", scenario_settings_tabs),
     ("45 patchnotes", scenario_patch_notes),
+    ("47 filtereditor", scenario_filter_editor),
 ]
 
 

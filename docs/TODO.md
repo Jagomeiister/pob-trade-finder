@@ -246,6 +246,15 @@ sources, or ask the author.
   - No reloads, no game input.
   - [ ] In game: save, re-select the filter (Options → UI), and check a re-tiered item and a
         hidden base drop as expected; Ctrl+D shows the block line.
+- [x] **In-game filter editor, Scalpel's feature set** (built 2026-11-03): Ctrl+Shift+D over an item.
+  - js/filter-edit.js (engine: move / hide / restyle / thresholds / record + replay, 171
+    tests in test/test_filter_edit.js), js/app/32-filter-editor.js (panel in the price-check
+    window), gui.py filter hotkey + dock + /reloaditemfilter + /itemfilter, filter_files.py
+    OnlineFilters import + baselines. e2e "47 filtereditor".
+  - Edits only the changed lines (comments, indent, CRLF, BOM kept), re-parses to check.
+  - [ ] In game: Ctrl+Shift+D docks beside the inventory / stash; Move here + Hide take effect
+        after the automatic /reloaditemfilter; Import an online filter, then the two-press update.
+  - [ ] Check `/itemfilter <online name>` really makes the game fetch the newest version.
 - [ ] Maybe later / probably not:
   - Art mode: drawing on top of the game, for content creators.
   - Plugins.

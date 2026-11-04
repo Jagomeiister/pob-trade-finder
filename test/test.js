@@ -358,6 +358,163 @@ async function main() {
     assert(!!Matcher.lookupById(index, id), 'exists: ' + id);
   });
 
+  console.log('== pasted items: base type, flags, map tier, eldritch ==');
+  const G = (lines) => PoB.parseGameItem(lines.join('\n'));
+  const MAGIC_ADV = ['Item Class: Body Armours', 'Rarity: Magic', 'Hale Vaal Regalia of the Penguin', '--------',
+    'Energy Shield: 233 (augmented)', '--------', 'Requirements:', 'Level: 68', 'Int: 194', '--------', 'Sockets: B-B B', '--------',
+    'Item Level: 79', '--------',
+    '{ Prefix Modifier "Hale" (Tier: 9) — Life }', '+22(20-29) to maximum Life',
+    '{ Suffix Modifier "of the Penguin" (Tier: 6) — Elemental, Cold, Resistance }', '+15(12-17)% to Cold Resistance',
+    '(Cold Resistance reduces Cold Damage taken)'];
+  const MAGIC_PLAIN = ['Item Class: Body Armours', 'Rarity: Magic', 'Hale Vaal Regalia of the Penguin', '--------',
+    'Energy Shield: 233 (augmented)', '--------', 'Requirements:', 'Level: 68', 'Int: 194', '--------', 'Item Level: 79', '--------',
+    '+22 to maximum Life', '+15% to Cold Resistance'];
+  const FLASK = ['Item Class: Life Flasks', 'Rarity: Magic', 'Saturated Divine Life Flask of Staunching', '--------',
+    'Recovers 3600 (augmented) Life over 10.50 (augmented) Seconds', 'Consumes 15 of 45 Charges on use', 'Currently has 45 Charges', '--------',
+    'Requirements:', 'Level: 81', '--------', 'Item Level: 84', '--------',
+    '50% increased Amount Recovered', '33% reduced Recovery rate', 'Grants Immunity to Bleeding for 4 seconds if used while Bleeding',
+    'Grants Immunity to Corrupted Blood for 4 seconds if used while affected by Corrupted Blood', '--------',
+    'Right click to drink. Can only hold charges while in belt. Refills as you kill monsters.'];
+  const MAGIC_MAP = ['Item Class: Maps', 'Rarity: Magic', 'Antagonist\'s Lair of the Hydra Map of Exposure', '--------',
+    'Map Tier: 16', 'Item Quantity: +31% (augmented)', 'Item Rarity: +17% (augmented)', '--------', 'Item Level: 83', '--------',
+    'Rare Monsters each have a Nemesis Mod', '20% more Rare Monsters', 'Players have -10% to all maximum Resistances', '--------',
+    'Travel to this Map by using it in a personal Map Device. Maps can only be used once.'];
+  const SUPERIOR = ['Item Class: Body Armours', 'Rarity: Normal', 'Superior Vaal Regalia', '--------',
+    'Quality: +12% (augmented)', 'Energy Shield: 217 (augmented)', '--------', 'Requirements:', 'Level: 68', 'Int: 194', '--------',
+    'Sockets: B-B-G', '--------', 'Item Level: 84'];
+  const UNUSABLE = ['Item Class: Two Hand Swords', 'Rarity: Rare', 'You cannot use this item. Its stats will be ignored', '--------',
+    'Havoc Edge', 'Reaver Sword', '--------', 'Two Hand Sword', 'Physical Damage: 92-191 (augmented)', 'Critical Strike Chance: 5.00%',
+    'Attacks per Second: 1.25', 'Weapon Range: 1.3 metres', '--------', 'Requirements:', 'Level: 66', 'Str: 121 (unmet)', 'Dex: 121 (unmet)', '--------',
+    'Sockets: R-R-G', '--------', 'Item Level: 75', '--------', '+40% to Global Critical Strike Multiplier (implicit)', '--------',
+    'Adds 12 to 24 Physical Damage', '+30 to maximum Life'];
+  const RARE_MAP = ['Item Class: Maps', 'Rarity: Rare', 'Grim Halls', 'Strand Map', '--------',
+    'Map Tier: 14', 'Item Quantity: +72% (augmented)', 'Item Rarity: +38% (augmented)', 'Monster Pack Size: +25% (augmented)',
+    'Quality: +20% (augmented)', '--------', 'Item Level: 81', '--------',
+    'Area has patches of Burning Ground', 'Monsters deal 90% extra Physical Damage as Fire', '--------',
+    'Travel to this Map by using it in a personal Map Device. Maps can only be used once.'];
+  const BLIGHTED = ['Item Class: Maps', 'Rarity: Normal', 'Blighted Strand Map', '--------', 'Map Tier: 11', '--------',
+    'Item Level: 78', '--------', 'Area is infested with Fungal Growths (implicit)', 'Map\'s Item Quantity Modifiers also affect Blight Chest count (implicit)',
+    '--------', 'Travel to this Map by using it in a personal Map Device. Maps can only be used once.'];
+  const RAVAGED = ['Item Class: Maps', 'Rarity: Rare', 'Doom Spires', 'Blight-ravaged Strand Map', '--------', 'Map Tier: 16', '--------',
+    'Item Level: 83', '--------', 'Area is infested with Fungal Growths (implicit)', '--------', 'Monsters have 50% increased Area of Effect'];
+  const ELDRITCH = ['Item Class: Body Armours', 'Rarity: Rare', 'Doom Shell', 'Vaal Regalia', '--------', 'Energy Shield: 412 (augmented)', '--------',
+    'Requirements:', 'Level: 68', 'Int: 194', '--------', 'Item Level: 86', '--------',
+    '{ Searing Exarch Implicit Modifier (Grand) — Mana }', '12(11-13)% increased Mana Regeneration Rate (implicit)',
+    '{ Eater of Worlds Implicit Modifier (Exquisite) — Damage }', '9(8-10)% increased Global Damage (implicit)', '--------',
+    '{ Prefix Modifier "Seraphim\'s" (Tier: 2) — Defences, Energy Shield }', '+42(39-42)% increased Energy Shield', '+13(12-13)% increased Stun and Block Recovery',
+    '{ Suffix Modifier "of Bameth" (Tier: 1) — Chaos, Resistance }', '+33(31-35)% to Chaos Resistance', '--------',
+    'Searing Exarch Item', 'Eater of Worlds Item'];
+  const ELDRITCH_PLAIN = ['Item Class: Body Armours', 'Rarity: Rare', 'Doom Shell', 'Vaal Regalia', '--------', 'Item Level: 86', '--------',
+    '12% increased Mana Regeneration Rate (implicit)', '--------', '+33% to Chaos Resistance', '--------', 'Searing Exarch Item'];
+  const FRACTURED = ['Item Class: Rings', 'Rarity: Rare', 'Rune Turn', 'Two-Stone Ring', '--------', 'Requirements:', 'Level: 50', '--------',
+    'Item Level: 84', '--------', '+14% to Cold and Lightning Resistances (implicit)', '--------',
+    '+42% to Fire Resistance (fractured)', '+70 to maximum Life', '--------', 'Fractured Item'];
+  const MIRRORED = ['Item Class: Rings', 'Rarity: Rare', 'Corpse Bite', 'Steel Ring', '--------', 'Item Level: 84', '--------',
+    'Adds 8 to 13 Physical Damage to Attacks (implicit)', '--------', '+68 to maximum Life', '--------', 'Mirrored'];
+  const TRANSFIG = ['Item Class: Skill Gems', 'Rarity: Gem', 'Kinetic Bolt of Fragmentation', '--------', 'Projectile, Attack', 'Level: 20 (Max)',
+    'Cost: 7 Mana', 'Quality: +20% (augmented)', '--------', 'Requirements:', 'Level: 70', 'Dex: 79', 'Int: 110', '--------',
+    'Fires a projectile that changes direction when it hits a wall and fragments when it expires.', '--------',
+    'Place into an item socket of the right colour to gain this skill. Right click to remove from a socket.'];
+  const PLAIN_GEM = TRANSFIG.map(l => l === 'Kinetic Bolt of Fragmentation' ? 'Kinetic Bolt' : l);
+  const STRANDS = ['Item Class: Body Armours', 'Rarity: Rare', 'Grim Shell', 'Vaal Regalia', '--------', 'Energy Shield: 300 (augmented)', '--------',
+    'Item Level: 84', '--------', 'Memory Strands: 37', '--------', '+90 to maximum Life'];
+  const SYNTH = ['Item Class: Rings', 'Rarity: Rare', 'Blood Loop', 'Synthesised Two-Stone Ring', '--------', 'Item Level: 84', '--------',
+    '10% increased Attack Speed (implicit)', '+14% to Cold and Lightning Resistances (implicit)', '--------', '+60 to maximum Life', '--------', 'Synthesised Item'];
+  const VESTIGIAL = ['Item Class: Body Armours', 'Rarity: Normal', 'Vestigial Simple Robe', '--------', 'Energy Shield: 18', '--------', 'Item Level: 40'];
+  const FOULBORN = ['Item Class: Belts', 'Rarity: Unique', 'Foulborn Headhunter', 'Leather Belt', '--------', 'Item Level: 84', '--------',
+    '+32 to maximum Life (implicit)', '--------', '+46 to Strength', '+45 to Dexterity (mutated)', '+55 to maximum Life',
+    'When you Kill a Rare monster, you gain its Modifiers for 60 seconds', '--------', '"A man\'s soul rules from a cavern of bone."'];
+  const REPLICA = ['Item Class: Body Armours', 'Rarity: Unique', 'Replica Farrul\'s Fur', 'Triumphant Lamellar', '--------', 'Item Level: 84', '--------',
+    '+90 to maximum Life'];
+  const UNID_UNIQUE = ['Item Class: Belts', 'Rarity: Unique', 'Leather Belt', '--------', 'Item Level: 84', '--------',
+    '+32 to maximum Life (implicit)', '--------', 'Unidentified'];
+
+  // no name tables loaded: the old behaviour for a plain magic copy (the whole name)
+  const noTab = G(MAGIC_PLAIN);
+  assert(noTab.base === 'Hale Vaal Regalia of the Penguin' && noTab.name === noTab.base, 'magic, no headers, no base tables: base stays the whole name');
+  const adv1 = G(MAGIC_ADV);
+  assert(adv1.base === 'Vaal Regalia' && adv1.name === 'Hale Vaal Regalia of the Penguin', 'magic advanced copy: affix names peeled off -> "' + adv1.base + '", name kept');
+  assert(adv1.mods.length === 2 && adv1.mods[0].affix === 'Hale' && adv1.mods[0].affixType === 'prefix' &&
+         adv1.mods[1].affix === 'of the Penguin' && adv1.mods[1].affixType === 'suffix' && adv1.mods[0].line === '+22 to maximum Life',
+         'advanced copy keeps the affix names on the mods: ' + adv1.mods.map(m => m.affix).join(', '));
+  assert(adv1.advanced === true && adv1.identified === true && adv1.sockets === 'B-B B', 'advanced flag, identified, sockets still parsed');
+
+  global.window = {};
+  ['basetypes', 'baseicons', 'filtericons', 'gemtypes'].forEach(n => require(path.join(__dirname, '..', 'data', n + '.js')));
+  const plain = G(MAGIC_PLAIN);
+  assert(plain.base === 'Vaal Regalia' && plain.name === 'Hale Vaal Regalia of the Penguin', 'magic, no headers: base from the known-base lookup -> "' + plain.base + '"');
+  assert(G(FLASK).base === 'Divine Life Flask', 'magic flask base -> "' + G(FLASK).base + '"');
+  const mmap = G(MAGIC_MAP);
+  assert(mmap.base === 'Lair of the Hydra Map' && mmap.mapTier === 16, 'magic guardian map: base with its own "of" kept, tier 16 -> "' + mmap.base + '" T' + mmap.mapTier);
+  const unidMagic = G(['Item Class: Body Armours', 'Rarity: Magic', 'Vaal Regalia', '--------', 'Item Level: 79', '--------', 'Unidentified']);
+  assert(unidMagic.base === 'Vaal Regalia' && unidMagic.identified === false, 'unidentified magic: base is its only line');
+
+  const sup = G(SUPERIOR);
+  assert(sup.base === 'Vaal Regalia' && sup.name === 'Superior Vaal Regalia' && sup.quality === 12, 'Superior stripped from the base, name kept: "' + sup.base + '"');
+  const un = G(UNUSABLE);
+  assert(un.name === 'Havoc Edge' && un.base === 'Reaver Sword' && un.unusable === true, 'unusable item: warning dropped, name/base from the next section: ' + un.name + ' / ' + un.base);
+  assert(un.itemLevel === 75 && un.sockets === 'R-R-G' && un.mods.some(m => m.kind === 'implicit' && /Critical Strike Multiplier/.test(m.line)) &&
+         !un.mods.some(m => /cannot use/.test(m.line)), 'unusable item: the rest still parses, warning is not a mod');
+
+  const rmap = G(RARE_MAP);
+  assert(rmap.mapTier === 14 && rmap.base === 'Strand Map' && rmap.quality === 20, 'map tier parsed: ' + rmap.mapTier);
+  assert(!rmap.mods.some(m => /Map Tier/.test(m.line)) && rmap.mods.some(m => m.line === 'Area has patches of Burning Ground'),
+         'Map Tier is still not a mod line, the map mods still are');
+  assert(rmap.blightedMap === false && rmap.uberBlightedMap === false, 'ordinary map: not blighted');
+  const bl = G(BLIGHTED);
+  assert(bl.base === 'Strand Map' && bl.name === 'Blighted Strand Map' && bl.blightedMap === true && bl.uberBlightedMap === false && bl.mapTier === 11,
+         'blighted map: base "' + bl.base + '", BlightedMap, T' + bl.mapTier);
+  const rv = G(RAVAGED);
+  assert(rv.base === 'Strand Map' && rv.uberBlightedMap === true && rv.blightedMap === true, 'blight-ravaged map: base "' + rv.base + '", both blight flags');
+  const incub = G(['Item Class: Incubators', 'Rarity: Normal', 'Blighted Incubator', '--------', 'Item Level: 1']);
+  assert(incub.base === 'Blighted Incubator' && incub.blightedMap === false, '"Blighted Incubator" is a real base and not a map');
+  assert(sup.mapTier === undefined, 'no map tier on a non-map');
+
+  const el = G(ELDRITCH);
+  assert(el.influences.indexOf('Searing Exarch') !== -1 && el.influences.indexOf('Eater of Worlds') !== -1,
+         'eldritch lines still in influences (the trade search and cards read them there)');
+  assert(JSON.stringify(el.eldritch) === '["Searing Exarch","Eater of Worlds"]', 'eldritch lines in their own field: ' + JSON.stringify(el.eldritch));
+  assert(el.searingExarchImplicits === 3 && el.eaterOfWorldsImplicits === 5, 'eldritch tiers from the headers (Grand 3, Exquisite 5): ' +
+         el.searingExarchImplicits + '/' + el.eaterOfWorldsImplicits);
+  assert(el.mods.filter(m => m.kind === 'implicit').length === 2 && el.mods[0].eldritch === 'Searing Exarch' && el.mods[1].eldritch === 'Eater of Worlds',
+         'eldritch implicits: kind implicit, source on the mod');
+  assert(el.mods[2].affix === 'Seraphim\'s' && el.mods[3].affix === 'Seraphim\'s' && el.mods[2].affixSeq === el.mods[3].affixSeq &&
+         el.mods[4].affix === 'of Bameth' && el.mods[4].affixSeq !== el.mods[2].affixSeq, 'hybrid mod: both lines share one header number');
+  const elp = G(ELDRITCH_PLAIN);
+  assert(elp.searingExarchImplicits === undefined && elp.eaterOfWorldsImplicits === 0, 'eldritch without headers: tier unknown (unset); absent Eater = 0');
+  assert(G(MIRRORED).searingExarchImplicits === 0 && G(MIRRORED).eldritch.length === 0, 'no eldritch line -> tier 0');
+
+  const fr = G(FRACTURED);
+  assert(fr.fractured === true && !fr.mods.some(m => m.line === 'Fractured Item') && fr.mods.some(m => m.fractured), 'fractured item: flag set, marker line is not a mod');
+  assert(G(MIRRORED).fractured === false && G(MIRRORED).mirrored === true && !G(MIRRORED).mods.some(m => m.line === 'Mirrored'),
+         'mirrored item: flag set, marker line is not a mod; not fractured');
+  assert(fr.mirrored === false && fr.synthesised === false && fr.vestigial === false && fr.zanaMemory === false && fr.scourged === false &&
+         fr.memoryStrands === 0 && fr.replica === false && fr.foulborn === false && fr.transfiguredGem === false,
+         'flags known false on a full copy without their markers');
+
+  const tg = G(TRANSFIG), pg = G(PLAIN_GEM);
+  assert(tg.transfiguredGem === true && pg.transfiguredGem === false && tg.gemLevel === 20 && tg.quality === 20,
+         'transfigured gem from the gem table (Kinetic Bolt of Fragmentation yes, Kinetic Bolt no)');
+  const ms = G(STRANDS);
+  assert(ms.memoryStrands === 37 && !ms.mods.some(m => /Memory Strands/.test(m.line)) && ms.mods.length === 1, 'memory strands parsed, not a mod');
+  const sy = G(SYNTH);
+  assert(sy.synthesised === true && sy.base === 'Two-Stone Ring' && !sy.mods.some(m => m.line === 'Synthesised Item'), 'synthesised: base "' + sy.base + '", flag, marker not a mod');
+  const ve = G(VESTIGIAL);
+  assert(ve.vestigial === true && ve.base === 'Simple Robe' && ve.name === 'Vestigial Simple Robe', 'vestigial: base "' + ve.base + '", name kept');
+  const fb = G(FOULBORN);
+  assert(fb.foulborn === true && fb.imbued === true && fb.replica === false && fb.mods.some(m => m.mutated && m.line === '+45 to Dexterity'),
+         'foulborn unique: flags, (mutated) suffix taken off the mod line');
+  assert(G(REPLICA).replica === true && G(REPLICA).foulborn === false, 'replica unique');
+  const uu = G(UNID_UNIQUE);
+  assert(uu.replica === undefined && uu.foulborn === undefined && uu.identified === false && uu.base === 'Leather Belt',
+         'unidentified unique: replica/foulborn unknown (unset), not false');
+  const spaced = G(['Item Class: Stackable Currency', 'Rarity: Currency', 'Chaos Orb', '--------', 'Stack Size: 1 234/5 000']);
+  assert(spaced.stackSize === 1234, 'stack size with a space as thousands separator: ' + spaced.stackSize);
+  delete window.POE_GEM_TYPES;
+  assert(G(PLAIN_GEM).transfiguredGem === undefined && G(TRANSFIG.concat(['--------', 'Transfigured'])).transfiguredGem === true,
+         'no gem table: transfigured unknown unless the copy says "Transfigured"');
+  delete global.window;
+
   console.log('\n' + (failures ? failures + ' FAILURES' : 'ALL TESTS PASSED'));
   process.exit(failures ? 1 : 0);
 }
