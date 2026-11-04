@@ -60,6 +60,9 @@ DIVCARDS_TTL = 6 * 3600
 # cheat sheets (tools/make_cheatsheets.py): the server's copy lets fixes reach the app between releases
 CHEATSHEETS_API = "https://pob-trade-finder.vercel.app/cheatsheets.json"
 CHEATSHEETS_TTL = 6 * 3600
+# mechanic strategy guides (tools/make_guides.py), drawn inside the cheat sheets: same server pattern
+GUIDES_API = "https://pob-trade-finder.vercel.app/guides.json"
+GUIDES_TTL = 6 * 3600
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
 MIN_INTERVAL = 2.5
@@ -998,6 +1001,86 @@ class Api:
             return {"ok": True, "data": data}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    @staticmethod
+    def _guides_ok(data):
+        """Mechanic guides: only a complete, well-formed copy counts (the page draws what this returns)."""
+        try:
+            guides = data.get("guides") or {}
+            return (isinstance(data.get("version"), int) and not isinstance(data.get("version"), bool)
+                    and isinstance(guides, dict) and len(guides) >= 15
+                    and all(isinstance(k, str) and isinstance(g, dict) and isinstance(g.get("title"), str)
+                            and isinstance(g.get("summary"), str) and isinstance(g.get("readMore"), list)
+                            and all(isinstance(r, dict) and str(r.get("url", "")).startswith(("https://", "http://"))
+                                    for r in g["readMore"])
+                            for k, g in guides.items())
+                    and isinstance(data.get("sheets", []), list))
+        except (AttributeError, TypeError):
+            return False
+
+    def guides_data(self):
+        """Mechanic guides: the server's copy (newest), else the last one downloaded. The page
+        compares its version with the copy shipped in data/guides.js and keeps the newer."""
+        try:
+            hit = getattr(self, "_guides_cache", None)
+            if hit and time.time() - hit[0] < GUIDES_TTL:
+                return {"ok": True, "data": hit[1]}
+            disk = os.path.join(DATA_DIR, "guides_cache.json")
+            data = None
+            try:
+                req = urllib.request.Request(GUIDES_API, headers={"User-Agent": UA, "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    data = json.loads(r.read().decode("utf-8"))
+                if not self._guides_ok(data):
+                    raise ValueError("incomplete guides")
+                try:
+                    with open(disk, "w", encoding="utf-8") as f:
+                        json.dump(data, f)
+                except OSError:
+                    pass
+            except Exception:
+                try:
+                    with open(disk, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except (OSError, ValueError):
+                    data = None
+                if not (data and self._guides_ok(data)):
+                    return {"ok": False, "error": "offline: using the guides shipped with the app"}
+            self._guides_cache = (time.time(), data)
+            return {"ok": True, "data": data}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def _guide_urls(self):
+        """Every guide's written sources (Read more): the only other pages open_url may open. From
+        the shipped data/guides.js and the server copy (memory, else the disk cache), read once."""
+        urls = getattr(self, "_guide_url_set", None)
+        if getattr(self, "_guides_cache", None) is not getattr(self, "_guide_url_src", None):
+            urls = None  # a server copy arrived since the last read: read again
+        if urls is None:
+            urls = set()
+            copies = []
+            try:
+                with open(os.path.join(DATA_DIR, "guides.js"), "r", encoding="utf-8") as f:
+                    m = re.search(r"window\.POE_GUIDES\s*=\s*(\{.*\})\s*;\s*$", f.read(), re.S)
+                copies.append(json.loads(m.group(1)) if m else None)
+            except (OSError, ValueError):
+                pass
+            hit = getattr(self, "_guides_cache", None)
+            if hit:
+                copies.append(hit[1])
+            else:
+                try:
+                    with open(os.path.join(DATA_DIR, "guides_cache.json"), "r", encoding="utf-8") as f:
+                        copies.append(json.load(f))
+                except (OSError, ValueError):
+                    pass
+            for d in copies:
+                if d and self._guides_ok(d):
+                    for g in d["guides"].values():
+                        urls.update(r["url"] for r in g["readMore"])
+            self._guide_url_set, self._guide_url_src = urls, hit
+        return urls
 
     DIVCARDS_LAST = "divcards_last.json"  # last full answer per league, shown at once after a restart
 
@@ -3286,6 +3369,10 @@ class Api:
 
     def open_url(self, url):
         if url.startswith(self.OPEN_URL_PREFIXES):
+            webbrowser.open(url)
+            return {"ok": True}
+        # a guide's Read more source: only the exact pages the guide data lists
+        if isinstance(url, str) and url.startswith(("https://", "http://")) and url in self._guide_urls():
             webbrowser.open(url)
             return {"ok": True}
         return {"ok": False, "error": "refusing to open that URL"}

@@ -284,6 +284,7 @@ STUB_JS = r"""
     pick_sheet_image: function () { return { ok: true, file: 'data/cheatsheets/e2e.png', name: 'route.png' }; },
     delete_sheet_image: function () { return { ok: true }; },
     cheatsheets_data: function () { return { ok: false, error: 'offline (e2e)' }; },
+    guides_data: function () { return { ok: false, error: 'offline (e2e)' }; },
     overlay_sheet_open: function () { return { ok: true }; },
     anoint_oils: function () {  // every oil 2c, Golden 40c; divine 200c
       var o = {};
@@ -4790,6 +4791,362 @@ def scenario_atlas(s, tag):
     check(tag + " Tools nav lists the Atlas tree", r["nav"], r["nav"])
 
 
+S49_SYND = r"""
+const H = window.__e2e;
+const out = {};
+const host = document.createElement('div');
+host.style.width = '1100px';
+document.body.appendChild(host);
+out.hook = window.__mechanicExtras && window.__mechanicExtras.syndicate === syndicatePlanner;
+syndicatePlanner(host);
+const card = n => host.querySelector('.synd-card[data-name="' + n + '"]');
+const row = (d, r) => host.querySelector('.synd-col[data-div="' + d + '"] .synd-row[data-rank="' + r + '"]');
+const moves = () => [...host.querySelectorAll('.synd-move-text')].map(e => e.textContent);
+const st = () => JSON.parse(localStorage.getItem('pobtf-syndicate') || 'null');
+const ed = () => host.querySelector('.synd-editor');
+out.cols = [...host.querySelectorAll('.synd-col')].map(c => c.dataset.div);
+out.unassigned = host.querySelectorAll('.synd-pool[data-pool="none"] .synd-card').length;
+out.setup = moves().some(t => t.startsWith('Copy your board first'));
+// goal
+const gs = host.querySelector('.synd-goal-select');
+gs.value = 'general'; gs.dispatchEvent(new Event('change'));
+out.goalText = H.text('.synd-goal', host);
+// click a member, then a division row
+const put = (n, d, r) => { card(n).click(); row(d, r).click(); };
+put('It That Fled', 'transportation', '3');
+put('Vorici', 'transportation', '3');
+put('Haku', 'intervention', '3');
+// the editor path: pick Leo, a division, a rank
+card('Leo').click();
+out.editorOpen = !ed().hidden && H.text('.synd-ed-name', ed());
+ed().querySelector('.synd-ed-place[data-div="intervention"]').click();
+ed().querySelector('.segmented button[data-value="2"]').click();
+// drag and drop: Guff into Intervention rank 1
+const dt = new DataTransfer();
+card('Guff').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+row('intervention', '1').dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+row('intervention', '1').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+put('Korell', 'fortification', '1');
+const s1 = st().m;
+out.placed = ['It That Fled', 'Vorici', 'Haku', 'Leo', 'Guff', 'Korell'].map(n => [n, s1[n].d, s1[n].r]);
+out.cards = [!!row('intervention', '3').querySelector('.synd-card[data-name="Haku"]'),
+  H.text('.synd-card[data-name="Haku"] .synd-card-reward', host), H.text('.synd-card[data-name="Leo"] .synd-hint', host),
+  !!row('intervention', '1').querySelector('.synd-card.is-out[data-name="Guff"]')];
+out.moves1 = moves();
+// intel: a filler house close to full
+const rng = host.querySelector('.synd-col[data-div="research"] .synd-intel input');
+rng.value = 90; rng.dispatchEvent(new Event('input')); rng.dispatchEvent(new Event('change'));
+out.moves2 = moves();
+out.intelSaved = st().intel.research;
+// leader + rivals through the editor
+card('Haku').click();
+ed().querySelector('.synd-ed-ctl input[type=checkbox]').click();
+out.leaderMoves = moves().filter(t => /leader/.test(t));
+out.leaderRow = !!row('intervention', 'L').querySelector('.synd-card[data-name="Haku"]');
+ed().querySelector('.synd-ed-ctl input[type=checkbox]').click();
+[...ed().querySelectorAll('.synd-rival')].find(b => b.textContent === 'Korell').click();
+out.rivals = [st().m.Haku.riv, st().m.Korell.riv];
+out.betray = moves().filter(t => t.startsWith('Betray'));
+// away
+card('Gravicius').click();
+H.button(ed(), 'Away / dead').click();
+out.away = [st().m.Gravicius.d, !!host.querySelector('.synd-pool[data-pool="away"] .synd-card[data-name="Gravicius"]')];
+host.querySelector('.synd-ed-head button').click();
+out.editorClosed = ed().hidden;
+// copy as text
+window.__clip = null;
+H.button(host, 'Copy board as text').click();
+await H.waitFor(() => window.__clip, 3000, 'board text on the clipboard');
+out.clip = window.__clip;
+out.persisted = H.calls('storage_set').some(c => c.args[0] === 'pobtf-syndicate');
+out.stored = H.calls('storage_set').filter(c => c.args[0] === 'pobtf-syndicate').slice(-1)[0].args[1];
+return out;
+"""
+
+S49_RELOAD = r"""
+const H = window.__e2e;
+const out = {};
+await H.waitFor(() => localStorage.getItem('pobtf-syndicate'), 5000, 'the board from bridge storage');
+const host = document.createElement('div');
+document.body.appendChild(host);
+window.__mechanicExtras.syndicate(host);
+const st = () => JSON.parse(localStorage.getItem('pobtf-syndicate'));
+const row = (d, r) => host.querySelector('.synd-col[data-div="' + d + '"] .synd-row[data-rank="' + r + '"]');
+const dlg = () => document.querySelector('dialog.ui-dialog[open]');
+out.goal = host.querySelector('.synd-goal-select').value;
+out.haku = !!row('intervention', '3').querySelector('.synd-card[data-name="Haku"]');
+out.intel = host.querySelector('.synd-col[data-div="research"] .synd-intel input').value;
+out.away = !!host.querySelector('.synd-pool[data-pool="away"] .synd-card[data-name="Gravicius"]');
+out.run = [...host.querySelectorAll('.synd-move-text')].map(e => e.textContent).filter(t => t.startsWith('Run the'));
+// reset asks first: Cancel keeps the board
+H.button(host, 'Reset board').click();
+await H.waitFor(dlg, 2000, 'reset confirm');
+out.confirm = H.text('.ui-dialog-title', dlg());
+H.button(dlg(), 'Cancel').click();
+await H.sleep(30);
+out.afterCancel = st().m.Haku.d;
+H.button(host, 'Reset board').click();
+await H.waitFor(dlg, 2000, 'reset confirm again');
+H.button(dlg(), 'Reset').click();
+await H.sleep(30);
+const s = st();
+out.afterReset = [Object.values(s.m).every(x => x.d === null && x.r === 0 && !x.l && !x.riv.length), s.goal, s.intel.research,
+  host.querySelectorAll('.synd-pool[data-pool="none"] .synd-card').length];
+out.resetSaved = JSON.parse(H.calls('storage_set').filter(c => c.args[0] === 'pobtf-syndicate').slice(-1)[0].args[1]).m.Haku.d;
+return out;
+"""
+
+
+def scenario_syndicate(s, tag):
+    s.fresh()
+    r = s.run(S49_SYND, timeout=60)
+    check(tag + " hook: __mechanicExtras.syndicate is the planner", r["hook"], r["hook"])
+    check(tag + " board: 4 division columns, all 17 members unassigned, setup hint",
+          r["cols"] == ["transportation", "fortification", "research", "intervention"] and r["unassigned"] == 17 and r["setup"],
+          (r["cols"], r["unassigned"], r["setup"]))
+    check(tag + " goal picker shows the 2-2-5-5 targets and rules", "Haku → Intervention" in (r["goalText"] or "") and
+          "Never raid the filler houses." in r["goalText"], r["goalText"])
+    check(tag + " placed by click, editor and drag and drop", r["editorOpen"] == "Leo" and r["placed"] == [
+        ["It That Fled", "transportation", 3], ["Vorici", "transportation", 3], ["Haku", "intervention", 3],
+        ["Leo", "intervention", 2], ["Guff", "intervention", 1], ["Korell", "fortification", 1]], r["placed"])
+    check(tag + " cards: reward where they sit, value hint, unwanted marker", r["cards"] == [True, "Ambush scarabs", "~456c", True],
+          r["cards"])
+    m1 = r["moves1"]
+    check(tag + " target at rank 3 -> run its safehouse",
+          "Run the Transportation safehouse: It That Fled rank 3 and Vorici rank 3" in m1, m1)
+    check(tag + " filler member in a target house -> interrogate it out, execute it in a filler house",
+          "Interrogate Guff out of Intervention (-1 rank), then execute Guff in a Research encounter" in m1, m1)
+    check(tag + " target below rank 3 -> execute (Test of Loyalty)",
+          "Execute Leo in an Intervention encounter (needs a witness) → rank 3" in m1, m1)
+    check(tag + " rank-3 targets: don't interrogate; filler houses: don't raid; unassigned fillers",
+          "Don't interrogate It That Fled, Vorici and Haku before their safehouses" in m1 and
+          "Don't raid Fortification: filler house" in m1 and "Hold the Intervention safehouse: Haku rank 3 and Leo rank 2 (wants rank 3)" in m1
+          and any(t.startswith("Execute Aisling, Cameria") and t.endswith(": filler") for t in m1), m1)
+    check(tag + " filler house close to full -> warning (intel saved)",
+          "Research is close to full (90%)" in r["moves2"] and "Don't raid Research: filler house (90% full)" in r["moves2"] and
+          r["intelSaved"] == 90, r["moves2"])
+    check(tag + " target stuck as leader -> warning, shown in the Leader row",
+          "Haku is stuck as the Intervention leader" in r["leaderMoves"] and
+          "Hold the Intervention safehouse: Haku leader and Leo rank 2 (wants rank 3)" in r["leaderMoves"] and r["leaderRow"],
+          r["leaderMoves"])
+    check(tag + " rivals both ways; Betray suggested for targets without one",
+          r["rivals"] == [["Korell"], ["Haku"]] and not any("Haku and" in t for t in r["betray"]) and
+          any(t.startswith("Betray to make Leo and ") for t in r["betray"]), (r["rivals"], r["betray"]))
+    check(tag + " away pool, editor closes", r["away"] == ["away", True] and r["editorClosed"], (r["away"], r["editorClosed"]))
+    clip = r["clip"] or ""
+    check(tag + " copy board as text", "Syndicate board (goal: General currency (2-2-5-5))" in clip and
+          "Intervention: Haku R3, Leo R2, Guff R1" in clip and "Away / dead: Gravicius" in clip and "Next moves:" in clip, clip)
+    check(tag + " saved through the bridge (pobtf-syndicate)", r["persisted"], r["persisted"])
+    s.fresh("?e2eStore=" + urllib.parse.quote(json.dumps({"pobtf-syndicate": r["stored"]})))
+    r = s.run(S49_RELOAD, timeout=60)
+    check(tag + " reload: board, goal, intel and away come back from storage",
+          r["goal"] == "general" and r["haku"] and r["intel"] == "90" and r["away"], r)
+    check(tag + " reload: same moves (run the full target house)",
+          "Run the Transportation safehouse: It That Fled rank 3 and Vorici rank 3" in r["run"], r["run"])
+    check(tag + " reset asks first; Cancel keeps the board", r["confirm"] == "Reset the Syndicate board?" and
+          r["afterCancel"] == "intervention", (r["confirm"], r["afterCancel"]))
+    check(tag + " reset: everyone unassigned, goal kept, saved", r["afterReset"] == [True, "general", 0, 17] and
+          r["resetSaved"] is None, (r["afterReset"], r["resetSaved"]))
+
+
+# ---- 48 guides: mechanic strategy guides inside the cheat sheets (js/app/33-guides.js) ----
+S48_APP = r"""
+const H = window.__e2e;
+const out = {};
+const G = window.POE_GUIDES.guides;
+document.getElementById('open-sheets').click();
+await H.sleep(80);
+const pick = (title) => { [...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => b.textContent === title).click(); };
+const panel = () => document.querySelector('#view-sheets .sheet-panel.is-mech');
+out.listed = [...document.querySelectorAll('#view-sheets .sheet-pick')].map(b => b.textContent);
+// Betrayal (sheet id syndicate)
+pick(mechanicById('syndicate').title);
+await H.sleep(60);
+const g = panel().querySelector('.guide');
+out.has = !!g;
+out.asof = H.text('.guide-asof', g);
+out.summary = H.text('.guide-summary', g);
+out.secs = [...g.querySelectorAll('.guide-sec:not([data-key="extra"]) .guide-sec-title')].map(e => e.textContent);
+out.openSecs = [...g.querySelectorAll('.guide-sec:not([data-key="extra"])')].filter(d => d.open).map(d => d.dataset.key);
+// a mechanic's own tool (the Syndicate planner, 34-syndicate.js) mounts in the app guide, first and open
+const ex = g.querySelector('.guide-sec[data-key="extra"]');
+out.extra = typeof (window.__mechanicExtras || {}).syndicate !== 'function' ||
+  (!!ex && ex.open && g.querySelector('.guide-sec') === ex && ex.querySelector('.guide-extra').childNodes.length > 0);
+out.strats = [...g.querySelectorAll('.guide-strat-name')].map(e => e.textContent);
+out.wantStrats = G.syndicate.strategies.map(s => s.name);
+out.inv = g.querySelectorAll('.guide-strat-inv').length;
+out.refTitle = H.text('.guide-ref-title', g);
+out.refRows = g.querySelectorAll('.guide-ref .sheet-table tbody tr').length;
+out.filterInRef = !!g.querySelector('.guide-ref-head .sheet-filter');
+out.icons = [...g.querySelectorAll('img.guide-icon')].map(i => i.getAttribute('src'));
+out.profitNote = H.text('.guide-sec[data-key="profit"] .guide-note', g);
+out.patchTags = [...g.querySelectorAll('.guide-patch-tag')].map(e => e.textContent).slice(0, 3);
+// stage filter: League start hides lines tagged only for later stages
+const howItems = () => [...g.querySelectorAll('.guide-sec[data-key="howTo"] .guide-item')];
+out.allShown = howItems().filter(li => !li.hidden).length;
+out.howTotal = G.syndicate.howTo.length;
+[...g.querySelectorAll('.guide-stage-seg .seg')].find(b => b.textContent === 'League start').click();
+await H.sleep(30);
+const vis = howItems().filter(li => !li.hidden);
+out.lsShown = vis.length;
+out.lsWant = G.syndicate.howTo.filter(l => l.stage.includes('all') || l.stage.includes('league-start')).length;
+out.lsOk = [...g.querySelectorAll('[data-stages]')].every(el => el.hidden !== (el.dataset.stages.split(' ').some(t => t === 'all' || t === 'league-start')));
+out.lsStrats = [...g.querySelectorAll('.guide-strat')].filter(c => !c.hidden).map(c => c.querySelector('.guide-strat-name').textContent);
+out.lsStratsWant = G.syndicate.strategies.filter(s => s.stage.includes('all') || s.stage.includes('league-start')).map(s => s.name);
+out.lsCount = H.text('.guide-sec[data-key="howTo"] .guide-sec-count', g);
+out.hiddenNote = H.text('.guide-hidden-count', g);
+out.saved = localStorage.getItem('pobtf-guide-stage');
+[...g.querySelectorAll('.guide-stage-seg .seg')].find(b => b.textContent === 'All').click();
+await H.sleep(30);
+out.backAll = howItems().filter(li => !li.hidden).length;
+// a cite marker opens Read more at that source
+const cite = g.querySelector('.guide-sec[data-key="howTo"] .guide-cite');
+out.citeText = cite.textContent;
+cite.click();
+await H.sleep(50);
+out.readOpen = g.querySelector('.guide-sec[data-key="readMore"]').open;
+const flash = g.querySelector('.guide-src.is-flash');
+out.flashN = flash ? H.text('.guide-src-n', flash) : null;
+// Read more opens the page in the browser (bridge open_url)
+const n0 = H.calls('open_url').length;
+flash.querySelector('.guide-link').click();
+await H.sleep(30);
+out.opened = (H.calls('open_url')[n0] || { args: [] }).args[0];
+out.wantUrl = G.syndicate.readMore[parseInt(out.citeText.slice(1), 10) - 1].url;
+out.sources = g.querySelectorAll('.guide-src').length;
+out.wantSources = G.syndicate.readMore.length;
+out.tableCount = H.text('.guide-sec[data-key="tables"] .guide-sec-count', g);
+// Blight: guide + the anoint helper and tables under Reference data
+pick(mechanicById('blight').title);
+await H.sleep(60);
+out.blight = !!panel().querySelector('.guide') && !!panel().querySelector('.guide-ref .anoint') &&
+  H.text('.guide-summary', panel()) === G.blight.summary;
+// Mercenaries: a guide-only sheet, no reference data
+pick('Mercenaries of Trarthus');
+await H.sleep(60);
+out.merc = !!panel().querySelector('.guide') && !panel().querySelector('.guide-ref') &&
+  panel().querySelectorAll('.guide-strat').length === G.mercenaries.strategies.length;
+// a sheet without a guide works as before
+pick(mechanicById('scarabs').title);
+await H.sleep(60);
+out.noGuide = !panel().querySelector('.guide') && panel().querySelectorAll('.sheet-table tbody tr').length > 20 &&
+  !!document.querySelector('#view-sheets .sheet-filter');
+out.noGuideFoot = H.text('.sheet-foot', panel());
+return out;
+"""
+
+S48_OVERLAY = r"""
+const H = window.__e2e;
+const out = {};
+const G = window.POE_GUIDES.guides;
+window.__sheetOpen('syndicate');
+await H.sleep(60);
+const p = document.querySelector('.sheet-panel');
+out.title = H.text('.sheet-title');
+out.quick = [...p.querySelectorAll('.guide-quick .sheet-li .guide-quick-text')].map(e => e.textContent);
+out.wantQuick = G.syndicate.quickCard.map(l => l.replace(/^\[[^\]]+\]\s*/, ''));
+out.quickTags = p.querySelectorAll('.guide-quick .guide-stage').length;
+out.strats = [...p.querySelectorAll('.guide-ov-strats .guide-quick-text')].map(e => e.textContent);
+out.wantStrats = G.syndicate.strategies.map(s => s.name);
+out.more = H.text('.guide-ov-more', p);
+out.long = p.querySelectorAll('.guide-sec, .guide-asof, .guide-summary, .guide-strat, .guide-src, .guide-cite').length;
+out.sections = [...p.querySelectorAll('.guide-ov > .sheet-sec > .sheet-sec-title')].map(e => e.textContent);
+out.inputs = p.querySelectorAll('input, select, textarea').length;
+out.refRows = p.querySelectorAll('.guide-ov-ref .sheet-table tbody tr').length;
+window.__sheetOpen('mercenaries');
+await H.sleep(60);
+out.mercTitle = H.text('.sheet-title');
+out.mercQuick = document.querySelectorAll('.sheet-panel .guide-quick .sheet-li').length;
+window.__sheetOpen('pantheon');
+await H.sleep(60);
+out.pantheon = !document.querySelector('.sheet-panel .guide-ov') &&
+  document.querySelectorAll('.sheet-panel .sheet-table tbody tr, .sheet-panel .sheet-li').length > 0;
+return out;
+"""
+
+S48_SYNC = r"""
+const H = window.__e2e;
+const out = {};
+const D = JSON.parse(JSON.stringify(window.POE_GUIDES));
+out.shipped = D.version;
+if (NEWER) {
+  D.version = D.version + 1;
+  D.guides.syndicate.summary = 'E2E summary from the server';
+  D.guides.e2eguide = JSON.parse(JSON.stringify(D.guides.mercenaries));
+  D.guides.e2eguide.title = 'E2E guide';
+  D.sheets = D.sheets.concat([{ id: 'e2eguide', title: 'E2E guide sheet', group: 'League mechanics' }]);
+} else {
+  D.version = D.version - 1;
+  D.guides.syndicate.summary = 'E2E older copy';
+}
+window.__stubOverrides.guides_data = { ok: true, data: D };
+document.getElementById('open-sheets').click();
+await H.sleep(100);
+out.version = window.POE_GUIDES.version;
+[...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => b.textContent === mechanicById('syndicate').title).click();
+await H.sleep(60);
+out.summary = H.text('#view-sheets .guide-summary');
+out.newSheet = [...document.querySelectorAll('#view-sheets .sheet-pick')].some(b => b.textContent === 'E2E guide sheet');
+out.calls = H.calls('guides_data').length;
+delete window.__stubOverrides.guides_data;
+return out;
+"""
+
+
+def scenario_guides(s, tag):
+    s.fresh()
+    r = s.run(S48_APP, timeout=60)
+    check(tag + " Mercenaries listed as a sheet", "Mercenaries of Trarthus" in r["listed"], r["listed"])
+    check(tag + " Betrayal guide renders with the 3.29 disclaimer", r["has"] and
+          "Information as of 3.29 — checked " in (r["asof"] or "") and "may change with 3.30" in r["asof"], r["asof"])
+    check(tag + " summary, sections in order, How to + Strategies open", r["summary"] and r["secs"] ==
+          ["How to run it", "Strategies", "Dangers", "What to sell", "Profit", "Changes by patch", "Tables", "Read more"]
+          and r["openSecs"] == ["howTo", "strategies"], (r["secs"], r["openSecs"]))
+    check(tag + " the mechanic's own tool (__mechanicExtras) mounts first, open, app only", r["extra"], r["extra"])
+    check(tag + " strategy cards with investment", r["strats"] == r["wantStrats"] and r["inv"] == len(r["wantStrats"]), r["strats"])
+    check(tag + " profit labelled rough community estimates", "Rough community estimates" in (r["profitNote"] or ""), r["profitNote"])
+    check(tag + " changes grouped by patch, newest first", r["patchTags"] and r["patchTags"][0].startswith("3.29"), r["patchTags"])
+    check(tag + " wiki tables stay under Reference data, filter on its heading", r["refTitle"] == "Reference data" and
+          r["refRows"] > 10 and r["filterInRef"], (r["refTitle"], r["refRows"], r["filterInRef"]))
+    check(tag + " scarab names get GGG icons (CDN url, via the art cache)", r["icons"] and
+          all(u.startswith("https://web.poecdn.com/gen/image/") for u in r["icons"]), r["icons"][:2])
+    check(tag + " stage filter hides lines not tagged for League start", r["allShown"] == r["howTotal"] and
+          r["lsShown"] == r["lsWant"] < r["howTotal"] and r["lsOk"], (r["allShown"], r["lsShown"], r["lsWant"]))
+    check(tag + " stage filter: strategies, counts, note, remembered", r["lsStrats"] == r["lsStratsWant"] and
+          0 < len(r["lsStrats"]) < len(r["wantStrats"]) and r["lsCount"] == "%d of %d" % (r["lsWant"], r["howTotal"]) and "hidden" in (r["hiddenNote"] or "")
+          and r["saved"] == "league-start", (r["lsStrats"], r["lsCount"], r["hiddenNote"], r["saved"]))
+    check(tag + " All shows every line again", r["backAll"] == r["howTotal"], r["backAll"])
+    check(tag + " [n] cite jumps to that source under Read more", r["readOpen"] and r["flashN"] == r["citeText"],
+          (r["citeText"], r["flashN"]))
+    check(tag + " Read more opens the source via open_url", r["opened"] == r["wantUrl"] and r["sources"] == r["wantSources"],
+          (r["opened"], r["wantUrl"]))
+    check(tag + " section counts for tables stay", r["tableCount"] and r["tableCount"] != "0", r["tableCount"])
+    check(tag + " Blight guide with the anoint helper under Reference data", r["blight"], r)
+    check(tag + " Mercenaries: guide-only sheet, no reference data", r["merc"], r)
+    check(tag + " a sheet without a guide still works (tables, filter, credit)", r["noGuide"] and
+          "CC BY-NC-SA" in (r["noGuideFoot"] or ""), r["noGuideFoot"])
+    s.fresh("?sheet=1")
+    r = s.run(S48_OVERLAY, timeout=60)
+    check(tag + " overlay: quick card lines (stage brackets as tags)", r["quick"] == r["wantQuick"] and r["quickTags"] > 0,
+          r["quick"])
+    check(tag + " overlay: strategy names + More in the app", r["strats"] == r["wantStrats"] and
+          (r["more"] or "").startswith("More in the app"), (r["strats"], r["more"]))
+    check(tag + " overlay: only quick card + strategies, no long sections, no inputs", r["long"] == 0 and
+          r["sections"] == ["Quick card", "Strategies"] and r["inputs"] == 0, (r["long"], r["sections"], r["inputs"]))
+    check(tag + " overlay: reference tables still below", r["refRows"] > 10, r["refRows"])
+    check(tag + " overlay: Mercenaries sheet opens", r["mercTitle"] == "Mercenaries of Trarthus" and r["mercQuick"] > 0, r)
+    check(tag + " overlay: a sheet without a guide is unchanged", r["pantheon"], r)
+    s.fresh()
+    r = s.run(S48_SYNC, timeout=60, NEWER=False)
+    check(tag + " an older server copy keeps the shipped guides", r["version"] == r["shipped"] and
+          r["summary"] != "E2E older copy" and r["calls"] == 1, r)
+    s.fresh()
+    r = s.run(S48_SYNC, timeout=60, NEWER=True)
+    check(tag + " a newer server copy replaces the shipped one", r["version"] == r["shipped"] + 1 and
+          r["summary"] == "E2E summary from the server", r)
+    check(tag + " a new guide-only sheet from the server is listed", r["newSheet"], r)
+
+
 SCENARIOS = [
     ("1 landing", scenario_landing),
     ("2 decode", scenario_decode),
@@ -4838,6 +5195,8 @@ SCENARIOS = [
     ("45 patchnotes", scenario_patch_notes),
     ("46 regex", scenario_regex),
     ("47 filtereditor", scenario_filter_editor),
+    ("48 guides", scenario_guides),
+    ("49 syndicate", scenario_syndicate),
 ]
 
 

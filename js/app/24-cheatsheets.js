@@ -113,6 +113,7 @@ async function sheetSync(onNew) {
     var mine = sheetData();
     if (r && r.ok && r.data && r.data.version > ((mine && mine.version) || 0)) {
       window.POE_CHEATSHEETS = r.data;
+      if (typeof guidesPatchSheets === 'function') guidesPatchSheets(); // guide-only sheets (33-guides.js)
       if (onNew) onNew();
     }
   } catch (e) { /* keep the shipped copy */ }
@@ -132,6 +133,8 @@ function sheetMatch(ev) {
 // a mechanic sheet: tables and lists straight from the data
 function mechanicContent(m, opts) {
   opts = opts || {};
+  // a sheet with a strategy guide (33-guides.js): the guide, which shows these tables under it (opts.plain)
+  if (!opts.plain && typeof guideFor === 'function' && guideFor(m.id)) return guideContent(m, opts);
   var box = UI.el('div', 'sheet-content');
   // Blight: the anoint helper (27-anoints.js) replaces the long anoint tables with search, oils
   // and prices
@@ -536,6 +539,7 @@ function sheetReady(hydrate) { // markGui() in the sheet / hint overlay windows 
   sheetHydrate = hydrate;
   Promise.resolve(hydrate()).then(sheetStatusLoop, sheetStatusLoop);
   sheetSync(sheetRender);
+  if (typeof guideSync === 'function') guideSync(sheetRender);
 }
 function sheetStatusLoop() {
   refreshSheetStatus();
@@ -574,6 +578,7 @@ function renderSheetsView() {
     'in game with its hotkey; entering a mechanic\'s area offers its sheet in a small pop-up.'));
   if (isGui()) page.appendChild(renderSheetGameControls(p));
   sheetSync(renderSheetsView); // newer sheets from the server, if there are any
+  if (typeof guideSync === 'function') guideSync(renderSheetsView); // and newer guides (33-guides.js)
 
   // mechanics: pick one to preview it
   var mechs = sheetMechanics();
@@ -606,11 +611,15 @@ function renderSheetsView() {
     var mcard = UI.el('div', 'sheet-panel is-preview is-mech');
     mcard.appendChild(mechanicContent(vm));
     // long sheets (e.g. every amulet anoint): a filter box narrows the rows (app only, not in game)
-    var nrows = mcard.querySelectorAll('.sheet-table tbody tr, .sheet-list .sheet-li').length;
+    // (a sheet with a guide: the filter sits on its "Reference data" heading and narrows only those tables)
+    var refBox = mcard.querySelector('.guide-ref') || mcard;
+    var nrows = refBox.querySelectorAll('.sheet-table tbody tr, .sheet-list .sheet-li').length;
     if (nrows > 25) {
       var filt = UI.input({ type: 'search', placeholder: 'Filter ' + nrows + ' rows…', ariaLabel: 'Filter this sheet', cls: 'sheet-filter' });
-      filt.addEventListener('input', function () { sheetFilterRows(mcard, filt.value); });
-      mprev.appendChild(filt);
+      filt.addEventListener('input', function () { sheetFilterRows(refBox, filt.value); });
+      var refHead = refBox.querySelector('.guide-ref-head');
+      if (refHead) refHead.appendChild(filt);
+      else mprev.appendChild(filt);
     }
     mprev.appendChild(mcard);
     page.appendChild(mprev);
