@@ -66,7 +66,9 @@ function mechCited(cite) {
 // mech_prices (gui.py): icons and chaos prices for whole groups from GGG's hourly exchange
 // feed — no trade-site calls. One load per league and hour covers every tool; a tool asks for
 // the groups it needs and gets called back once they are in (straight away when cached).
-var MECH_PRICES = { league: null, hour: null, at: 0, groups: {}, items: {}, byName: {}, divine: null, loading: {} };
+// gen: bumped on every reset (league change, 20-min refresh); an answer from an older generation is
+// dropped, so another league's (or an old) reply never fills or marks the current one
+var MECH_PRICES = { league: null, hour: null, at: 0, gen: 0, groups: {}, items: {}, byName: {}, divine: null, loading: {} };
 var MECH_PRICE_TTL = 20 * 60 * 1000; // re-ask after 20 min: the feed is hourly
 
 function mechLeague() { return (document.getElementById('league') || {}).value || 'Standard'; }
@@ -74,7 +76,8 @@ function mechLeague() { return (document.getElementById('league') || {}).value |
 function mechPrices(groups, cb) {
   var P = MECH_PRICES, league = mechLeague();
   if (P.league !== league || Date.now() - P.at > MECH_PRICE_TTL) {
-    P.league = league; P.groups = {}; P.items = {}; P.byName = {}; P.divine = null; P.at = Date.now();
+    P.league = league; P.groups = {}; P.items = {}; P.byName = {}; P.divine = null; P.hour = null;
+    P.loading = {}; P.at = Date.now(); P.gen++;
   }
   var need = groups.filter(function (g) { return !P.groups[g] && !P.loading[g]; });
   var api = isGui() && window.pywebview.api.mech_prices;
@@ -84,21 +87,26 @@ function mechPrices(groups, cb) {
     else if (cb) mechPriceWaiters.push({ groups: groups, cb: cb });
     return P;
   }
-  need.forEach(function (g) { P.loading[g] = 1; });
+  var gen = P.gen;
+  need.forEach(function (g) { P.loading[g] = gen; });
   if (cb) mechPriceWaiters.push({ groups: groups, cb: cb });
-  window.pywebview.api.mech_prices(league, JSON.stringify(need)).then(function (r) {
-    if (r && r.ok && P.league === league) {
-      Object.keys(r.items || {}).forEach(function (code) {
-        var it = r.items[code];
-        it.code = code;
-        P.items[code] = it;
-        P.byName[it.name] = it;
-      });
-      if (r.divine) P.divine = r.divine;
-      P.hour = r.hour || P.hour;
-    }
-  }).catch(function () { /* no prices: the tools still show names and icons they have */ })
-    .then(function () {
+  window.pywebview.api.mech_prices(league, JSON.stringify(need)).then(function (r) { return r; }, function () { return null; })
+    .then(function (r) {
+      if (P.gen !== gen) {
+        // a reset happened meanwhile: drop this answer, and ask again for anyone still waiting
+        mechPriceWaiters.slice().forEach(function (w) { mechPrices(w.groups); });
+        return;
+      }
+      if (r && r.ok) {
+        Object.keys(r.items || {}).forEach(function (code) {
+          var it = r.items[code];
+          it.code = code;
+          P.items[code] = it;
+          P.byName[it.name] = it;
+        });
+        if (r.divine) P.divine = r.divine;
+        if (r.hour) P.hour = r.hour;
+      }
       need.forEach(function (g) { delete P.loading[g]; P.groups[g] = 1; });
       var left = [];
       mechPriceWaiters.forEach(function (w) {
@@ -147,7 +155,8 @@ function mechIcon(name, opts) {
     img.alt = '';
     img.loading = 'lazy';
     img.className = 'mech-item-img';
-    img.addEventListener('error', function () { img.remove(); el.classList.remove('has-img'); });
+    // no icon after all (offline, CDN blocked): the name shows instead, never a blank tile
+    img.addEventListener('error', function () { img.remove(); el.classList.remove('has-img', 'icon-only'); });
     el.classList.add('has-img');
     el.appendChild(img);
   }

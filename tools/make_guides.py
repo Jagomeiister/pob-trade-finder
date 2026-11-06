@@ -488,6 +488,50 @@ TAG_ALIASES = {
     "elemental": ["fire", "cold", "lightning"], "cast-on-crit": ["crit"], "slow-dot": ["dot"],
 }
 TOOL_WARNINGS = []
+TOOL_STATS = {}
+# the research's stage words for strategies -> the guides' stages; "pre-3.29-data" marks advice from
+# before this patch (the strategy is flagged outdated, its name says so)
+STAGE_ALIASES = {"endgame": "late", "late-league": "late"}
+STAGE_NOTES = {"low-investment", "high-investment"}  # investment levels, not stages: dropped quietly
+
+
+def tools_corrections(tools_path):
+    """tools/guides/mechtools-corrections-<patch>.json next to the tools research: [corrections]."""
+    p = re.sub(r"mechtools-([^\\/]+)\.json$", r"mechtools-corrections-\1.json", tools_path)
+    if p == tools_path or not os.path.exists(p):
+        return [], None
+    with open(p, encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("corrections") or [], p
+
+
+def apply_tool_corrections(research, corrections):
+    """Apply add / replace / delete fixes to the tools research (in memory). A replace or delete whose
+    match doesn't hit exactly one entry stops the build (a stale correction)."""
+    topics = {t.get("id"): t for t in research.get("tools") or []}
+    for c in corrections:
+        where = "tools correction %s" % c.get("id")
+        need(c.get("action") in ("add", "replace", "delete") and is_text(c.get("reason")), "%s: action and reason" % where)
+        need(all(SOURCE_RE.match(u) for u in c.get("sources") or []) and (c["action"] == "delete" or c.get("sources")),
+             "%s: https sources" % where)
+        t = topics.get(c.get("topic"))
+        need(t and isinstance(t.get("data"), dict) and c.get("key") in TOOL_TOPICS.get(c["topic"], {}), "%s: topic/key" % where)
+        items = t["data"].setdefault(c["key"], [])
+        label_key = TOOL_TOPICS[c["topic"]][c["key"]]
+        if c["action"] == "add":
+            v = c.get("value")
+            need(isinstance(v, dict) and is_text(v.get(label_key)), "%s: value" % where)
+            need(not any((e or {}).get(label_key) == v[label_key] for e in items), "%s: already there (stale)" % where)
+            items.append(copy.deepcopy(v))
+            continue
+        hits = [i for i, e in enumerate(items) if c.get("match") and c["match"] in str((e or {}).get(label_key) or "")]
+        need(len(hits) == 1, "%s: match hits %d entries (stale?)" % (where, len(hits)))
+        if c["action"] == "delete":
+            items.pop(hits[0])
+        else:
+            e = items[hits[0]]
+            e[label_key] = e[label_key].replace(c["match"], c["value"])
+    return research
 
 
 def tools_input(guides_path):
@@ -502,7 +546,19 @@ def tool_entry(topic, key, e, where):
     need(isinstance(e, dict), "%s: not an object" % where)
     if topic == "strategies":
         need(is_text(e.get("name")), "%s: no name" % where)
-        e["stage"] = [s for s in e.get("stage") or [] if s in STAGES] or ["all"]
+        raw = [str(s).strip().lower() for s in e.get("stage") or []]
+        if "pre-3.29-data" in raw:
+            e["outdated"] = True
+            if not re.search(r"pre-3\.29|old guide", e["name"], re.I):
+                e["name"] += " (pre-3.29 data)"
+        stages = []
+        for s in raw:
+            s = STAGE_ALIASES.get(s, s)
+            if s in STAGES and s not in stages:
+                stages.append(s)
+            elif s not in STAGES and s not in STAGE_NOTES and s != "pre-3.29-data":
+                TOOL_WARNINGS.append("%s: unknown stage %r left out" % (where, s))
+        e["stage"] = stages or ["all"]
         e["scarabs"] = [{"name": s["name"].strip(), "count": max(1, int(s.get("count") or 1))}
                         for s in e.get("scarabs") or [] if isinstance(s, dict) and is_text(s.get("name"))]
         url = str(e.get("atlasTreeUrl") or "").strip()
@@ -545,8 +601,11 @@ def build_tools(path):
     """The tools' payload from the research file at path: {asOf, sources, <topic>: {...}, strategies}."""
     with open(path, encoding="utf-8") as f:
         research = json.load(f)
+    corrections, cpath = tools_corrections(path)
+    apply_tool_corrections(research, corrections)
     sources, index = [], {}
     out = {"asOf": str(research.get("asOf") or "").strip()}
+    TOOL_STATS["corrections"] = (len(corrections), os.path.basename(cpath) if cpath else None)
     for t in research.get("tools") or []:
         topic = t.get("id")
         if topic not in TOOL_TOPICS or not isinstance(t.get("data"), dict):
@@ -639,6 +698,7 @@ def main(argv):
             "icons": find_icons(guides, icon_names())}
     tpath = tools_input(path)
     if tpath:
+        n0 = len(DROPPED)
         try:
             data["tools"] = build_tools(tpath)
             need(data["tools"]["asOf"] == data["asOf"], "tools research is for %s, guides for %s"
@@ -646,8 +706,16 @@ def main(argv):
         except Bad as e:
             print("  tools: %s: not writing" % e)
             return 1
+        for d in DROPPED[n0:]:
+            print("  warning: " + d)
+        if len(DROPPED) > MAX_DROPPED:  # the guides' and the tools' slips together
+            print("%d out-of-range cites (more than %d): a research file looks broken: not writing" % (len(DROPPED), MAX_DROPPED))
+            return 1
         for w in TOOL_WARNINGS:
             print("  warning: " + w)
+        nc, cname = TOOL_STATS.get("corrections") or (0, None)
+        if cname:
+            print("  %d tools corrections from %s" % (nc, cname))
         t = data["tools"]
         print("  tools from %s: %d sources; %s" % (os.path.basename(tpath), len(t["sources"]), ", ".join(
             "%s %d" % (k, sum(len(v) for v in t[k].values()) if isinstance(t[k], dict) else len(t[k]))

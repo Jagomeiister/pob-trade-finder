@@ -556,10 +556,16 @@ function sheetStatusLoop() {
   refreshSheetStatus();
   setInterval(refreshSheetStatus, 10000);
 }
-async function refreshSheetStatus() { // hotkey labels for the tooltips
+// hotkey labels for the tooltips. Redraw only when they changed: a redraw rebuilds the sheet, which
+// would reset the scroll position and the tools' view (a filter, a sort, "Show all") every 10 s
+var sheetStatusSeen = null;
+async function refreshSheetStatus() {
   if (isGui() && window.pywebview.api.overlay_status) {
     try { var st = await window.pywebview.api.overlay_status(); if (st && st.ok) overlayState = st; } catch (e) { /* keep */ }
   }
+  var key = JSON.stringify((overlayState && overlayState.hotkeys) || {});
+  if (key === sheetStatusSeen) return;
+  sheetStatusSeen = key;
   sheetRender();
 }
 
@@ -689,6 +695,8 @@ function renderSheetsView() {
 function sheetFilterRows(box, text) {
   var words = String(text || '').toLowerCase().split(/\s+/).filter(Boolean);
   box.querySelectorAll('.sheet-sec').forEach(function (sec) {
+    // the mechanic tools (40-mechtools.js) aren't reference rows: the filter leaves them alone
+    if (sec.classList.contains('mech-tool-sec') || sec.closest('.mech-tool')) return;
     var shown = 0;
     sec.querySelectorAll('.sheet-table tbody tr, .sheet-list .sheet-li').forEach(function (r) {
       var t = r.textContent.toLowerCase();

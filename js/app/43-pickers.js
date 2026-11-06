@@ -12,19 +12,24 @@
 // A row is a toggle ("I see this one"); the verdict sums up the marked rows for your build.
 // The marks last while the app runs (an encounter is short); the build tags are remembered.
 var PICK_SEEN = {};
+var PICK_VIEW = {}; // each checker's list filter, kept while the app runs (a sheet redraw keeps it)
 
 // how a rating reads for your build: a mod rated deadly only for builds you didn't tick shows as
 // "deadly for other builds" (caution); no ticks = the ratings as researched
+// (a mod rated safe overall that the research says hurts what your build uses reads as caution, so
+// the row, the filters and the verdict agree)
 function pickEffective(e, tags) {
   var d = e.dangerousFor || [], r = e.rating;
-  var hits = mechHitsBuild(d, tags);
-  if (!tags.length || r !== 'deadly' || hits || !d.length) return { rating: r, hits: hits && !!tags.length, other: false };
+  var hits = mechHitsBuild(d, tags) && !!tags.length;
+  if (r === 'safe' && hits && d.indexOf('all') === -1) return { rating: 'caution', hits: true, other: false };
+  if (!tags.length || r !== 'deadly' || hits || !d.length) return { rating: r, hits: hits, other: false };
   return { rating: 'caution', hits: false, other: true };
 }
 
 function pickChecker(host, ctx, cfg) {
   var seen = PICK_SEEN[cfg.id] = PICK_SEEN[cfg.id] || {};
-  var state = { q: '', filter: 'all' };
+  var state = PICK_VIEW[cfg.id + (ctx.overlay ? ':ov' : '')] = PICK_VIEW[cfg.id + (ctx.overlay ? ':ov' : '')] || { q: '', filter: 'all' };
+  if (ctx.overlay) state.q = '';
   var root = UI.el('div', 'pick');
 
   if (!cfg.entries.length) {
@@ -38,13 +43,17 @@ function pickChecker(host, ctx, cfg) {
   root.appendChild(mechBuildPicker(function () { draw(); }));
 
   var bar = UI.el('div', 'pick-bar');
-  var seg = UI.segmented([['all', 'All'], ['deadly', 'Run-ending'], ['mine', 'Hits my build'], ['seen', 'Marked']], 'all', {
+  var seg = UI.segmented([['all', 'All'], ['deadly', 'Run-ending'], ['mine', 'Hits my build'], ['seen', 'Marked']], state.filter, {
     ariaLabel: 'Which ' + cfg.noun + 's to list',
     titles: { all: 'Every ' + cfg.noun, deadly: 'Only the run-ending ones (for your build)',
       mine: 'Only the ones that hit what your build uses', seen: 'Only the ones you marked' },
     onChange: function (v) { state.filter = v; draw(); } });
   bar.appendChild(seg);
-  if (!ctx.overlay) bar.appendChild(mechSearch('Find a ' + cfg.noun, function (q) { state.q = q; draw(); }));
+  if (!ctx.overlay) {
+    var search = mechSearch('Find a ' + cfg.noun, function (q) { state.q = q; draw(); });
+    search.value = state.q;
+    bar.appendChild(search);
+  }
   var clear = UI.button('ghost', { label: 'Clear marks', size: 'sm', title: 'Unmark every ' + cfg.noun,
     onClick: function () { Object.keys(seen).forEach(function (k) { delete seen[k]; }); draw(); } });
   bar.appendChild(clear);
@@ -456,6 +465,7 @@ mechTool({ id: 'temple', title: 'Temple room planner', sheets: ['incursion'], ov
       var b = UI.el('button', 'temple-tier' + (i === t ? ' is-on' : ''), i ? 'T' + i : '–');
       b.type = 'button';
       b.title = i ? 'Tier ' + i + ': ' + label : 'Not built';
+      b.setAttribute('aria-label', c.short + ': ' + (i ? 'tier ' + i + ', ' + label : 'not built'));
       b.setAttribute('aria-pressed', i === t ? 'true' : 'false');
       b.addEventListener('click', function () { st.tier[c.short] = i; templeSave(st); draw(); });
       tiers.appendChild(b);

@@ -51,7 +51,7 @@ const open = async (id, board) => {
 out.boards = {};
 for (const [id, board] of [['delve', 'delve'], ['essences', 'essences'], ['harvest', 'harvest'], ['blight', 'blight'],
     ['delirium', 'delirium'], ['breach', 'breach'], ['legion', 'legion'], ['expedition', 'expedition'],
-    ['expedition', 'catalysts'], ['vendor', 'catalysts'], ['bestiary', 'bestiary']]) {
+    ['ultimatum', 'catalysts'], ['vendor', 'catalysts'], ['bestiary', 'bestiary']]) {
   const el = await open(id, board);
   out.boards[id + '/' + board] = { visible: H.visible(el), items: el.querySelectorAll('.pb-tile, .pb-grid td, .pb-lf tbody tr').length,
     foot: H.text('.pb-foot', el), sort: !!el.querySelector('.pb-sort') };
@@ -170,9 +170,14 @@ out.vaalNote = [...el.querySelectorAll('.pb-tile')].filter(t => t.dataset.name =
 el = await open('expedition', 'expedition');
 out.exped = tileNames(el);
 out.expedNote = H.text('.pb-tile .pb-note', el);
-el = await open('expedition', 'catalysts');
+el = await open('ultimatum', 'catalysts');
 out.catalysts = tileNames(el).length;
 out.catSummary = H.text('.pb-summary', el);
+// not on Expedition any more (3.29 removed catalyst chests there)
+await open('expedition', 'expedition');
+out.catOnExp = !!document.querySelector('#view-sheets .pb[data-board="catalysts"]');
+el = await open('vendor', 'catalysts');
+out.catVendor = H.text('.pb-summary', el);
 
 // ---- Bestiary: stubbed beast prices --------------------------------------------------------
 el = await open('bestiary', 'bestiary');
@@ -272,8 +277,10 @@ def run(s, tag, check):
     check(tag + " Expedition: the 4 vendor currencies, vendor named", sorted(r["exped"]) ==
           ["Astragali", "Burial Medallion", "Exotic Coinage", "Scrap Metal"] and
           "’s currency" in (r["expedNote"] or ""), (r["exped"], r["expedNote"]))
-    check(tag + " Catalysts on Expedition + Vendor, source line from the sheet", r["catalysts"] == 13 and
-          "Ultimatum" in (r["catSummary"] or "") and "Catalysts" in (r["catSummary"] or ""), (r["catalysts"], r["catSummary"]))
+    check(tag + " Catalysts on Ultimatum (the 3.29 source, quoted from the verified tool data) + Vendor, not Expedition",
+          r["catalysts"] == 13 and "Catalyst" in (r["catSummary"] or "") and "Ultimatum" in (r["catSummary"] or "")
+          and not r["catOnExp"] and (r["catVendor"] or "").startswith("On this sheet:"),
+          (r["catalysts"], r["catSummary"], r["catOnExp"], r["catVendor"]))
     check(tag + " Bestiary: stubbed beast prices, most valuable first, recipe beasts tagged",
           r["beastFirst"][0] == ["Black Mórrigan", "1.5 div", True] and r["beastFirst"][1][:2] == ["Vivid Vulture", "60c"] and
           any(b[0] == "Craicic Chimeral" and not b[2] for b in r["beastFirst"]) and r["beastCalls"] == 1,

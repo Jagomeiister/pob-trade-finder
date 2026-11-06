@@ -489,3 +489,8 @@ the v2.0 redesign finishes migrating components — see `docs/UI-PLAN.md`.
   payload as `tools` (sources merged, cites re-pointed, unknown ratings dropped with a warning,
   build tags mapped through `TAG_ALIASES`, kept in step with `MECH_BUILD_TAGS` in 40-mechtools.js),
   so it ships and server-updates with the guides. The tools read it through `mechToolData()`.
+  Fixes found later go in `tools/guides/mechtools-corrections-<patch>.json` (add / replace / delete,
+  each with a reason and https sources; a stale one stops the build), never into the research file.
+- The in-game sheet only redraws when something it shows changed (the 10-s status loop compares the
+  hotkey labels); tools keep their view (filters, sort, "Show all") in module-level maps keyed by
+  tool id so a real redraw keeps it too.

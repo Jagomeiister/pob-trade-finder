@@ -153,10 +153,15 @@ function pbTiles(host, list, st, o, ov) {
 //   o.groupOrder(), o.groupInfo(group, items, st) → { text, mark }, o.controls(st) → [Node],
 //   o.search (app only), o.limit / o.limitOv, o.layout ('rows'), o.load(cb) (default: mechPrices),
 //   o.hasPrices(), o.foot() (default: mechPriceAge()), o.missing(list) → count
+// each board's view (sort, "Show all", tiers, beast filter) per board and window, kept while the
+// app runs, so a redraw of the sheet (league change, guide update) doesn't reset it
+var PB_VIEW = {};
 function priceBoard(container, ctx, o) {
   ctx = ctx || {};
   var ov = !!ctx.overlay;
-  var st = { sort: o.sort || 'price', all: false, loaded: false, q: '', ov: ov, div: null };
+  var view = PB_VIEW[o.id + (ov ? ':ov' : '')] = PB_VIEW[o.id + (ov ? ':ov' : '')] || {};
+  var st = { sort: view.sort || o.sort || 'price', all: !!view.all, loaded: false, q: '', ov: ov, div: null,
+    tiers: view.tiers, only: view.only };
   var root = UI.el('div', 'pb' + (ov ? ' is-overlay' : '') + (o.cls ? ' ' + o.cls : ''));
   root.dataset.board = o.id;
 
@@ -184,6 +189,7 @@ function priceBoard(container, ctx, o) {
   root.appendChild(foot);
 
   function draw(changed) {
+    view.sort = st.sort; view.all = st.all; view.tiers = st.tiers; view.only = st.only;
     var seen = {}, list = [];
     (o.entries(st) || []).forEach(function (e) {
       if (!e || !e.name) return;
@@ -353,8 +359,8 @@ function pbMountEssences(container, ctx) {
   priceBoard(container, ctx, {
     id: 'essences', groups: ['essences'], what: 'essences',
     controls: function (st) {
-      st.tiers = 'top';
-      var seg = UI.segmented([['top', 'Top ' + top + ' tiers'], ['all', 'All ' + E.tiers.length]], 'top', {
+      st.tiers = st.tiers === 'all' ? 'all' : 'top';
+      var seg = UI.segmented([['top', 'Top ' + top + ' tiers'], ['all', 'All ' + E.tiers.length]], st.tiers, {
         ariaLabel: 'Which essence tiers to show', onChange: function (v) { st.tiers = v; st.redraw(true); } });
       seg.classList.add('pb-tier-pick');
       return [seg];
@@ -672,10 +678,15 @@ function pbMountExpedition(container, ctx) {
 }
 
 // ==== Catalysts =====================================================================
-// on the sheets whose text names catalysts as a reward: Expedition (the "Ultimatum" logbook
-// chest drops them) and Vendor recipes (a quality-items recipe gives one)
-var PB_CATALYST_SHEETS = ['expedition', 'vendor'];
+// on Ultimatum (3.29 made it the only drop source of catalysts: the verified tool research says so,
+// and the board quotes that line) and Vendor recipes (a quality-items recipe gives one). Not on
+// Expedition any more: 3.29 removed catalyst chests there, though the wiki table still lists them.
+var PB_CATALYST_SHEETS = ['ultimatum', 'vendor'];
 function pbCatalystSource(sheetId) {
+  if (sheetId === 'ultimatum') {
+    var rule = ((mechToolData().ultimatum || {}).rules || []).filter(function (r) { return /\bCatalysts?\b/.test(r.text); })[0];
+    return rule ? rule.text : '';
+  }
   var m = pbSheet(sheetId), hit = null;
   ((m && m.sections) || []).forEach(function (s) {
     (s.rows || []).forEach(function (r) {
@@ -696,29 +707,31 @@ function pbMountCatalysts(container, ctx) {
     },
     summary: function () {
       var s = pbCatalystSource(ctx && ctx.sheet);
-      return s ? 'On this sheet: ' + s : null;
+      return s ? (ctx && ctx.sheet === 'ultimatum' ? s : 'On this sheet: ' + s) : null;
     },
   });
 }
 
 // ==== Bestiary ======================================================================
 // beast prices: the app's poe.ninja snapshot (beast_prices); kept 20 min per league
-var PB_BEASTS = { league: null, at: 0, r: null, waiting: [] };
+var PB_BEASTS = { league: null, at: 0, r: null, waiting: {} };
+// the beast prices for the league picked now (none while another league's answer is cached)
+function pbBeastsNow() { return PB_BEASTS.league === mechLeague() ? PB_BEASTS.r : null; }
 function pbBeastPrices(cb) {
   var B = PB_BEASTS, league = mechLeague();
   var api = isGui() && window.pywebview.api.beast_prices;
   if (!api) { cb(null); return; }
   if (B.league === league && B.r && Date.now() - B.at < MECH_PRICE_TTL) { cb(B.r); return; }
-  B.waiting.push(cb);
-  if (B.waiting.length > 1 && B.league === league) return; // one call in flight
-  B.league = league;
-  window.pywebview.api.beast_prices(league).then(function (r) {
-    B.r = r && r.ok ? r : null;
-    B.at = Date.now();
-  }).catch(function () { B.r = null; }).then(function () {
-    var w = B.waiting;
-    B.waiting = [];
-    w.forEach(function (f) { try { f(B.r); } catch (e) { /* board redraw */ } });
+  // waiters per league: an answer only ever reaches (and is cached for) the league it was asked for
+  var q = B.waiting[league] = B.waiting[league] || [];
+  q.push(cb);
+  if (q.length > 1) return; // one call in flight for this league
+  window.pywebview.api.beast_prices(league).then(function (r) { return r && r.ok ? r : null; },
+    function () { return null; }).then(function (r) {
+    if (mechLeague() === league) { B.league = league; B.r = r; B.at = Date.now(); }
+    var w = B.waiting[league] || [];
+    delete B.waiting[league];
+    w.forEach(function (f) { try { f(r); } catch (e) { /* board redraw */ } });
   });
 }
 function pbNorm(s) {
@@ -744,16 +757,16 @@ function pbMountBestiary(container, ctx) {
   priceBoard(container, ctx, {
     id: 'bestiary', what: 'beasts', search: true, layout: 'rows', limit: 40, limitOv: 12,
     load: function (cb) { pbBeastPrices(function () { cb(); }); },
-    hasPrices: function () { return !!(PB_BEASTS.r && (PB_BEASTS.r.items || []).length); },
+    hasPrices: function () { var r = pbBeastsNow(); return !!(r && (r.items || []).length); },
     controls: function (st) {
-      st.only = 'all';
-      var seg = UI.segmented([['all', 'All beasts'], ['recipe', 'Recipe beasts']], 'all', {
+      st.only = st.only === 'recipe' ? 'recipe' : 'all';
+      var seg = UI.segmented([['all', 'All beasts'], ['recipe', 'Recipe beasts']], st.only, {
         ariaLabel: 'Which beasts to show', onChange: function (v) { st.only = v; st.all = false; st.redraw(true); } });
       seg.classList.add('pb-beast-pick');
       return [seg];
     },
     entries: function (st) {
-      var r = PB_BEASTS.r, list = [], seen = {};
+      var r = pbBeastsNow(), list = [], seen = {};
       st.div = r && r.divine;
       function tagOf(name) {
         var x = R[pbNorm(name)];
@@ -777,7 +790,7 @@ function pbMountBestiary(container, ctx) {
     },
     foot: function () {
       if (!isGui()) return 'Prices show in the app.';
-      return PB_BEASTS.r ? 'Beast prices: poe.ninja, through the app’s price backend (refreshed every 20 min).' :
+      return pbBeastsNow() ? 'Beast prices: poe.ninja, through the app’s price backend (refreshed every 20 min).' :
         'No beast prices yet (offline, or the price backend has not answered).';
     },
   });

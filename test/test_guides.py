@@ -430,5 +430,40 @@ check("open_url may open the tools' sources and atlas links", "https://www.poe-v
 if "tools" in data:
     check("shipped tools data passes the bridge", gui.Api._tools_ok(data["tools"]))
 
+# tools corrections (tools/guides/mechtools-corrections-<patch>.json) and strategy stages
+STRAT = {"name": "Old Farm", "stage": ["endgame", "pre-3.29-data", "low-investment", "weird"], "scarabs": [], "maps": [],
+         "mapsPerHour": None, "costPerMapChaos": None, "mainDrops": [], "atlasTreeUrl": "", "profit": [], "cite": [0]}
+del make_guides.TOOL_WARNINGS[:]
+st = make_guides.tool_entry("strategies", "strategies", copy.deepcopy(STRAT), "t")
+check("tools: endgame -> late; pre-3.29 data flags the strategy and says so in its name; investment words dropped quietly",
+      st["stage"] == ["late"] and st.get("outdated") and st["name"] == "Old Farm (pre-3.29 data)"
+      and any("'weird'" in w for w in make_guides.TOOL_WARNINGS) and not any("investment" in w for w in make_guides.TOOL_WARNINGS),
+      (st, make_guides.TOOL_WARNINGS))
+R = copy.deepcopy(TOOL_RESEARCH)
+fix_add = {"id": "a", "topic": "eldritch", "key": "downsides", "action": "add", "reason": "r",
+           "sources": ["https://maxroll.gg/poe/x"], "value": {"mod": "Z", "rating": "deadly", "dangerousFor": [], "why": "w", "cite": [0]}}
+fix_rep = {"id": "b", "topic": "eldritch", "key": "rules", "action": "replace", "match": "R", "value": "R2", "reason": "r",
+           "sources": ["https://maxroll.gg/poe/x"]}
+make_guides.apply_tool_corrections(R, [fix_add, fix_rep])
+eld = [t for t in R["tools"] if t["id"] == "eldritch"][0]["data"]
+check("tools corrections: add appends an entry, replace edits the matched text",
+      eld["downsides"][-1]["mod"] == "Z" and eld["rules"][0]["text"] == "R2", (eld["downsides"][-1], eld["rules"]))
+stale = []
+for bad_fix in (dict(fix_add), dict(fix_rep, match="no such text"), dict(fix_add, sources=["http://x"]), dict(fix_rep, key="nope")):
+    try:
+        make_guides.apply_tool_corrections(copy.deepcopy(R), [bad_fix])
+        stale.append(bad_fix["id"])
+    except make_guides.Bad:
+        pass
+check("tools corrections: a stale add / a match that misses / a non-https source / an unknown key stop the build", not stale, stale)
+corr_file, _ = make_guides.tools_corrections(os.path.join(ROOT, "tools", "guides", "mechtools-3.29.json"))
+check("tools corrections file: every fix has a reason and https sources", corr_file and all(
+    c.get("reason") and c.get("sources") and all(u.startswith("https://") for u in c["sources"]) for c in corr_file), corr_file)
+if "tools" in data:
+    sanct = {a["name"] for a in data["tools"]["sanctum"]["afflictions"]}
+    check("shipped tools: Liquid Cowardice is in the Sanctum checker (review fix)", "Liquid Cowardice" in sanct)
+    check("shipped tools: the temple room count rule names the fixed Entrance and 11 shaped rooms",
+          any("11 rooms the 12 incursions shape" in r["text"] for r in data["tools"]["incursion"]["rules"]))
+
 print("\n" + ("ALL TESTS PASSED" if not failures else "%d FAILED" % failures))
 sys.exit(1 if failures else 0)

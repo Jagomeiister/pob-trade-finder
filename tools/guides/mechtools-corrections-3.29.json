@@ -1,0 +1,31 @@
+{
+  "about": "Fixes to tools/guides/mechtools-3.29.json found by the review of the mechanic tools (2026-11-06). The research file stays the untouched record; make_guides.py applies these before building the tools data. cite = indexes into that topic's own source list in the research file.",
+  "corrections": [
+    {
+      "id": "sanctum-liquid-cowardice",
+      "topic": "sanctum",
+      "key": "afflictions",
+      "action": "add",
+      "value": {
+        "name": "Liquid Cowardice",
+        "major": false,
+        "rating": "deadly",
+        "dangerousFor": ["flask"],
+        "why": "You lose 10 Resolve every time you use a flask. Builds that press flasks often drain their Resolve fast, and PoE Vault's affliction tier list rates it run-ending.",
+        "cite": [0, 8]
+      },
+      "reason": "The research left this minor affliction out although its own cited tier list (poe-vault, source 0) rates it Run-Ending; the effect text is on poedb Sanctum_league (source 8). Confirmed 3/3 by the review.",
+      "sources": ["https://poe-vault.com/guides/the-forbidden-sanctum-league-mechanic-afflictions", "https://poedb.tw/us/Sanctum_league"]
+    },
+    {
+      "id": "incursion-room-count",
+      "topic": "incursion",
+      "key": "rules",
+      "action": "replace",
+      "match": "The temple has 13 room slots: the 12 you shape plus the fixed Apex of Atzoatl, which holds the Vaal Omnitect.",
+      "value": "The temple has 13 rooms: the fixed Entrance, the fixed Apex of Atzoatl (the Vaal Omnitect) and the 11 rooms the 12 incursions shape.",
+      "reason": "The rule contradicted the same data's own rules (the Entrance and the Apex are fixed; the temple starts in 11 connectable spaces). Confirmed 3/3 by the review.",
+      "sources": ["https://www.poe-vault.com/guides/alva-temple-profit-making-strategy-guide"]
+    }
+  ]
+}
