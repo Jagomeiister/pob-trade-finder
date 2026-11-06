@@ -37,6 +37,29 @@ function mechMount(t, ctx) {
   return host;
 }
 
+// ==== tool data =====================================================================
+// The ratings, room plans and strategy setups the tools use: verified research, shipped inside the
+// guides payload (POE_GUIDES.tools, built by tools/make_guides.py from tools/guides/mechtools-*.json)
+// so a server update reaches them like the guides. cite = indexes into .sources.
+var MECH_DATA_EMPTY = { version: 0, asOf: '', sources: [], strategies: [],
+  eldritch: { downsides: [], upsides: [], rules: [] }, ultimatum: { mods: [], winConditions: [], rules: [] },
+  sanctum: { afflictions: [], boons: [], rules: [] }, expedition: { remnants: [], rules: [] },
+  incursion: { rooms: [], goals: [], rules: [] } };
+function mechToolData() {
+  var g = typeof guideData === 'function' ? guideData() : null;
+  var t = g && g.tools && typeof g.tools === 'object' ? g.tools : null;
+  if (!t) return MECH_DATA_EMPTY;
+  var out = {};
+  Object.keys(MECH_DATA_EMPTY).forEach(function (k) { out[k] = t[k] != null ? t[k] : MECH_DATA_EMPTY[k]; });
+  if (!out.asOf) out.asOf = g.asOf || '';
+  return out;
+}
+// the sources a list of cite indexes points at
+function mechCited(cite) {
+  var src = mechToolData().sources || [];
+  return (cite || []).map(function (i) { return src[i]; }).filter(Boolean);
+}
+
 // ==== prices ========================================================================
 // mech_prices (gui.py): icons and chaos prices for whole groups from GGG's hourly exchange
 // feed — no trade-site calls. One load per league and hour covers every tool; a tool asks for

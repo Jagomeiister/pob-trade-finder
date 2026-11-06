@@ -1074,9 +1074,31 @@ class Api:
                             and all(isinstance(r, dict) and str(r.get("url", "")).startswith(("https://", "http://"))
                                     for r in g["readMore"])
                             for k, g in guides.items())
-                    and isinstance(data.get("sheets", []), list))
+                    and isinstance(data.get("sheets", []), list)
+                    and Api._tools_ok(data.get("tools")))
         except (AttributeError, TypeError):
             return False
+
+    @staticmethod
+    def _tools_ok(tools):
+        """The mechanic tools' data inside the guides payload (optional): a dict whose sources are
+        all web pages and whose strategy atlas links, when set, are https pages."""
+        if tools is None:
+            return True
+        return (isinstance(tools, dict)
+                and all(isinstance(s, dict) and str(s.get("url", "")).startswith(("https://", "http://"))
+                        for s in tools.get("sources") or [])
+                and all(isinstance(s, dict) and (not s.get("atlasTreeUrl") or str(s["atlasTreeUrl"]).startswith("https://"))
+                        for s in tools.get("strategies") or []))
+
+    @staticmethod
+    def _tool_urls(tools):
+        """The pages the mechanic tools link to: their sources and the strategies' atlas trees."""
+        if not isinstance(tools, dict):
+            return set()
+        urls = {s["url"] for s in tools.get("sources") or []}
+        urls.update(s["atlasTreeUrl"] for s in tools.get("strategies") or [] if s.get("atlasTreeUrl"))
+        return urls
 
     def guides_data(self):
         """Mechanic guides: the server's copy (newest), else the last one downloaded. The page
@@ -1139,6 +1161,7 @@ class Api:
                 if d and self._guides_ok(d):
                     for g in d["guides"].values():
                         urls.update(r["url"] for r in g["readMore"])
+                    urls.update(self._tool_urls(d.get("tools")))
             self._guide_url_set, self._guide_url_src = urls, hit
         return urls
 

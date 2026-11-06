@@ -98,7 +98,6 @@ SHIP = [
     "data/cheatsheets.js",
     "data/guides.js",
     "data/syndicate.js",
-    "data/mechtools.js",
     "data/gemcolours.js",
     "data/dust.js",
     "data/atlasview.js",

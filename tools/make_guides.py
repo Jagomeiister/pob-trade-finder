@@ -459,6 +459,114 @@ def find_icons(guides, names):
     return dict(sorted(used.items()))
 
 
+# ---- the mechanic tools' data (js/app/40-43): tools/guides/mechtools-<patch>.json ------------------
+# The verified research run for the interactive tools (pickers, room planner, strategy setups):
+# {asOf, tools: [{id, verified, data, sources}]}, each topic citing its own source list. Here the
+# topics' sources merge into one list (deduped by URL), every cite is re-pointed at it, and the
+# ratings / build tags / stage tags are checked; an entry with an unknown rating is dropped with a
+# warning (never guessed). It ships inside the guides payload as "tools".
+TOOL_TOPICS = {
+    "eldritch": {"downsides": "mod", "upsides": "mod", "rules": "text"},
+    "ultimatum": {"mods": "name", "winConditions": "name", "rules": "text"},
+    "sanctum": {"afflictions": "name", "boons": "name", "rules": "text"},
+    "expedition": {"remnants": "mod", "rules": "text"},
+    "incursion": {"rooms": "tier3Room", "goals": "name", "rules": "text"},
+    "strategies": {"strategies": "name"},
+}
+DANGER_RATINGS = ("safe", "caution", "deadly")
+VALUE_RATINGS = ("high", "medium", "low")
+BUILD_TAGS = ("life-regen", "leech", "es", "minion", "dot", "attack", "spell", "low-max-res", "flask",
+              "curse", "mana", "low-ehp", "all")
+TOOL_WARNINGS = []
+
+
+def tools_input(guides_path):
+    """tools/guides/mechtools-<patch>.json next to the guides research, or None."""
+    patch = re.sub(r"^guides-|\.json$", "", os.path.basename(guides_path))
+    p = os.path.join(os.path.dirname(guides_path), "mechtools-%s.json" % patch)
+    return p if os.path.exists(p) else None
+
+
+def tool_entry(topic, key, e, where):
+    """One entry, checked; None (with a warning) when its rating isn't one the tools know."""
+    need(isinstance(e, dict), "%s: not an object" % where)
+    if topic == "strategies":
+        need(is_text(e.get("name")), "%s: no name" % where)
+        e["stage"] = [s for s in e.get("stage") or [] if s in STAGES] or ["all"]
+        e["scarabs"] = [{"name": s["name"].strip(), "count": max(1, int(s.get("count") or 1))}
+                        for s in e.get("scarabs") or [] if isinstance(s, dict) and is_text(s.get("name"))]
+        url = str(e.get("atlasTreeUrl") or "").strip()
+        e["atlasTreeUrl"] = url if SOURCE_RE.match(url) else ""
+        for k in ("mapsPerHour", "costPerMapChaos"):
+            v = e.get(k)
+            e[k] = v if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+        e["profit"] = [p for p in e.get("profit") or [] if isinstance(p, dict) and is_text(p.get("text"))]
+        return e
+    if "rating" in e or key in ("downsides", "mods", "afflictions", "remnants"):
+        r = str(e.get("rating") or "").strip().lower()
+        good = topic == "expedition" and e.get("kind") == "good"
+        allowed = VALUE_RATINGS if good else DANGER_RATINGS
+        if key in ("winConditions",):
+            allowed = DANGER_RATINGS + VALUE_RATINGS
+        if r not in allowed:
+            TOOL_WARNINGS.append("%s: rating %r is not one of %s, dropped" % (where, r, "/".join(allowed)))
+            return None
+        e["rating"] = r
+    if "value" in e:
+        v = str(e.get("value") or "").strip().lower()
+        if v not in VALUE_RATINGS:
+            TOOL_WARNINGS.append("%s: value %r is not one of %s, dropped" % (where, v, "/".join(VALUE_RATINGS)))
+            return None
+        e["value"] = v
+    if "dangerousFor" in e:
+        tags = [str(t).strip().lower() for t in e.get("dangerousFor") or []]
+        unknown = [t for t in tags if t not in BUILD_TAGS]
+        if unknown:
+            TOOL_WARNINGS.append("%s: unknown build tags %s left out" % (where, unknown))
+        e["dangerousFor"] = [t for t in tags if t in BUILD_TAGS]
+    return e
+
+
+def build_tools(path):
+    """The tools' payload from the research file at path: {asOf, sources, <topic>: {...}, strategies}."""
+    with open(path, encoding="utf-8") as f:
+        research = json.load(f)
+    sources, index = [], {}
+    out = {"asOf": str(research.get("asOf") or "").strip()}
+    for t in research.get("tools") or []:
+        topic = t.get("id")
+        if topic not in TOOL_TOPICS or not isinstance(t.get("data"), dict):
+            continue
+        local = []  # this topic's source i -> the merged list's index
+        for s in t.get("sources") or []:
+            url = str((s or {}).get("url") or "").strip()
+            need(SOURCE_RE.match(url) or url.startswith("http://"), "%s: source %r is not a web page" % (topic, url))
+            if url not in index:
+                index[url] = len(sources)
+                sources.append({k: str(s.get(k) or "").strip() for k in ("url", "title", "publisher", "date", "patch")})
+            local.append(index[url])
+        shaped = {}
+        for key, label_key in TOOL_TOPICS[topic].items():
+            kept = []
+            for i, e in enumerate(t["data"].get(key) or []):
+                where = "tools.%s.%s[%d] %s" % (topic, key, i, str((e or {}).get(label_key) or "")[:40])
+                need(is_text((e or {}).get(label_key)), "%s: no %s" % (where, label_key))
+                cites = list(e.get("cite") or [])
+                check_cites(where, cites, len(local))
+                e = tool_entry(topic, key, copy.deepcopy(e), where)
+                if e is None:
+                    continue
+                e["cite"] = sorted({local[c] for c in cites})
+                kept.append(e)
+            shaped[key] = kept
+        if topic == "strategies":
+            out["strategies"] = shaped["strategies"]
+        else:
+            out[topic] = shaped
+    out["sources"] = sources
+    return out
+
+
 def default_input():
     files = sorted(glob.glob(os.path.join(ROOT, "tools", "guides", "guides-*.json")), key=lambda p: patch_key(
         re.sub(r"^guides-|\.json$", "", os.path.basename(p))))
@@ -515,6 +623,21 @@ def main(argv):
             "guides": {sid: guides[sid] for sid in order},
             "sheets": [extra[s] for s in order if s in extra],
             "icons": find_icons(guides, icon_names())}
+    tpath = tools_input(path)
+    if tpath:
+        try:
+            data["tools"] = build_tools(tpath)
+            need(data["tools"]["asOf"] == data["asOf"], "tools research is for %s, guides for %s"
+                 % (data["tools"]["asOf"], data["asOf"]))
+        except Bad as e:
+            print("  tools: %s: not writing" % e)
+            return 1
+        for w in TOOL_WARNINGS:
+            print("  warning: " + w)
+        t = data["tools"]
+        print("  tools from %s: %d sources; %s" % (os.path.basename(tpath), len(t["sources"]), ", ".join(
+            "%s %d" % (k, sum(len(v) for v in t[k].values()) if isinstance(t[k], dict) else len(t[k]))
+            for k in TOOL_TOPICS if k in t)))
     prev = previous()
     stamp = int(time.strftime("%Y%m%d%H%M"))
     if prev and {k: v for k, v in prev.items() if k != "version"} == data and isinstance(prev.get("version"), int):
