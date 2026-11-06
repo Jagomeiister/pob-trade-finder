@@ -1,1 +1,64 @@
-/* css/mech-priceboards.css — placeholder (being built). */
+/* css/mech-priceboards.css — the mechanic price boards (js/app/42-priceboards.js): sort bar, the
+   "best now" line, labelled groups of icon + price tiles, the essence tier grid and the lifeforce
+   table. Tiles fill the width (2-3 a row in the ~420px in-game sheet, more in the app).
+   Colours: css/tokens.css only. */
+
+.pb { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pb-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.pb-bar-label { color: var(--text-2); font-size: var(--fs-xs); font-weight: 600; }
+.pb-bar .mech-search { flex: 1 1 180px; }
+.pb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* the "best now" line and its rule */
+.pb-summary { color: var(--text); font-size: var(--fs-sm); line-height: 1.45; }
+.pb-best { display: flex; flex-direction: column; gap: 2px; }
+.pb-best-name { color: var(--success); font-weight: 600; }
+.pb-rule { color: var(--text-3); font-size: var(--fs-xs); }
+
+/* groups of tiles */
+.pb-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pb-group { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pb-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--text);
+  font-size: var(--fs-sm); font-weight: 600; }
+.pb-group-info { color: var(--text-3); font-size: var(--fs-xs); font-weight: 400; font-variant-numeric: tabular-nums; }
+.pb .badge { margin-left: 0; }
+.pb-group.is-best > .pb-tiles { padding-left: 6px; border-left: 2px solid var(--success); }
+
+.pb-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px; }
+.pb-tiles.is-rows { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.pb.is-overlay .pb-tiles { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+.pb.is-overlay .pb-tiles.is-rows { grid-template-columns: minmax(0, 1fr); }
+
+.pb-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 6px;
+  min-width: 0; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--s2); }
+.pb-tile.is-best { border-color: var(--success); background: color-mix(in srgb, var(--success) 12%, var(--s2)); }
+.pb-tile .mech-item { min-width: 0; }
+.pb-price { color: var(--price); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap;
+  text-align: right; }
+.pb-tile.no-price .pb-price { color: var(--text-3); }
+.pb-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.pb-note { grid-column: 1 / -1; overflow: hidden; color: var(--text-3); font-size: var(--fs-xs);
+  text-overflow: ellipsis; white-space: nowrap; }
+.pb.is-overlay .mech-item-img { width: 24px; height: 24px; }
+
+.pb-more { align-self: flex-start; }
+.pb-missing { color: var(--text-2); font-size: var(--fs-xs); }
+
+/* essences: group × tier grid */
+.pb-grid-wrap { overflow-x: auto; min-width: 0; }
+.pb-grid { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.pb-grid th, .pb-grid td { padding: 3px 6px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.pb-grid thead th { color: var(--text-2); font-size: var(--fs-xs); font-weight: 600; text-align: right; }
+.pb-grid thead th.pb-grid-corner, .pb-grid .pb-grid-name { text-align: left; }
+.pb-grid .pb-grid-name { font-weight: 400; }
+.pb-grid td { color: var(--price); text-align: right; }
+.pb-grid td.is-na, .pb-grid td.is-none { color: var(--text-3); }
+.pb-grid td.is-top { font-weight: 700; }
+.pb-grid tbody tr:hover { background: var(--row-hover); }
+.pb.is-overlay .pb-grid th, .pb.is-overlay .pb-grid td { padding: 2px 4px; }
+
+/* lifeforce table */
+.pb-lf-name { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.pb-lf .pb-lf-row.is-best td { background: color-mix(in srgb, var(--success) 10%, transparent); }
+.pb-lf td.num { color: var(--price); font-variant-numeric: tabular-nums; white-space: nowrap; }

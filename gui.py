@@ -899,6 +899,7 @@ class Api:
         "delirium": lambda n, c: c == "Delirium Orbs",
         "fragments": lambda n, c: c == "Fragments, Scarabs & Mapping" and "Scarab" not in n,
         "expedition": lambda n, c: c == "Expedition Currency",
+        "foulborn": lambda n, c: c == "Foulborn Currency & Wombgifts",
         "embers": lambda n, c: c == "Allflame Embers",
         "currency": lambda n, c: c == "Currency",
     }
