@@ -55,7 +55,7 @@ sheets, _ = load_js(os.path.join(ROOT, "data", "cheatsheets.js"), "POE_CHEATSHEE
 sheet_ids = {m["id"] for m in sheets["mechanics"]}
 
 # -- top level ----------------------------------------------------------------------
-check("top-level keys", set(data) == {"version", "asOf", "checked", "guides", "sheets", "icons"}, sorted(data))
+check("top-level keys", set(data) - {"tools"} == {"version", "asOf", "checked", "guides", "sheets", "icons"}, sorted(data))
 v = data.get("version")
 check("version is an int YYYYMMDDHHMM", isinstance(v, int) and not isinstance(v, bool) and len(str(v)) == 12, v)
 check("asOf is a patch", bool(re.match(r"^\d+\.\d+$", data.get("asOf", ""))), data.get("asOf"))
@@ -364,6 +364,71 @@ src0 = guides["syndicate"]["readMore"][0]["url"]
 check("open_url opens a guide's source", api.open_url(src0).get("ok") and opened == [src0], opened)
 check("open_url still refuses other pages", not api.open_url("https://example.com/not-a-source").get("ok")
       and not api.open_url(src0 + "x").get("ok") and len(opened) == 1, opened)
+
+# -- the mechanic tools' data (make_guides.build_tools -> payload "tools", js/app/40-43) ------------
+import tempfile  # noqa: E402
+
+TOOL_RESEARCH = {"asOf": "3.29", "tools": [
+    {"id": "eldritch", "verified": 4, "sources": [
+        {"url": "https://www.poewiki.net/wiki/Eldritch_altar", "title": "Eldritch altar", "publisher": "PoE Wiki", "date": "2026", "patch": "3.29"},
+        {"url": "https://maxroll.gg/poe/x", "title": "X", "publisher": "Maxroll", "date": "2026", "patch": "3.29"}],
+     "data": {"downsides": [
+         {"mod": "A", "rating": "Deadly", "dangerousFor": ["es", "reflect"], "why": "w", "cite": [1]},
+         {"mod": "B", "rating": "terrible", "dangerousFor": [], "why": "w", "cite": [0]}],
+         "upsides": [{"mod": "C", "target": "boss", "value": "high", "note": "n", "cite": [0, 1]}],
+         "rules": [{"text": "R", "cite": [0]}]}},
+    {"id": "ultimatum", "verified": 1, "sources": [
+        {"url": "https://maxroll.gg/poe/x", "title": "X", "publisher": "Maxroll", "date": "2026", "patch": "3.29"}],
+     "data": {"mods": [{"name": "Ruin", "rating": "deadly", "dangerousFor": ["all"], "why": "w", "cite": [0]}],
+              "winConditions": [], "rules": []}},
+    {"id": "strategies", "verified": 1, "sources": [
+        {"url": "https://www.poe-vault.com/s", "title": "S", "publisher": "PoE Vault", "date": "2026", "patch": "3.29"}],
+     "data": {"strategies": [{"name": "Alch & Go", "stage": ["mid", "weird"], "scarabs": [{"name": "Horned Scarab of Bloodlines", "count": 0}],
+                              "maps": [], "mapsPerHour": 12, "costPerMapChaos": -3, "mainDrops": [],
+                              "atlasTreeUrl": "javascript:alert(1)", "profit": [], "cite": [0]}]}},
+    {"id": "sanctum", "verified": 0, "data": None, "sources": []},
+]}
+with tempfile.TemporaryDirectory() as td:
+    tp = os.path.join(td, "mechtools-3.29.json")
+    with open(tp, "w", encoding="utf-8") as f:
+        json.dump(TOOL_RESEARCH, f)
+    check("tools file found next to the guides research",
+          make_guides.tools_input(os.path.join(td, "guides-3.29.json")) == tp)
+    del make_guides.TOOL_WARNINGS[:]
+    T = make_guides.build_tools(tp)
+src_urls = [s["url"] for s in T["sources"]]
+check("tools: sources merged and deduped by URL", src_urls == ["https://www.poewiki.net/wiki/Eldritch_altar", "https://maxroll.gg/poe/x",
+                                                                "https://www.poe-vault.com/s"], src_urls)
+dn = T["eldritch"]["downsides"]
+check("tools: an unknown rating is dropped, not guessed; ratings lower-cased",
+      [d["mod"] for d in dn] == ["A"] and dn[0]["rating"] == "deadly", dn)
+check("tools: unknown build tags left out", dn[0]["dangerousFor"] == ["es"], dn[0]["dangerousFor"])
+check("tools: cites re-pointed at the merged list", dn[0]["cite"] == [1] and T["ultimatum"]["mods"][0]["cite"] == [1]
+      and T["strategies"][0]["cite"] == [2], (dn[0]["cite"], T["ultimatum"]["mods"][0]["cite"]))
+st = T["strategies"][0]
+check("tools: strategy stage tags checked, bad atlas URL / cost dropped, scarab count >= 1",
+      st["stage"] == ["mid"] and st["atlasTreeUrl"] == "" and st["costPerMapChaos"] is None and st["mapsPerHour"] == 12
+      and st["scarabs"] == [{"name": "Horned Scarab of Bloodlines", "count": 1}], st)
+check("tools: a topic with no data is left out (the page shows nothing for it)", "sanctum" not in T, sorted(T))
+check("tools: warnings name what was dropped", any("terrible" in w for w in make_guides.TOOL_WARNINGS)
+      and any("reflect" in w for w in make_guides.TOOL_WARNINGS), make_guides.TOOL_WARNINGS)
+with_tools = dict(data, tools=T)
+check("bridge accepts a payload with tools", gui.Api._guides_ok(with_tools))
+bad_tools = copy.deepcopy(with_tools)
+bad_tools["tools"]["sources"][0]["url"] = "file:///C:/x"
+check("bridge refuses a tool source that isn't a web page", not gui.Api._guides_ok(bad_tools))
+bad_tools = copy.deepcopy(with_tools)
+bad_tools["tools"]["strategies"][0]["atlasTreeUrl"] = "http://example.com/tree"
+check("bridge refuses a non-https atlas tree link", not gui.Api._guides_ok(bad_tools))
+good_atlas = copy.deepcopy(with_tools)
+good_atlas["tools"]["strategies"][0]["atlasTreeUrl"] = "https://www.pathofexile.com/fullscreen-atlas-skill-tree/AAAA"
+api2 = gui.Api.__new__(gui.Api)
+api2._guides_cache = (0, good_atlas)
+urls = api2._guide_urls()
+check("open_url may open the tools' sources and atlas links", "https://www.poe-vault.com/s" in urls and
+      "https://www.pathofexile.com/fullscreen-atlas-skill-tree/AAAA" in urls)
+if "tools" in data:
+    check("shipped tools data passes the bridge", gui.Api._tools_ok(data["tools"]))
 
 print("\n" + ("ALL TESTS PASSED" if not failures else "%d FAILED" % failures))
 sys.exit(1 if failures else 0)
