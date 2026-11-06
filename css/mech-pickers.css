@@ -1,1 +1,74 @@
-/* css/mech-pickers.css — placeholder (being built). */
+/* css/mech-pickers.css — the pick-and-check helpers and the temple room planner
+   (js/app/43-pickers.js). Colours come from css/tokens.css only. */
+
+.pick { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pick-tabs { align-self: flex-start; margin-bottom: 6px; }
+.pick-pane { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pick-bar .mech-search { flex: 1 1 180px; }
+
+/* the verdict: rating chip + words, tinted by the worst rating */
+.pick-verdict, .temple-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s2); font-size: var(--fs-sm); }
+.pick-verdict.is-idle, .temple-sum.is-idle { color: var(--text-2); }
+.pick-verdict.is-deadly { border-color: var(--danger); background: color-mix(in srgb, var(--danger) var(--chip-tint), var(--s2)); }
+.pick-verdict.is-caution, .temple-sum.is-caution { border-color: var(--warn); background: color-mix(in srgb, var(--warn) var(--chip-tint), var(--s2)); }
+.pick-verdict.is-safe, .temple-sum.is-safe { border-color: var(--success); background: color-mix(in srgb, var(--success) var(--chip-tint), var(--s2)); }
+.pick-verdict-text, .temple-left { color: var(--text); }
+
+.pick-list { display: flex; flex-direction: column; gap: 10px; }
+.pick-group { display: flex; flex-direction: column; gap: 4px; }
+.pick-group-title { color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; }
+
+/* a modifier: toggle (mark) + rating chips, the why under it */
+.pick-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px;
+  padding: 4px 6px; border: 1px solid var(--border); border-left-width: 3px; border-radius: var(--r-sm); background: var(--s1); }
+.pick-row.is-deadly { border-left-color: var(--danger); }
+.pick-row.is-caution { border-left-color: var(--warn); }
+.pick-row.is-safe { border-left-color: var(--success); }
+.pick-row.is-seen { background: color-mix(in srgb, var(--accent) 10%, var(--s1)); border-color: var(--accent); }
+.pick-toggle { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 2px 0; border: 0; background: none;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.pick-toggle:hover .pick-name { color: var(--accent); }
+.pick-check { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm); color: var(--accent); font-weight: 700; }
+.pick-row.is-seen .pick-check { border-color: var(--accent); }
+.pick-name { overflow-wrap: anywhere; }
+.pick-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.pick-why { grid-column: 1 / -1; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.45; padding-left: 26px; }
+.pick-for { color: var(--text-3); }
+.pick-cite { color: var(--text-3); font-size: var(--fs-xs); }
+.pick-cite:hover { color: var(--accent); }
+
+/* rated lines: upsides, boons, win conditions, good remnants */
+.pick-values { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pick-value { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-sm); line-height: 1.45; }
+.pick-value .mech-rating { flex: none; }
+.pick-value-text { color: var(--text-2); }
+.pick-value-text b { color: var(--text); font-weight: 600; }
+.pick-target { color: var(--text-3); }
+.pick-rules { display: flex; flex-direction: column; gap: 4px; }
+
+/* the temple planner: a row per architect */
+.temple { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.temple-tips .sheet-list { margin: 0; }
+.temple-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px; }
+.temple-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2px 8px;
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--s1); }
+.temple-row.is-wanted { border-color: var(--accent); }
+.temple-row.is-done.is-wanted { border-color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--s1)); }
+.temple-star { border: 0; background: none; color: var(--text-3); font-size: var(--fs-lg); line-height: 1; cursor: pointer; padding: 2px; }
+.temple-star[aria-pressed="true"] { color: var(--accent); }
+.temple-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.temple-room { color: var(--text); font-weight: 600; }
+.temple-arch { color: var(--text-3); font-size: var(--fs-sm); }
+.temple-tiers { display: flex; gap: 2px; }
+.temple-tier { min-width: 30px; padding: 2px 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--s2); color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.temple-tier:hover { border-color: var(--accent); color: var(--text); }
+.temple-tier.is-on { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 20%, var(--s2)); }
+.temple-row .pick-why { grid-column: 2 / -1; padding-left: 0; }
+
+/* the in-game sheet is narrow: one column, smaller rows */
+.guide-ov-tools .temple-grid { grid-template-columns: 1fr; }
+.guide-ov-tools .pick-row { padding: 3px 5px; }

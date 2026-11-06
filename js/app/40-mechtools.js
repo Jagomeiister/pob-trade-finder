@@ -19,10 +19,12 @@ function mechTool(def) {
   MECH_TOOLS.sort(function (a, b) { return (a.order || 50) - (b.order || 50); });
 }
 
-// the tools for one sheet; in the overlay only the ones made for it
+// the tools for one sheet; in the overlay only the ones made for it. def.available(): false hides
+// a tool that has nothing to show (e.g. its research data is empty)
 function mechToolsFor(sheetId, overlay) {
   return MECH_TOOLS.filter(function (t) {
-    return (t.sheets || []).indexOf(sheetId) !== -1 && (!overlay || t.overlay);
+    if ((t.sheets || []).indexOf(sheetId) === -1 || (overlay && !t.overlay)) return false;
+    try { return typeof t.available !== 'function' || !!t.available(); } catch (e) { return false; }
   });
 }
 
