@@ -10,6 +10,9 @@ TAG = "60 scarabhub"
 # open Cheat sheets -> Scarabs; both tools sit at the top of that sheet
 OPEN = r"""
 const H = window.__e2e;
+// these steps test the atlas guide's strategies (the fallback): no tool-data strategies unless a
+// script sets its own (S60_TOOLS)
+if (!window.__e2eKeepTools) window.POE_GUIDES.tools = null;
 document.getElementById('open-sheets').click();
 await H.sleep(150);
 [...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => b.textContent === mechanicById('scarabs').title).click();
@@ -234,6 +237,7 @@ return { total: total(), lines: ['return', 'cost', 'profit', 'profitHour', 'inve
 # strategies from the tool data (mechToolData().strategies) win over the atlas guide; the atlas link opens
 S60_TOOLS = r"""
 const H = window.__e2e;
+window.__e2eKeepTools = true;
 window.POE_GUIDES.tools = { version: 1, asOf: '3.29', sources: [], strategies: [{ name: 'E2E strat', stage: ['late'],
   scarabs: [{ name: 'Ambush Scarab of Containment', count: 1 }, { name: 'Ambush Scarab', count: 5 }, { name: 'No Such Scarab', count: 1 }],
   maps: [], mapsPerHour: 12, costPerMapChaos: 300, mainDrops: [], atlasTreeUrl: 'https://poeplanner.com/atlas-tree/e2e',

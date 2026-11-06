@@ -309,6 +309,13 @@ function templeLoad() {
 }
 function templeSave(st) { persist(TEMPLE_KEY, JSON.stringify(st)); }
 function templeNorm(s) { return String(s || '').toLowerCase().replace(/[^a-z]/g, ''); }
+// a goal's name for the menu: research ids like "corrupt-items" read as "Corrupt items"
+var TEMPLE_GOAL_WORDS = { sell: 'Sell the temple', 'run-yourself': 'Run it yourself', 'upgrade-neighbours': 'Upgrade neighbouring rooms' };
+function templeGoalLabel(name) {
+  if (TEMPLE_GOAL_WORDS[name]) return TEMPLE_GOAL_WORDS[name];
+  var s = String(name || '').replace(/[-_]+/g, ' ').trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 mechTool({ id: 'temple', title: 'Temple room planner', sheets: ['incursion'], overlay: true, order: 10, mount: function (host, ctx) {
   var I = mechToolData().incursion;
@@ -323,7 +330,7 @@ mechTool({ id: 'temple', title: 'Temple room planner', sheets: ['incursion'], ov
   // goal presets from the research: they tick the rooms they want
   if (I.goals.length) {
     var gbar = UI.el('div', 'pick-bar');
-    var opts = [['', 'Pick a goal…']].concat(I.goals.map(function (g) { return [g.name, g.name]; }));
+    var opts = [['', 'Pick a goal…']].concat(I.goals.map(function (g) { return [g.name, templeGoalLabel(g.name)]; }));
     var sel = UI.select(opts, st.goal || '', { ariaLabel: 'Temple goal' });
     sel.addEventListener('change', function () {
       st.goal = sel.value;

@@ -20,8 +20,9 @@
 .mech-rating { white-space: nowrap; }
 
 /* "my build uses ..." toggle chips */
-.mech-build { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.mech-build-label { color: var(--text-2); font-size: var(--fs-sm); }
+.mech-build { display: flex; flex-direction: column; gap: 4px; }
+.mech-build-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.mech-build-label { flex: none; min-width: 96px; color: var(--text-2); font-size: var(--fs-sm); }
 .mech-build-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .mech-tag { padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--r-pill);
   background: var(--s2); color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; }

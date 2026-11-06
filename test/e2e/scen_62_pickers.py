@@ -176,6 +176,38 @@ out.sanctTitle = H.text('.sheet-title');
 return out;
 """
 
+# the shipped research data (no fixture): every picker draws a row per rated entry, the goals read
+# as words, and the scarab hub offers the research strategies
+REAL = r"""
+const H = window.__e2e;
+const T = window.POE_GUIDES.tools;
+const out = { has: !!T };
+if (!T) return out;
+document.getElementById('open-sheets').click();
+await H.sleep(80);
+const pick = (id) => { [...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => b.textContent === mechanicById(id).title).click(); };
+const panel = () => document.querySelector('#view-sheets .sheet-panel.is-mech');
+const rows = (tool) => panel().querySelectorAll('.mech-tool[data-tool="' + tool + '"] .pick-pane:not([hidden]) .pick-row').length;
+pick('eldritch'); await H.sleep(80);
+out.altar = [rows('altarpick'), T.eldritch.downsides.length];
+pick('ultimatum'); await H.sleep(80);
+out.ulti = [rows('ultipick'), T.ultimatum.mods.length];
+pick('sanctum'); await H.sleep(80);
+out.sanct = [rows('sanctpick'), T.sanctum.afflictions.length];
+pick('expedition'); await H.sleep(80);
+out.exp = [rows('exppick'), T.expedition.remnants.filter(r => r.kind === 'bad').length];
+pick('incursion'); await H.sleep(80);
+const t = panel().querySelector('.mech-tool[data-tool="temple"]');
+out.goals = [...t.querySelectorAll('select option')].slice(1).map(o => o.textContent);
+out.values = t.querySelectorAll('.temple-row .mech-rating').length;
+out.rooms = T.incursion.rooms.length;
+pick('scarabs'); await H.sleep(150);
+const sel = panel().querySelector('.mech-tool[data-tool="scarabhub"] select.shub-strat-select');
+out.strats = sel ? [...sel.options].filter(o => o.value).length : -1;
+out.wantStrats = T.strategies.length;
+return out;
+"""
+
 
 def run(s, tag, check):
     s.fresh()
@@ -209,6 +241,15 @@ def run(s, tag, check):
     s.b.navigate(s.url, "typeof mechToolsFor === 'function' && document.readyState === 'complete'", timeout=30)
     r = s.run(RELOAD, timeout=40, FIX=FIX)
     check(tag + " temple comes back after a reload", r["sum"] == "1 of 2 at tier 3" and r["goal"] == "Test: double corrupt", r)
+    s.fresh()
+    r = s.run(REAL, timeout=60)
+    check(tag + " shipped data: the guides payload carries the tools' research", r.get("has"), r)
+    if r.get("has"):
+        check(tag + " shipped data: a row per rated altar downside / Ultimatum mod / affliction / bad remnant",
+              all(r[k][0] == r[k][1] and r[k][0] > 0 for k in ("altar", "ulti", "sanct", "exp")), r)
+        check(tag + " shipped data: temple goals read as words, every researched room shows its value",
+              r["goals"] and all(g[:1].isupper() and "-" not in g for g in r["goals"]) and r["values"] == r["rooms"], r)
+        check(tag + " shipped data: the scarab hub offers the research strategies", r["strats"] == r["wantStrats"] > 0, r)
     s.fresh("?sheet=1")
     r = s.run(OVERLAY, timeout=40, FIX=FIX)
     check(tag + " in-game sheet: Quick card | Tools | Reference", r["tabs"] == ["Quick card", "Tools", "Reference"], r["tabs"])

@@ -169,10 +169,16 @@ function mechRating(r, label) {
 }
 
 // the build-type tags the pickers use (dangerousFor), with words for the chips
+// (the same list as BUILD_TAGS in tools/make_guides.py), in two rows: how you survive, how you kill
 var MECH_BUILD_TAGS = [
-  ['life-regen', 'Life regen'], ['leech', 'Leech'], ['es', 'Energy shield'], ['minion', 'Minions'],
-  ['dot', 'Damage over time'], ['attack', 'Attacks'], ['spell', 'Spells'], ['low-max-res', 'Low max res'],
-  ['flask', 'Flask-reliant'], ['curse', 'Curses'], ['mana', 'Mana-reliant'], ['low-ehp', 'Low EHP / glass'],
+  ['life-regen', 'Life regen', 'def'], ['leech', 'Leech', 'def'], ['es', 'Energy shield', 'def'],
+  ['armour', 'Armour', 'def'], ['evasion', 'Evasion', 'def'], ['flask', 'Flask-reliant', 'def'],
+  ['mana', 'Mana-reliant', 'def'], ['low-max-res', 'Low max res', 'def'], ['low-ehp', 'Low EHP / glass', 'def'],
+  ['low-life', 'Low life', 'def'], ['low-mobility', 'Low mobility', 'def'],
+  ['attack', 'Attacks', 'off'], ['melee', 'Melee', 'off'], ['spell', 'Spells', 'off'], ['minion', 'Minions', 'off'],
+  ['dot', 'Damage over time', 'off'], ['crit', 'Crit', 'off'], ['curse', 'Curses', 'off'], ['low-dps', 'Slow kill speed', 'off'],
+  ['phys', 'Physical', 'off'], ['fire', 'Fire', 'off'], ['cold', 'Cold', 'off'], ['lightning', 'Lightning', 'off'],
+  ['chaos', 'Chaos', 'off'],
 ];
 function mechTagName(t) {
   var p = MECH_BUILD_TAGS.filter(function (x) { return x[0] === t; })[0];
@@ -190,12 +196,20 @@ function mechSetBuildTags(tags) { persist(MECH_BUILD_KEY, JSON.stringify(tags));
 // a row of toggle chips for "my build is ..."; onChange(tags)
 function mechBuildPicker(onChange) {
   var box = UI.el('div', 'mech-build');
-  box.appendChild(UI.el('span', 'mech-build-label', 'My build uses'));
-  var row = UI.el('div', 'mech-build-tags');
-  row.setAttribute('role', 'group');
-  row.setAttribute('aria-label', 'What your build relies on');
   var mine = mechBuildTags();
+  var rows = {};
+  [['def', 'I survive with'], ['off', 'I kill with']].forEach(function (g) {
+    var line = UI.el('div', 'mech-build-line');
+    line.appendChild(UI.el('span', 'mech-build-label', g[1]));
+    var r = UI.el('div', 'mech-build-tags');
+    r.setAttribute('role', 'group');
+    r.setAttribute('aria-label', 'Your build: ' + g[1].toLowerCase());
+    line.appendChild(r);
+    box.appendChild(line);
+    rows[g[0]] = r;
+  });
   MECH_BUILD_TAGS.forEach(function (p) {
+    var row = rows[p[2]];
     var b = UI.el('button', 'mech-tag', p[1]);
     b.type = 'button';
     b.setAttribute('aria-pressed', mine.indexOf(p[0]) !== -1 ? 'true' : 'false');
@@ -209,7 +223,6 @@ function mechBuildPicker(onChange) {
     });
     row.appendChild(b);
   });
-  box.appendChild(row);
   return box;
 }
 

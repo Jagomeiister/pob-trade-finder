@@ -475,8 +475,18 @@ TOOL_TOPICS = {
 }
 DANGER_RATINGS = ("safe", "caution", "deadly")
 VALUE_RATINGS = ("high", "medium", "low")
-BUILD_TAGS = ("life-regen", "leech", "es", "minion", "dot", "attack", "spell", "low-max-res", "flask",
-              "curse", "mana", "low-ehp", "all")
+BUILD_TAGS = ("life-regen", "leech", "es", "minion", "dot", "attack", "melee", "spell", "crit", "low-max-res", "flask",
+              "curse", "mana", "low-ehp", "low-life", "low-mobility", "low-dps", "armour", "evasion",
+              "phys", "fire", "cold", "lightning", "chaos", "all")
+# the research's own words for the same build traits -> the tools' tags (one may stand for several);
+# situational notes ("early floors", "hardcore") aren't build types and stay in the "why" text only
+TAG_ALIASES = {
+    "all-builds": ["all"], "minions": ["minion"], "energy-shield": ["es"], "ci": ["es"], "mom": ["mana"],
+    "face-tank": ["melee", "low-ehp"], "glass-cannon": ["low-ehp"], "low-life-pool": ["low-ehp"],
+    "no-crit-damage-reduction": ["low-ehp"], "drops-low-between-hits": ["low-life"], "physical": ["phys"],
+    "poison": ["chaos"], "ignite": ["fire"], "freeze": ["cold"], "shock": ["lightning"],
+    "elemental": ["fire", "cold", "lightning"], "cast-on-crit": ["crit"], "slow-dot": ["dot"],
+}
 TOOL_WARNINGS = []
 
 
@@ -519,7 +529,11 @@ def tool_entry(topic, key, e, where):
             return None
         e["value"] = v
     if "dangerousFor" in e:
-        tags = [str(t).strip().lower() for t in e.get("dangerousFor") or []]
+        tags = []
+        for t in (str(t).strip().lower() for t in e.get("dangerousFor") or []):
+            for x in TAG_ALIASES.get(t, [t]):
+                if x not in tags:
+                    tags.append(x)
         unknown = [t for t in tags if t not in BUILD_TAGS]
         if unknown:
             TOOL_WARNINGS.append("%s: unknown build tags %s left out" % (where, unknown))
