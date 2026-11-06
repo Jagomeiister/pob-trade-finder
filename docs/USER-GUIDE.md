@@ -714,6 +714,38 @@ Kingsmarch, vendor recipes, Mercenaries, Atlas strategies) now has a full guide 
 - The guides update from the app's server, so fixes and the next league's changes arrive without
   a new download.
 
+## 5i4. 🧰 Mechanic tools: scarabs, prices, pickers, temple planner
+
+Interactive tools sit inside the mechanic sheets (open first, listed in **Jump to**). Prices and
+icons come from GGG's hourly currency exchange — no trade-site searches, nothing to wait for.
+
+- **Scarab hub** (Scarabs and Atlas sheets): every scarab with its icon, price, effect and limit
+  per map. Search, filter by family, sort by price. Click a scarab to add it to **My setup**; add
+  the map, embers, astrolabes, orbs or a typed cost. The setup shows its **cost per map** in chaos
+  and divines. **Strategy** fills the setup from an Atlas strategy (it asks before replacing yours)
+  and lists anything it couldn't match.
+- **Profit calculator** (same sheets): maps per hour, cost per map (from My setup unless you type
+  one) and what you expect per map (pick items or type amounts) give profit per map, per hour and
+  the investment per hour. The community's own estimates for that strategy sit next to it — rough,
+  as of 3.29.
+- **Price boards**: fossils by Delve biome (with the best biome right now), essences by tier,
+  lifeforce (each, per 100, per 1,000), oils by tier, Delirium orbs and Simulacrum, Breach and
+  Legion fragments, Expedition currencies, catalysts (Expedition and Vendor sheets) and beasts
+  (Bestiary, with recipe beasts marked; beast prices from poe.ninja).
+- **Pick-and-check helpers** (Eldritch altars, Ultimatum, Sanctum, Expedition): tick what your
+  build relies on (how you survive, how you kill), then click the modifiers you see. The verdict
+  names anything run-ending for your build; "Hits your build" and "Deadly for other builds" tell
+  the two apart. Each line says why and links its sources. Extra tabs list the good upsides /
+  boons / remnants and rules of thumb.
+- **Temple room planner** (Incursion): pick a goal (or star rooms yourself) and set each room to
+  the tier it has in your temple; it counts the wanted rooms at tier 3 and says which still need
+  upgrades. Saved between sessions.
+- **In game** (Alt+C): the boards, pickers and the temple planner are on the sheet's **Tools**
+  tab, click-only.
+- The ratings come from community guides and player reports (as of 3.29), each checked against
+  its source by three reviewers. They are a rough guide: your own defences decide. Like the
+  guides, they update from the app's server.
+
 ## 5j. 🃏 Div cards
 
 Tools → **Div cards** shows where each divination card drops and what it's worth.

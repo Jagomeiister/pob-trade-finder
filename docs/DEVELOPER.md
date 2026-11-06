@@ -43,7 +43,8 @@ index.html + js/*  ──────────────►  any browser   
 |---|---|
 | `fetch_pob_link(url)` | Fetch a PoB code from pobb.in/pastebin/poe.ninja (host-allowlisted) |
 | `guides_data()` | Mechanic guides from the app's server (`server/public/guides.json`), cached to `data/guides_cache.json`; the page keeps whichever of it and the shipped `data/guides.js` has the newer `version` |
-| `open_url(url)` | Opens allow-listed sites, or an http(s) URL that exactly matches a source listed in the guide data (Read more links) |
+| `open_url(url)` | Opens allow-listed sites, or an http(s) URL that exactly matches a source listed in the guide data (Read more links, the tools' sources and strategy atlas links) |
+| `mech_prices(league, groupsJson)` | Mechanic tools: icon + chaos price for whole item groups (`Api.MECH_GROUPS`: scarabs, fossils, essences, lifeforce, oils, catalysts, delirium, fragments, expedition, foulborn, embers, currency) from the hourly exchange feed only; icons not yet in the art cache are fetched in a background thread |
 | `trade_search(league, payloadJson, background=False)` | POST search; returns first 10 listings + up to 100 ids. `background` (saved-build daily re-pricing) paces at `BG_INTERVAL` and is refused during any cooldown |
 | `trade_fetch(searchId, idsJson)` | One further page (≤10 ids, ids validated) |
 | `exchange_rates(league, currenciesJson)` | Median chaos rate per currency from GGG bulk exchange, 30-min cache |
@@ -470,3 +471,21 @@ the v2.0 redesign finishes migrating components — see `docs/UI-PLAN.md`.
 - Each league: re-run the research workflow (or add corrections from the patch notes), bump the
   file names to the new patch, regenerate, push to main: the server serves the new guides without
   an app release.
+
+### Mechanic tools (js/app/40-43)
+
+- `40-mechtools.js` is the core: `mechTool({id, title, sheets, overlay, available, mount})`
+  registers a tool; `mechToolsFor(sheet, overlay)` is what the sheets call — a guide sheet draws
+  each tool as an open section (33-guides.js), a sheet without a guide puts them at the top
+  (24-cheatsheets.js `mechanicContent`), and the in-game sheet shows `overlay: true` tools on a
+  **Tools** tab (click-only: no text inputs there). `available()` false hides a tool with no data.
+  Prices: `mechPrices(groups, cb)` → `mech_prices` bridge, one load per league per 20 min.
+- 41 scarab hub + profit calculator, 42 price boards, 43 pickers + temple planner. Each has its own
+  CSS file (`css/mech-*.css`) and e2e scenario file (`test/e2e/scen_6x_*.py`, picked up by
+  `run_e2e.py`'s `_extra_scenarios`).
+- The pickers' ratings, the temple's room values/goals and the strategy setups are research:
+  `tools/guides/mechtools-<patch>.json` (the `poe-tool-data` workflow: 2 researchers, 3 verifiers
+  per claim, a writer per topic; keep it as the record). `make_guides.py` folds it into the guides
+  payload as `tools` (sources merged, cites re-pointed, unknown ratings dropped with a warning,
+  build tags mapped through `TAG_ALIASES`, kept in step with `MECH_BUILD_TAGS` in 40-mechtools.js),
+  so it ships and server-updates with the guides. The tools read it through `mechToolData()`.

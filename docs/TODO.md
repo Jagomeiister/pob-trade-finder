@@ -264,7 +264,15 @@ sources, or ask the author.
 - [ ] **3.30 (13 Nov 2026): refresh the mechanic guides.** Read the 3.30 patch notes, add corrections
       (tools/guides/corrections-3.29.json) or re-run the research workflow for changed mechanics,
       regenerate (make_guides.py + make_syndicate.py), push: the server serves the update.
+      The mechanic tools' data (tools/guides/mechtools-3.29.json: altar / Ultimatum / Sanctum /
+      remnant ratings, temple rooms, strategy setups) refreshes the same way: re-run the
+      `poe-tool-data` workflow for changed mechanics; check new scarab / currency names land in
+      `MECH_GROUPS` (gui.py).
 - [ ] In game: the guide quick card + Reference tab (Alt+C), and the Syndicate planner against a real board.
+- [ ] In game: the Tools tab (Alt+C) on Eldritch / Ultimatum / Sanctum / Expedition / Incursion / Delve
+      while the encounter is up; scarab hub prices against the in-game exchange.
+- [ ] guides.js is ~740 KB with the tools data (every window loads it): if it grows past 800 KB, move
+      `tools` into its own lazily-loaded payload.
 
 ## 4. Parked / decided against (and why)
 
