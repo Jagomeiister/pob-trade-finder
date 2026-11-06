@@ -40,7 +40,7 @@ function pickChecker(host, ctx, cfg) {
   var verdict = UI.el('div', 'pick-verdict');
   verdict.setAttribute('role', 'status');
   verdict.setAttribute('aria-live', 'polite');
-  root.appendChild(mechBuildPicker(function () { draw(); }));
+  root.appendChild(mechBuildPicker(function () { draw(); }, { compact: !!ctx.overlay, onResize: ctx.onChange }));
 
   var bar = UI.el('div', 'pick-bar');
   var seg = UI.segmented([['all', 'All'], ['deadly', 'Run-ending'], ['mine', 'Hits my build'], ['seen', 'Marked']], state.filter, {

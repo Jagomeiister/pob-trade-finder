@@ -202,10 +202,29 @@ function mechBuildTags() {
 }
 function mechSetBuildTags(tags) { persist(MECH_BUILD_KEY, JSON.stringify(tags)); }
 
-// a row of toggle chips for "my build is ..."; onChange(tags)
-function mechBuildPicker(onChange) {
+// a row of toggle chips for "my build is ..."; onChange(tags). opts.compact (the in-game sheet):
+// folded into one line naming what's ticked ("My build: Melee, Low EHP ▸"), open on click
+var mechBuildOpen = false; // the folded picker, opened (while the app runs)
+function mechBuildPicker(onChange, opts) {
+  opts = opts || {};
   var box = UI.el('div', 'mech-build');
   var mine = mechBuildTags();
+  var outer = box;
+  if (opts.compact) {
+    outer = UI.el('details', 'mech-build-fold');
+    outer.open = mechBuildOpen;
+    var sum = UI.el('summary', 'mech-build-sum');
+    var setSum = function () {
+      var t = mechBuildTags().map(mechTagName);
+      sum.textContent = 'My build: ' + (t.length ? t.join(', ') : 'not set (click to tick what it uses)');
+    };
+    setSum();
+    outer.appendChild(sum);
+    outer.appendChild(box);
+    outer.addEventListener('toggle', function () { mechBuildOpen = outer.open; if (opts.onResize) opts.onResize(); });
+    var inner = onChange;
+    onChange = function (cur) { setSum(); if (inner) inner(cur); };
+  }
   var rows = {};
   [['def', 'I survive with'], ['off', 'I kill with']].forEach(function (g) {
     var line = UI.el('div', 'mech-build-line');
@@ -232,7 +251,7 @@ function mechBuildPicker(onChange) {
     });
     row.appendChild(b);
   });
-  return box;
+  return outer;
 }
 
 // does this mod hit my build? 'all' always does; no tags picked = only 'all'

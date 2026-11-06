@@ -30,6 +30,9 @@
 .mech-tag[aria-pressed="true"] { border-color: var(--accent); color: var(--text);
   background: color-mix(in srgb, var(--accent) 18%, var(--s2)); }
 
+.mech-build-fold > summary { color: var(--text-2); font-size: var(--fs-sm); cursor: pointer; padding: 2px 0; }
+.mech-build-fold > summary:hover { color: var(--accent); }
+.mech-build-fold[open] > summary { margin-bottom: 4px; }
 .mech-search { min-width: 0; width: 100%; max-width: 320px; }
 
 .mech-foot { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.5; }

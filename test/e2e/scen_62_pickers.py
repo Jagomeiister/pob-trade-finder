@@ -161,6 +161,19 @@ await H.sleep(40);
 const tool = p.querySelector('.guide-ov-tools .mech-tool[data-tool="altarpick"]');
 out.tool = !!tool && tool.getClientRects().length > 0;
 out.typing = tool ? tool.querySelectorAll('input, textarea').length : -1;
+// the build tags fold to one line in game; opening it re-fits the window, ticking names the tag
+const fold = tool.querySelector('details.mech-build-fold');
+out.foldClosed = !!fold && !fold.open && /My build: not set/.test(fold.querySelector('summary').textContent);
+const f0 = H.calls('overlay_fit').length;
+fold.querySelector('summary').click();
+await H.sleep(40);
+out.foldFit = fold.open && H.calls('overlay_fit').length > f0;
+[...fold.querySelectorAll('.mech-tag')].find(b => b.textContent === 'Melee').click();
+await H.sleep(20);
+out.foldSum = fold.querySelector('summary').textContent;
+[...fold.querySelectorAll('.mech-tag')].find(b => b.textContent === 'Melee').click();
+fold.querySelector('summary').click();
+await H.sleep(20);
 const fits = H.calls('overlay_fit').length;
 tool.querySelector('.pick-row .pick-toggle').click();
 await H.sleep(40);
@@ -254,6 +267,8 @@ def run(s, tag, check):
     r = s.run(OVERLAY, timeout=40, FIX=FIX)
     check(tag + " in-game sheet: Quick card | Tools | Reference", r["tabs"] == ["Quick card", "Tools", "Reference"], r["tabs"])
     check(tag + " in-game: the altar picker shows, nothing to type", r["tool"] and r["typing"] == 0, r)
+    check(tag + " in-game: the build tags fold to one line, open re-fits the window, the line names what's ticked",
+          r["foldClosed"] and r["foldFit"] and r["foldSum"] == "My build: Melee", r)
     check(tag + " in-game: marking re-fits the window; the why shows for the marked row only; tab remembered",
           r["fit"] and r["whyMarkedOnly"] and r["tabSaved"] == "tools", r)
     check(tag + " in-game: no tool data -> no Tools tab (an empty tool stays hidden)",
