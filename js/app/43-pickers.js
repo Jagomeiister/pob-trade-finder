@@ -132,15 +132,31 @@ function pickRow(e, eff, on, ctx, onToggle) {
 }
 
 // [1] [2] links to the sources a line cites (the app only: the overlay has no browser to open)
+// one link per site (the first page cited from it), at most PICK_CITE_MAX; the rest are counted
+var PICK_CITE_MAX = 3;
 function pickCites(el, cite) {
+  var seen = {}, sites = [];
   mechCited(cite).forEach(function (s) {
-    var a = UI.el('a', 'pick-cite', s.publisher || 'source');
+    var key = String(s.publisher || s.url).toLowerCase().replace(/\s*\(.*\)\s*/g, '').trim();
+    if (seen[key]) { seen[key].more.push(s); return; }
+    seen[key] = { s: s, more: [] };
+    sites.push(seen[key]);
+  });
+  sites.slice(0, PICK_CITE_MAX).forEach(function (x) {
+    var s = x.s;
+    var a = UI.el('a', 'pick-cite', String(s.publisher || 'source').replace(/\s*\(.*\)\s*$/, ''));
     a.href = '#';
-    a.title = (s.title || s.url) + (s.date ? ' (' + s.date + ')' : '');
+    a.title = (s.title || s.url) + (s.date ? ' (' + s.date + ')' : '') + (x.more.length ? ' — and ' + x.more.length + ' more page' + (x.more.length === 1 ? '' : 's') + ' there' : '');
     a.addEventListener('click', function (ev) { ev.preventDefault(); if (typeof openUrl === 'function') openUrl(s.url); });
     el.appendChild(document.createTextNode(' '));
     el.appendChild(a);
   });
+  if (sites.length > PICK_CITE_MAX) {
+    var rest = sites.slice(PICK_CITE_MAX).map(function (x) { return x.s.publisher || x.s.url; });
+    var m = UI.el('span', 'pick-cite-more', ' +' + rest.length);
+    m.title = 'Also: ' + rest.join(', ');
+    el.appendChild(m);
+  }
 }
 
 // a plain list of rated lines (upsides, boons, good remnants, win conditions): value chip + text
@@ -169,8 +185,10 @@ function pickRules(rules, ctx, title) {
   box.appendChild(UI.el('div', 'pick-group-title', title || 'Rules of thumb'));
   var ul = UI.el('ul', 'sheet-list');
   rules.forEach(function (r) {
-    var li = UI.el('li', 'sheet-li', r.text);
-    if (!ctx.overlay) pickCites(li, r.cite);
+    var li = UI.el('li', 'sheet-li');
+    var t = UI.el('span', 'pick-rule-text', r.text); // one inline run: the cites follow the text
+    if (!ctx.overlay) pickCites(t, r.cite);
+    li.appendChild(t);
     ul.appendChild(li);
   });
   box.appendChild(ul);
@@ -294,6 +312,7 @@ mechTool({ id: 'exppick', title: 'Remnant picker', sheets: ['expedition'], overl
 // want. The chains come from the wiki sheet (Room upgrade chains); the room values, goals and tips
 // from the verified research. Saved: pobtf-temple (persist()).
 var TEMPLE_KEY = 'pobtf-temple';
+var templeWhyOpen = {}; // rooms whose "Why" you opened (while the app runs)
 
 function templeChains() {
   var m = typeof mechanicById === 'function' ? mechanicById('incursion') : null;
@@ -397,9 +416,17 @@ mechTool({ id: 'temple', title: 'Temple room planner', sheets: ['incursion'], ov
     var g = I.goals.filter(function (x) { return x.name === st.goal; })[0];
     if (g && g.tips.length) {
       var ul = UI.el('ul', 'sheet-list');
-      g.tips.forEach(function (t) { ul.appendChild(UI.el('li', 'sheet-li', t)); });
+      g.tips.forEach(function (t) {
+        var li = UI.el('li', 'sheet-li');
+        li.appendChild(UI.el('span', 'pick-rule-text', t));
+        ul.appendChild(li);
+      });
       tips.appendChild(ul);
-      if (!ctx.overlay) pickCites(tips, g.cite);
+      if (!ctx.overlay) {
+        var src = UI.el('div', 'mech-foot', 'Sources for these tips:');
+        pickCites(src, g.cite);
+        tips.appendChild(src);
+      }
     }
     if (ctx.onChange) ctx.onChange();
   }
@@ -434,10 +461,18 @@ mechTool({ id: 'temple', title: 'Temple room planner', sheets: ['incursion'], ov
       tiers.appendChild(b);
     });
     row.appendChild(tiers);
+    // why this room is worth it: folded ("Why") so the grid stays scannable; open for wanted rooms
+    // in the app, and only shown for wanted rooms in the game
     if (ri && ri.why && (!ctx.overlay || want)) {
+      var det = UI.el('details', 'temple-why');
+      det.open = want && !ctx.overlay ? true : !!templeWhyOpen[c.short];
+      if (ctx.overlay) det.open = true;
+      det.appendChild(UI.el('summary', 'temple-why-sum', 'Why'));
       var why = UI.el('div', 'pick-why', ri.why);
       if (!ctx.overlay) pickCites(why, ri.cite);
-      row.appendChild(why);
+      det.appendChild(why);
+      det.addEventListener('toggle', function () { templeWhyOpen[c.short] = det.open; if (ctx.onChange) ctx.onChange(); });
+      row.appendChild(det);
     }
     return row;
   }

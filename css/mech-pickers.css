@@ -67,7 +67,12 @@
   background: var(--s2); color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
 .temple-tier:hover { border-color: var(--accent); color: var(--text); }
 .temple-tier.is-on { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 20%, var(--s2)); }
-.temple-row .pick-why { grid-column: 2 / -1; padding-left: 0; }
+.temple-why { grid-column: 2 / -1; }
+.temple-why-sum { color: var(--text-3); font-size: var(--fs-sm); cursor: pointer; width: fit-content; }
+.temple-why-sum:hover { color: var(--accent); }
+.temple-why .pick-why { padding: 2px 0 0; }
+.temple-grid { align-items: start; }
+.pick-cite-more { color: var(--text-3); font-size: var(--fs-xs); cursor: help; }
 
 /* the in-game sheet is narrow: one column, smaller rows */
 .guide-ov-tools .temple-grid { grid-template-columns: 1fr; }
