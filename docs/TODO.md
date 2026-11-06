@@ -126,6 +126,45 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [x] **Search text**: one map mod (done: regex `s have \d+% increased ar`) ("Monsters have #% increased Area of Effect") has no
       unique plain-text token. It could use a small regex.
 
+## 2b. In progress: round 2 (planned v2.5.24) — paused 2026-11-06
+
+Plan: `~/.claude/plans/snuggly-toasting-teapot.md`. Branch `sheets-round2`, worktree
+`.claude/worktrees/sheets-round2` (gitignored data copied in). Reserved with both forks: js/app 44-46,
+e2e scen_64-68, css/mech-bosses|leveling|relics.css, edits to 11-market / 24 / 28 / 33 / 41 / 42,
+server/api/prices.js, make_extras.py + data/extras.js + server/public/extras.json.
+
+Done so far: `gui.py` extras bridge (`extras_data`, `_extras_ok`, `_extras_urls`, `EXTRAS_API`,
+`IMAGE_HOSTS`, open_url allowlist reads the extras).
+
+- [ ] **Research** (`poe-extras` workflow, stopped mid-run; resume with the same script + args:
+      `Workflow({scriptPath: …/workflows/scripts/poe-extras-wf_fc97f557-17e.js, resumeFromRunId:
+      "wf_fc97f557-17e", args: <same>})`; finished agents replay from cache). Topics: pinnacle / uber /
+      league / campaign bosses (+ verified images), leveling acts 1-5 and 6-10 + labs + XP penalty,
+      Sanctum relics, Heist rogue gear, atlas trees for all 132 strategies. Save as
+      `tools/guides/extras-3.29.json`.
+- [ ] **Data pipeline**: `tools/make_extras.py` → `data/extras.js` + `server/public/extras.json`
+      (research + game data: `templar_relic` relic mods and `heist_npc` rogue mods with weight > 0,
+      atlas node ids from `data/atlasview.js` + auto-connected trees); `extrasData()` / `extrasSync()`
+      in 40-mechtools.js; `art_cache.ALLOWED_PREFIXES` += poewiki images + cdn.poedb.tw; index.html +
+      build_release SHIP entries; `test/test_extras.py`.
+- [ ] **Folding**: every wiki table a fold (first open, remembered per sheet in `pobtf-sheet-open`),
+      act sheet sections too, filter opens matching folds (and fix the title-hit bug), overlay re-fits.
+- [ ] **Sanctum relic planner** (46): loadouts, mods by goal with tiers and sizes, base shapes.
+- [ ] **Heist rogue gear** (46): per rogue / job, the 4 slots and the mods to want; dead mods marked.
+- [ ] **Bestiary recipe browser**: gear-type chips, beast → recipes, beast prices per recipe.
+- [ ] **Atlas trees per strategy**: "Open tree" link + "Show on my Atlas tree" (in-app, auto-connected,
+      marked rough) on every strategy card and in the scarab hub; poeplanner links clickable.
+- [ ] **Boss guides** (44): new Bosses sheet, grid with images (art cache, credit line), detail
+      (reach, phases, what kills you, rough stats, drops with prices, uber changes), in-game card.
+- [ ] **Leveling guide** (45): gem picks for the build (reward to take, gems to buy, required level from
+      make_cheatsheets), act tips + boss notes, lab / ascendancy prompts (store ascendancy + bandit in
+      `sheetRememberBuild`), over/under-levelled hint from `is now level N` (log reading only when on).
+- [ ] **Market like poe.ninja** (11): left category rail (exchange + poe.ninja types), per-category
+      tables with icons, chaos + divine, 7-day sparklines, change, volume/listings, filters (gem level /
+      quality / corrupted, map tier), detail drawer; `ninja_category` bridge; `server/api/prices.js`
+      `compact()` adds icon + sparkline (+ server test).
+- [ ] e2e scen_64-68, review workflow (4 lenses, 3 skeptics), screenshots, docs, then release on "publish it".
+
 ## 3. To do (agreed, not started)
 
 - [x] **Trade ledger** (released in v2.5.8): buying cards record Bought / Didn't happen /

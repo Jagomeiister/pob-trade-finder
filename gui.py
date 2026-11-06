@@ -63,6 +63,9 @@ CHEATSHEETS_TTL = 6 * 3600
 # mechanic strategy guides (tools/make_guides.py), drawn inside the cheat sheets: same server pattern
 GUIDES_API = "https://pob-trade-finder.vercel.app/guides.json"
 GUIDES_TTL = 6 * 3600
+EXTRAS_API = "https://pob-trade-finder.vercel.app/extras.json"  # boss guides, leveling, relics, rogue gear, atlas trees
+# where boss guide images may come from (also the art cache's allowlist, art_cache.py)
+IMAGE_HOSTS = ("https://web.poecdn.com/", "https://www.poewiki.net/images/", "https://cdn.poedb.tw/")
 
 # GGG rate limits are strict; space all trade API calls out and honour 429s.
 MIN_INTERVAL = 2.5
@@ -1134,12 +1137,78 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @staticmethod
+    def _extras_ok(data):
+        """The extras payload (tools/make_extras.py): versioned, web-page sources, boss images only
+        from the hosts the art cache may fetch, tree links only https."""
+        try:
+            if not (isinstance(data.get("version"), int) and not isinstance(data.get("version"), bool)):
+                return False
+            if not all(isinstance(s, dict) and str(s.get("url", "")).startswith(("https://", "http://"))
+                       for s in data.get("sources") or []):
+                return False
+            for b in data.get("bosses") or []:
+                img = (b or {}).get("image")
+                if img and not str(img.get("url", "")).startswith(IMAGE_HOSTS):
+                    return False
+            return all(not t.get("treeUrl") or str(t["treeUrl"]).startswith("https://")
+                       for t in data.get("atlasTrees") or [])
+        except (AttributeError, TypeError):
+            return False
+
+    def extras_data(self):
+        """Boss guides, leveling tips, relic and rogue gear advice, atlas trees: the server's copy
+        (newest), else the last one downloaded. The page keeps whichever of it and the shipped
+        data/extras.js has the newer version."""
+        try:
+            hit = getattr(self, "_extras_cache", None)
+            if hit and time.time() - hit[0] < GUIDES_TTL:
+                return {"ok": True, "data": hit[1]}
+            disk = os.path.join(DATA_DIR, "extras_cache.json")
+            data = None
+            try:
+                req = urllib.request.Request(EXTRAS_API, headers={"User-Agent": UA, "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    data = json.loads(r.read().decode("utf-8"))
+                if not self._extras_ok(data):
+                    raise ValueError("incomplete extras")
+                try:
+                    with open(disk, "w", encoding="utf-8") as f:
+                        json.dump(data, f)
+                except OSError:
+                    pass
+            except Exception:
+                try:
+                    with open(disk, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except (OSError, ValueError):
+                    data = None
+                if not (data and self._extras_ok(data)):
+                    return {"ok": False, "error": "offline: using the extras shipped with the app"}
+            self._extras_cache = (time.time(), data)
+            return {"ok": True, "data": data}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @staticmethod
+    def _extras_urls(data):
+        """The pages the extras link to: their sources, the atlas tree links, the boss image pages."""
+        if not isinstance(data, dict):
+            return set()
+        urls = {s["url"] for s in data.get("sources") or [] if s.get("url")}
+        urls.update(t["treeUrl"] for t in data.get("atlasTrees") or [] if t.get("treeUrl"))
+        urls.update(b["image"]["page"] for b in data.get("bosses") or []
+                    if isinstance(b.get("image"), dict) and str(b["image"].get("page", "")).startswith("https://"))
+        return urls
+
     def _guide_urls(self):
         """Every guide's written sources (Read more): the only other pages open_url may open. From
         the shipped data/guides.js and the server copy (memory, else the disk cache), read once."""
         urls = getattr(self, "_guide_url_set", None)
-        if getattr(self, "_guides_cache", None) is not getattr(self, "_guide_url_src", None):
-            urls = None  # a server copy arrived since the last read: read again
+        src = (getattr(self, "_guides_cache", None), getattr(self, "_extras_cache", None))
+        old = getattr(self, "_guide_url_src", None) or (None, None)
+        if src[0] is not old[0] or src[1] is not old[1]:
+            urls = None  # a server copy (guides or extras) arrived since the last read: read again
         if urls is None:
             urls = set()
             copies = []
@@ -1163,7 +1232,21 @@ class Api:
                     for g in d["guides"].values():
                         urls.update(r["url"] for r in g["readMore"])
                     urls.update(self._tool_urls(d.get("tools")))
-            self._guide_url_set, self._guide_url_src = urls, hit
+            # the extras (boss guides, atlas trees …): the shipped copy and the server's
+            ex = []
+            try:
+                with open(os.path.join(DATA_DIR, "extras.js"), "r", encoding="utf-8") as f:
+                    m = re.search(r"window\.POE_EXTRAS\s*=\s*(\{.*\})\s*;\s*$", f.read(), re.S)
+                ex.append(json.loads(m.group(1)) if m else None)
+            except (OSError, ValueError):
+                pass
+            eh = getattr(self, "_extras_cache", None)
+            if eh:
+                ex.append(eh[1])
+            for d in ex:
+                if d and self._extras_ok(d):
+                    urls.update(self._extras_urls(d))
+            self._guide_url_set, self._guide_url_src = urls, src
         return urls
 
     DIVCARDS_LAST = "divcards_last.json"  # last full answer per league, shown at once after a restart
