@@ -33,3 +33,8 @@ data/divcards_cache.json
 data/cheatsheets/
 data/cheatsheets_cache.json
 data/divcards_last.json
+data/storage.json.bak
+data/storage.json.tmp
+data/storage.bad-*.json
+data/extras_cache.json
+data/guides_cache.json

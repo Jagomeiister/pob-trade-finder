@@ -77,7 +77,9 @@ function mechPrices(groups, cb) {
   var P = MECH_PRICES, league = mechLeague();
   if (P.league !== league || Date.now() - P.at > MECH_PRICE_TTL) {
     P.league = league; P.groups = {}; P.items = {}; P.byName = {}; P.divine = null; P.hour = null;
-    P.loading = {}; P.at = Date.now(); P.gen++;
+    P.loading = {}; P.at = Date.now(); P.gen++; P.failed = false; P.tries = 0;
+    if (mechRetry.timer) { clearTimeout(mechRetry.timer); mechRetry.timer = null; }
+    mechRetry.groups = {}; mechRetry.waiters = [];
   }
   var need = groups.filter(function (g) { return !P.groups[g] && !P.loading[g]; });
   var api = isGui() && window.pywebview.api.mech_prices;
@@ -107,17 +109,59 @@ function mechPrices(groups, cb) {
         if (r.divine) P.divine = r.divine;
         if (r.hour) P.hour = r.hour;
       }
+      // no prices came (the call failed, or the feed was unreachable: no hour): the tools draw
+      // what there is (names, cached icons) and the groups are asked again shortly, not in 20 min
+      var failed = !(r && r.ok && r.hour);
+      P.failed = failed; // set before the tools redraw: their footer shows or drops "Retry"
+      if (!failed) P.tries = 0;
       need.forEach(function (g) { delete P.loading[g]; P.groups[g] = 1; });
-      var left = [];
+      var left = [], done = [];
       mechPriceWaiters.forEach(function (w) {
-        if (w.groups.every(function (g) { return P.groups[g]; })) { try { w.cb(P); } catch (e) { /* tool redraw */ } }
+        if (w.groups.every(function (g) { return P.groups[g]; })) { done.push(w); try { w.cb(P); } catch (e) { /* tool redraw */ } }
         else left.push(w);
       });
       mechPriceWaiters = left;
+      if (failed) mechPriceFailed(need, done);
     });
   return P;
 }
 var mechPriceWaiters = [];
+
+// a load brought no prices: remember who was waiting and try again after a minute (then every
+// 5 minutes, 6 times at most); mechPricesRetry() does it at once (the "Retry" link)
+var MECH_RETRY_MS = [60000, 300000];
+var mechRetry = { timer: null, groups: {}, waiters: [] };
+function mechPriceFailed(groups, waiters) {
+  var P = MECH_PRICES, R = mechRetry;
+  P.failed = true;
+  groups.forEach(function (g) { R.groups[g] = 1; });
+  waiters.forEach(function (w) { if (R.waiters.length < 40) R.waiters.push(w); });
+  P.tries = (P.tries || 0) + 1;
+  if (R.timer || P.tries > 6) return;
+  R.timer = setTimeout(function () { R.timer = null; mechPricesRetry(); }, MECH_RETRY_MS[P.tries > 1 ? 1 : 0]);
+}
+function mechPricesRetry() {
+  var P = MECH_PRICES, R = mechRetry;
+  if (R.timer) { clearTimeout(R.timer); R.timer = null; }
+  var groups = Object.keys(R.groups), waiters = R.waiters;
+  R.groups = {}; R.waiters = [];
+  if (!groups.length) return;
+  groups.forEach(function (g) { delete P.groups[g]; });
+  // each tool that was waiting redraws when its groups are in; one call covers them all
+  waiters.forEach(function (w) { mechPriceWaiters.push(w); });
+  mechPrices(groups);
+}
+// the tools' footer: how old the prices are, and a Retry link while the last load had none
+function mechPriceFoot(el, text) {
+  el.textContent = text || mechPriceAge();
+  if (!MECH_PRICES.failed || !isGui()) return;
+  el.appendChild(document.createTextNode(' '));
+  var b = UI.el('button', 'link-btn mech-retry', 'Retry');
+  b.type = 'button';
+  b.title = 'Ask for prices again now';
+  b.addEventListener('click', function () { b.disabled = true; b.textContent = 'Retrying…'; mechPricesRetry(); });
+  el.appendChild(b);
+}
 
 // an item by its in-game name ("Ambush Scarab of Containment"); null when the feed lacks it
 function mechItem(name) { return MECH_PRICES.byName[name] || null; }

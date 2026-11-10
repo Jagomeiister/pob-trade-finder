@@ -768,7 +768,7 @@ function shubMount(host, ctx) {
     drawList();
     drawSetup();
     picker.draw();
-    foot.textContent = mechPriceAge();
+    mechPriceFoot(foot);
     if (ctx && ctx.onChange) ctx.onChange();
   }
   shubView(host, render);
@@ -978,7 +978,7 @@ function shubCalcMount(host, ctx) {
     drawRows();
     drawOut();
     picker.draw();
-    foot.textContent = mechPriceAge();
+    mechPriceFoot(foot);
     if (ctx && ctx.onChange) ctx.onChange();
   }
   shubView(host, render);

@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
   ['league', 'trade-status', 'pseudo', 'sale-type', 'listed-within', 'priced-in'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', saveSettings);
   });
+  document.getElementById('league').addEventListener('change', onLeagueChange);
   // pseudo totals change the SCALE of dual-res inputs (×2) — rescale live so
   // the number in the box always matches the stat the search will use
   document.getElementById('pseudo').addEventListener('change', function () {
@@ -611,6 +612,20 @@ function leaguesSeen() {
   catch (e) { /* none yet */ }
   return [];
 }
+// The league changed: once the setting is saved, the in-game windows re-read it (their prices
+// follow the league), and the open view is drawn again for the new league. Market, Stash, Dust
+// and the loot filter listen for the change themselves.
+async function onLeagueChange() {
+  var s = null;
+  try { s = localStorage.getItem(SETTINGS_KEY); } catch (e) { /* none */ }
+  if (s) await persistNow(SETTINGS_KEY, s);
+  if (isGui() && window.pywebview.api.trade_prefs_changed) {
+    try { await window.pywebview.api.trade_prefs_changed(); } catch (e) { /* the overlays catch up on their next open */ }
+  }
+  var v = document.body.dataset.view;
+  if (v === 'sheets' || v === 'divcards') setView(v);
+}
+
 // awaited: a reload right after must not race the bridge write
 async function persistNow(key, value) {
   try { localStorage.setItem(key, value); } catch (e) { /* fine */ }

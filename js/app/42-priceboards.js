@@ -223,7 +223,9 @@ function priceBoard(container, ctx, o) {
       missing + ' items have no price this hour.') : '';
     miss.hidden = !miss.textContent;
 
-    foot.textContent = isGui() && !st.loaded ? 'Loading prices…' : (o.foot ? o.foot() : mechPriceAge());
+    if (isGui() && !st.loaded) foot.textContent = 'Loading prices…';
+    else if (o.foot) foot.textContent = o.foot();
+    else mechPriceFoot(foot);
     if (changed && ctx.onChange && root.isConnected) ctx.onChange();
   }
   st.redraw = draw;

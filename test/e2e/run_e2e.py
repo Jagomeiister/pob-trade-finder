@@ -2630,7 +2630,20 @@ function sized(w, h, rgb) {
   return c.toDataURL('image/png');
 }
 const pixel = (x, y) => [...cv.ctx.getImageData(Math.round(x * cv.dpr), Math.round(y * cv.dpr), 1, 1).data].slice(0, 3);
-const plainMs = (() => { const t = performance.now(); for (let i = 0; i < 5; i++) treeDraw(cv); return (performance.now() - t) / 5; })();
+// timing: the median of 15 draws after a warm-up (one GC pause or a busy CPU can't fail it), and a
+// load-independent measure: the source pixels drawImage reads per redraw
+const medianMs = () => { treeDraw(cv); const ts = []; for (let i = 0; i < 15; i++) { const t = performance.now(); treeDraw(cv); ts.push(performance.now() - t); } return ts.sort((a, b) => a - b)[7]; };
+const srcArea = () => {
+  const real = cv.ctx.drawImage; let px = 0;
+  cv.ctx.drawImage = function (img, a, b, c, d, e, f, g, h) {
+    px += arguments.length >= 9 ? Math.abs(c * d) : (img.naturalWidth || img.width || 0) * (img.naturalHeight || img.height || 0);
+    return real.apply(this, arguments);
+  };
+  try { treeDraw(cv); } finally { cv.ctx.drawImage = real; }
+  return px;
+};
+const plainMs = medianMs();
+const plainArea = srcArea();
 out.cornerPlain = pixel(2, 2);
 const bgArt = {};
 bgArt[B.tile.url] = sized(B.tile.rect[2], B.tile.rect[3], 'rgb(40,40,160)');
@@ -2645,9 +2658,8 @@ out.bgCalls = H.calls('cache_art').slice(nBg).map(c => JSON.parse(c.args[0]));
 treeDraw(cv);
 out.bgFit = cv.bgDrawn;
 out.cornerBg = pixel(2, 2);
-const t1 = performance.now();
-for (let i = 0; i < 5; i++) treeDraw(cv);
-out.bgMs = [plainMs, (performance.now() - t1) / 5];
+out.bgMs = [plainMs, medianMs()];
+out.bgArea = [plainArea, srcArea(), cv.el.width * cv.el.height];
 out.insetBg = T.inset ? T.inset.bgDrawn : 'no inset';
 cv.cx = notable.x; cv.cy = notable.y; cv.s = 0.5; treeDraw(cv);
 out.bgZoomed = cv.bgDrawn;
@@ -2796,7 +2808,9 @@ def scenario_tree(s, tag):
     zb, c = r["bgZoomed"] or {}, r["centreOverBg"]
     check(tag + " backdrop: zoomed in, nodes stay on top of it (allocated notable's icon at the centre)",
           zb.get("tile") and c[1] > 150 and c[0] < 80 and c[2] < 90, (zb, c))
-    check(tag + " backdrop: a fitted redraw stays fast (< 40 ms, < plain + 15 ms)",
+    check(tag + " backdrop: a fitted redraw reads a shrunken copy, not the full sheets (source px <= 4x the canvas)",
+          0 < r["bgArea"][1] - r["bgArea"][0] <= 4 * r["bgArea"][2], r["bgArea"])
+    check(tag + " backdrop: a fitted redraw stays fast (median of 15: < 40 ms, < plain + 15 ms)",
           r["bgMs"][1] < 40 and r["bgMs"][1] < r["bgMs"][0] + 15, r["bgMs"])
     check(tag + " masteries: test picks a chosen, a connected and a locked one", r["mStates"] == ["chosen", "connected", "locked"],
           r["mStates"])

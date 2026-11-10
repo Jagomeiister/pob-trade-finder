@@ -166,11 +166,8 @@ class Api:
         # durable key-value store: the exe's WebView2 localStorage is ephemeral
         # (onefile temp dirs), so persistence lives here instead
         self._storage_path = os.path.join(DATA_DIR, "storage.json")
-        try:
-            with open(self._storage_path, "r", encoding="utf-8") as f:
-                self._storage = json.load(f)
-        except Exception:
-            self._storage = {}
+        self._storage_lock = threading.Lock()  # bridge calls run on worker threads, from six windows
+        self._storage = self._load_storage(self._storage_path)
         # in-game price check: hotkey thread + overlay window (wired up by main())
         self._hotkey = None
         self._overlay = None
@@ -850,15 +847,15 @@ class Api:
             codes = [c for c in json.loads(currencies_json) if c in self._currency_map][:20]
             days = max(1, min(int(days), 30))
             ids = [self._currency_map[c]["id"] for c in codes]
-            series, hour = self._feed.history(league, ids, days=days, step_hours=self.cx_step(days))
-            return {"ok": True, "hour": hour, "step": self.cx_step(days),
+            series, hour = self._feed.history(league, ids, days=days, step_hours=self._cx_step(days))
+            return {"ok": True, "hour": hour, "step": self._cx_step(days),
                     "series": {c: series.get(self._currency_map[c]["id"], []) for c in codes},
                     "names": {c: self._currency_map[c]["name"] for c in codes}}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
     @staticmethod
-    def cx_step(days):
+    def _cx_step(days):
         """History sampling: 2-hourly for a day, 6-hourly for a week, daily beyond.
         The grids nest, so a finer view reuses the coarser views' cached hours."""
         return 2 if days <= 1 else 6 if days <= 7 else 24
@@ -956,7 +953,7 @@ class Api:
         6-hourly history: {'ok', 'hour', 'items': {code: {name, cat, img, s: [[unix hour,
         chaos, chaos volume], ...]}}}. One feed read covers all items (~28 cached hours)."""
         try:
-            series, hour = self._feed.history(league, None, days=7, step_hours=self.cx_step(7))
+            series, hour = self._feed.history(league, None, days=7, step_hours=self._cx_step(7))
             by_id = {}
             for code, m in self._currency_map.items():
                 prev = by_id.get(m["id"])
@@ -2196,10 +2193,6 @@ class Api:
         except Exception:
             price_hotkey.place_window(hwnd, x, y)
 
-    def filter_zone(self):
-        """The zone the editor uses for AreaLevel (None until Client.txt shows one)."""
-        return {"ok": True, "zone": self._zone}
-
     def _hide_overlay(self):
         ov = self._overlay
         if not ov:
@@ -2559,7 +2552,6 @@ class Api:
     def overlay_reset_pos(self, name=None):
         """Setup → Reset position: back to the default spot on the next show."""
         for n in ([name] if name in OVERLAYS else OVERLAYS):
-            self._storage.pop(OVERLAYS[n]["pos"], None)
             self.storage_set(OVERLAYS[n]["pos"], "{}")
             self._ov[n]["replace"] = True
         return {"ok": True}
@@ -3028,14 +3020,48 @@ class Api:
             return {"ok": False, "error": str(e)}
 
     # -- durable storage for the web app -------------------------------------------
+    @staticmethod
+    def _load_storage(path):
+        """The saved store, else its backup. A file that exists but can't be read is set aside as
+        storage.bad-<time>.json (never overwritten by the next save) and the backup
+        (storage.json.bak, the state one save earlier) is used instead."""
+        for i, src in enumerate((path, path + ".bak")):
+            try:
+                with open(src, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    if i:
+                        _debug_log("storage: loaded the backup (%s)" % os.path.basename(src))
+                    return data
+                raise ValueError("not an object")
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                _debug_log("storage: %s unreadable (%s)" % (os.path.basename(src), e))
+                try:
+                    os.replace(src, "%s.bad-%d.json" % (path[:-5] if path.endswith(".json") else path, int(time.time())))
+                except OSError:
+                    pass
+        return {}
+
     def storage_get(self):
-        return {"ok": True, "data": self._storage}
+        with self._storage_lock:
+            return {"ok": True, "data": dict(self._storage)}
 
     def storage_set(self, key, value):
+        """One save at a time, never in place: write storage.json.tmp, keep the previous file as
+        storage.json.bak, then swap. A crash or a failed write leaves a complete file behind."""
         try:
-            self._storage[str(key)] = str(value)
-            with open(self._storage_path, "w", encoding="utf-8") as f:
-                json.dump(self._storage, f)
+            with self._storage_lock:
+                self._storage[str(key)] = str(value)
+                tmp = self._storage_path + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(self._storage, f)
+                    f.flush()
+                    os.fsync(f.fileno())
+                if os.path.exists(self._storage_path):
+                    os.replace(self._storage_path, self._storage_path + ".bak")
+                os.replace(tmp, self._storage_path)
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}

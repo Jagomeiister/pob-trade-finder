@@ -386,7 +386,7 @@ function renderNav() {
     b.appendChild(UI.el('span', 'nav-label', VIEW_LABELS[k]));
     b.appendChild(UI.el('span', 'nav-count', navCount(k)));
     b.addEventListener('click', function () {
-      if (k === 'trades') { openTradesWindow(); return; } // its own always-on-top window
+      if (k === 'trades') { openTradesWindow(); return; } // the Trade helper view (19-trades.js)
       setView(k); window.scrollTo(0, 0);
     });
     nav.appendChild(b);

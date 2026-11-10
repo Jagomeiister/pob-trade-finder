@@ -65,6 +65,14 @@ class _Server(http.server.ThreadingHTTPServer):
     # the odd connection, so one random script never loaded ("X is not defined" flakes)
     request_queue_size = 128
 
+    def handle_error(self, request, client_address):
+        # Chrome drops idle keep-alive sockets when it navigates or is killed: not an error here.
+        # Anything else still prints its traceback.
+        import sys
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
+
 
 class StaticServer:
     def __init__(self, root):
