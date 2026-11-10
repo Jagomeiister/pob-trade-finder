@@ -525,8 +525,14 @@ await H.waitFor(() => !tile.classList.contains('hidden') && /c$/.test(H.text('.m
 const out = { tileValue: H.text('.mt-value', tile), tileDelta: H.text('.mt-delta', tile),
               tileVisible: H.visible(tile), overviewCalls: H.calls('cx_overview').length };
 tile.click();
-await H.waitFor(() => document.querySelector('#market-page .mk-table tbody tr'), 5000, 'market table');
+await H.waitFor(() => document.querySelector('#market-page .mk-watch-list .mk-watch-row'), 5000, 'market overview');
 const page = document.getElementById('market-page');
+// the page opens on the Overview; the item table is a category of the rail (Currency), and the
+// watchlist lives on the Overview, so the checks hop between the two
+const goCat = async (id, sel) => {
+  page.querySelector('.mk-rail-item[data-cat="' + id + '"]').click();
+  await H.waitFor(() => page.querySelector(sel), 5000, 'market category ' + id);
+};
 const watchRows = () => page.querySelectorAll('.mk-watch-list .mk-watch-row').length;
 const rowFor = name => [...page.querySelectorAll('.mk-table tbody tr')]
   .find(tr => (tr.querySelector('.mk-name') || {}).textContent === name);
@@ -535,25 +541,31 @@ Object.assign(out, {
   emptyHidden: !H.visible(document.getElementById('market-empty')),
   rising: page.querySelectorAll('.mk-mover-col:first-child .mk-mover').length,
   falling: page.querySelectorAll('.mk-mover-col:last-child .mk-mover').length,
-  tableRows: page.querySelectorAll('.mk-table tbody tr').length,
   watch0: watchRows(), chartTitle: H.text('.mk-title', page), chartSvg: !!page.querySelector('.mk-chart svg'),
   conv: H.text('.mk-conv-out', page),
-  // 7-day chip (second .pct in the row) carries the chaos/divine amount too
-  amtDivine: H.text('.pct', [...rowFor('Divine Orb').querySelectorAll('td')].filter(td => td.querySelector('.pct'))[1]),
-  amtMirror: H.text('.pct', [...rowFor('Mirror of Kalandra').querySelectorAll('td')].filter(td => td.querySelector('.pct'))[1]),
   moverAmt: !!page.querySelector('.mk-mover .pct-amt'),
+});
+await goCat('cx:currency', '.mk-table tbody tr .mk-name');
+Object.assign(out, {
+  tableRows: page.querySelectorAll('.mk-table tbody tr').length,
+  // the 7-day chip carries the chaos/divine amount too
+  amtDivine: H.text('.pct', rowFor('Divine Orb')),
+  amtMirror: H.text('.pct', rowFor('Mirror of Kalandra')),
 });
 // star an unwatched item, then un-star it
 let star = rowFor('Orb of Alchemy').querySelector('.mk-star');
 out.starBefore = star.textContent.trim();
 star.click();
 await H.sleep(30);
-out.watch1 = watchRows();
 out.starAfter = rowFor('Orb of Alchemy').querySelector('.mk-star').textContent.trim();
 out.saved = JSON.parse(localStorage.getItem('pobtf-watch') || '[]');
 out.persisted = H.calls('storage_set').some(c => c.args[0] === 'pobtf-watch' && c.args[1].indexOf('alch') !== -1);
+await goCat('overview', '.mk-watch-list .mk-watch-row');
+out.watch1 = watchRows();
+await goCat('cx:currency', '.mk-table tbody tr .mk-name');
 rowFor('Orb of Alchemy').querySelector('.mk-star').click();
 await H.sleep(30);
+await goCat('overview', '.mk-watch-list .mk-watch-row');
 out.watch2 = watchRows();
 // a mover selects its item in the chart
 const mover = page.querySelector('.mk-mover');

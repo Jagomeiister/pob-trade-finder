@@ -1347,6 +1347,39 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    # the backend's categories (server/api/prices.js TYPES)
+    NINJA_TYPES = ("UniqueWeapon", "UniqueArmour", "UniqueAccessory", "UniqueFlask", "UniqueJewel",
+                   "UniqueTincture", "UniqueRelic", "ForbiddenJewel", "SkillGem", "ClusterJewel", "Map",
+                   "UniqueMap", "Invitation", "Memory", "Beast")
+
+    def ninja_category(self, league, type):
+        """Market page: one category of the backend's poe.ninja snapshot, lines as the backend
+        sends them (n name, c chaos, b base, v variant, d divine, l links, gl/gq gem level/quality,
+        cr corrupted, t map tier, lc listings, i icon path on web.poecdn.com, sp [7-day change %,
+        [daily points]]): {'ok', 'type', 'at' (ms the backend read it), 'divine', 'lines',
+        'counts': {type: lines}}."""
+        try:
+            if type not in self.NINJA_TYPES:
+                return {"ok": False, "error": "unknown category"}
+            data = self._ninja_prices(league) or {}
+            types = data.get("types") or {}
+            t = types.get(type)
+            if not isinstance(t, dict):
+                why = (data.get("errors") or {}).get(type)
+                return {"ok": False, "error": "poe.ninja has no prices for this category right now"
+                                              + (" (%s)" % why if why else "")}
+            div_id = (self._currency_map.get("divine") or {}).get("id")
+            try:
+                rates, _ = self._feed.rates(league, [div_id]) if div_id else ({}, None)
+            except Exception:
+                rates = {}  # the page falls back to the rate it already has
+            return {"ok": True, "type": type, "at": t.get("at"),
+                    "divine": rates.get(div_id) if div_id else None, "lines": t.get("lines") or [],
+                    "counts": {k: len((v or {}).get("lines") or []) for k, v in types.items()
+                               if k in self.NINJA_TYPES}}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     @staticmethod
     def _ninja_match(data, item):
         """Best poe.ninja line for a pasted item: uniques by name (+ links), gems by name,

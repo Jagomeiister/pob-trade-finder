@@ -9,6 +9,7 @@ import { getCache } from '@vercel/functions';
 
 export const UA = 'PoBTradeFinder-API/1.0 (contact: https://github.com/Jagomeiister/pob-trade-finder/issues)';
 const NINJA = 'https://poe.ninja/poe1/api/economy';
+const CDN = 'https://web.poecdn.com';
 // stash item overviews: things that aren't on the currency exchange (the app prices those
 // from GGG's own exchange feed)
 export const TYPES = ['UniqueWeapon', 'UniqueArmour', 'UniqueAccessory', 'UniqueFlask', 'UniqueJewel',
@@ -41,7 +42,34 @@ export function compact(line) {
   if (line.corrupted) o.cr = 1;
   if (line.mapTier) o.t = line.mapTier;
   if (line.listingCount != null) o.lc = line.listingCount;
+  // icon: the path on GGG's CDN (the app adds the origin back); anything else is left out
+  if (typeof line.icon === 'string' && line.icon.startsWith(CDN + '/')) o.i = line.icon.slice(CDN.length);
+  const sp = spark(line.sparkLine || line.sparkline) || spark(line.lowConfidenceSparkLine);
+  if (sp) o.sp = sp;
   return o;
+}
+
+// poe.ninja's 7-day trend {data: [% change vs 7 days ago, one per day, null = no data], totalChange}
+// -> [totalChange, [up to 7 points]], rounded to 1 decimal; nothing when there is no trend
+function spark(s) {
+  if (!s || !Array.isArray(s.data)) return null;
+  const r1 = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 10) / 10 : null);
+  const pts = s.data.slice(-7).map(r1);
+  if (!pts.some((v) => v !== null)) return null;
+  return [r1(s.totalChange) || 0, pts];
+}
+
+// a whole category: every variant of an item shares one icon, so only the first line of each
+// name carries it (the app looks an icon up by name); a 6,000-line gem list stays small
+export function compactLines(lines) {
+  const seen = new Map();
+  return (lines || []).map((line) => {
+    const o = compact(line);
+    if (o.i) {
+      if (seen.get(o.n) === o.i) delete o.i; else if (!seen.has(o.n)) seen.set(o.n, o.i);
+    }
+    return o;
+  });
 }
 
 // Vercel Runtime Cache in production; a per-process Map when run locally (tests)
@@ -99,7 +127,7 @@ export async function handlePrices(request, deps = {}) {
         types[t] = await cached(cache, 'type:' + league + ':' + t, TTL, async () => {
           const d = await ninja('/stash/current/item/overview?league=' + encodeURIComponent(league) +
             '&type=' + t, fetchImpl);
-          return { at: Date.now(), lines: (d.lines || []).map(compact) };
+          return { at: Date.now(), lines: compactLines(d.lines) };
         });
       } catch (e) {
         errors[t] = e.message;

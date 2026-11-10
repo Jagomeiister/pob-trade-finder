@@ -114,18 +114,21 @@
   }
 
   // Data table. columns: [{ key, label, num, render(row) → Node|string, sort(row) → value }]
-  // opts: { caption, rowClass(row), sortable, emptyText }
+  // opts: { caption, rowClass(row), sortable, emptyText,
+  //         sort: { key, dir: 1|-1 } — the column sorted at first,
+  //         onSort(key) — the caller orders (and pages) the rows itself and draws the table again;
+  //                       the table then only shows the arrow from opts.sort }
   function table(columns, rows, opts) {
     opts = opts || {};
     var t = el('table', 'data-table');
     if (opts.caption) t.appendChild(el('caption', null, opts.caption));
     var thead = el('thead'), hr = el('tr');
     var tbody = el('tbody');
-    var sortKey = null, sortDir = 1;
+    var sortKey = opts.sort ? opts.sort.key : null, sortDir = opts.sort && opts.sort.dir < 0 ? -1 : 1;
     function fill() {
       tbody.innerHTML = '';
       var list = rows.slice();
-      if (sortKey) {
+      if (sortKey && !opts.onSort) {
         var col = columns.filter(function (c) { return c.key === sortKey; })[0];
         var val = col.sort || function (r) { return r[col.key]; };
         list.sort(function (a, b) {
@@ -156,7 +159,11 @@
       if (opts.sortable && c.label) {
         var sb = el('button', 'th-sort', c.label);
         sb.type = 'button';
+        sb.dataset.sort = c.key;
+        if (c.title) sb.title = c.title;
+        if (sortKey === c.key) th.setAttribute('aria-sort', sortDir > 0 ? 'ascending' : 'descending');
         sb.addEventListener('click', function () {
+          if (opts.onSort) { opts.onSort(c.key); return; }
           sortDir = sortKey === c.key ? -sortDir : 1;
           sortKey = c.key;
           hr.querySelectorAll('th').forEach(function (x) { x.removeAttribute('aria-sort'); });

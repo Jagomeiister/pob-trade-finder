@@ -108,10 +108,17 @@ var market = null; // {league, hour, items: {code: {name, cat, img, s: [[t, chao
 var THIN_MARKET_CHAOS = 5000; // median chaos-equivalent traded per hour
 var marketSeq = 0;
 var marketDirty = false;
-var MK = { sel: 'divine', range: 7, cat: 'All', q: '', hideThin: false, movers: 24, showAll: false,
-           convAmt: '1', convCode: 'divine', alertOpen: false, els: null };
 var CDN_ROOT = 'https://web.poecdn.com';
-var MARKET_ROWS = 80;
+var MARKET_ROWS = 80;          // rows per page of a category table ("Show more" adds a page)
+var MK_NINJA_TTL = 20 * 60000; // a poe.ninja category is asked for again after 20 minutes
+var MK_FEW_LISTINGS = 5;       // poe.ninja prices from fewer listings are low-confidence
+// cat: the rail entry showing (null until first read from 'pobtf-market-cat'); open: the row in
+// the detail drawer; sort: per kind of table (cx = exchange feed, nj = poe.ninja snapshot);
+// f: the snapshot filters; ninja: 'league|type' -> {state, at, data, error}; counts: league -> {type: lines}
+var MK = { sel: 'divine', range: 7, cat: null, q: '', hideThin: false, movers: 24, limit: MARKET_ROWS,
+           convAmt: '1', convCode: 'divine', alertOpen: false, els: null, open: null,
+           sort: { cx: { key: 'n', dir: -1 }, nj: { key: 'c', dir: -1 } },
+           f: { gl: '', gq: '', cr: '', t: '', l: '' }, ninja: {}, counts: {} };
 
 function loadWatch() {
   try { var w = JSON.parse(localStorage.getItem('pobtf-watch')); if (Array.isArray(w)) return w; }
@@ -125,6 +132,7 @@ function toggleWatch(code) {
   if (i === -1) w.push(code); else w.splice(i, 1);
   saveWatch(w);
   renderWatch();
+  renderMarketRail(); // the Watchlist count
   renderMarketTable();
   renderChartCard();
 }
@@ -239,6 +247,7 @@ function alertForm(code, it) {
     MK.alertOpen = false;
     renderChartCard();
     renderWatch();
+    renderMarketRail(); // an alert also watches the item
     renderMarketTable();
     var held = all[code] && ['above', 'below', 'move'].filter(function (r) { return all[code].fired[r]; });
     UI.toast(!all[code] ? 'Alert removed for ' + it.name
@@ -281,6 +290,7 @@ async function loadMarket() {
     if (seq !== marketSeq) return; // league switched mid-load
     if (!r || !r.ok) throw new Error((r && r.error) || 'feed unavailable');
     Object.keys(r.items).forEach(function (c) { r.items[c].st = marketStats(r.items[c]); });
+    if (market && market.league !== league) MK.open = null; // the drawer showed the other league's row
     market = { league: league, hour: r.hour, items: r.items, hist: {} };
     if (!market.items[MK.sel]) MK.sel = market.items.divine ? 'divine' : Object.keys(market.items)[0];
     // seed the rate cache: chaos equivalents for every exchange item, no trade-API calls
@@ -356,11 +366,33 @@ function itemImg(it, cls) {
   return img;
 }
 
+// an icon that never leaves a hole: no path, or a download that fails, shows the name's initial
+function mkIcon(path, name, cls) {
+  cls = cls || 'mk-ic';
+  function none() {
+    var s = UI.el('span', cls + ' mk-noic', String(name || '?').charAt(0).toUpperCase());
+    s.setAttribute('aria-hidden', 'true');
+    return s;
+  }
+  if (!path) return none();
+  var img = UI.el('img', cls), waited = false;
+  img.alt = '';
+  img.loading = 'lazy';
+  img.addEventListener('error', function () {
+    // a cached copy that went missing: the art cache (08-cards.js) retries the CDN first
+    if (img.dataset.remote && !waited) { waited = true; return; }
+    if (img.parentNode) img.parentNode.replaceChild(none(), img);
+  });
+  img.src = CDN_ROOT + path;
+  return img;
+}
+
+// show an exchange item in the Overview's chart (movers, watchlist, flips, alert toasts)
 function selectMarketItem(code, scroll) {
   MK.sel = code;
+  if (MK.els && !MK.els.chart) setMarketCat('overview', true);
   renderChartCard();
-  renderMarketTable();
-  if (scroll && MK.els) MK.els.chart.scrollIntoView({ block: 'nearest' });
+  if (scroll && MK.els && MK.els.chart) MK.els.chart.scrollIntoView({ block: 'nearest' });
 }
 
 // ---- price chart: line + area, labelled axes, crosshair tooltip, keyboard ----
@@ -491,29 +523,212 @@ function renderMarketPage() {
     updated.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })));
   page.appendChild(head);
 
-  var movers = UI.el('section', 'mk-movers panel');
-  var flips = UI.el('section', 'mk-flips panel');
-  var grid = UI.el('div', 'mk-grid');
-  var chart = UI.el('section', 'mk-chart panel');
-  var side = UI.el('div', 'mk-side');
-  var watch = UI.el('section', 'mk-watch panel');
-  var conv = UI.el('section', 'mk-conv panel');
-  side.appendChild(watch);
-  side.appendChild(conv);
-  grid.appendChild(chart);
-  grid.appendChild(side);
+  // poe.ninja-style: categories down the left, the chosen one on the right
+  var layout = UI.el('div', 'mk-layout');
+  var rail = UI.el('nav', 'mk-rail panel');
+  rail.setAttribute('aria-label', 'Market categories');
+  var main = UI.el('div', 'mk-main');
+  layout.appendChild(rail);
+  layout.appendChild(main);
+  page.appendChild(layout);
+  MK.els = { rail: rail, main: main };
+  renderMarketRail();
+  renderMarketMain();
+  // the snapshot's item counts for the rail: one read of a category brings them all
+  if (!MK.counts[market.league]) loadNinjaCat('UniqueWeapon');
+}
+
+// ---- categories: the exchange feed split like poe.ninja's sidebar, then its item snapshot ----
+var MK_CX_CATS = [['cx:currency', 'Currency'], ['cx:fragments', 'Fragments'], ['cx:scarabs', 'Scarabs'],
+  ['cx:essences', 'Essences'], ['cx:fossils', 'Fossils & Resonators'], ['cx:oils', 'Oils'],
+  ['cx:catalysts', 'Catalysts'], ['cx:delirium', 'Delirium Orbs'], ['cx:tattoos', 'Tattoos & Omens'],
+  ['cx:runegrafts', 'Runegrafts'], ['cx:embers', 'Allflame Embers'], ['cx:expedition', 'Expedition'],
+  ['cx:cards', 'Divination cards'], ['cx:other', 'Other']];
+// the feed's own category names
+var MK_FEED_CAT = { 'Currency': 'cx:currency', 'Fragments, Scarabs & Mapping': 'cx:fragments', 'Essences': 'cx:essences',
+  'Fossils & Resonators': 'cx:fossils', 'Oils & Extractor': 'cx:oils', 'Catalysts': 'cx:catalysts',
+  'Delirium Orbs': 'cx:delirium', 'Tattoos & Omens': 'cx:tattoos', 'Runegrafts': 'cx:runegrafts',
+  'Allflame Embers': 'cx:embers', 'Expedition Currency': 'cx:expedition', 'Cards': 'cx:cards' };
+// names that say what an item is when the feed's category does not (new leagues rename categories)
+var MK_NAME_CAT = [[/Scarab/, 'cx:scarabs'], [/Tattoo|^Omen of /, 'cx:tattoos'], [/Fossil$|Resonator$/, 'cx:fossils'],
+  [/ Oil$/, 'cx:oils'], [/Catalyst$/, 'cx:catalysts'], [/Delirium Orb$/, 'cx:delirium'],
+  [/Essence of |^Remnant of Corruption$/, 'cx:essences'], [/^Runegraft /, 'cx:runegrafts'],
+  [/^Allflame Ember /, 'cx:embers']];
+// anything the rules do not place lands in Other, never nowhere
+function marketCatOf(it) {
+  var n = it.name || '';
+  if (/Scarab/.test(n)) return 'cx:scarabs'; // filed with fragments in the feed
+  if (!it.cat) return 'cx:currency';
+  if (MK_FEED_CAT[it.cat]) return MK_FEED_CAT[it.cat];
+  for (var i = 0; i < MK_NAME_CAT.length; i++) if (MK_NAME_CAT[i][0].test(n)) return MK_NAME_CAT[i][1];
+  return 'cx:other';
+}
+// poe.ninja snapshot: [backend type, label, poe.ninja page]
+var MK_NINJA_GROUPS = [
+  ['Equipment & gems', [['UniqueWeapon', 'Unique weapons', 'unique-weapons'], ['UniqueArmour', 'Unique armour', 'unique-armours'],
+    ['UniqueAccessory', 'Unique accessories', 'unique-accessories'], ['UniqueFlask', 'Unique flasks', 'unique-flasks'],
+    ['UniqueJewel', 'Unique jewels', 'unique-jewels'], ['UniqueRelic', 'Unique relics', 'unique-relics'],
+    ['UniqueTincture', 'Unique tinctures', 'unique-tinctures'], ['ForbiddenJewel', 'Forbidden jewels', 'forbidden-jewels'],
+    ['ClusterJewel', 'Cluster jewels', 'cluster-jewels'], ['SkillGem', 'Skill gems', 'skill-gems']]],
+  ['Atlas', [['Map', 'Maps', 'maps'], ['UniqueMap', 'Unique maps', 'unique-maps'],
+    ['Invitation', 'Invitations', 'invitations'], ['Memory', 'Memories', 'memories']]],
+  ['Other', [['Beast', 'Beasts', 'beasts']]]];
+
+// the rail: [{label, items: [{id, label, n (count, null = not known yet), kind, type, page}]}]
+function marketCatGroups() {
+  var n = {};
+  Object.keys(market.items).forEach(function (c) { var k = marketCatOf(market.items[c]); n[k] = (n[k] || 0) + 1; });
+  var watching = loadWatch().filter(function (c) { return market.items[c]; }).length;
+  var counts = MK.counts[market.league] || {};
+  var groups = [{ label: '', items: [{ id: 'overview', label: 'Overview', n: null, kind: 'overview' },
+                                     { id: 'watch', label: 'Watchlist', n: watching, kind: 'cx' }] },
+    { label: 'General', items: MK_CX_CATS.filter(function (c) { return n[c[0]]; }).map(function (c) {
+      return { id: c[0], label: c[1], n: n[c[0]], kind: 'cx' };
+    }) }];
+  MK_NINJA_GROUPS.forEach(function (g) {
+    groups.push({ label: g[0], items: g[1].map(function (c) {
+      return { id: 'nj:' + c[0], label: c[1], n: counts[c[0]] === undefined ? null : counts[c[0]], kind: 'nj', type: c[0], page: c[2] };
+    }) });
+  });
+  return groups.filter(function (g) { return g.items.length; });
+}
+function marketCatDef(id) {
+  var hit = null;
+  marketCatGroups().forEach(function (g) { g.items.forEach(function (c) { if (c.id === id) hit = c; }); });
+  return hit;
+}
+// the entry showing: the remembered one, or Overview when this league has nothing in it
+function marketCat() {
+  if (MK.cat === null) {
+    try { MK.cat = localStorage.getItem('pobtf-market-cat') || 'overview'; } catch (e) { MK.cat = 'overview'; }
+  }
+  return marketCatDef(MK.cat) ? MK.cat : 'overview';
+}
+// transient: a jump made for the user (an alert's View button), not their choice to remember
+function setMarketCat(id, transient) {
+  if (!marketCatDef(id)) id = 'overview';
+  MK.cat = id;
+  if (!transient) persist('pobtf-market-cat', id);
+  MK.q = '';
+  MK.limit = MARKET_ROWS;
+  MK.open = null;
+  MK.alertOpen = false;
+  MK.f = { gl: '', gq: '', cr: '', t: '', l: '' };
+  var def = marketCatDef(id), key = def.type && market.league + '|' + def.type;
+  if (key && MK.ninja[key] && MK.ninja[key].state === 'error') delete MK.ninja[key]; // opening it again asks again
+  if (!MK.els) return;
+  renderMarketRail();
+  renderMarketMain();
+}
+
+// keep the keyboard focus across a redraw: controls carry data-mk
+function mkKeepFocus(box) {
+  var a = document.activeElement, id = a && box.contains(a) ? a.dataset.mk : null;
+  return function () {
+    if (!id) return;
+    var els = box.querySelectorAll('[data-mk]');
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].dataset.mk !== id) continue;
+      els[i].focus();
+      if (els[i].type === 'search') els[i].setSelectionRange(els[i].value.length, els[i].value.length);
+      return;
+    }
+  };
+}
+
+function renderMarketRail() {
+  if (!MK.els || !MK.els.rail) return;
+  var rail = MK.els.rail, refocus = mkKeepFocus(rail), cur = marketCat(), groups = marketCatGroups();
+  rail.textContent = '';
+  function countText(c) { return c.n === null ? '' : String(c.n); }
+  // narrow windows: the same list as one select
+  var sel = UI.el('select', 'mk-rail-select');
+  sel.setAttribute('aria-label', 'Market category');
+  sel.dataset.mk = 'railsel';
+  var list = UI.el('div', 'mk-rail-list');
+  groups.forEach(function (g) {
+    var into = sel, grp = UI.el('div', 'mk-rail-group');
+    if (g.label) {
+      into = document.createElement('optgroup');
+      into.label = g.label;
+      sel.appendChild(into);
+      grp.appendChild(UI.el('div', 'mk-rail-label', g.label));
+    }
+    g.items.forEach(function (c) {
+      var o = UI.el('option', null, c.label + (c.n === null ? '' : ' (' + c.n + ')'));
+      o.value = c.id;
+      into.appendChild(o);
+      var b = UI.el('button', 'mk-rail-item');
+      b.type = 'button';
+      b.dataset.cat = c.id;
+      b.dataset.mk = 'rail:' + c.id;
+      if (c.id === cur) b.setAttribute('aria-current', 'page');
+      b.appendChild(UI.el('span', 'mk-rail-name', c.label));
+      var n = UI.el('span', 'mk-rail-n', countText(c));
+      if (c.n !== null) n.title = c.n + (c.n === 1 ? ' item' : ' items');
+      b.appendChild(n);
+      b.addEventListener('click', function () { if (marketCat() !== c.id) setMarketCat(c.id); });
+      grp.appendChild(b);
+    });
+    list.appendChild(grp);
+  });
+  sel.value = cur;
+  sel.addEventListener('change', function () { setMarketCat(sel.value); });
+  // arrows walk the list; Tab leaves it
+  list.addEventListener('keydown', function (e) {
+    var items = Array.prototype.slice.call(list.querySelectorAll('.mk-rail-item'));
+    var i = items.indexOf(document.activeElement), j;
+    if (i === -1) return;
+    if (e.key === 'ArrowDown') j = Math.min(items.length - 1, i + 1);
+    else if (e.key === 'ArrowUp') j = Math.max(0, i - 1);
+    else if (e.key === 'Home') j = 0;
+    else if (e.key === 'End') j = items.length - 1;
+    else return;
+    e.preventDefault();
+    items[j].focus();
+  });
+  rail.appendChild(sel);
+  rail.appendChild(list);
+  refocus();
+}
+
+function renderMarketMain() {
+  var main = MK.els.main, cur = marketCat();
+  main.textContent = '';
+  MK.els = { rail: MK.els.rail, main: main };
+  if (cur === 'overview') {
+    var movers = UI.el('section', 'mk-movers panel');
+    var flips = UI.el('section', 'mk-flips panel');
+    var grid = UI.el('div', 'mk-grid');
+    var chart = UI.el('section', 'mk-chart panel');
+    var side = UI.el('div', 'mk-side');
+    var watch = UI.el('section', 'mk-watch panel');
+    var conv = UI.el('section', 'mk-conv panel');
+    side.appendChild(watch);
+    side.appendChild(conv);
+    grid.appendChild(chart);
+    grid.appendChild(side);
+    main.appendChild(movers);
+    main.appendChild(grid);
+    main.appendChild(flips);
+    MK.els.movers = movers; MK.els.chart = chart; MK.els.watch = watch; MK.els.conv = conv; MK.els.flips = flips;
+    renderMovers();
+    renderFlips();
+    renderChartCard();
+    renderWatch();
+    renderConverter();
+    return;
+  }
+  var view = UI.el('div', 'mk-catview');
   var table = UI.el('section', 'mk-table panel');
-  page.appendChild(movers);
-  page.appendChild(grid);
-  page.appendChild(flips);
-  page.appendChild(table);
-  MK.els = { movers: movers, chart: chart, watch: watch, conv: conv, table: table, flips: flips };
-  renderMovers();
-  renderFlips();
-  renderChartCard();
-  renderWatch();
-  renderConverter();
+  var drawer = UI.el('aside', 'mk-drawer panel');
+  drawer.hidden = true;
+  view.appendChild(table);
+  view.appendChild(drawer);
+  main.appendChild(view);
+  MK.els.view = view; MK.els.table = table; MK.els.drawer = drawer;
   renderMarketTable();
+  renderMarketDrawer();
 }
 
 function renderMovers() {
@@ -640,10 +855,17 @@ function marketNinjaCategory(it) {
            'Delirium Orbs': 'delirium-orbs', 'Fragments, Scarabs & Mapping': 'fragments' }[cat] || null;
 }
 
-async function renderChartCard() {
+// the Overview's chart, and the drawer when it shows an exchange item
+function renderChartCard() {
   if (!MK.els) return;
-  var box = MK.els.chart;
-  var code = MK.sel, it = market.items[code];
+  if (MK.els.chart) fillChartCard(MK.els.chart, MK.sel);
+  if (MK.els.drawer && MK.open && MK.open.key.indexOf('#') === -1) renderMarketDrawer();
+}
+
+// one exchange item: price, watch star, alert form, poe.ninja link, chart with range buttons
+async function fillChartCard(box, code) {
+  var it = market.items[code], refocus = mkKeepFocus(box);
+  var seq = box.mkSeq = (box.mkSeq || 0) + 1;
   box.textContent = '';
   if (!it) return;
   var head = UI.el('div', 'mk-chart-head');
@@ -659,6 +881,7 @@ async function renderChartCard() {
   var star = UI.button(watching ? 'secondary' : 'ghost', { label: watching ? '★ Watching' : '☆ Watch',
     onClick: function () { toggleWatch(code); } });
   star.setAttribute('aria-pressed', watching ? 'true' : 'false');
+  star.dataset.mk = 'card-star';
   acts.appendChild(star);
   var hasAlert = !!loadAlerts()[code];
   var form = alertForm(code, it);
@@ -677,6 +900,8 @@ async function renderChartCard() {
     onClick: function () { openUrl(ninjaUrl(nCat, it.name, market.league)); } }));
   var range = UI.segmented([['1', '1 day'], ['7', '7 days'], ['30', '30 days']], String(MK.range), {
     ariaLabel: 'Chart range', onChange: function (v) { MK.range = parseInt(v, 10); renderChartCard(); } });
+  Array.prototype.forEach.call(range.querySelectorAll('.seg'), function (b) { b.dataset.mk = 'card-range:' + b.dataset.value; });
+  bell.dataset.mk = 'card-bell';
   acts.appendChild(range);
   head.appendChild(acts);
   box.appendChild(head);
@@ -686,6 +911,7 @@ async function renderChartCard() {
   box.appendChild(body);
   var stats = UI.el('div', 'mk-stats');
   box.appendChild(stats);
+  refocus();
   var pts;
   if (MK.range === 7) pts = marketPoints(code);
   else {
@@ -702,7 +928,7 @@ async function renderChartCard() {
         body.appendChild(UI.el('div', 'finder-sub', '❌ ' + (e.message || e)));
         return;
       }
-      if (MK.sel !== code || MK.els.chart !== box) return; // moved on meanwhile
+      if (box.mkSeq !== seq || !box.isConnected) return; // moved on meanwhile
       body.textContent = '';
     }
     pts = market.hist[key].map(function (p) {
@@ -714,6 +940,7 @@ async function renderChartCard() {
     var vals = pts.map(function (p) { return p.v; });
     var first = pts[0].v, lastV = pts[pts.length - 1].v;
     [['Change', pctChip(first ? (lastV - first) / first : null, false, first ? lastV - first : null)],
+     ['24 hours', pctChip(it.st.ch24, false, it.st.d24)],
      ['Low', document.createTextNode(fmtCompact(Math.min.apply(null, vals)) + 'c')],
      ['High', document.createTextNode(fmtCompact(Math.max.apply(null, vals)) + 'c')],
      ['Typical volume', document.createTextNode(fmtCompact(it.st.vol) + 'c / hour')]].forEach(function (s) {
@@ -729,6 +956,7 @@ async function renderChartCard() {
 }
 
 function renderWatch() {
+  if (!MK.els || !MK.els.watch) return;
   var box = MK.els.watch;
   box.textContent = '';
   box.appendChild(UI.sectionHeader('Watchlist'));
@@ -789,93 +1017,412 @@ function renderConverter() {
   calc();
 }
 
+// ---- poe.ninja snapshot categories (Api.ninja_category), kept 20 minutes per league ----
+// -> {state: 'loading' | 'ok' | 'error' | 'noapp', at, error, data: {at, divine, lines, icons}}
+function loadNinjaCat(type, force) {
+  var league = market.league, key = league + '|' + type, e = MK.ninja[key];
+  if (!force && e && (e.state !== 'ok' || Date.now() - e.at < MK_NINJA_TTL)) return e;
+  if (!isGui() || !window.pywebview.api.ninja_category) return { state: 'noapp' };
+  e = MK.ninja[key] = { state: 'loading', at: Date.now() };
+  window.pywebview.api.ninja_category(league, type).then(function (r) {
+    if (!r || !r.ok) throw new Error((r && r.error) || 'prices unavailable');
+    var lines = Array.isArray(r.lines) ? r.lines : [], icons = {};
+    // the backend sends an item's icon once, on the first of its variants
+    lines.forEach(function (l) { if (l.i && !icons[l.n]) icons[l.n] = l.i; });
+    e.state = 'ok';
+    e.at = Date.now();
+    e.data = { at: r.at || Date.now(), divine: r.divine || null, lines: lines, icons: icons };
+    var counts = MK.counts[league] = r.counts || MK.counts[league] || {};
+    if (!r.counts) counts[type] = lines.length;
+  }).then(null, function (err) {
+    e.state = 'error';
+    e.error = String((err && err.message) || err);
+  }).then(function () {
+    if (MK.ninja[key] !== e || !market || market.league !== league || !MK.els) return;
+    renderMarketRail(); // the counts
+    if (marketCat() === 'nj:' + type) { renderMarketTable(); renderMarketDrawer(); }
+  });
+  return e;
+}
+
+// ---- one row per item, the same shape for both sources ----
+// key: exchange code, or 'Type#line index' for a snapshot line (codes have no '#')
+function mkCxRow(code) {
+  var it = market.items[code], st = it.st;
+  return { key: code, kind: 'cx', code: code, it: it, name: it.name, sub: it.cat || 'Currency', icon: it.img,
+           c: st.now, ch7: st.ch7, d7: st.d7, n: st.vol, low: st.thin,
+           swing: st.lo > 0 ? (st.hi - st.lo) / st.lo : null,
+           text: (it.name + ' ' + (it.cat || '')).toLowerCase() };
+}
+function mkNinjaRow(def, data, idx) {
+  var l = data.lines[idx], sub = [], c = l.c || 0;
+  if (l.b) sub.push(l.b);
+  if (l.v) sub.push(l.v);
+  if (l.l) sub.push(l.l + '-link');
+  if (l.gl) sub.push('Level ' + l.gl);
+  if (l.gq) sub.push(l.gq + '% quality');
+  if (l.t) sub.push('Tier ' + l.t);
+  var sp = Array.isArray(l.sp) && Array.isArray(l.sp[1]) ? l.sp : null;
+  var ch = sp && typeof sp[0] === 'number' ? sp[0] / 100 : null;
+  var seen = sp ? sp[1].filter(function (p) { return typeof p === 'number'; }) : [];
+  return { key: def.type + '#' + idx, kind: 'nj', def: def, line: l, at: data.at, name: l.n || '', sub: sub.join(' · '),
+           cr: !!l.cr, icon: data.icons[l.n], c: c, ch7: ch, d7: ch !== null && ch > -1 ? c - c / (1 + ch) : null,
+           n: l.lc === undefined ? null : l.lc, low: l.lc !== undefined && l.lc !== null && l.lc < MK_FEW_LISTINGS,
+           swing: seen.length > 1 ? (Math.max.apply(null, seen) - Math.min.apply(null, seen)) / 100 : null,
+           text: ((l.n || '') + ' ' + (l.b || '') + ' ' + (l.v || '')).toLowerCase() };
+}
+// 7 days of prices for the sparkline. poe.ninja sends one point a day as % change against
+// 7 days ago (null = no data that day); the latest price turns those back into chaos.
+function mkRowPoints(row) {
+  if (row.kind === 'cx') return marketPoints(row.code);
+  var sp = Array.isArray(row.line.sp) && Array.isArray(row.line.sp[1]) ? row.line.sp : null;
+  if (!sp || !(sp[0] > -100)) return [];
+  var base = row.c / (1 + (sp[0] || 0) / 100), at = Math.floor(row.at / 1000), n = sp[1].length, pts = [];
+  sp[1].forEach(function (p, k) {
+    if (typeof p === 'number') pts.push({ t: at - (n - 1 - k) * 86400, v: base * (1 + p / 100) });
+  });
+  return pts;
+}
+function mkRowByKey(key) {
+  var cut = key.indexOf('#');
+  if (cut === -1) return market.items[key] ? mkCxRow(key) : null;
+  var type = key.slice(0, cut), e = MK.ninja[market.league + '|' + type], def = marketCatDef('nj:' + type);
+  var idx = parseInt(key.slice(cut + 1), 10);
+  return e && e.state === 'ok' && def && e.data.lines[idx] ? mkNinjaRow(def, e.data, idx) : null;
+}
+function mkDivRate(data) {
+  return (RATES[market.league] && RATES[market.league].divine) || (data && data.divine) || null;
+}
+
+// the snapshot's filters, only the ones its lines can answer: [state key, label, options]
+function mkFilters(lines) {
+  function distinct(get, text) {
+    var seen = {};
+    lines.forEach(function (l) { var v = get(l); if (v !== null) seen[v] = 1; });
+    return Object.keys(seen).map(Number).sort(function (a, b) { return b - a; })
+      .map(function (v) { return [String(v), text(v)]; });
+  }
+  var out = [];
+  if (lines.some(function (l) { return l.gl; })) {
+    out.push(['gl', 'Level', [['', 'Any']].concat(distinct(function (l) { return l.gl || null; }, String))]);
+    out.push(['gq', 'Quality', [['', 'Any']].concat(distinct(function (l) { return l.gq || 0; }, function (v) { return v + '%'; }))]);
+    out.push(['cr', 'Corrupted', [['', 'Either'], ['1', 'Yes'], ['0', 'No']]]);
+  }
+  if (lines.some(function (l) { return l.t; })) {
+    out.push(['t', 'Tier', [['', 'Any']].concat(distinct(function (l) { return l.t || null; }, String))]);
+  }
+  if (lines.some(function (l) { return l.l; })) {
+    out.push(['l', 'Links', [['', 'Any'], ['0', 'Under 5'], ['5', '5-link'], ['6', '6-link']]]);
+  }
+  return out;
+}
+function mkFilterPass(l) {
+  var f = MK.f;
+  if (f.gl && String(l.gl || '') !== f.gl) return false;
+  if (f.gq && String(l.gq || 0) !== f.gq) return false;
+  if (f.cr && (l.cr ? '1' : '0') !== f.cr) return false;
+  if (f.t && String(l.t || '') !== f.t) return false;
+  if (f.l && (f.l === '0' ? (l.l || 0) >= 5 : String(l.l || 0) !== f.l)) return false;
+  return true;
+}
+
+// columns shared by both kinds of table; `sort` values of null always sink to the bottom
+function mkColumns(kind, dr, watch) {
+  var cols = [
+    { key: 'name', label: 'Item', sort: function (r) { return r.name.toLowerCase(); }, render: function (r) {
+      var b = UI.el('button', 'link-btn mk-item');
+      b.type = 'button';
+      b.dataset.key = r.key;
+      b.dataset.mk = 'row:' + r.key;
+      b.title = 'Details for ' + r.name;
+      b.appendChild(mkIcon(r.icon, r.name));
+      var txt = UI.el('span', 'mk-item-txt');
+      txt.appendChild(UI.el('span', 'mk-name', r.name));
+      var sub = UI.el('span', 'mk-sub', r.sub);
+      if (r.cr) { if (r.sub) sub.appendChild(document.createTextNode(' ')); sub.appendChild(UI.chip('Corrupted', 'danger')); }
+      txt.appendChild(sub);
+      b.appendChild(txt);
+      b.addEventListener('click', function () { openMarketDrawer(r.key); });
+      return b;
+    } },
+    { key: 'c', label: 'Chaos', num: true, sort: function (r) { return r.c; }, render: function (r) {
+      return UI.el('span', 'mk-num', fmtCompact(r.c) + 'c');
+    } },
+    { key: 'd', label: 'Divine', num: true, sort: function (r) { return r.c; }, render: function (r) {
+      return dr ? fmtCompact(r.c / dr) + ' div' : '—';
+    } },
+    { key: 'trend', label: 'Last 7 days', title: 'Sort by how far the price swung in 7 days',
+      sort: function (r) { return r.swing; }, render: function (r) {
+        var pts = mkRowPoints(r);
+        if (pts.length < 2) return UI.el('span', 'mk-sub', 'no trend yet');
+        return sparkline(pts, { w: 110, h: 24, label: r.name + ' in chaos, 7 days', fmt: function (v) { return fmtCompact(v) + 'c'; } });
+      } },
+    { key: 'ch7', label: '7-day change', num: true, sort: function (r) { return r.ch7; },
+      render: function (r) { return pctChip(r.ch7, false, r.d7); } },
+    kind === 'cx'
+      ? { key: 'n', label: 'Volume / h', num: true, sort: function (r) { return r.n; }, render: function (r) {
+        var s = UI.el('span', null, fmtCompact(r.n) + 'c');
+        if (r.low) { s.appendChild(document.createTextNode(' ')); s.appendChild(UI.chip('thin', 'warn')); }
+        return s;
+      } }
+      : { key: 'n', label: 'Listings', num: true, sort: function (r) { return r.n; }, render: function (r) {
+        if (r.n === null) return '—';
+        var s = UI.el('span', null, String(r.n));
+        if (r.low) { s.appendChild(document.createTextNode(' ')); s.appendChild(UI.chip('few', 'warn')); }
+        return s;
+      } }
+  ];
+  if (kind === 'cx') {
+    cols.push({ key: 'star', label: '★', title: 'Sort by watched', sort: function (r) { return watch.indexOf(r.code) === -1 ? 0 : 1; },
+      render: function (r) {
+        var on = watch.indexOf(r.code) !== -1;
+        var b = UI.iconButton(on ? '★' : '☆', (on ? 'Stop watching ' : 'Watch ') + r.name, { size: 'sm',
+          cls: 'mk-star' + (on ? ' on' : ''), onClick: function () { toggleWatch(r.code); } });
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.dataset.mk = 'star:' + r.code;
+        return b;
+      } });
+  }
+  return cols;
+}
+
+// the chosen category: toolbar (search, filters, hide thin), sortable table, "Show more"
 function renderMarketTable() {
-  if (!MK.els) return;
-  var box = MK.els.table;
-  var focused = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.mk : null;
+  if (!MK.els || !MK.els.table) return;
+  var box = MK.els.table, def = marketCatDef(marketCat()), kind = def.kind;
+  var refocus = mkKeepFocus(box);
   box.textContent = '';
-  var cats = {};
-  Object.keys(market.items).forEach(function (c) { var k = market.items[c].cat || 'Other'; cats[k] = (cats[k] || 0) + 1; });
-  var catOpts = [['All', 'All categories (' + Object.keys(market.items).length + ')'], ['Watchlist', 'Watchlist']]
-    .concat(Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; })
-      .map(function (k) { return [k, k + ' (' + cats[k] + ')']; }));
+  var note = UI.el('span', 'mk-sub');
+  box.appendChild(UI.sectionHeader(def.label, [note]));
+
+  var rows, data = null, filters = [];
+  if (kind === 'nj') {
+    var e = loadNinjaCat(def.type);
+    if (e.state === 'noapp') {
+      box.appendChild(UI.emptyState({ title: 'Prices show in the app',
+        text: 'poe.ninja prices for ' + def.label.toLowerCase() + ' load in the desktop app.' }));
+      return;
+    }
+    if (e.state === 'loading') {
+      var wait = UI.el('div', 'finder-loading', 'Loading ' + def.label.toLowerCase() + ' from poe.ninja…');
+      wait.setAttribute('role', 'status');
+      box.appendChild(wait);
+      return;
+    }
+    if (e.state === 'error') {
+      var retry = UI.button('primary', { label: 'Retry', onClick: function () {
+        loadNinjaCat(def.type, true);
+        renderMarketTable();
+      } });
+      retry.dataset.mk = 'retry';
+      var fail = UI.emptyState({ title: 'Couldn\'t load ' + def.label.toLowerCase(),
+        text: '❌ ' + e.error + '. Prices come from poe.ninja through the app\'s server; nothing was loaded.', action: retry });
+      fail.classList.add('mk-error');
+      fail.setAttribute('role', 'alert');
+      box.appendChild(fail);
+      refocus();
+      return;
+    }
+    data = e.data;
+    filters = mkFilters(data.lines);
+    rows = [];
+    data.lines.forEach(function (l, idx) { if (mkFilterPass(l)) rows.push(mkNinjaRow(def, data, idx)); });
+  } else {
+    var watch = loadWatch();
+    rows = Object.keys(market.items).filter(function (c) {
+      return def.id === 'watch' ? watch.indexOf(c) !== -1 : marketCatOf(market.items[c]) === def.id;
+    }).map(mkCxRow);
+    // the feed's category under the name only where the rows come from several of them
+    if (def.id !== 'watch' && def.id !== 'cx:other') rows.forEach(function (r) { r.sub = ''; });
+  }
+  var all = rows.length;
+
   var bar = UI.el('div', 'mk-toolbar');
-  var q = UI.input({ type: 'search', value: MK.q, placeholder: 'Search items — e.g. "prismatic", "div", "scarab"',
-                     ariaLabel: 'Search market items' });
+  var q = UI.input({ type: 'search', value: MK.q, placeholder: 'Search ' + def.label.toLowerCase() + '…',
+                     ariaLabel: 'Search ' + def.label.toLowerCase() });
   q.dataset.mk = 'q';
-  q.addEventListener('input', function () { MK.q = q.value; MK.showAll = false; renderMarketTable(); });
-  var cat = UI.select(catOpts, MK.cat, { ariaLabel: 'Category',
-    onChange: function () { MK.cat = this.value; MK.showAll = false; renderMarketTable(); } });
-  cat.dataset.mk = 'cat';
+  q.addEventListener('input', function () { MK.q = q.value; MK.limit = MARKET_ROWS; renderMarketTable(); });
+  bar.appendChild(q);
+  filters.forEach(function (f) {
+    var sel = UI.select(f[2], MK.f[f[0]], { ariaLabel: f[1], onChange: function () {
+      MK.f[f[0]] = this.value; MK.limit = MARKET_ROWS; renderMarketTable();
+    } });
+    if (sel.value !== MK.f[f[0]]) { MK.f[f[0]] = ''; sel.value = ''; } // a value this category does not have
+    sel.dataset.mk = 'f:' + f[0];
+    bar.appendChild(UI.field(f[1], sel));
+  });
   var thinLab = UI.el('label', 'check');
   var thin = UI.input({ type: 'checkbox' });
   thin.checked = MK.hideThin;
   thin.dataset.mk = 'thin';
-  thin.addEventListener('change', function () { MK.hideThin = thin.checked; renderMarketTable(); });
+  thin.addEventListener('change', function () { MK.hideThin = thin.checked; MK.limit = MARKET_ROWS; renderMarketTable(); });
   thinLab.appendChild(thin);
-  thinLab.appendChild(document.createTextNode(' Hide thin markets'));
-  bar.appendChild(q);
-  bar.appendChild(cat);
+  thinLab.appendChild(document.createTextNode(kind === 'cx' ? ' Hide thin markets' : ' Hide low-confidence prices'));
+  thinLab.title = kind === 'cx' ? 'Under ' + fmtCompact(THIN_MARKET_CHAOS) + 'c traded in a typical hour: the price jumps on single trades'
+    : 'Fewer than ' + MK_FEW_LISTINGS + ' listings: the price is a guess';
   bar.appendChild(thinLab);
   box.appendChild(bar);
 
-  var watch = loadWatch();
-  var codes = Object.keys(market.items).filter(function (c) {
-    var it = market.items[c];
-    if (MK.cat === 'Watchlist' ? watch.indexOf(c) === -1 : MK.cat !== 'All' && (it.cat || 'Other') !== MK.cat) return false;
-    return !(MK.hideThin && it.st.thin);
+  var words = MK.q.toLowerCase().split(/\s+/).filter(Boolean);
+  rows = rows.filter(function (r) {
+    if (MK.hideThin && r.low) return false;
+    return words.every(function (w) { return r.text.indexOf(w) !== -1; });
   });
-  if (MK.q.trim()) codes = fuzzyFilter(codes, MK.q.trim(), function (c) { return market.items[c].name + ' ' + (market.items[c].cat || ''); });
-  else codes.sort(function (a, b) { return market.items[b].st.vol - market.items[a].st.vol; }); // busiest first
-  var total = codes.length;
-  if (!MK.showAll) codes = codes.slice(0, MARKET_ROWS);
-  var rows = codes.map(function (c) { return { code: c, it: market.items[c] }; });
-  var t = UI.table([
-    { key: 'star', label: '', render: function (r) {
-      var on = watch.indexOf(r.code) !== -1;
-      var b = UI.iconButton(on ? '★' : '☆', (on ? 'Stop watching ' : 'Watch ') + r.it.name, { size: 'sm',
-        cls: 'mk-star' + (on ? ' on' : ''), onClick: function () { toggleWatch(r.code); } });
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
-      return b;
-    } },
-    { key: 'name', label: 'Item', sort: function (r) { return r.it.name; }, render: function (r) {
-      var b = UI.el('button', 'link-btn mk-item');
-      b.type = 'button';
-      b.appendChild(itemImg(r.it));
-      var txt = UI.el('span', 'mk-item-txt');
-      txt.appendChild(UI.el('span', 'mk-name', r.it.name));
-      txt.appendChild(UI.el('span', 'mk-sub', r.it.cat || ''));
-      b.appendChild(txt);
-      b.addEventListener('click', function () { selectMarketItem(r.code, true); });
-      return b;
-    } },
-    { key: 'now', label: 'Price', num: true, sort: function (r) { return r.it.st.now; }, render: function (r) { return mPrice(r.it.st.now); } },
-    { key: 'ch24', label: '24h', num: true, sort: function (r) { return r.it.st.ch24 === null ? -Infinity : r.it.st.ch24; },
-      render: function (r) { return pctChip(r.it.st.ch24, false, r.it.st.d24); } },
-    { key: 'ch7', label: '7 days', num: true, sort: function (r) { return r.it.st.ch7 === null ? -Infinity : r.it.st.ch7; },
-      render: function (r) { return pctChip(r.it.st.ch7, false, r.it.st.d7); } },
-    { key: 'range', label: '7-day range', num: true, sort: function (r) { return r.it.st.hi; },
-      render: function (r) { return fmtCompact(r.it.st.lo) + ' – ' + fmtCompact(r.it.st.hi) + 'c'; } },
-    { key: 'vol', label: 'Volume / h', num: true, sort: function (r) { return r.it.st.vol; }, render: function (r) {
-      var s = UI.el('span', null, fmtCompact(r.it.st.vol) + 'c');
-      if (r.it.st.thin) { s.appendChild(document.createTextNode(' ')); s.appendChild(UI.chip('thin', 'warn')); }
-      return s;
-    } },
-    { key: 'trend', label: 'Trend', render: function (r) {
-      return sparkline(marketPoints(r.code), { w: 110, h: 24, label: r.it.name + ' in chaos, 7 days',
-        fmt: function (v) { return fmtCompact(v) + 'c'; } });
-    } }
-  ], rows, { sortable: true, emptyText: 'Nothing matches.',
-             rowClass: function (r) { return r.code === MK.sel ? 'sel' : ''; } });
+  var dr = mkDivRate(data), cols = mkColumns(kind, dr, kind === 'cx' ? loadWatch() : []);
+  var s = MK.sort[kind], col = cols.filter(function (c) { return c.key === s.key; })[0] || cols[1];
+  rows.sort(function (a, b) {
+    var x = col.sort(a), y = col.sort(b);
+    var xn = x === null || x === undefined || x !== x, yn = y === null || y === undefined || y !== y;
+    if (xn || yn) return xn === yn ? 0 : xn ? 1 : -1; // no value: last, whichever way
+    return (x > y ? 1 : x < y ? -1 : 0) * s.dir || (a.name > b.name ? 1 : a.name < b.name ? -1 : 0);
+  });
+  var total = rows.length, shown = rows.slice(0, MK.limit);
+  note.textContent = (kind === 'cx' ? 'GGG currency exchange' : 'poe.ninja · read ' +
+    new Date(data.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })) + ' · ' +
+    (total === all ? all : total + ' of ' + all) + (all === 1 ? ' item' : ' items');
+
+  var openKey = MK.open && MK.open.key;
+  var t = UI.table(cols, shown, { sortable: true, sort: { key: col.key, dir: s.dir },
+    emptyText: def.id === 'watch' && !all ? 'Star items (☆) in any exchange category to keep them here.' : 'Nothing matches.',
+    rowClass: function (r) { return r.key === openKey ? 'sel' : ''; },
+    // numbers start high→low, names A→Z; the same column again flips it
+    onSort: function (key) {
+      var c = cols.filter(function (x) { return x.key === key; })[0];
+      MK.sort[kind] = { key: key, dir: s.key === key ? -s.dir : c.num || key === 'trend' || key === 'star' ? -1 : 1 };
+      MK.limit = MARKET_ROWS;
+      renderMarketTable();
+    } });
+  Array.prototype.forEach.call(t.querySelectorAll('.th-sort'), function (b) { b.dataset.mk = 'sort:' + b.dataset.sort; });
+  // the whole row opens the details; its controls keep their own clicks
+  t.addEventListener('click', function (ev) {
+    if (ev.target.closest('button, a, input, select, .spark')) return;
+    var tr = ev.target.closest('tbody tr'), b = tr && tr.querySelector('.mk-item');
+    if (b) openMarketDrawer(b.dataset.key);
+  });
   box.appendChild(t);
-  if (total > codes.length || MK.showAll && total > MARKET_ROWS) {
-    box.appendChild(UI.button('secondary', { label: MK.showAll ? 'Show the busiest ' + MARKET_ROWS : 'Show all ' + total,
-      onClick: function () { MK.showAll = !MK.showAll; renderMarketTable(); } }));
+  if (total > shown.length) {
+    var more = UI.button('secondary', { label: 'Show ' + Math.min(MARKET_ROWS, total - shown.length) + ' more (' +
+      shown.length + ' of ' + total + ' showing)', onClick: function () { MK.limit += MARKET_ROWS; renderMarketTable(); } });
+    more.dataset.mk = 'more';
+    box.appendChild(more);
   }
-  if (focused) {
-    var again = box.querySelector('[data-mk="' + focused + '"]');
-    if (again) { again.focus(); if (again.type === 'search') again.setSelectionRange(again.value.length, again.value.length); }
+  refocus();
+}
+
+// ---- detail drawer: beside the table (below it on narrow windows) ----
+function mkRowButton(key) {
+  var els = MK.els && MK.els.table ? MK.els.table.querySelectorAll('.mk-item') : [];
+  for (var i = 0; i < els.length; i++) if (els[i].dataset.key === key) return els[i];
+  return null;
+}
+function mkMarkOpenRow() {
+  var key = MK.open && MK.open.key;
+  if (!MK.els || !MK.els.table) return;
+  Array.prototype.forEach.call(MK.els.table.querySelectorAll('.mk-item'), function (b) {
+    var tr = b.closest('tr');
+    if (tr) tr.classList.toggle('sel', b.dataset.key === key);
+  });
+}
+function openMarketDrawer(key) {
+  if (!MK.open || MK.open.key !== key) MK.alertOpen = false;
+  MK.open = { key: key };
+  mkMarkOpenRow();
+  renderMarketDrawer();
+  var close = MK.els.drawer.querySelector('.mk-drawer-close');
+  if (close) close.focus();
+}
+// focus goes back to the row that opened it (the search box when that row is filtered away)
+function closeMarketDrawer() {
+  if (!MK.open) return;
+  var key = MK.open.key;
+  MK.open = null;
+  MK.alertOpen = false;
+  mkMarkOpenRow();
+  renderMarketDrawer();
+  var back = mkRowButton(key) || (MK.els && MK.els.table && MK.els.table.querySelector('[data-mk="q"]'));
+  if (back) back.focus();
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || e.defaultPrevented || !MK.open || document.body.dataset.view !== 'market') return;
+  // something on top takes the key first: a dialog, a menu or popover, the settings drawer
+  if (document.querySelector('dialog[open], .menu, .popover:not([hidden]), #settings-panel:not(.hidden)')) return;
+  closeMarketDrawer();
+}, true); // capture: asked before those layers close themselves on the same key
+
+function renderMarketDrawer() {
+  if (!MK.els || !MK.els.drawer) return;
+  var box = MK.els.drawer, row = MK.open && mkRowByKey(MK.open.key);
+  var refocus = mkKeepFocus(box);
+  box.textContent = '';
+  if (!row) MK.open = null;
+  box.hidden = !row;
+  MK.els.view.classList.toggle('has-drawer', !!row);
+  if (!row) return;
+  box.setAttribute('aria-label', row.name + ' details');
+  var top = UI.el('div', 'mk-drawer-top');
+  top.appendChild(UI.el('span', 'section-title', 'Details'));
+  var close = UI.iconButton('✕', 'Close details', { size: 'sm', cls: 'mk-drawer-close', title: 'Close (Esc)',
+    onClick: closeMarketDrawer });
+  close.dataset.mk = 'close';
+  top.appendChild(close);
+  box.appendChild(top);
+  var body = UI.el('div', 'mk-drawer-body');
+  box.appendChild(body);
+  if (row.kind === 'cx') fillChartCard(body, row.code);
+  else fillNinjaCard(body, row);
+  refocus();
+}
+
+// one snapshot item: prices, the 7-day trend enlarged, listings, its poe.ninja page
+function fillNinjaCard(box, row) {
+  var entry = MK.ninja[market.league + '|' + row.def.type], dr = mkDivRate(entry && entry.data);
+  var head = UI.el('div', 'mk-chart-head');
+  head.appendChild(mkIcon(row.icon, row.name, 'mk-ic-lg'));
+  var id = UI.el('div', 'mk-id');
+  id.appendChild(UI.el('div', 'mk-cat', row.def.label));
+  id.appendChild(UI.el('h3', 'mk-title', row.name));
+  if (row.sub || row.cr) {
+    var sub = UI.el('div', 'mk-sub', row.sub);
+    if (row.cr) { if (row.sub) sub.appendChild(document.createTextNode(' ')); sub.appendChild(UI.chip('Corrupted', 'danger')); }
+    id.appendChild(sub);
   }
+  id.appendChild(UI.el('div', 'mk-price', fmtCompact(row.c) + 'c' + (dr ? ' · ' + fmtCompact(row.c / dr) + ' div' : '')));
+  head.appendChild(id);
+  var acts = UI.el('div', 'mk-chart-acts');
+  var link = UI.button('ghost', { label: 'poe.ninja ↗', title: 'This item on poe.ninja, in the same league',
+    onClick: function () { openUrl(ninjaUrl(row.def.page, row.name, market.league)); } });
+  link.dataset.mk = 'card-ninja';
+  acts.appendChild(link);
+  head.appendChild(acts);
+  box.appendChild(head);
+
+  var body = UI.el('div', 'mk-chart-body mk-drawer-spark');
+  box.appendChild(body);
+  var pts = mkRowPoints(row);
+  if (pts.length > 1) {
+    body.appendChild(sparkline(pts, { w: 340, h: 110, label: row.name + ' in chaos, 7 days',
+      fmt: function (v) { return fmtCompact(v) + 'c'; } }));
+  } else {
+    body.appendChild(UI.el('div', 'finder-sub', 'poe.ninja has no 7-day trend for this one yet.'));
+  }
+  var stats = UI.el('div', 'mk-stats');
+  var vals = pts.map(function (p) { return p.v; });
+  [['7-day change', pctChip(row.ch7, false, row.d7)],
+   ['Low', document.createTextNode(vals.length > 1 ? fmtCompact(Math.min.apply(null, vals)) + 'c' : '—')],
+   ['High', document.createTextNode(vals.length > 1 ? fmtCompact(Math.max.apply(null, vals)) + 'c' : '—')],
+   ['Listings', document.createTextNode(row.n === null ? '—' : String(row.n))]].forEach(function (s) {
+    var cell = UI.el('div', 'mk-stat');
+    cell.appendChild(UI.el('span', 'mk-stat-label', s[0]));
+    var v = UI.el('span', 'mk-stat-value');
+    v.appendChild(s[1]);
+    cell.appendChild(v);
+    stats.appendChild(cell);
+  });
+  if (row.low) stats.appendChild(UI.chip('Few listings — price is a guess', 'warn'));
+  box.appendChild(stats);
+  box.appendChild(UI.el('div', 'finder-sub', 'poe.ninja\'s estimate from public stash listings, read ' +
+    new Date(row.at).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) +
+    '. The trend is one point a day.'));
 }
 
 async function annotateChaosEq(state) {

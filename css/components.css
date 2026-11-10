@@ -908,8 +908,53 @@ body.gui .settings-section.gui-only { display: flex; }
 .mk-item-txt { display: flex; flex-direction: column; }
 .mk-star { color: var(--text-3); }
 .mk-star.on { color: var(--accent); }
+/* category rail + main area (poe.ninja-style) */
+.mk-layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 12px; align-items: start; }
+.market-page .mk-rail { position: sticky; top: 8px; max-height: calc(100vh - 24px); overflow-y: auto; padding: 8px; }
+.mk-rail-select { display: none; width: 100%; }
+.mk-rail-list { display: flex; flex-direction: column; gap: 10px; }
+.mk-rail-group { display: flex; flex-direction: column; gap: 1px; }
+.mk-rail-label { color: var(--text-3); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; }
+.mk-rail-item {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 8px; border-radius: var(--r-md); cursor: pointer; color: var(--text-2); font-size: var(--fs-sm);
+}
+.mk-rail-item:hover { background: var(--s2); color: var(--text); }
+.mk-rail-item[aria-current="page"] { background: var(--accent-soft); color: var(--text); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.mk-rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mk-rail-n { color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.mk-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.mk-catview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.mk-catview.has-drawer { grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); }
+.mk-table { overflow-x: auto; }
+.mk-table tbody tr { cursor: pointer; }
+.mk-table .section-actions { font-weight: 400; }
+.mk-table .mk-sub .badge { margin-left: 2px; }
+.mk-noic {
+  display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm);
+  background: var(--s3); color: var(--text-2); font-size: var(--fs-xs); font-weight: 700; line-height: 1;
+}
+.mk-ic-lg.mk-noic { font-size: var(--fs-lg); }
+.mk-error .btn { margin-top: 10px; }
+/* detail drawer */
+.market-page .mk-drawer { position: sticky; top: 8px; max-height: calc(100vh - 24px); overflow-y: auto; }
+.mk-drawer[hidden] { display: none; }
+.mk-drawer-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: var(--accent); font-weight: 600; }
+.mk-drawer .mk-chart-body { min-height: 0; }
+.mk-drawer-spark .spark { display: block; }
+.mk-drawer-spark .spark svg { width: 100%; height: auto; }
 @media (max-width: 1100px) {
   .mk-grid, .mk-mover-row { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1500px) {
+  .mk-catview.has-drawer { grid-template-columns: minmax(0, 1fr); }
+  .market-page .mk-drawer { position: static; max-height: none; }
+}
+@media (max-width: 900px) {
+  .mk-layout { grid-template-columns: minmax(0, 1fr); }
+  .market-page .mk-rail { position: static; max-height: none; overflow: visible; }
+  .mk-rail-list { display: none; }
+  .mk-rail-select { display: block; }
 }
 
 /* ---- anoint helper (js/app/27-anoints.js): inside the Blight cheat sheet ---- */

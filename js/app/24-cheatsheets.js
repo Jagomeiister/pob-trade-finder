@@ -402,6 +402,7 @@ function sheetContent(act, opts) {
 
 // ---- overlay window (index.html?sheet=1) ----------------------------------------------------
 function renderSheetOverlay() {
+  sheetStatusSeen = sheetHotkeyKey(); // the labels this draw uses: the status loop redraws only for new ones
   var root = document.getElementById('sheet-root');
   if (!root) return;
   if (ovDrag) { setTimeout(renderSheetOverlay, 300); return; } // never rebuild the grip mid-drag
@@ -505,6 +506,7 @@ var hintTimer = null;
 var hintLast = null;     // don't suggest the same mechanic again until you've been elsewhere
 var HINT_SECONDS = 20;
 function renderSheetHint() {
+  sheetStatusSeen = sheetHotkeyKey(); // the labels this draw uses: the status loop redraws only for new ones
   var root = document.getElementById('sheet-root');
   if (!root) return;
   if (ovDrag) { setTimeout(renderSheetHint, 300); return; }
@@ -641,11 +643,10 @@ async function refreshSheetStatus() {
   if (isGui() && window.pywebview.api.overlay_status) {
     try { var st = await window.pywebview.api.overlay_status(); if (st && st.ok) overlayState = st; } catch (e) { /* keep */ }
   }
-  var key = JSON.stringify((overlayState && overlayState.hotkeys) || {});
-  if (key === sheetStatusSeen) return;
-  sheetStatusSeen = key;
+  if (sheetHotkeyKey() === sheetStatusSeen) return; // nothing new since the last draw
   sheetRender();
 }
+function sheetHotkeyKey() { return JSON.stringify((overlayState && overlayState.hotkeys) || {}); }
 
 // ---- main window: Tools → Cheat sheets ------------------------------------------------------
 var sheetViewBack = null;
