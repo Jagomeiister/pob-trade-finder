@@ -33,6 +33,7 @@ SHIP = [
     "css/mech-scarabhub.css",
     "css/mech-priceboards.css",
     "css/mech-pickers.css",
+    "css/sheet-folds.css",
     "js/ui.js",
     "js/pob.js",
     "js/matcher.js",

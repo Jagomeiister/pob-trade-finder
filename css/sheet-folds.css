@@ -1,0 +1,24 @@
+/* css/sheet-folds.css — cheat sheet sections as folds (24-cheatsheets.js: sheetFold). Each wiki
+   table, mechanic tool and act-sheet part is a <details>: the summary is the click target, with
+   an arrow (▸ closed, ▾ open), the title and a row-count chip. Same look as the guide sections
+   (.guide-sec in components.css); tighter over the game, where the sheet is small. */
+.sheet-fold { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--s1); min-width: 0; }
+.sheet-fold[open] { background: color-mix(in srgb, var(--s2) 40%, var(--s1)); }
+.sheet-fold-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; list-style: none;
+  user-select: none; }
+.sheet-fold-head::-webkit-details-marker { display: none; }
+.sheet-fold-head::before { content: '▸'; flex: none; width: 10px; color: var(--text-3); font-size: var(--fs-sm); }
+.sheet-fold[open] > .sheet-fold-head::before { content: '▾'; }
+.sheet-fold-head .sheet-sec-title { margin-bottom: 0; color: var(--text-2); }
+.sheet-fold[open] > .sheet-fold-head .sheet-sec-title { color: var(--text); }
+.sheet-fold-head:hover .sheet-sec-title, .sheet-fold-head:hover::before { color: var(--accent); }
+.sheet-fold-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-md); }
+.sheet-fold-head .sheet-fold-count { margin-left: 0; font-variant-numeric: tabular-nums; }
+/* (no overflow here: the table headers stick to the sheet's own scroll box) */
+.sheet-fold-body { padding: 2px 12px 10px; min-width: 0; }
+/* the mechanic tools keep their own spacing under the title */
+.sheet-fold.mech-tool-sec > .sheet-fold-body { padding-top: 4px; }
+
+/* over the game: no room for padding; the fold is a thin row */
+body.sheet-ov .sheet-fold-head { gap: 6px; padding: 3px 6px; }
+body.sheet-ov .sheet-fold-body { padding: 0 6px 6px; }

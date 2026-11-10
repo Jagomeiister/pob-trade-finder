@@ -8,7 +8,7 @@
 // Cache-busted stylesheets (same reason as the scripts at the end of <body>).
 (function () {
   var v = Date.now();
-  ['css/tokens.css', 'css/base.css', 'css/components.css', 'css/layout.css', 'css/navicons.css', 'css/filter-editor.css', 'css/mechtools.css', 'css/mech-scarabhub.css', 'css/mech-priceboards.css', 'css/mech-pickers.css'].forEach(function (href) {
+  ['css/tokens.css', 'css/base.css', 'css/components.css', 'css/layout.css', 'css/navicons.css', 'css/filter-editor.css', 'css/mechtools.css', 'css/mech-scarabhub.css', 'css/mech-priceboards.css', 'css/mech-pickers.css', 'css/sheet-folds.css'].forEach(function (href) {
     document.write('<link rel="stylesheet" href="' + href + '?v=' + v + '">');
   });
   // theme before first paint (app.js applyPrefs owns it afterwards)

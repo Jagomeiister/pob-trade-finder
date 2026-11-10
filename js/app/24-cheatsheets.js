@@ -130,12 +130,72 @@ function sheetMatch(ev) {
   })[0] || null;
 }
 
+// ---- folds: each section of a sheet is a <details>, so a long sheet doesn't run down the page ----
+// What you opened or closed is remembered per sheet: { sheetId: { sectionKey: true|false } }. The
+// sheet over the game keeps its own state (sheetId + ':ov'): it is small, the app's page is not.
+var SHEET_OPEN_KEY = 'pobtf-sheet-open';
+function sheetOpenMap() {
+  var m;
+  try { m = JSON.parse(localStorage.getItem(SHEET_OPEN_KEY)); } catch (e) { m = null; }
+  return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+}
+function sheetFoldScope(id) { return id + (SHEET_OV ? ':ov' : ''); }
+function sheetFoldWanted(scope, key, dflt) {
+  var s = sheetOpenMap()[scope];
+  return s && typeof s === 'object' && typeof s[key] === 'boolean' ? s[key] : !!dflt;
+}
+function sheetFoldSave(scope, key, open) {
+  var m = sheetOpenMap();
+  if (!m[scope] || typeof m[scope] !== 'object' || Array.isArray(m[scope])) m[scope] = {};
+  m[scope][key] = !!open;
+  persist(SHEET_OPEN_KEY, JSON.stringify(m));
+}
+// the state a fold goes back to when the row filter is cleared
+function sheetFoldRemembered(det) {
+  return sheetFoldWanted(det.dataset.scope, det.dataset.key, det.dataset.dflt === '1');
+}
+// o: { scope, key (default: the title), title, count (a number: the chip; null: none), unit, open
+// (the default state), cls }. Returns the <details>; its content goes in .foldBody
+function sheetFold(o) {
+  var key = o.key || o.title;
+  var det = UI.el('details', 'sheet-sec sheet-fold' + (o.cls ? ' ' + o.cls : ''));
+  det.dataset.scope = o.scope;
+  det.dataset.key = key;
+  det.dataset.dflt = o.open ? '1' : '0';
+  det.open = sheetFoldWanted(o.scope, key, o.open);
+  var sum = UI.el('summary', 'sheet-fold-head');
+  sum.appendChild(UI.el('span', 'sheet-sec-title', o.title));
+  if (typeof o.count === 'number') {
+    var unit = o.unit || 'row';
+    var chip = UI.chip(String(o.count), 'neutral', 'sheet-fold-count');
+    chip.title = o.count + ' ' + unit + (o.count === 1 ? '' : 's');
+    chip.setAttribute('aria-label', chip.title);
+    sum.appendChild(chip);
+  }
+  det.appendChild(sum);
+  var body = UI.el('div', 'sheet-fold-body');
+  det.appendChild(body);
+  det.foldBody = body;
+  // "toggle" also fires for what the code sets (the first draw, the row filter): only a real
+  // change counts, and only your own click is remembered (not what the filter opened)
+  var last = det.open;
+  det.addEventListener('toggle', function () {
+    if (det.open === last) return;
+    last = det.open;
+    if (SHEET_OV) fitSheetOverlay();
+    if (det.dataset.filtering) return;
+    if (det.open !== sheetFoldRemembered(det)) sheetFoldSave(det.dataset.scope, det.dataset.key, det.open);
+  });
+  return det;
+}
+
 // a mechanic sheet: tables and lists straight from the data
 function mechanicContent(m, opts) {
   opts = opts || {};
   // a sheet with a strategy guide (33-guides.js): the guide, which shows these tables under it (opts.plain)
   if (!opts.plain && typeof guideFor === 'function' && guideFor(m.id)) return guideContent(m, opts);
   var box = UI.el('div', 'sheet-content');
+  var scope = sheetFoldScope(m.id);
   // Blight: the anoint helper (27-anoints.js) replaces the long anoint tables with search, oils
   // and prices
   var helper = m.id === 'blight' && typeof anointHelper === 'function';
@@ -149,18 +209,28 @@ function mechanicContent(m, opts) {
   // first; under a guide, the guide shows them itself (opts.noTools)
   if (!opts.noTools && typeof mechToolsFor === 'function') {
     mechToolsFor(m.id, !!SHEET_OV).forEach(function (t) {
-      var ts = UI.el('div', 'sheet-sec mech-tool-sec');
-      ts.appendChild(UI.el('div', 'sheet-sec-title', t.title));
-      ts.appendChild(mechMount(t, { overlay: !!SHEET_OV, sheet: m.id,
+      var ts = sheetFold({ scope: scope, key: 'tool:' + (t.id || t.title), title: t.title, count: null, open: true,
+        cls: 'mech-tool-sec' });
+      ts.foldBody.appendChild(mechMount(t, { overlay: !!SHEET_OV, sheet: m.id,
         onChange: SHEET_OV ? function () { fitSheetOverlay(); } : null }));
       box.appendChild(ts);
     });
   }
+  // the wiki tables and lists: one fold each, the first open (what you open is remembered)
+  var first = true;
   (m.sections || []).forEach(function (s) {
     if (helper && /^(Amulet|Ring|Blighted map) anoints/i.test(s.title || '')) return; // in the helper
-    var sec = UI.el('div', 'sheet-sec');
-    if (s.title) sec.appendChild(UI.el('div', 'sheet-sec-title', s.title));
-    if (Array.isArray(s.columns) && Array.isArray(s.rows)) {
+    var isTable = Array.isArray(s.columns) && Array.isArray(s.rows);
+    var holder, sec;
+    if (s.title) {
+      sec = sheetFold({ scope: scope, title: s.title, open: first, unit: isTable ? 'row' : 'line',
+        count: isTable ? s.rows.length : Array.isArray(s.lines) ? s.lines.length : null });
+      holder = sec.foldBody;
+    } else { // nothing to click on: it stays as it is
+      holder = sec = UI.el('div', 'sheet-sec');
+    }
+    first = false;
+    if (isTable) {
       var t = UI.el('table', 'sheet-table');
       var hr = UI.el('tr');
       s.columns.forEach(function (c) { hr.appendChild(UI.el('th', null, c)); });
@@ -174,11 +244,11 @@ function mechanicContent(m, opts) {
         tb.appendChild(tr);
       });
       t.appendChild(tb);
-      sec.appendChild(t);
+      holder.appendChild(t);
     } else if (Array.isArray(s.lines)) {
       var ul = UI.el('ul', 'sheet-list');
       s.lines.forEach(function (l) { ul.appendChild(UI.el('li', 'sheet-li', String(l))); });
-      sec.appendChild(ul);
+      holder.appendChild(ul);
     }
     box.appendChild(sec);
   });
@@ -203,16 +273,20 @@ function sheetLabFor(act) {
   return { lab: lab, count: count, level: (d.labs || {})[lab] || null };
 }
 
+var SHEET_GEMS_FOLD = 40; // more gem chips than this: the Gems part starts folded
 function sheetContent(act, opts) {
   opts = opts || {};
   var p = sheetPrefs(), d = sheetData();
   var box = UI.el('div', 'sheet-content');
   var a = d && d.acts ? d.acts[act] || {} : {};
-  function section(title) {
-    var s = UI.el('div', 'sheet-sec');
-    s.appendChild(UI.el('div', 'sheet-sec-title', title));
+  // each part folds (open unless said otherwise); what you close stays closed on every act
+  var scope = sheetFoldScope('act');
+  function section(title, o) {
+    o = o || {};
+    var s = sheetFold({ scope: scope, key: o.key || title, title: title, open: o.open !== false, unit: o.unit,
+      count: typeof o.count === 'number' ? o.count : null });
     box.appendChild(s);
-    return s;
+    return s.foldBody;
   }
   if (!d) box.appendChild(UI.el('div', 'sheet-empty', 'The built-in sheet data is missing (data/cheatsheets.js).'));
   if (d && p.show.points && (a.points || []).length) {
@@ -224,7 +298,7 @@ function sheetContent(act, opts) {
       li.appendChild(UI.el('span', null, q.quest));
       ul.appendChild(li);
     });
-    section('Quests').appendChild(ul);
+    section('Quests', { count: a.points.length, unit: 'quest' }).appendChild(ul);
   }
   if (d && p.show.trials && (a.trials || []).length) {
     var tl = UI.el('ul', 'sheet-list');
@@ -244,13 +318,13 @@ function sheetContent(act, opts) {
       tl.appendChild(UI.el('li', 'sheet-li sheet-sub', lab.lab + ' Labyrinth' + (lab.level ? ' (area level ' + lab.level + ')' : '') +
         ': opens after these ' + lab.count + ' trials'));
     }
-    section('Trials of Ascendancy').appendChild(tl);
+    section('Trials of Ascendancy', { count: a.trials.length, unit: 'trial' }).appendChild(tl);
   }
   if (d && p.show.notes) {
     (a.notes || []).forEach(function (n) {
       var nl = UI.el('ul', 'sheet-list');
       n.lines.forEach(function (l) { nl.appendChild(UI.el('li', 'sheet-li', l)); });
-      section(n.title).appendChild(nl);
+      section(n.title, { key: 'note:' + n.title, count: n.lines.length, unit: 'line' }).appendChild(nl);
     });
   }
   // the act's zones in order; the one you're in is marked (Client.txt area id, or its name)
@@ -268,17 +342,18 @@ function sheetContent(act, opts) {
       (z.notes || []).forEach(function (n) { li.appendChild(UI.el('span', 'sheet-li-sub', n)); });
       rl.appendChild(li);
     });
-    section('Route').appendChild(rl);
+    section('Route', { count: a.route.length, unit: 'zone' }).appendChild(rl);
   }
   // quest gem rewards and what the vendor sells after, for your class; your build's gems marked
   if (d && p.show.gems && (a.gems || []).length) {
     var cls = sheetGemClass(p);
-    var gsec = section('Gems' + (cls ? ' · ' + cls : ''));
+    var gtitle = 'Gems' + (cls ? ' · ' + cls : '');
     if (!cls) {
-      gsec.appendChild(UI.el('div', 'sheet-empty', 'Load a build, or pick a class in Tools → Cheat sheets, to see your gems.'));
+      section(gtitle, { key: 'Gems' }).appendChild(UI.el('div', 'sheet-empty',
+        'Load a build, or pick a class in Tools → Cheat sheets, to see your gems.'));
     } else {
       var mine = sheetBuildGems();
-      var gl = UI.el('ul', 'sheet-list');
+      var gl = UI.el('ul', 'sheet-list'), gemCount = 0;
       a.gems.forEach(function (q) {
         var rew = (q.reward || []).filter(function (g) { return (g.classes || []).indexOf(cls) !== -1; });
         var ven = (q.vendor || []).filter(function (g) { return (g.classes || []).indexOf(cls) !== -1; });
@@ -295,18 +370,21 @@ function sheetContent(act, opts) {
             var gem = UI.el('span', 'sheet-gem' + (own ? ' is-mine' : ''), g.gem);
             if (own) gem.title = 'In your build';
             row.appendChild(gem);
+            gemCount++;
           });
           li.appendChild(row);
         });
         gl.appendChild(li);
       });
+      // a long gem list (an act with many rewards) starts folded: it would push the rest away
+      var gsec = section(gtitle, { key: 'Gems', count: gemCount, unit: 'gem', open: gemCount <= SHEET_GEMS_FOLD });
       if (!gl.childNodes.length) gsec.appendChild(UI.el('div', 'sheet-empty', 'No gem rewards for ' + cls + ' in this act.'));
       else gsec.appendChild(gl);
     }
   }
   if (p.show.mine) {
     sheetsForAct(act).forEach(function (s) {
-      var sec = section(s.title || 'Your notes');
+      var sec = section(s.title || 'Your notes', { key: 'mine:' + s.id });
       if (s.text) sec.appendChild(UI.el('div', 'sheet-user-text', s.text));
       (s.images || []).filter(sheetImgOk).forEach(function (src) {
         var img = UI.el('img', 'sheet-img');
@@ -697,16 +775,24 @@ function sheetFilterRows(box, text) {
   box.querySelectorAll('.sheet-sec').forEach(function (sec) {
     // the mechanic tools (40-mechtools.js) aren't reference rows: the filter leaves them alone
     if (sec.classList.contains('mech-tool-sec') || sec.closest('.mech-tool')) return;
+    var title = ((sec.querySelector('.sheet-sec-title') || {}).textContent || '').toLowerCase();
+    // the words are in the section's title: the whole section matches, every row of it shows
+    var titleHit = words.length > 0 && words.every(function (w) { return title.indexOf(w) !== -1; });
     var shown = 0;
     sec.querySelectorAll('.sheet-table tbody tr, .sheet-list .sheet-li').forEach(function (r) {
       var t = r.textContent.toLowerCase();
-      var ok = words.every(function (w) { return t.indexOf(w) !== -1; });
+      var ok = titleHit || words.every(function (w) { return t.indexOf(w) !== -1; });
       r.style.display = ok ? '' : 'none';
       shown += ok ? 1 : 0;
     });
-    var title = (sec.querySelector('.sheet-sec-title') || {}).textContent || '';
-    var titleHit = words.length && words.every(function (w) { return title.toLowerCase().indexOf(w) !== -1; });
-    sec.style.display = !words.length || shown || titleHit ? '' : 'none';
+    var show = !words.length || shown > 0 || titleHit;
+    sec.style.display = show ? '' : 'none';
+    // a fold with matches opens while you filter; clearing the box puts back what you had (the
+    // remembered state isn't touched: see sheetFold's toggle)
+    if (sec.classList.contains('sheet-fold')) {
+      if (words.length) { sec.dataset.filtering = '1'; sec.open = show; }
+      else { delete sec.dataset.filtering; sec.open = sheetFoldRemembered(sec); }
+    }
   });
 }
 
