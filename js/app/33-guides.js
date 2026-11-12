@@ -178,6 +178,59 @@ function guideNextPatch(p) {
   return m ? m[1] + '.' + (parseInt(m[2], 10) + 1) : 'the next patch';
 }
 
+// ---- notices and retired content (from the payload, so the server can change them) ----------
+// notices: [{id, from (UTC time it starts showing), sheets: 'all' | [ids], untilAsOf, tone, text}]
+// retired: {scarabs: {patch, from, text}} — content the game removed; tools check guideRetired(key)
+var GUIDE_NOTICE_KEY = 'pobtf-notice-seen';
+function guideNow() { return window.__guideNow || Date.now(); } // (tests set __guideNow)
+function guidePatchAtLeast(p, min) {
+  var a = /^(\d+)\.(\d+)/.exec(p || ''), b = /^(\d+)\.(\d+)/.exec(min || '');
+  if (!a || !b) return false;
+  return +a[1] > +b[1] || (+a[1] === +b[1] && +a[2] >= +b[2]);
+}
+function guideNoticesSeen() {
+  try { var v = JSON.parse(localStorage.getItem(GUIDE_NOTICE_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+// the notices to show on a sheet now; asOf = the patch that sheet's content is from
+function guideNotices(sheetId, asOf) {
+  var d = guideData(), seen = guideNoticesSeen(), now = guideNow();
+  return ((d && d.notices) || []).filter(function (n) {
+    if (!n || !n.id || !n.text || seen.indexOf(n.id) !== -1) return false;
+    var from = Date.parse(n.from);
+    if (!isFinite(from) || now < from) return false;
+    if (n.sheets !== 'all' && (n.sheets || []).indexOf(sheetId) === -1) return false;
+    return !(n.untilAsOf && guidePatchAtLeast(asOf, n.untilAsOf));
+  });
+}
+// the banner(s) for a sheet, or null; "Got it" hides a notice for good (on every sheet)
+function guideNoticeBar(sheetId, asOf, onChange) {
+  var list = guideNotices(sheetId, asOf);
+  if (!list.length) return null;
+  var box = UI.el('div', 'guide-notices');
+  list.forEach(function (n) {
+    var bar = UI.el('div', 'guide-notice tone-' + (n.tone === 'warn' ? 'warn' : 'info'));
+    bar.setAttribute('role', 'note');
+    bar.dataset.notice = n.id;
+    bar.appendChild(UI.el('span', 'guide-notice-text', n.text));
+    bar.appendChild(UI.button('ghost', { label: 'Got it', size: 'sm', title: 'Hide this notice on every sheet', onClick: function () {
+      var seen = guideNoticesSeen();
+      if (seen.indexOf(n.id) === -1) seen.push(n.id);
+      persist(GUIDE_NOTICE_KEY, JSON.stringify(seen.slice(-50)));
+      document.querySelectorAll('.guide-notice[data-notice="' + n.id + '"]').forEach(function (el) { el.remove(); });
+      if (onChange) onChange();
+    } }));
+    box.appendChild(bar);
+  });
+  return box;
+}
+function guideRetired(key) {
+  var d = guideData(), r = d && d.retired && d.retired[key];
+  if (!r) return null;
+  var from = Date.parse(r.from);
+  return isFinite(from) && guideNow() >= from ? r : null;
+}
+
 // ---- the guide in the app -------------------------------------------------------------------
 function guideContent(m, opts) {
   opts = opts || {};
@@ -197,6 +250,8 @@ function guideContent(m, opts) {
   nt.appendChild(document.createTextNode(' A summary of community guides: each line\'s [n] names its source under Read more.'));
   note.appendChild(nt);
   root.appendChild(note);
+  var notices = guideNoticeBar(m.id, asOf, null);
+  if (notices) root.appendChild(notices);
   // the jump bar: filled at the end, once every section is drawn
   var jump = UI.el('nav', 'guide-jump');
   jump.setAttribute('aria-label', 'Jump to a section of this guide');
@@ -287,7 +342,7 @@ function guideContent(m, opts) {
       }
       if ((s.scarabs || []).length) {
         var sc = UI.el('div', 'guide-strat-row');
-        sc.appendChild(UI.el('span', 'guide-k', 'Scarabs'));
+        sc.appendChild(UI.el('span', 'guide-k', guideRetired('scarabs') ? 'Scarabs (removed in ' + guideRetired('scarabs').patch + ')' : 'Scarabs'));
         var scl = UI.el('span', 'guide-pills');
         s.scarabs.forEach(function (t) { scl.appendChild(guideText(t, 'guide-pill is-scarab')); });
         sc.appendChild(scl);
@@ -546,6 +601,8 @@ function guideOverlay(m, g, opts) {
     box.appendChild(ref);
   }
 
+  var ovNotices = guideNoticeBar(m.id, g.asOf || (guideData() || {}).asOf || '', guideOvFit);
+  if (ovNotices) quick.appendChild(ovNotices);
   var qs = UI.el('div', 'sheet-sec');
   qs.appendChild(UI.el('div', 'sheet-sec-title', 'Quick card'));
   var ql = UI.el('ul', 'sheet-list guide-quick');

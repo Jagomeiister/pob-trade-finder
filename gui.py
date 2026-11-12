@@ -897,12 +897,17 @@ class Api:
         "oils": lambda n, c: c == "Oils & Extractor",
         "catalysts": lambda n, c: c == "Catalysts",
         "delirium": lambda n, c: c == "Delirium Orbs",
-        "fragments": lambda n, c: c == "Fragments, Scarabs & Mapping" and "Scarab" not in n,
+        # 3.30: Threads replace scarabs ("Abyss Thread" … "Frayed Thread"), whatever category they get
+        "threads": lambda n, c: n.endswith(" Thread") and not n.startswith("Memory"),
+        "fragments": lambda n, c: c == "Fragments, Scarabs & Mapping" and "Scarab" not in n and not n.endswith(" Thread"),
         "expedition": lambda n, c: c == "Expedition Currency",
         "foulborn": lambda n, c: c == "Foulborn Currency & Wombgifts",
         "embers": lambda n, c: c == "Allflame Embers",
-        "currency": lambda n, c: c == "Currency",
+        "currency": lambda n, c: c == "Currency" and not n.endswith(" Thread"),
+        # everything no other group claims (cards and maps aside): a new league's items show up here
+        "other": lambda n, c: False,
     }
+    MECH_OTHER_SKIP = ("Cards", "Maps", "Shaper, Conqueror & Elder Maps", "Legacy Items")
 
     def mech_prices(self, league, groups_json):
         """Icons and chaos prices for whole item groups (MECH_GROUPS keys), from GGG's hourly
@@ -911,7 +916,7 @@ class Api:
         URL (the rest are cached in the background, so the next open works offline); chaos is
         None when the feed has no price for it this hour."""
         try:
-            groups = [g for g in json.loads(groups_json or "[]") if g in self.MECH_GROUPS][:12]
+            groups = [g for g in json.loads(groups_json or "[]") if g in self.MECH_GROUPS][:len(self.MECH_GROUPS)]
             seen, picked = set(), {}
             for code, m in sorted(self._currency_map.items(), key=lambda kv: len(kv[0])):
                 name, cat, mid = m.get("name") or "", m.get("cat") or "", m.get("id")
@@ -922,6 +927,11 @@ class Api:
                         seen.add(mid)
                         picked[code] = (m, g)
                         break
+                else:
+                    if ("other" in groups and cat not in self.MECH_OTHER_SKIP
+                            and not any(f(name, cat) for f in self.MECH_GROUPS.values())):
+                        seen.add(mid)
+                        picked[code] = (m, "other")
             div_id = (self._currency_map.get("divine") or {}).get("id")
             want = [m["id"] for m, _ in picked.values()] + ([div_id] if div_id else [])
             try:

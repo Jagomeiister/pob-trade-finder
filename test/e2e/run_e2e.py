@@ -305,6 +305,9 @@ STUB_JS = r"""
   // every bridge method exists; unknown ones resolve to a soft failure and are recorded.
   // A scenario can swap one method's answer at runtime: window.__stubOverrides[name] = result.
   window.__stubOverrides = {};
+  // a fixed clock for date-gated content (payload notices / retired flags, 33-guides.js): before the
+  // 3.30 launch, so scenarios see the app as built; a scenario sets its own time to test the gates
+  window.__guideNow = Date.UTC(2026, 10, 1);
   var api = new Proxy({}, {
     get: function (t, name) {
       if (typeof name !== 'string' || name === 'then' || name === 'toJSON') return undefined;
@@ -5474,7 +5477,8 @@ def mech_data():
         def rates(self, league, ids):
             return {i: 1 + (sum(map(ord, i)) % 12) for i in ids}, 1762300800
 
-    fake = types.SimpleNamespace(_currency_map=cm, _feed=Feed(), _art=None, MECH_GROUPS=gui.Api.MECH_GROUPS)
+    fake = types.SimpleNamespace(_currency_map=cm, _feed=Feed(), _art=None, MECH_GROUPS=gui.Api.MECH_GROUPS,
+                                 MECH_OTHER_SKIP=gui.Api.MECH_OTHER_SKIP)
     r = gui.Api.mech_prices(fake, "Standard", json.dumps(list(gui.Api.MECH_GROUPS)))
     items = r.get("items") or {}
     for it in items.values():

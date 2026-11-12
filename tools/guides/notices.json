@@ -1,0 +1,20 @@
+{
+  "about": "Banners the app shows on cheat sheets, and content it treats as retired. Shipped in the guides payload (tools/make_guides.py), so they can change from the server without a release. from = when it starts showing (UTC). untilAsOf = hidden on a guide whose own asOf has reached that patch. Every statement here must be in the official patch notes.",
+  "notices": [
+    {
+      "id": "330-launch",
+      "from": "2026-11-13T20:00:00Z",
+      "sheets": "all",
+      "untilAsOf": "3.30",
+      "tone": "warn",
+      "text": "Path of Exile 3.30 (Covens of Umbra) reworked the endgame: Scarabs were removed (Threads take their place), the Atlas passive tree was rebuilt and many league mechanics changed. This page was written for 3.29. Updates for 3.30 arrive automatically."
+    }
+  ],
+  "retired": {
+    "scarabs": {
+      "patch": "3.30",
+      "from": "2026-11-13T20:00:00Z",
+      "text": "Scarabs were removed from the game in 3.30. Threads replace them: each Thread adds its league mechanic to a map, and you can spend up to eight on a map."
+    }
+  }
+}

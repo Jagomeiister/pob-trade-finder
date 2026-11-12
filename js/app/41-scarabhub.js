@@ -562,6 +562,15 @@ function shubStepper(name, n, max, fk, onSet) {
 
 // ==== Scarab hub ==============================================================================
 function shubMount(host, ctx) {
+  // the game removed scarabs (payload "retired", from a date): the hub says so and stops there
+  var gone = typeof guideRetired === 'function' ? guideRetired('scarabs') : null;
+  if (gone) {
+    var msg = UI.el('div', 'guide-notice tone-warn shub-retired');
+    msg.setAttribute('role', 'note');
+    msg.appendChild(UI.el('span', 'guide-notice-text', gone.text));
+    host.appendChild(msg);
+    return;
+  }
   shubInit();
   var root = UI.el('div', 'shub');
   host.appendChild(root);

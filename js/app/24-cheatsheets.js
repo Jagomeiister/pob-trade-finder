@@ -196,6 +196,11 @@ function mechanicContent(m, opts) {
   if (!opts.plain && typeof guideFor === 'function' && guideFor(m.id)) return guideContent(m, opts);
   var box = UI.el('div', 'sheet-content');
   var scope = sheetFoldScope(m.id);
+  // a sheet without a guide: its notices (33-guides.js; under a guide, the guide shows them)
+  if (!opts.noTools && typeof guideNoticeBar === 'function') {
+    var notices = guideNoticeBar(m.id, m.patch || '', SHEET_OV ? function () { fitSheetOverlay(); } : null);
+    if (notices) box.appendChild(notices);
+  }
   // Blight: the anoint helper (27-anoints.js) replaces the long anoint tables with search, oils
   // and prices
   var helper = m.id === 'blight' && typeof anointHelper === 'function';

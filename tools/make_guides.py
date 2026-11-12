@@ -640,6 +640,41 @@ def build_tools(path):
     return out
 
 
+# ---- notices and retired content: tools/guides/notices.json --------------------------------------
+NOTICE_TONES = ("info", "warn")
+ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+def load_notices(guides_path, sheet_ids):
+    """({notices: [...], retired: {...}}) from notices.json next to the research; {} when absent."""
+    p = os.path.join(os.path.dirname(guides_path), "notices.json")
+    if not os.path.exists(p):
+        return {}
+    with open(p, encoding="utf-8") as f:
+        raw = json.load(f)
+    notices, seen = [], set()
+    for i, n in enumerate(raw.get("notices") or []):
+        where = "notices[%d]" % i
+        need(is_text(n.get("id")) and n["id"] not in seen, "%s: id missing or repeated" % where)
+        seen.add(n["id"])
+        need(is_text(n.get("text")) and ISO_RE.match(str(n.get("from") or "")), "%s: text and from (UTC, ...Z)" % where)
+        sheets = n.get("sheets")
+        need(sheets == "all" or (isinstance(sheets, list) and sheets and all(x in sheet_ids for x in sheets)),
+             "%s: sheets must be \"all\" or known sheet ids" % where)
+        need(n.get("tone", "info") in NOTICE_TONES, "%s: tone" % where)
+        out = {"id": n["id"], "from": n["from"], "sheets": sheets, "tone": n.get("tone", "info"), "text": n["text"].strip()}
+        if n.get("untilAsOf"):
+            need(re.match(r"^\d+\.\d+$", str(n["untilAsOf"])), "%s: untilAsOf is a patch" % where)
+            out["untilAsOf"] = str(n["untilAsOf"])
+        notices.append(out)
+    retired = {}
+    for k, r in (raw.get("retired") or {}).items():
+        need(is_text(r.get("text")) and ISO_RE.match(str(r.get("from") or "")) and re.match(r"^\d+\.\d+$", str(r.get("patch") or "")),
+             "retired.%s: text, from and patch" % k)
+        retired[k] = {"patch": str(r["patch"]), "from": r["from"], "text": r["text"].strip()}
+    return {"notices": notices, "retired": retired}
+
+
 def default_input():
     files = sorted(glob.glob(os.path.join(ROOT, "tools", "guides", "guides-*.json")), key=lambda p: patch_key(
         re.sub(r"^guides-|\.json$", "", os.path.basename(p))))
@@ -696,6 +731,12 @@ def main(argv):
             "guides": {sid: guides[sid] for sid in order},
             "sheets": [extra[s] for s in order if s in extra],
             "icons": find_icons(guides, icon_names())}
+    try:
+        extra_keys = load_notices(path, set(sheets) | set(guides))
+    except Bad as e:
+        print("  notices: %s: not writing" % e)
+        return 1
+    data.update({k: v for k, v in extra_keys.items() if v})
     tpath = tools_input(path)
     if tpath:
         n0 = len(DROPPED)
