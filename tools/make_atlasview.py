@@ -41,7 +41,7 @@ DATA = os.path.join(ROOT, "data")
 sys.path.insert(0, HERE)
 from make_treeview import BG_ZOOM, background, bg_sheet, orbit_angles, position  # noqa: E402  (same maths)
 
-TAG = "3.29.1"  # bump for a new league (the repo tags each patch)
+TAG = "3.30.0"  # bump for a new league (the repo tags each patch)
 URL = "https://raw.githubusercontent.com/grindinggear/atlastree-export/%s/data.json" % TAG
 CACHE = os.path.join(tempfile.gettempdir(), "pobtf-atlastree-%s.json" % TAG)  # 1.4 MB, kept out of the repo
 UA = "Mozilla/5.0 PoB-Trade-Finder/1.0"

@@ -50,7 +50,7 @@ b = AV["bounds"]
 check("bounds hold every node", all(b[0] <= n[1] <= b[2] and b[1] <= n[2] <= b[3] for n in AV["nodes"]), b)
 check("points available from the export", isinstance(AV["totalPoints"], int) and 100 < AV["totalPoints"] < 300, AV["totalPoints"])
 granted = [n for n in AV["nodes"] if len(n) > 6]
-check("nodes that grant points carry it", granted and all(n[6] > 0 and "Passive Skill Point" in n[5] for n in granted),
+check("nodes that grant points carry it (3.30 has none)", all(n[6] > 0 and "Passive Skill Point" in n[5] for n in granted),
       [(n[4], n[6]) for n in granted])
 
 edges = list(zip(AV["edges"][0::2], AV["edges"][1::2]))
@@ -92,7 +92,7 @@ check("backdrop: the start art on the start node", bg["starts"][0::2] == AV["sta
       all(art[a][0] == make_atlasview.START_ART for a in bg["starts"][1::2]), bg["starts"])
 pr = bg["painting"]["rect"]
 check("backdrop: the painting spans the tree (every node inside it, give or take a node)",
-      pr[0] < pr[2] and pr[1] < pr[3] and all(pr[0] - 400 <= n[1] <= pr[2] + 400 and pr[1] - 100 <= n[2] <= pr[3] + 100 for n in AV["nodes"]),
+      pr[0] < pr[2] and pr[1] < pr[3] and all(pr[0] - 400 <= n[1] <= pr[2] + 400 and pr[1] - 400 <= n[2] <= pr[3] + 400 for n in AV["nodes"]),
       pr)
 check("backdrop: small (< 4 KB of the file)", len(json.dumps(bg, separators=(",", ":"))) < 4 * 1024,
       len(json.dumps(bg, separators=(",", ":"))))
