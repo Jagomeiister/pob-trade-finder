@@ -55,7 +55,7 @@ sheets, _ = load_js(os.path.join(ROOT, "data", "cheatsheets.js"), "POE_CHEATSHEE
 sheet_ids = {m["id"] for m in sheets["mechanics"]}
 
 # -- top level ----------------------------------------------------------------------
-check("top-level keys", set(data) - {"tools", "notices", "retired"} == {"version", "asOf", "checked", "guides", "sheets", "icons"}, sorted(data))
+check("top-level keys", set(data) - {"tools", "notices", "retired", "currentPatch"} == {"version", "asOf", "checked", "guides", "sheets", "icons"}, sorted(data))
 v = data.get("version")
 check("version is an int YYYYMMDDHHMM", isinstance(v, int) and not isinstance(v, bool) and len(str(v)) == 12, v)
 check("asOf is a patch", bool(re.match(r"^\d+\.\d+$", data.get("asOf", ""))), data.get("asOf"))

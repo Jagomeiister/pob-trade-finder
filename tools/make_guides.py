@@ -300,7 +300,28 @@ def corrected_research(path):
     if problems:
         raise Bad("%d correction(s) in %s no longer apply:\n    %s"
                   % (len(problems), os.path.basename(cpath), "\n    ".join(problems)))
+    # patch updates (tools/make_update.py): what a later patch changed, applied on top, in name order
+    del UPDATES_APPLIED[:]
+    for upath in update_paths(path):
+        with open(upath, encoding="utf-8") as f:
+            doc = json.load(f)
+        need(doc.get("research") == os.path.basename(path), "%s is for %r" % (os.path.basename(upath), doc.get("research")))
+        ucounts, problems = apply_corrections(research, doc.get("corrections") or [])
+        if problems:
+            raise Bad("%d update(s) in %s no longer apply:\n    %s"
+                      % (len(problems), os.path.basename(upath), "\n    ".join(problems)))
+        UPDATES_APPLIED.append((os.path.basename(upath), sum(ucounts.values())))
     return research, cpath, counts
+
+
+UPDATES_APPLIED = []
+
+
+def update_paths(research_path):
+    """tools/guides/guides-3.29.json -> [tools/guides/updates-3.29-to-3.30.json, ...]"""
+    folder, base = os.path.split(research_path)
+    patch = re.sub(r"^guides-|[.]json$", "", base)
+    return sorted(glob.glob(os.path.join(folder, "updates-%s-to-*.json" % patch)))
 
 
 def check_syndicate(asof, research_path, cpath):
@@ -737,6 +758,8 @@ def main(argv):
         print("  notices: %s: not writing" % e)
         return 1
     data.update({k: v for k, v in extra_keys.items() if v})
+    if UPDATES_APPLIED:  # the patch the newest update file brings the guides to ("Changed in 3.30")
+        data["currentPatch"] = re.sub(r"^updates-.*-to-|[.]json$", "", UPDATES_APPLIED[-1][0])
     tpath = tools_input(path)
     if tpath:
         n0 = len(DROPPED)
@@ -786,6 +809,8 @@ def main(argv):
           % (stamp, data["asOf"], checked))
     print("  %d guides (%s), %d extra sheet(s): %s" % (len(guides), ", ".join(order), len(extra),
                                                        ", ".join(extra) or "none"))
+    for name, n in UPDATES_APPLIED:
+        print("  %d patch updates from %s" % (n, name))
     print("  %d corrections from %s (%s)" % (sum(fixed.values()), os.path.basename(cpath) if cpath else "no corrections file",
                                             ", ".join("%s %d" % kv for kv in sorted(fixed.items())) or "none"))
     print("  " + ", ".join("%s %d" % (k, v) for k, v in counts.items()) + ", icons %d" % len(data["icons"]))

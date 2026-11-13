@@ -312,6 +312,23 @@ function guideContent(m, opts) {
     });
   }
 
+  // what the newest patch changed (payload currentPatch, e.g. "3.30"): first and open, so a guide
+  // written for the patch before reads correctly from the top
+  var cp = d.currentPatch || '';
+  var fresh = cp ? (g.changes || []).filter(function (c) { return String(c.patch || '').indexOf(cp) === 0; }) : [];
+  if (fresh.length) {
+    if (!('changesNew' in GUIDE_OPEN)) GUIDE_OPEN.changesNew = true;
+    var ful = UI.el('ul', 'guide-list is-fresh');
+    fresh.forEach(function (c) {
+      var li = UI.el('li', 'guide-item');
+      li.appendChild(guideText(c.text, 'guide-line-text'));
+      var ct = guideCites(c.cite, ctx);
+      if (ct) li.appendChild(ct);
+      ful.appendChild(li);
+    });
+    section('changesNew', 'Changed in ' + cp, ful, fresh.length);
+  }
+
   if ((g.howTo || []).length) section('howTo', 'How to run it', list('ol', g.howTo, 'is-steps'), g.howTo.length);
 
   if ((g.strategies || []).length) {
