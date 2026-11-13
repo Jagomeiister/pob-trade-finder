@@ -3,7 +3,7 @@
 The running list of everything agreed on, so nothing is lost between sessions. Update it when
 something is done, added or dropped. Newest decisions at the top of each section.
 
-Status: **v2.5.23 released 2026-11-06** (mechanic tools: scarab hub + setup cost, profit calculator, price boards, Eldritch / Ultimatum / Sanctum / Expedition checkers, Incursion temple planner, in-game Tools tab). Before: **v2.5.22 released 2026-11-04** (in-depth mechanic guides for 21 mechanics, as of 3.29, and a Syndicate planner). Before: **v2.5.21 released 2026-11-04** (in-game loot filter editor like Scalpel: Ctrl+Shift+D, Switch Tier, Hide, tier looks, effects, thresholds, economy audit, history, online filter updates). Before: **v2.5.20 released 2026-11-03** (Search text like poe.re: Items, Gems, Scarabs, Tattoos, Beasts, Gwennen, Heist; richer Maps and Vendor; 250-character box). Before: **v2.5.19 released 2026-11-01** (Settings → Patch notes: every release's notes in the app). Before: **v2.5.18 released 2026-11-01** (Builds page at launch, the app without a build, Atlas tree with saved strategies, in-game tree backgrounds and masteries). Before: **v2.5.17 released 2026-11-01** (diagnostics list each screen's scaling). Before: **v2.5.16** (Settings in tabs with Find; saved POESESSID shown as saved). Before: **v2.5.15** (loot filter tools: price re-tier, build items, rules, find an item, checkpoints). Before: **v2.5.14** (the whole div card on hover: name, picture, stack, reward, flavour). Before: **v2.5.13** (div card value per 1000 drops per area, from community drop weights). Before: **v2.5.12** (anoint helper in the Blight sheet: search, oil icons, prices). Before: **v2.5.11 released 2026-11-01** (compare again at launch; in-game settings no longer reset after a restart). Before: **v2.5.10** (one copy at a time; updates exit fully and wait for the old copy). Before: **v2.5.9** (deeper cheat sheets: act routes, quest gems, 24 mechanics; div card art; tree icons; saved characters; update banner). Before: **v2.5.8 released 2026-11-01** (trade ledger: purchases, profit, flips, People, Reports, goal, backup). Before: **v2.5.7** (dust explorer + dust on the price check). Before: **v2.5.6** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
+Status: **v2.5.24 released 2026-11-14** (3.30 readiness: launch notices, scarabs-removed handling, 3.30 Atlas and skill trees, Thread prices; Market like poe.ninja; folding sheets; Bestiary recipe browser; safe saves). Before: **v2.5.23 released 2026-11-06** (mechanic tools: scarab hub + setup cost, profit calculator, price boards, Eldritch / Ultimatum / Sanctum / Expedition checkers, Incursion temple planner, in-game Tools tab). Before: **v2.5.22 released 2026-11-04** (in-depth mechanic guides for 21 mechanics, as of 3.29, and a Syndicate planner). Before: **v2.5.21 released 2026-11-04** (in-game loot filter editor like Scalpel: Ctrl+Shift+D, Switch Tier, Hide, tier looks, effects, thresholds, economy audit, history, online filter updates). Before: **v2.5.20 released 2026-11-03** (Search text like poe.re: Items, Gems, Scarabs, Tattoos, Beasts, Gwennen, Heist; richer Maps and Vendor; 250-character box). Before: **v2.5.19 released 2026-11-01** (Settings → Patch notes: every release's notes in the app). Before: **v2.5.18 released 2026-11-01** (Builds page at launch, the app without a build, Atlas tree with saved strategies, in-game tree backgrounds and masteries). Before: **v2.5.17 released 2026-11-01** (diagnostics list each screen's scaling). Before: **v2.5.16** (Settings in tabs with Find; saved POESESSID shown as saved). Before: **v2.5.15** (loot filter tools: price re-tier, build items, rules, find an item, checkpoints). Before: **v2.5.14** (the whole div card on hover: name, picture, stack, reward, flavour). Before: **v2.5.13** (div card value per 1000 drops per area, from community drop weights). Before: **v2.5.12** (anoint helper in the Blight sheet: search, oil icons, prices). Before: **v2.5.11 released 2026-11-01** (compare again at launch; in-game settings no longer reset after a restart). Before: **v2.5.10** (one copy at a time; updates exit fully and wait for the old copy). Before: **v2.5.9** (deeper cheat sheets: act routes, quest gems, 24 mechanics; div card art; tree icons; saved characters; update banner). Before: **v2.5.8 released 2026-11-01** (trade ledger: purchases, profit, flips, People, Reports, goal, backup). Before: **v2.5.7** (dust explorer + dust on the price check). Before: **v2.5.6** (Sold for: set the price you got on the trade card). Before: **v2.5.5** (poe.ninja links, chat macros, flask / vendor search text, borderless Ctrl+D price check, Shift+Space window fix). Before: **v2.5.4** (socket colour helper in the gem compare). Before: **v2.5.3** (mechanic cheat sheets + "open the sheet?" suggestions, updated from the server). Before: **v2.5.2 released 2026-11-01** (Compare gear checks gem setups on any worn item: linked / not linked tags, socket picture, unticked PoB gems). Before: **v2.5.1** (cleaner in-game overlays: always dark, status in words, bigger text; new gold line icons). Before: **v2.5.0** (cheat sheets, trade helper test mode, light-blue crafted mods). Before: **v2.4.2** (app-over-game fixes, compare checks every slot). Before: **v2.4.1** (tree stages). Before: **v2.4.0** (skill tree, custom sounds, quad outline, WE triples / legacy,
 buyer merge, div card divines). Before that: **v2.3.0 released 2026-11-01** (published at the user's request: it includes the v2.2 trade
 helper + overlays and the v2.3 tools). Section 1 is still the in-game checklist: fix anything that
 fails in a patch release.
@@ -126,44 +126,36 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [x] **Search text**: one map mod (done: regex `s have \d+% increased ar`) ("Monsters have #% increased Area of Effect") has no
       unique plain-text token. It could use a small regex.
 
-## 2b. In progress: round 2 (planned v2.5.24) — paused 2026-11-06
+## 2b. In progress: 3.30 follow-up (after v2.5.24)
 
-Plan: `~/.claude/plans/snuggly-toasting-teapot.md`. Branch `sheets-round2`, worktree
-`.claude/worktrees/sheets-round2` (gitignored data copied in). Reserved with both forks: js/app 44-46,
-e2e scen_64-68, css/mech-bosses|leveling|relics.css, edits to 11-market / 24 / 28 / 33 / 41 / 42,
-server/api/prices.js, make_extras.py + data/extras.js + server/public/extras.json.
+Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAGUE-DAY.md`. Branch
+`sheets-round2` (worktree `.claude/worktrees/sheets-round2`), merged to main at v2.5.24.
 
-Done so far: `gui.py` extras bridge (`extras_data`, `_extras_ok`, `_extras_urls`, `EXTRAS_API`,
-`IMAGE_HOSTS`, open_url allowlist reads the extras).
-
-- [ ] **Research** (`poe-extras` workflow, stopped mid-run; resume with the same script + args:
-      `Workflow({scriptPath: …/workflows/scripts/poe-extras-wf_fc97f557-17e.js, resumeFromRunId:
-      "wf_fc97f557-17e", args: <same>})`; finished agents replay from cache). Topics: pinnacle / uber /
-      league / campaign bosses (+ verified images), leveling acts 1-5 and 6-10 + labs + XP penalty,
-      Sanctum relics, Heist rogue gear, atlas trees for all 132 strategies. Save as
-      `tools/guides/extras-3.29.json`.
-- [ ] **Data pipeline**: `tools/make_extras.py` → `data/extras.js` + `server/public/extras.json`
-      (research + game data: `templar_relic` relic mods and `heist_npc` rogue mods with weight > 0,
-      atlas node ids from `data/atlasview.js` + auto-connected trees); `extrasData()` / `extrasSync()`
-      in 40-mechtools.js; `art_cache.ALLOWED_PREFIXES` += poewiki images + cdn.poedb.tw; index.html +
-      build_release SHIP entries; `test/test_extras.py`.
-- [ ] **Folding**: every wiki table a fold (first open, remembered per sheet in `pobtf-sheet-open`),
-      act sheet sections too, filter opens matching folds (and fix the title-hit bug), overlay re-fits.
-- [ ] **Sanctum relic planner** (46): loadouts, mods by goal with tiers and sizes, base shapes.
-- [ ] **Heist rogue gear** (46): per rogue / job, the 4 slots and the mods to want; dead mods marked.
-- [ ] **Bestiary recipe browser**: gear-type chips, beast → recipes, beast prices per recipe.
-- [ ] **Atlas trees per strategy**: "Open tree" link + "Show on my Atlas tree" (in-app, auto-connected,
-      marked rough) on every strategy card and in the scarab hub; poeplanner links clickable.
-- [ ] **Boss guides** (44): new Bosses sheet, grid with images (art cache, credit line), detail
-      (reach, phases, what kills you, rough stats, drops with prices, uber changes), in-game card.
-- [ ] **Leveling guide** (45): gem picks for the build (reward to take, gems to buy, required level from
-      make_cheatsheets), act tips + boss notes, lab / ascendancy prompts (store ascendancy + bandit in
-      `sheetRememberBuild`), over/under-levelled hint from `is now level N` (log reading only when on).
-- [ ] **Market like poe.ninja** (11): left category rail (exchange + poe.ninja types), per-category
-      tables with icons, chaos + divine, 7-day sparklines, change, volume/listings, filters (gem level /
-      quality / corrupted, map tier), detail drawer; `ninja_category` bridge; `server/api/prices.js`
-      `compact()` adds icon + sparkline (+ server test).
-- [ ] e2e scen_64-68, review workflow (4 lenses, 3 skeptics), screenshots, docs, then release on "publish it".
+- [ ] **3.30 guide updates**: `poe-330-update` workflow (run `wf_145d4bb2-821`, resumable with
+      its scriptPath + same args; it stops whenever the session ends) → save the result as
+      `tools/guides/update-research-3.30.json` → `python tools/make_update.py <that file>` → check
+      `skipped` → `make_guides.py --checked <date>` + `make_syndicate.py` → tests → push main (the
+      server serves it; no release needed).
+- [ ] **Pre-release review** of the round-2 code (`review-round2` workflow, run `wf_08ae55ee-250`)
+      was NOT finished before v2.5.24 went out (the user chose to publish for launch): finish it and
+      ship fixes as v2.5.25.
+- [ ] **Launch day**: `python tools/refresh_all.py` once the league is live and RePoE has 3.30 data;
+      currencymap (Threads), new uniques/bases, loot filter syntax (Item Filter Information post),
+      cheat sheet wiki tables (`make_cheatsheets.py`) when the wiki updates.
+- [ ] **New 3.30 tools**: Threads of Creation planner (replaces the scarab hub), Fate helper,
+      Viscera / Wickerman tracker, Covens of Umbra sheet — data from the research run above.
+- [ ] Tool data for reworked mechanics (`mechtools-3.30.json`): altars, Ultimatum, Expedition,
+      Incursion (Atziri, Cradle of Creation), strategy setups without scarabs.
+- [ ] Boss guides (+ Grim Fate variants, Coven Queen), Sanctum relic planner, Heist rogue gear:
+      research `poe-extras` (run `wf_fc97f557-17e`) partly done; UIs not built. Page code for
+      `extras_data` not written yet.
+- [ ] Leveling guide upgrades (3.30 changed the campaign: re-research first).
+- [ ] Lighter overlay windows (each loads ~6 MB of scripts), Ctrl+K palette, one price module,
+      Recent row in the in-game sheet picker.
+- [ ] **Asked 2026-11-14**: choose between a PoB link's gear sets ("gear levels") in the app; show
+      Mobalytics / Icy Veins build guides in the app (embed or another way), e.g.
+      mobalytics.gg/poe/profile/<user>/builds/<slug>.
+- [ ] PoB timeless data for 3.30 (two tree nodes moved): `make_timeless.py --update` when PoB updates.
 
 ## 3. To do (agreed, not started)
 
