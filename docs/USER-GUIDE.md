@@ -86,8 +86,19 @@ cooldown starts. *Price changed slots*, *Price all gems* and *Value my gear* wor
 same way.
 
 **Market** (sidebar, or click the Divine Orb tile) covers every item traded on GGG's
-currency exchange in your league, around 480 of them: currency, fossils, essences, oils,
-scarabs, catalysts, divination cards and more.
+currency exchange in your league, plus uniques, gems, cluster jewels, maps and beasts
+from poe.ninja (through the app's own backend).
+
+- **Categories** on the left, like poe.ninja: Overview, Watchlist, General (currency,
+  fragments, essences, fossils, oils …), Equipment & gems, Atlas, and Beasts, each with its
+  item count. The app reopens on the category you used last.
+- **Category tables**: value in chaos and divines, a 7-day trend line, the 7-day change,
+  and volume per hour (exchange) or listings (poe.ninja). Click a column to sort; search;
+  filter gems by level, quality and corrupted, maps by tier, uniques by links.
+- **Details**: click a row for its chart, alert and watch star (exchange items) or its
+  trend and a poe.ninja link (the rest). Esc closes it.
+
+The **Overview** keeps the tools below.
 
 - **Biggest movers**: the largest risers and fallers over 24 hours or 7 days. Thin markets
   (under 5,000c traded in a typical hour) are left out, because their price jumps on
@@ -745,6 +756,17 @@ icons come from GGG's hourly currency exchange — no trade-site searches, nothi
 - The ratings come from community guides and player reports (as of 3.29), each checked against
   its source by three reviewers. They are a rough guide: your own defences decide. Like the
   guides, they update from the app's server.
+
+## 5i5. Folding tables, 3.30 notices
+
+- **Dropdowns**: every reference table on a cheat sheet is a dropdown with its row count; the
+  first is open. What you open is remembered per sheet (the app and the in-game sheet
+  separately). The filter box opens the tables that match and hides the rest.
+- **Patch notices**: when a league changes a mechanic before its guide is updated, a banner
+  on that sheet says so. **Got it** hides it. Updated guides open with **Changed in 3.30**.
+- **Scarabs** were removed from the game in 3.30 (Threads replace them): from launch the
+  scarab hub says so, and strategy cards mark their scarab lines as removed.
+- **Atlas tree** and **Skill tree** show the 3.30 trees.
 
 ## 5j. 🃏 Div cards
 

@@ -44,7 +44,10 @@ index.html + js/*  ──────────────►  any browser   
 | `fetch_pob_link(url)` | Fetch a PoB code from pobb.in/pastebin/poe.ninja (host-allowlisted) |
 | `guides_data()` | Mechanic guides from the app's server (`server/public/guides.json`), cached to `data/guides_cache.json`; the page keeps whichever of it and the shipped `data/guides.js` has the newer `version` |
 | `open_url(url)` | Opens allow-listed sites, or an http(s) URL that exactly matches a source listed in the guide data (Read more links, the tools' sources and strategy atlas links) |
-| `mech_prices(league, groupsJson)` | Mechanic tools: icon + chaos price for whole item groups (`Api.MECH_GROUPS`: scarabs, fossils, essences, lifeforce, oils, catalysts, delirium, fragments, expedition, foulborn, embers, currency) from the hourly exchange feed only; icons not yet in the art cache are fetched in a background thread |
+| `mech_prices(league, groupsJson)` | Mechanic tools: icon + chaos price for whole item groups (`Api.MECH_GROUPS`: scarabs, threads, fossils, essences, lifeforce, oils, catalysts, delirium, fragments, expedition, foulborn, embers, currency, and `other` = whatever no group claims) from the hourly exchange feed only; icons not yet in the art cache are fetched in a background thread |
+| `ninja_category(league, type)` | Market: one poe.ninja category (`Api.NINJA_TYPES`) from the backend snapshot, with `counts` for every category; `unique_prices` / `beast_prices` read the same snapshot |
+| `extras_data()` | Boss guides, leveling tips, relic / rogue gear advice, atlas trees (`server/public/extras.json`), cached like the guides; its sources and links join the `open_url` allowlist |
+| `storage_get()` / `storage_set(key, value)` | The durable store (`data/storage.json`). Saves are serialised and atomic (`.tmp` then `os.replace`, previous file kept as `.bak`); a damaged file is set aside as `storage.bad-<time>.json` and the backup loaded |
 | `trade_search(league, payloadJson, background=False)` | POST search; returns first 10 listings + up to 100 ids. `background` (saved-build daily re-pricing) paces at `BG_INTERVAL` and is refused during any cooldown |
 | `trade_fetch(searchId, idsJson)` | One further page (≤10 ids, ids validated) |
 | `exchange_rates(league, currenciesJson)` | Median chaos rate per currency from GGG bulk exchange, 30-min cache |
@@ -471,6 +474,19 @@ the v2.0 redesign finishes migrating components — see `docs/UI-PLAN.md`.
 - Each league: re-run the research workflow (or add corrections from the patch notes), bump the
   file names to the new patch, regenerate, push to main: the server serves the new guides without
   an app release.
+
+### Patch updates, notices (see docs/LEAGUE-DAY.md)
+
+- `tools/make_update.py <research run>` writes `tools/guides/updates-<from>-to-<patch>.json`:
+  per guide, the patch notes as a source, a `changes` entry per verified change, located
+  replace / delete fixes, and `asOf` moved on when the guide is fully checked. Fixes whose
+  text isn't found exactly once are listed under `skipped`, never applied. `make_guides.py`
+  applies update files after the corrections and sets `currentPatch` in the payload; the guide
+  view shows those changes first ("Changed in 3.30").
+- `tools/guides/notices.json` → payload `notices` (banner per sheet from a UTC start time,
+  hidden once a guide's `asOf` reaches `untilAsOf`, dismissable) and `retired`
+  (`guideRetired('scarabs')`: tools switch off content the game removed). Tests pin the clock
+  with `window.__guideNow`.
 
 ### Mechanic tools (js/app/40-43)
 
