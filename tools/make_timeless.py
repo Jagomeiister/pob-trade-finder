@@ -156,6 +156,8 @@ def geometry(tree):
     for nid, n in tree["nodes"].items():
         if n.get("ascendancyName") or n.get("isMastery") or n.get("classStartIndex") is not None:
             continue
+        if n.get("isProxy"):  # placeholders a jewel fills in (3.30: Mycelium Core), not tree passives
+            continue
         # sockets inside cluster jewels (they have a parent socket) can't hold timeless jewels
         if n.get("isJewelSocket") and (n.get("expansionJewel") or {}).get("parent"):
             continue
