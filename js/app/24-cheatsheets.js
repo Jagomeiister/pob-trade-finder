@@ -638,7 +638,8 @@ function sheetReady(hydrate) { // markGui() in the sheet / hint overlay windows 
   if (typeof guideSync === 'function') guideSync(sheetRender);
 }
 function sheetStatusLoop() {
-  refreshSheetStatus();
+  // (__sheetStatusReady: the first labels are in, so the start-up redraw is over; tests wait for it)
+  refreshSheetStatus().then(function () { window.__sheetStatusReady = true; }, function () { window.__sheetStatusReady = true; });
   setInterval(refreshSheetStatus, 10000);
 }
 // hotkey labels for the tooltips. Redraw only when they changed: a redraw rebuilds the sheet, which

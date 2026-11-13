@@ -961,6 +961,9 @@ class Session:
         self.b.send("Storage.clearDataForOrigin", {"origin": self.server.origin, "storageTypes": "local_storage"})
         self.b.take_events()
         self.b.navigate(self.url + query, READY_JS, timeout=30)
+        if "sheet=1" in query:  # the in-game sheet redraws once when its hotkey labels arrive: wait that out
+            self.b.evaluate("new Promise(r => { const t = Date.now(); (function w() { "
+                            "if (window.__sheetStatusReady || Date.now() - t > 3000) r(1); else setTimeout(w, 20); })(); })", timeout=10)
 
     def run(self, body, timeout=40, **consts):
         decl = "".join("const %s = %s;\n" % (k, json.dumps(v)) for k, v in consts.items())

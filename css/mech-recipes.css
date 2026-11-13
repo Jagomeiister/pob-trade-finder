@@ -1,0 +1,24 @@
+/* css/mech-recipes.css — the Bestiary recipe browser (js/app/45-beastrecipes.js). Colours come
+   from css/tokens.css only. */
+
+.br { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.br-kinds { display: flex; flex-wrap: wrap; gap: 4px; }
+.br-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.br-bar .mech-search { flex: 1 1 200px; }
+.br-beast { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-2); }
+.br-beast:empty { display: none; }
+.br-beast b { color: var(--text); }
+.br-list { display: flex; flex-direction: column; gap: 4px; }
+.br-type { margin-top: 6px; color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; }
+.br-row { display: flex; flex-direction: column; gap: 4px; padding: 5px 8px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: var(--s1); }
+.br-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.br-recipe { flex: 1 1 200px; min-width: 0; color: var(--text); font-size: var(--fs-sm); }
+.br-total { font-weight: 600; }
+.br-beasts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.br-beast-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 2px 8px; border: 1px solid var(--border);
+  border-radius: var(--r-pill); background: var(--s2); color: var(--text-2); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.br-beast-chip:hover { border-color: var(--accent); color: var(--text); }
+.br-beast-chip.is-on { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 18%, var(--s2)); }
+.br-any { color: var(--text-3); font-size: var(--fs-sm); }
+.br-more { align-self: flex-start; }
