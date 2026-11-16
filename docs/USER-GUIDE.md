@@ -345,6 +345,19 @@ their Atlas strategy) above the paste box. Click one to load it.
 - Importing a new build offers **☆ Save**; saving asks for a name (main skill · ascendancy).
 - **⋯** on a saved build: rename it, link an Atlas strategy, or delete it. Up to 100 builds;
   a search box appears once you have more than 6.
+- **📖 Build guide link:** link the written guide a build follows (Mobalytics, Maxroll, Icy Veins,
+  PoE Vault, poe.ninja, pobb.in, or a pathofexile.com forum guide; https only). On the build card:
+  **📖 Add guide link** (an unsaved build is saved first); on a saved build: **⋯ → Guide**. Then
+  **📖 Guide: …** / the 📖 button opens it, ⋯ has **Change** and **Remove** (asks first).
+  - The guide opens in its **own window**: the real page, as your own visit to that site; the app
+    does not read it. Put it beside the app or on a second monitor; **Keep on top** (the card's ⋯,
+    or the Guides list) keeps it above other windows, the game too. It remembers where it was.
+    Opening another guide reuses that window; close it like any window.
+  - Links inside it stay on the guide sites; a link you click to another site opens in your normal
+    browser. Ctrl+F finds text, Alt+← goes back, Ctrl+wheel zooms. Being signed in to a site
+    lasts until the app closes.
+- **Guides** (below your builds): a list of up to 50 guides you're reading that aren't tied to a
+  build. **+ Add guide**, click one to open it, **⋯** to rename or delete it (asks first).
 - **No build needed** for Watcher's Eye & co., Search text, Div cards, Cheat sheets, the Atlas
   tree, Dust explorer, Market and the Trade helper: they're in the sidebar from launch. Gear,
   the planner and the skill tree tools appear once a build is loaded.

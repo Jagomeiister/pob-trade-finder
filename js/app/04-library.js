@@ -1,13 +1,13 @@
 /* js/app/04-library.js — saved builds: the library on the start screen (shown at launch), saving
-   from the build card or the "save this build?" offer after an import, rename, search, and a
-   linked Atlas strategy per build (js/app/28-atlas.js).
+   from the build card or the "save this build?" offer after an import, rename, search, a
+   linked Atlas strategy per build (js/app/28-atlas.js) and a linked build guide (js/app/46-guidewindow.js).
    The js/app/ files are one program split by feature: they load in order (index.html)
    and share their top-level names. */
 'use strict';
 
 // ---- saved builds library --------------------------------------------------
 // Entries: { name, code, ts (saved), opened (last loaded), cls, asc, level, skill, atlas (an Atlas
-// strategy id) }. The stored order is kept (price tracking refers to entries by position:
+// strategy id), guide ({ url, title }: the written guide it follows, 46-guidewindow.js) }. The stored order is kept (price tracking refers to entries by position:
 // 13-builds-tracking.js); the start screen sorts its own view by last opened.
 var BUILD_LIB_MAX = 100;
 function loadBuildLib() {
@@ -93,6 +93,7 @@ function libShowCurrent() {
     btn.textContent = e ? '★ Saved' : '☆ Save';
     btn.title = e ? 'Saved as "' + e.name + '": click to rename' : 'Keep this build in your library for one-click reload';
   }
+  if (typeof guideRenderBuildCard === 'function') guideRenderBuildCard(e); // 📖 its guide link
   if (!line) return;
   line.textContent = '';
   var has = e && e.atlas && typeof atlasName === 'function' && atlasName(e.atlas);
@@ -128,7 +129,8 @@ function refreshBuildSelect() {
   var rows = lib.map(function (b, i) { return { b: b, i: i }; })
     .filter(function (r) {
       if (!q.length) return true;
-      var hay = [r.b.name, r.b.asc, r.b.cls, r.b.skill, r.b.atlas && typeof atlasName === 'function' ? atlasName(r.b.atlas) : '']
+      var hay = [r.b.name, r.b.asc, r.b.cls, r.b.skill, r.b.atlas && typeof atlasName === 'function' ? atlasName(r.b.atlas) : '',
+                 r.b.guide && r.b.guide.title || '']
         .join(' ').toLowerCase();
       return q.every(function (w) { return hay.indexOf(w) !== -1; });
     })
@@ -148,7 +150,8 @@ function refreshBuildSelect() {
     open.appendChild(UI.el('span', 'saved-meta', meta));
     var when = b.opened || b.ts;
     var sub = [when ? 'opened ' + libWhen(when) : '',
-               b.atlas && typeof atlasName === 'function' && atlasName(b.atlas) ? '🗺 ' + atlasName(b.atlas) : '']
+               b.atlas && typeof atlasName === 'function' && atlasName(b.atlas) ? '🗺 ' + atlasName(b.atlas) : '',
+               b.guide && b.guide.title ? '📖 ' + b.guide.title : '']
       .filter(Boolean).join(' · ');
     if (sub) open.appendChild(UI.el('span', 'saved-meta saved-when', sub));
     var tr = b.track;
@@ -173,16 +176,21 @@ function refreshBuildSelect() {
       trackBtn.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
     } });
     trackBtn.setAttribute('aria-expanded', 'false');
-    var more = UI.iconButton('⋯', 'Rename, Atlas strategy, delete: ' + parts[0], { size: 'sm', onClick: function () {
+    var more = UI.iconButton('⋯', 'Rename, Atlas strategy, delete, guide link: ' + parts[0], { size: 'sm', onClick: function () {
       libEdit(i);
     } });
     row.appendChild(trackBtn);
+    if (b.guide && b.guide.url && typeof guideOpen === 'function') {
+      row.appendChild(UI.iconButton('📖', 'Open guide: ' + (b.guide.title || b.guide.url), { size: 'sm', cls: 'saved-guide',
+        onClick: function () { guideOpen(b.guide.url, b.guide.title); } }));
+    }
     row.appendChild(more);
     var cell = UI.el('div', 'saved-item'); // card + its tracking form share a grid cell
     cell.appendChild(row);
     cell.appendChild(form);
     list.appendChild(cell);
   });
+  if (typeof guidesRender === 'function') guidesRender(); // the Guides list below (46-guidewindow.js)
 }
 
 // ⋯ on a saved build: name, its Atlas strategy (pick one, open it), delete
@@ -206,6 +214,9 @@ async function libEdit(i) {
         atlasOpen(b.atlas);
       } }));
     }
+  }
+  if (typeof guideEditSection === 'function') {
+    body.appendChild(guideEditSection(b, function () { var d = body.closest('dialog'); if (d) d.close(); }));
   }
   var del = UI.button('danger', { size: 'sm', label: 'Delete this build…', onClick: async function () {
     var d = body.closest('dialog');

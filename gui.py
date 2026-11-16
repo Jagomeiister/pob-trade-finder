@@ -69,7 +69,52 @@ EXTRAS_API = "https://pob-trade-finder.vercel.app/extras.json"  # boss guides, l
 # where boss guide images may come from (also the art cache's allowlist, art_cache.py)
 IMAGE_HOSTS = ("https://web.poecdn.com/", "https://www.poewiki.net/images/", "https://cdn.poedb.tw/")
 
-# GGG rate limits are strict; space all trade API calls out and honour 429s.
+# Build-guide window (js/app/46-guidewindow.js): a saved guide link opens the REAL page in its own
+# plain browser window (the user's own visit; nothing is read from it). Written guides only, so no
+# video sites. The one list: the page asks for it through guide_hosts(), so JS checks the same.
+GUIDE_HOSTS = ("mobalytics.gg", "maxroll.gg", "www.icy-veins.com", "www.poe-vault.com", "poe.ninja",
+               "pobb.in", "www.pathofexile.com")
+GUIDE_PATHS = {"www.pathofexile.com": "/forum/"}  # a host limited to part of the site (forum guides)
+GUIDE_URL_MAX = 2048
+GUIDE_TITLE_MAX = 80
+GUIDE_WIN_KEY = "pobtf-guide-win"     # {x, y, w, h, top}: where it was, and Keep on top
+GUIDE_WIN_SIZE = (1000, 900)
+GUIDE_WIN_PREFIX = "Guide: "
+
+
+def guide_url_check(url):
+    """(url, None) for an https link to an allowed build-guide site, else (None, why). Exact host
+    match (no look-alikes, no user@host, no port, no backslash or whitespace tricks)."""
+    if not isinstance(url, str):
+        return None, "No link given."
+    url = url.strip()
+    if not url:
+        return None, "No link given."
+    if len(url) > GUIDE_URL_MAX:
+        return None, "That link is too long."
+    if any(c <= " " or c == "\x7f" or c == "\\" for c in url):
+        return None, "That link has spaces or characters a web address can't have."
+    sites = ", ".join(h[4:] if h.startswith("www.") else h for h in GUIDE_HOSTS)
+    nope = "Only https:// links to build-guide sites open here: %s." % sites
+    try:
+        p = urllib.parse.urlsplit(url)
+        port = p.port
+    except ValueError:
+        return None, nope
+    if p.scheme.lower() != "https" or "@" in p.netloc or port not in (None, 443):
+        return None, nope
+    host = (p.hostname or "").lower()
+    if host not in GUIDE_HOSTS or p.netloc.lower() not in (host, host + ":443"):
+        return None, nope
+    if any(urllib.parse.unquote(seg) in (".", "..") for seg in p.path.split("/")):
+        return None, nope  # a browser resolves /forum/../trade to /trade: no dot segments at all
+    need = GUIDE_PATHS.get(host)
+    if need and not (p.path or "/").startswith(need):
+        return None, "On %s only forum guides (%s…) open here." % (host, need)
+    return url, None
+
+
+
 MIN_INTERVAL = 2.5
 
 # in-game price-check overlay: a second window on index.html?overlay=1
@@ -179,6 +224,10 @@ class Api:
         # trade helper (wired up by main()): Client.txt tail, chat sender, stash outline
         self._trades = None
         self._overlay_windows = {}  # name -> pywebview window (OVERLAYS)
+        self._guide_win = None      # the build-guide window (guide_open), None when closed
+        self._guide_lock = threading.Lock()
+        self._guide_rect = {}       # last place / size it had (logical px), saved when it closes
+        self._guide_gone = set()    # uids of guide windows already closed
         # the cheat sheet starts hidden (its hotkey shows it); the others report once their page loads
         self._ov = {n: {"content": n not in HIDDEN_AT_START, "placed": None, "placed_at": 0.0, "dragging": False, "replace": False}
                     for n in OVERLAYS}
@@ -1683,6 +1732,7 @@ class Api:
                 self._tray.stop()
             for w in overlays.values():
                 self._destroy_once(w)
+            self.guide_close()  # an open guide window would otherwise keep the app alive
 
         def overlay_closing():
             _debug_log("overlay: close requested (app quitting=%s)" % self._quitting)
@@ -3614,6 +3664,325 @@ class Api:
             webbrowser.open(url)
             return {"ok": True}
         return {"ok": False, "error": "refusing to open that URL"}
+
+    # -- build-guide window ------------------------------------------------------
+    # One extra plain browser window showing a saved guide link directly (Mobalytics and Maxroll
+    # refuse iframes, Mobalytics blocks server fetches). It is the user's own visit to that site:
+    # created WITHOUT js_api, and install_guide_hooks() keeps pywebview's bridge and helper script
+    # out of it entirely; links off the allowed sites go to the system browser.
+    def guide_hosts(self):
+        """The allowed build-guide sites, for the page's own check (js/app/46-guidewindow.js)."""
+        return {"ok": True, "hosts": list(GUIDE_HOSTS), "paths": dict(GUIDE_PATHS)}
+
+    def _guide_saved(self):
+        try:
+            d = json.loads(self._storage.get(GUIDE_WIN_KEY) or "{}")
+            return d if isinstance(d, dict) else {}
+        except Exception:
+            return {}
+
+    def _guide_save(self, **changes):
+        d = self._guide_saved()
+        d.update(changes)
+        self.storage_set(GUIDE_WIN_KEY, json.dumps(d))
+
+    def _guide_alive(self, win):
+        """Still a window: pywebview windows can't be shown again once closed (it drops them from
+        webview.windows and its form registry), so a closed one is made again."""
+        return win is not None and win.uid not in self._guide_gone and win in webview.windows
+
+    @staticmethod
+    def _guide_title(title, url):
+        t = re.sub(r"\s+", " ", title if isinstance(title, str) else "").strip()
+        if not t:
+            t = urllib.parse.urlsplit(url).hostname or "Build guide"
+        return t[:GUIDE_TITLE_MAX]
+
+    def _guide_place(self, saved, w, h):
+        """Where a new guide window goes: where it last was (if that is still on a screen), else
+        beside the main window (right, or left when there's no room), else centred (None)."""
+        try:
+            scr = list(webview.screens or [])
+        except Exception:
+            scr = []
+
+        def on_screen(x, y):
+            return any(s.x <= x + 60 <= s.x + s.width and s.y <= y + 10 <= s.y + s.height for s in scr)
+
+        x, y = saved.get("x"), saved.get("y")
+        if isinstance(x, int) and isinstance(y, int) and (not scr or on_screen(x, y)):
+            return x, y
+        main = self._main
+        if main is None or not scr:
+            return None, None
+        try:
+            mx, my, mw = main.x, main.y, main.width
+        except Exception:
+            return None, None
+        home = next((s for s in scr if s.x <= mx + mw // 2 < s.x + s.width), scr[0])
+        y = max(home.y, min(my, home.y + home.height - h))
+        if mx + mw + 8 + w <= home.x + home.width:
+            return mx + mw + 8, y
+        if mx - 8 - w >= home.x:
+            return mx - 8 - w, y
+        return None, None
+
+    def guide_open(self, url, title=None):
+        """Show a build guide in the guide window: made the first time (and again after it was
+        closed), otherwise the same window goes to the new page. Opens nothing for a link that
+        isn't https on an allowed site."""
+        url, err = guide_url_check(url)
+        if err:
+            return {"ok": False, "error": err}
+        title = self._guide_title(title, url)
+        if not self._guide_hooks_ready():
+            # no WebView2 (or a pywebview whose handlers changed): the bridge could not be kept out
+            # of the page, so the guide goes to the system browser instead
+            webbrowser.open(url)
+            return {"ok": True, "external": True}
+        try:
+            with self._guide_lock:
+                win = self._guide_win
+                if self._guide_alive(win):
+                    win.load_url(url)
+                    win.set_title(GUIDE_WIN_PREFIX + title)
+                    self._guide_raise(win)
+                    return {"ok": True, "reused": True, "onTop": bool(self._guide_saved().get("top"))}
+                self._guide_win = self._guide_create(url, title)
+                return {"ok": True, "reused": False, "onTop": bool(self._guide_saved().get("top"))}
+        except Exception as e:
+            _debug_log("guide window: %r" % e)
+            return {"ok": False, "error": "The guide window could not open: %s" % e}
+
+    def _guide_create(self, url, title):
+        saved = self._guide_saved()
+        try:
+            w = max(420, min(4000, int(saved.get("w") or GUIDE_WIN_SIZE[0])))
+            h = max(320, min(3000, int(saved.get("h") or GUIDE_WIN_SIZE[1])))
+        except (TypeError, ValueError):
+            w, h = GUIDE_WIN_SIZE
+        x, y = self._guide_place(saved, w, h)
+        top = bool(saved.get("top"))
+        opts = dict(width=w, height=h, min_size=(420, 320), on_top=top, background_color="#0f0e0c",
+                    # the page as its site made it: pywebview's own helper script (which would turn
+                    # these off) is kept out of guide pages anyway (install_guide_hooks)
+                    text_select=True, zoomable=True, draggable=True)
+        if x is not None:
+            opts.update(x=x, y=y)
+        # NO js_api: nothing of the Api is exposed to the remote page
+        win = webview.create_window(GUIDE_WIN_PREFIX + title, url, **opts)
+        if win is None:
+            raise RuntimeError("window creation was cancelled")
+        _GUIDE_UIDS.add(win.uid)
+        self._guide_rect = {"x": x, "y": y, "w": w, "h": h}
+
+        def moved(x, y):
+            self._guide_rect.update(x=int(x), y=int(y))
+
+        def resized(width, height):
+            self._guide_rect.update(w=int(width), h=int(height))
+
+        def closing():
+            r = {k: v for k, v in self._guide_rect.items() if isinstance(v, int)}
+            if r:
+                self._guide_save(**r)  # opens there next time
+            return True
+
+        def closed():
+            self._guide_gone.add(win.uid)
+            _GUIDE_UIDS.discard(win.uid)
+            if self._guide_win is win:
+                self._guide_win = None
+
+        win.events.moved += moved
+        win.events.resized += resized
+        win.events.closing += closing
+        win.events.closed += closed
+        return win
+
+    def _guide_hwnd(self, win):
+        form = getattr(win, "native", None)
+        if form is None or sys.platform != "win32":
+            return 0
+        try:
+            return int(self._on_ui(lambda: form.Handle.ToInt64(), form) or 0)
+        except Exception:
+            return 0
+
+    def _guide_raise(self, win):
+        """Bring an open guide window forward WITHOUT taking focus (restored if minimised)."""
+        hwnd = self._guide_hwnd(win)
+        if not hwnd:
+            return
+        import ctypes
+        u = ctypes.windll.user32
+        if u.IsIconic(hwnd):
+            u.ShowWindow(hwnd, 4)  # SW_SHOWNOACTIVATE
+        top = bool(self._guide_saved().get("top"))
+        # HWND_TOPMOST / HWND_TOP; NOMOVE | NOSIZE | NOACTIVATE | SHOWWINDOW
+        u.SetWindowPos(hwnd, -1 if top else 0, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040)
+
+    def _guide_set_top(self, win, on):
+        """Keep on top, set on the window itself with NOACTIVATE (WinForms' TopMost setter would
+        also activate it, i.e. steal focus from the game)."""
+        hwnd = self._guide_hwnd(win)
+        if not hwnd:
+            return False
+        import ctypes
+        # HWND_TOPMOST / HWND_NOTOPMOST; NOMOVE | NOSIZE | NOACTIVATE
+        return bool(ctypes.windll.user32.SetWindowPos(hwnd, -1 if on else -2, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010))
+
+    def guide_on_top(self, flag):
+        """'Keep on top' for the guide window (remembered; also used when it is made again)."""
+        on = bool(flag)
+        try:
+            self._guide_save(top=on)
+            win = self._guide_win
+            if self._guide_alive(win):
+                self._guide_set_top(win, on)
+            return {"ok": True, "onTop": on, "open": self._guide_alive(win)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def guide_close(self):
+        """Close the guide window (a later guide_open makes a new one)."""
+        try:
+            win = self._guide_win
+            self._guide_win = None
+            if self._guide_alive(win):
+                self._destroy_once(win)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def guide_status(self):
+        return {"ok": True, "open": self._guide_alive(self._guide_win), "onTop": bool(self._guide_saved().get("top"))}
+
+    def _guide_hooks_ready(self):
+        try:
+            gl = getattr(webview, "guilib", None)
+            if getattr(gl, "renderer", None) != "edgechromium":
+                return False
+            from webview.platforms.edgechromium import EdgeChrome
+            return install_guide_hooks(EdgeChrome)
+        except Exception as e:
+            _debug_log("guide window: hooks unavailable (%r)" % e)
+            return False
+
+
+# -- build-guide window: pywebview kept out of the remote page ------------------------------
+# pywebview 6 has no per-window switch for this: every page it shows gets its window.pywebview
+# helper injected after each navigation (inject_pywebview, from on_navigation_completed), and
+# window.chrome.webview.postMessage reaches util.js_bridge_call, which besides js_api also serves
+# its own helpers (move the window, native alert boxes, state) and resolves dotted names with
+# getattr. So EdgeChrome's handlers are wrapped once (class level, before the guide window's
+# EdgeChrome is made, so its bound handlers are the wrapped ones): for a guide window, web
+# messages are ignored and switched off, nothing is injected, top-level navigation stays on
+# GUIDE_HOSTS (else the system browser, for a click) and new-window requests are checked too.
+_GUIDE_UIDS = set()           # uids of guide windows
+GUIDE_HOOKED = ("on_webview_ready", "on_navigation_start", "on_navigation_completed",
+                "on_new_window_request", "on_script_notify")
+
+
+def _is_guide_view(view):
+    """A guide window's EdgeChrome. Known by uid once guide_open has it; before that (WebView2 can
+    finish starting before create_window returns) by what only a guide window is: no js_api and a
+    "Guide: " title. Every other window of the app has the Api."""
+    w = getattr(view, "pywebview_window", None)
+    if w is None:
+        return False
+    if getattr(w, "uid", None) in _GUIDE_UIDS:
+        return True
+    return getattr(w, "_js_api", True) is None and str(getattr(w, "title", "")).startswith(GUIDE_WIN_PREFIX)
+
+
+def _guide_off_site(uri, user):
+    """A top-level link off the allowed sites: the system browser, when the user clicked it."""
+    scheme = urllib.parse.urlsplit(uri).scheme.lower() if isinstance(uri, str) else ""
+    if user and scheme in ("https", "http"):
+        threading.Thread(target=webbrowser.open, args=(uri,), daemon=True).start()
+        _debug_log("guide window: opened off-site link in the browser: %s" % urllib.parse.urlsplit(uri).hostname)
+    else:
+        _debug_log("guide window: blocked %s navigation (%s)" % ("a script" if not user else scheme, scheme))
+
+
+def install_guide_hooks(cls):
+    """Wrap cls's (EdgeChrome's) handlers for guide windows; other windows go to the originals.
+    Returns True once installed, False if this pywebview doesn't have the expected handlers."""
+    if getattr(cls, "_pobtf_guide_hooks", False):
+        return True
+    orig = {n: getattr(cls, n, None) for n in GUIDE_HOOKED}
+    if not all(callable(f) for f in orig.values()):
+        return False
+
+    def on_script_notify(self, sender, args):
+        if _is_guide_view(self):
+            return None  # the page never reaches Python: no js_api, no move/alert/state helpers
+        return orig["on_script_notify"](self, sender, args)
+
+    def on_navigation_completed(self, sender, args):
+        if not _is_guide_view(self):
+            return orig["on_navigation_completed"](self, sender, args)
+        try:
+            self.url = None if self.ishtml else str(sender.Source)
+        except Exception:
+            pass
+        self.pywebview_window.events.loaded.set()  # no inject_pywebview: the page stays as its site made it
+        return None
+
+    def on_navigation_start(self, sender, args):
+        orig["on_navigation_start"](self, sender, args)
+        if not _is_guide_view(self):
+            return None
+        uri = str(args.Uri)
+        if guide_url_check(uri)[1] is None:
+            return None
+        args.Cancel = True
+        _guide_off_site(uri, bool(getattr(args, "IsUserInitiated", False)))
+        return None
+
+    def on_new_window_request(self, sender, args):
+        if not _is_guide_view(self):
+            return orig["on_new_window_request"](self, sender, args)
+        args.Handled = True  # never a second WebView2 window, never pywebview's open-anything path
+        uri = str(args.Uri)
+        if guide_url_check(uri)[1] is None:
+            self.load_url(uri)  # another guide page: this same window
+        else:
+            _guide_off_site(uri, bool(getattr(args, "IsUserInitiated", True)))
+        return None
+
+    def on_webview_ready(self, sender, args):
+        r = orig["on_webview_ready"](self, sender, args)
+        if not _is_guide_view(self) or not getattr(args, "IsSuccess", False):
+            return r
+        try:
+            core = sender.CoreWebView2
+            s = core.Settings
+            s.IsWebMessageEnabled = False          # belt and braces: on_script_notify ignores them anyway
+            s.AreDevToolsEnabled = False
+            s.AreBrowserAcceleratorKeysEnabled = True  # Ctrl+F, Alt+Left (back), F5, Ctrl+wheel zoom
+            s.AreDefaultContextMenusEnabled = True     # Back / Reload / Print; new windows come through above
+            s.IsStatusBarEnabled = True                # shows where a link goes before you click it
+
+            def deny(_sender, pargs):  # camera, microphone, location, notifications…: never
+                try:
+                    from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
+                    pargs.State = CoreWebView2PermissionState.Deny
+                except Exception:
+                    pass
+            core.PermissionRequested += deny
+        except Exception as e:
+            _debug_log("guide window: settings: %r" % e)
+        return r
+
+    for name, fn in (("on_script_notify", on_script_notify), ("on_navigation_completed", on_navigation_completed),
+                     ("on_navigation_start", on_navigation_start), ("on_new_window_request", on_new_window_request),
+                     ("on_webview_ready", on_webview_ready)):
+        fn.__name__ = name
+        setattr(cls, name, fn)
+    cls._pobtf_guide_hooks = True
+    return True
 
 
 def _unblock_app_files():
