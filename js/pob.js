@@ -228,6 +228,68 @@
     return item;
   }
 
+  /* The skill sets inside <Skills>: [{id, title, body}] and the active one's index. Old builds
+   * have <Skill> directly under <Skills> with no SkillSet wrapper: one set, the whole block. */
+  function findSkillSets(skillsAttrs, scope) {
+    var activeId = attr(skillsAttrs, 'activeSkillSet') || '1';
+    var sets = [], active = 0;
+    var re = /<SkillSet\b([^>]*)>([\s\S]*?)<\/SkillSet>/g, m;
+    while ((m = re.exec(scope))) {
+      if (attr(m[1], 'id') === activeId) active = sets.length;
+      sets.push({ id: attr(m[1], 'id'), title: attr(m[1], 'title') || '', body: m[2] });
+    }
+    if (!sets.length) sets.push({ id: '1', title: '', body: scope });
+    return { sets: sets, active: active };
+  }
+
+  /* One skill set's link groups (enabled groups with real gems), its gems in order, and its main
+   * skill: <Build mainSocketGroup="N"> is the 1-based position among ALL <Skill> entries of the
+   * set (disabled and item-granted ones count); 0 = none. */
+  function parseSkillScope(scope, mainIdx) {
+    var res = { gemGroups: [], gems: [], mainSkill: [] };
+    var skillRe = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk, n = 0;
+    while ((sk = skillRe.exec(scope))) {
+      n++;
+      var gemRe = /<Gem\b([^>]*)\/?>/g, gm;
+      if (n === mainIdx) {
+        while ((gm = gemRe.exec(sk[2]))) {
+          if (attr(gm[1], 'enabled') !== 'false' && attr(gm[1], 'nameSpec')) res.mainSkill.push(attr(gm[1], 'nameSpec'));
+        }
+        gemRe.lastIndex = 0;
+      }
+      if (attr(sk[1], 'enabled') === 'false') continue;
+      if (attr(sk[1], 'source')) continue; // item-granted skill, not a real gem
+      var group = {
+        slot: attr(sk[1], 'slot') || '',
+        label: attr(sk[1], 'label') || '',
+        gems: [],
+        offGems: [] // unticked in PoB: swap-in options, not part of the setup
+      };
+      while ((gm = gemRe.exec(sk[2]))) {
+        var off = attr(gm[1], 'enabled') === 'false';
+        var gname = attr(gm[1], 'nameSpec');
+        if (!gname) continue;
+        // real gems always carry a gemId; item-granted skills don't (and not
+        // every PoB version marks the parent Skill with a source attribute)
+        if (!attr(gm[1], 'gemId') && !attr(gm[1], 'variantId')) continue;
+        var gemObj = {
+          name: gname,
+          level: parseInt(attr(gm[1], 'level') || '1', 10),
+          quality: parseInt(attr(gm[1], 'quality') || '0', 10),
+          count: parseInt(attr(gm[1], 'count') || '1', 10)
+        };
+        if (off) { gemObj.enabled = false; group.offGems.push(gemObj); } else group.gems.push(gemObj);
+      }
+      if (group.gems.length) {
+        // group title: user label, else the first (main) gem's name
+        group.title = group.label || (group.gems[0].name + (group.gems.length > 1 ? ' setup' : ''));
+        res.gemGroups.push(group);
+        group.gems.forEach(function (g) { res.gems.push(g); });
+      }
+    }
+    return res;
+  }
+
   /* Parse a full PoB XML document string.
    * Returns { className, ascendClass, items: {id: item}, slots: [{slot, itemId}],
    *           jewels: [itemId...], flasks: [{slot,itemId}] } */
@@ -269,9 +331,11 @@
     var setRe = /<ItemSet\b([^>]*)>([\s\S]*?)<\/ItemSet>/g, sm2;
     while ((sm2 = setRe.exec(xml))) {
       var setId = attr(sm2[1], 'id');
+      var setTitle = attr(sm2[1], 'title');
       var set = {
         id: setId,
-        title: attr(sm2[1], 'title') || ('Gear set ' + (out.itemSets.length + 1)),
+        title: setTitle || ('Gear set ' + (out.itemSets.length + 1)),
+        untitled: !setTitle,
         slots: [], flasks: []
       };
       var slotRe = /<Slot\b([^>]*)\/?>/g, slm;
@@ -290,76 +354,32 @@
     var act = out.itemSets[out.activeSetIndex];
     if (act) { out.slots = act.slots; out.flasks = act.flasks; }
 
-    // Skill gems — active skill set, enabled gems only, deduped by name/level/quality
+    // Skill sets — guide PoBs ship one gem setup per stage (Leveling / Endgame…). Every set is
+    // parsed; gemGroups / gems / mainSkill mirror the active one (what every caller reads)
+    out.skillSets = [];
+    out.activeSkillSet = 0;
     out.gems = [];
+    out.mainSkill = [];
     var skillsBlock = xml.match(/<Skills\b([^>]*)>([\s\S]*?)<\/Skills>/);
     if (skillsBlock) {
-      var activeGemSet = attr(skillsBlock[1], 'activeSkillSet') || '1';
-      var scope = skillsBlock[2];
-      var setRe2 = /<SkillSet\b([^>]*)>([\s\S]*?)<\/SkillSet>/g, ss;
-      var found = null, firstSet = null;
-      while ((ss = setRe2.exec(scope))) {
-        if (firstSet === null) firstSet = ss[2];
-        if (attr(ss[1], 'id') === activeGemSet) { found = ss[2]; break; }
-      }
-      // old builds have <Skill> directly under <Skills> with no SkillSet wrapper
-      var gemScope = found !== null ? found : (firstSet !== null ? firstSet : scope);
-      out.gemGroups = [];
-      var skillRe = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk;
-      while ((sk = skillRe.exec(gemScope))) {
-        if (attr(sk[1], 'enabled') === 'false') continue;
-        if (attr(sk[1], 'source')) continue; // item-granted skill, not a real gem
-        var group = {
-          slot: attr(sk[1], 'slot') || '',
-          label: attr(sk[1], 'label') || '',
-          gems: [],
-          offGems: [] // unticked in PoB: swap-in options, not part of the setup
-        };
-        var gemRe = /<Gem\b([^>]*)\/?>/g, gm;
-        while ((gm = gemRe.exec(sk[2]))) {
-          var off = attr(gm[1], 'enabled') === 'false';
-          var gname = attr(gm[1], 'nameSpec');
-          if (!gname) continue;
-          // real gems always carry a gemId; item-granted skills don't (and not
-          // every PoB version marks the parent Skill with a source attribute)
-          if (!attr(gm[1], 'gemId') && !attr(gm[1], 'variantId')) continue;
-          var gemObj = {
-            name: gname,
-            level: parseInt(attr(gm[1], 'level') || '1', 10),
-            quality: parseInt(attr(gm[1], 'quality') || '0', 10),
-            count: parseInt(attr(gm[1], 'count') || '1', 10)
-          };
-          if (off) { gemObj.enabled = false; group.offGems.push(gemObj); } else group.gems.push(gemObj);
-        }
-        if (group.gems.length) {
-          // group title: user label, else the first (main) gem's name
-          group.title = group.label || (group.gems[0].name + (group.gems.length > 1 ? ' setup' : ''));
-          out.gemGroups.push(group);
-          group.gems.forEach(function (g) { out.gems.push(g); });
-        }
-      }
-    }
-
-    // Main skill: <Build mainSocketGroup="N"> is the 1-based position among ALL
-    // <Skill> entries of the active skill set (disabled and item-granted ones count)
-    out.mainSkill = [];
-    if (bm && skillsBlock) {
-      var mainIdx = parseInt(attr(bm[1], 'mainSocketGroup') || '0', 10);
-      var activeSet3 = attr(skillsBlock[1], 'activeSkillSet') || '1';
-      var setRe3 = /<SkillSet\b([^>]*)>([\s\S]*?)<\/SkillSet>/g, ss3, scope3 = null;
-      while ((ss3 = setRe3.exec(skillsBlock[2]))) {
-        if (scope3 === null || attr(ss3[1], 'id') === activeSet3) scope3 = ss3[2];
-        if (attr(ss3[1], 'id') === activeSet3) break;
-      }
-      if (scope3 === null) scope3 = skillsBlock[2];
-      var skRe3 = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk3, n3 = 0;
-      while ((sk3 = skRe3.exec(scope3))) {
-        if (++n3 !== mainIdx) continue;
-        var gRe3 = /<Gem\b([^>]*)\/?>/g, g3;
-        while ((g3 = gRe3.exec(sk3[2]))) {
-          if (attr(g3[1], 'enabled') !== 'false' && attr(g3[1], 'nameSpec')) out.mainSkill.push(attr(g3[1], 'nameSpec'));
-        }
-      }
+      var mainIdx = bm ? parseInt(attr(bm[1], 'mainSocketGroup') || '0', 10) : 0;
+      var found = findSkillSets(skillsBlock[1], skillsBlock[2]);
+      found.sets.forEach(function (s, i) {
+        var parsed = parseSkillScope(s.body, mainIdx);
+        out.skillSets.push({ id: s.id, title: s.title || ('Skill set ' + (i + 1)), untitled: !s.title,
+                             gemGroups: parsed.gemGroups, gems: parsed.gems, mainSkill: parsed.mainSkill });
+      });
+      out.activeSkillSet = found.active;
+      // the other sets have no main group of their own: the one holding the active set's main gem,
+      // else the same position (what PoB shows when you switch to that set)
+      var mainGem = (out.skillSets[found.active] || { mainSkill: [] }).mainSkill[0];
+      out.skillSets.forEach(function (s, i) {
+        if (i === found.active || !mainGem) return;
+        var g = s.gemGroups.find(function (gr) { return gr.gems.some(function (x) { return x.name === mainGem; }); });
+        if (g) s.mainSkill = g.gems.map(function (x) { return x.name; });
+      });
+      var act2 = out.skillSets[found.active];
+      if (act2) { out.gemGroups = act2.gemGroups; out.gems = act2.gems; out.mainSkill = act2.mainSkill; }
     }
 
     // PoB's own "Find Timeless Jewel" settings, if the build author filled them in:
@@ -422,6 +442,109 @@
       }
     }
     return out;
+  }
+
+  // ---- stages: one gear set + skill set + tree spec per build stage ------------
+
+  // a set's name for matching: lower case, punctuation and runs of spaces folded; PoB's
+  // default names ("Default", no title, our "Gear set 2"-style fallbacks) all become ''
+  function stageKey(title, untitled) {
+    if (untitled) return '';
+    var k = String(title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    return k === 'default' ? '' : k;
+  }
+  function wordsIn(a, b) { return (' ' + a + ' ').indexOf(' ' + b + ' ') !== -1; }
+
+  /* A build's stages: [{ title, itemSet, skillSet, treeSpec, active, match }] where each of the
+   * three is an index into build.itemSets / skillSets / treeSpecs, or null when that list has
+   * nothing for the stage (the caller then keeps PoB's active entry). active: the stage made of
+   * PoB's active sets (or the closest). match: 'name' | 'position' | 'single'.
+   * - Sets are matched across the lists by name (case, spaces and punctuation ignored; whole
+   *   words of one name inside the other also match when that is the only candidate).
+   * - A list whose names don't all match but that is as long as the first list with several
+   *   entries is paired by position instead.
+   * - A list with one entry (or none) is the same for every stage; only lists with several
+   *   entries make stages. Order: the first such list's (item sets first), then names only found
+   *   in the later lists. */
+  function buildStages(b) {
+    b = b || {};
+    var kinds = [
+      { k: 'itemSet', active: b.activeSetIndex || 0,
+        list: (b.itemSets || []).map(function (s) { return { title: s.title || '', key: stageKey(s.title, s.untitled) }; }) },
+      { k: 'skillSet', active: b.activeSkillSet || 0,
+        list: (b.skillSets || []).map(function (s) { return { title: s.title || '', key: stageKey(s.title, s.untitled) }; }) },
+      { k: 'treeSpec', active: b.treeActive || 0,
+        list: (b.treeSpecs || []).map(function (s) { return { title: s.title || '', key: stageKey(s.title, !s.title) }; }) }
+    ];
+    function blank(match) { return { title: '', itemSet: null, skillSet: null, treeSpec: null, active: false, match: match, keys: [], titles: [] }; }
+    var multi = kinds.filter(function (x) { return x.list.length > 1; });
+    var stages = [];
+    if (!multi.length) {
+      stages.push(blank('single'));
+    } else {
+      var base = multi[0];
+      base.list.forEach(function (e, i) {
+        var st = blank('name');
+        st[base.k] = i;
+        st.keys.push(e.key);
+        st.titles.push(e);
+        stages.push(st);
+      });
+      multi.slice(1).forEach(function (x) {
+        var assigned = x.list.map(function () { return -1; });
+        var taken = {};
+        function free(si) { return stages[si][x.k] === null && !taken[si]; }
+        // exact names first
+        x.list.forEach(function (e, j) {
+          for (var si = 0; si < stages.length; si++) {
+            if (free(si) && stages[si].keys.indexOf(e.key) !== -1) { assigned[j] = si; taken[si] = true; return; }
+          }
+        });
+        // then one name's words inside the other's ("Endgame" ~ "Endgame mapping"), if unambiguous
+        x.list.forEach(function (e, j) {
+          if (assigned[j] !== -1 || !e.key) return;
+          var hits = [];
+          stages.forEach(function (st, si) {
+            if (free(si) && st.keys.some(function (k) { return k && (wordsIn(k, e.key) || wordsIn(e.key, k)); })) hits.push(si);
+          });
+          if (hits.length === 1) { assigned[j] = hits[0]; taken[hits[0]] = true; }
+        });
+        var all = assigned.every(function (a) { return a !== -1; });
+        if (!all && x.list.length === base.list.length) {
+          x.list.forEach(function (e, j) {
+            stages[j][x.k] = j;
+            stages[j].match = 'position';
+            stages[j].keys.push(e.key);
+            stages[j].titles.push(e);
+          });
+          return;
+        }
+        x.list.forEach(function (e, j) {
+          var st = assigned[j] !== -1 ? stages[assigned[j]] : null;
+          if (!st) { st = blank('name'); stages.push(st); }
+          st[x.k] = j;
+          st.keys.push(e.key);
+          st.titles.push(e);
+        });
+      });
+    }
+    // lists with one entry: the same for every stage
+    kinds.forEach(function (x) {
+      if (x.list.length !== 1) return;
+      stages.forEach(function (st) { st[x.k] = 0; });
+    });
+    var best = -1, bestAt = 0;
+    stages.forEach(function (st, i) {
+      var named = st.titles.filter(function (t) { return t.key; })[0] || st.titles[0];
+      st.title = named && named.title ? named.title : 'Stage ' + (i + 1);
+      var score = 0;
+      multi.forEach(function (x) { if (st[x.k] === x.active) score++; });
+      if (score > best) { best = score; bestAt = i; }
+      delete st.keys;
+      delete st.titles;
+    });
+    stages[bestAt].active = true;
+    return stages;
   }
 
   // ---- game clipboard format (Ctrl+C on an item in the client) --------------
@@ -744,6 +867,7 @@
   return {
     decodePobCode: decodePobCode,
     parseBuild: parseBuild,
+    buildStages: buildStages,
     parseItemText: parseItemText,
     parseGameItem: parseGameItem,
     looksLikeGameItem: looksLikeGameItem,
