@@ -188,7 +188,15 @@ async function main() {
 
   console.log('== stat matching against real trade DB ==');
   const stats = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'stats.json'), 'utf8'));
-  const index = Matcher.buildStatIndex(stats);
+  const legacy = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'statslegacy.json'), 'utf8'));
+  const index = Matcher.buildStatIndex(stats, legacy);
+  // 3.30 reworded these; items saved in PoB before then keep the old text
+  const mOldRarity = Matcher.matchMod(index, { line: '12% increased Rarity of Items found', kind: 'explicit', crafted: false, fractured: false }, 'Ring 1');
+  assert(mOldRarity && mOldRarity.entry.id === 'explicit.stat_3917489142', 'pre-3.30 rarity text matches the reworded stat: ' + (mOldRarity && mOldRarity.entry.id));
+  const mOldNearby = Matcher.matchMod(index, { line: 'Nearby Allies gain 2% of Life Regenerated per second', kind: 'explicit', crafted: false, fractured: false }, 'Helmet');
+  assert(mOldNearby && /within 5 metres/.test(mOldNearby.entry.text), 'pre-3.30 "Nearby Allies" text matches: ' + (mOldNearby && mOldNearby.entry.text));
+  const mCrafted = Matcher.matchMod(index, { line: '15% increased Rarity of Items found', kind: 'explicit', crafted: true, fractured: false }, 'Ring 1');
+  assert(mCrafted && /^(crafted|explicit)\./.test(mCrafted.entry.id), 'old text keeps its section: ' + (mCrafted && mCrafted.entry.id));
 
   const expectMatch = (item, slot, lineIncludes, note) => {
     const mod = item.mods.find(m => m.line.includes(lineIncludes));
@@ -333,7 +341,10 @@ async function main() {
     for (const line of c.line.split('\n')) {
       const mod = { line, kind: c.kind === 'enchant' ? 'implicit' : (c.kind === 'implicit' ? 'implicit' : 'explicit'),
                     crafted: c.kind === 'crafted' || c.kind === 'enchant', fractured: c.kind === 'fractured' };
-      if (!Matcher.matchMod(index, mod, c.cat.includes('armour') ? 'Helmet' : 'Ring 1')) corpusMisses++;
+      if (!Matcher.matchMod(index, mod, c.cat.includes('armour') ? 'Helmet' : 'Ring 1')) {
+        corpusMisses++;
+        if (corpusMisses <= 12) console.log('    miss [' + c.kind + '] ' + line);
+      }
     }
   }
   assert(corpusMisses === 0, 'every real listing mod line matches (misses: ' + corpusMisses + ')');

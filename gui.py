@@ -63,6 +63,8 @@ CHEATSHEETS_TTL = 6 * 3600
 # mechanic strategy guides (tools/make_guides.py), drawn inside the cheat sheets: same server pattern
 GUIDES_API = "https://pob-trade-finder.vercel.app/guides.json"
 GUIDES_TTL = 6 * 3600
+# the exchange's fragment category: renamed in 3.30 when Threads replaced Scarabs
+FRAGMENT_CATS = ("Fragments, Scarabs & Mapping", "Fragments, Threads & Mapping")
 EXTRAS_API = "https://pob-trade-finder.vercel.app/extras.json"  # boss guides, leveling, relics, rogue gear, atlas trees
 # where boss guide images may come from (also the art cache's allowlist, art_cache.py)
 IMAGE_HOSTS = ("https://web.poecdn.com/", "https://www.poewiki.net/images/", "https://cdn.poedb.tw/")
@@ -890,7 +892,7 @@ class Api:
     # Mechanic tools (Cheat sheets → scarab hub, price boards, profit calculator): which
     # currency-exchange items each group covers, matched on the currencymap name and category.
     MECH_GROUPS = {
-        "scarabs": lambda n, c: c == "Fragments, Scarabs & Mapping" and "Scarab" in n and "Chisel" not in n,
+        "scarabs": lambda n, c: c in FRAGMENT_CATS and "Scarab" in n and "Chisel" not in n,
         "fossils": lambda n, c: c == "Fossils & Resonators",
         "essences": lambda n, c: c == "Essences",
         "lifeforce": lambda n, c: n.endswith("Crystallised Lifeforce"),
@@ -899,7 +901,7 @@ class Api:
         "delirium": lambda n, c: c == "Delirium Orbs",
         # 3.30: Threads replace scarabs ("Abyss Thread" … "Frayed Thread"), whatever category they get
         "threads": lambda n, c: n.endswith(" Thread") and not n.startswith("Memory"),
-        "fragments": lambda n, c: c == "Fragments, Scarabs & Mapping" and "Scarab" not in n and not n.endswith(" Thread"),
+        "fragments": lambda n, c: c in FRAGMENT_CATS and "Scarab" not in n and not n.endswith(" Thread"),
         "expedition": lambda n, c: c == "Expedition Currency",
         "foulborn": lambda n, c: c == "Foulborn Currency & Wombgifts",
         "embers": lambda n, c: c == "Allflame Embers",

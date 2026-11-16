@@ -1,0 +1,810 @@
+{
+"#% chance for Impales on Enemies you Kill to Reflect Damage to surrounding Enemies": [
+"explicit.stat_3927388937",
+"implicit.stat_3927388937"
+],
+"#% chance to Blind Enemies on hit": [
+"crafted.stat_2301191210",
+"explicit.stat_2301191210",
+"fractured.stat_2301191210"
+],
+"#% chance to Blind nearby Enemies when gaining Her Blessing": [
+"explicit.stat_2327728343"
+],
+"#% chance to grant Chaotic Might to nearby Enemies on Kill": [
+"explicit.stat_3607444087"
+],
+"#% chance to grant Onslaught to nearby Enemies on Kill": [
+"explicit.stat_1924591908"
+],
+"#% chance to grant a Frenzy Charge to nearby Allies on Hit": [
+"explicit.stat_991168463",
+"implicit.stat_991168463"
+],
+"#% chance to grant a Power Charge to nearby Allies on Kill": [
+"explicit.stat_2367680009",
+"implicit.stat_2367680009"
+],
+"#% increased Attack Speed while a Rare or Unique Enemy is Nearby": [
+"crafted.stat_314741699",
+"explicit.stat_314741699",
+"fractured.stat_314741699"
+],
+"#% increased Attack and Cast Speed for each nearby Enemy, up to a maximum of 30%": [
+"explicit.stat_1027670161",
+"fractured.stat_1027670161"
+],
+"#% increased Cost of Building and Upgrading Towers": [
+"enchant.stat_2078691497",
+"explicit.stat_2078691497"
+],
+"#% increased Item Rarity per White Socket": [
+"explicit.stat_144675621"
+],
+"#% increased Magic Pack Size": [
+"enchant.stat_1714706956"
+],
+"#% increased Movement Speed for each nearby Enemy, up to a maximum of 50%": [
+"explicit.stat_1426967889",
+"fractured.stat_1426967889"
+],
+"#% increased Movement Speed for you and nearby Allies": [
+"explicit.stat_3410049114"
+],
+"#% increased Quantity of Expedition Logbooks dropped by Runic Monsters in your Maps": [
+"explicit.stat_1083387327"
+],
+"#% increased Rarity of Items Dropped by Enemies killed with a Critical Strike": [
+"explicit.stat_21824003"
+],
+"#% increased Rarity of Items Dropped by Frozen Enemies": [
+"explicit.stat_2138434718"
+],
+"#% increased Rarity of Items Dropped by Slain Magic Enemies": [
+"explicit.stat_3433676080"
+],
+"#% increased Rarity of Items Dropped by Slain Rare or Unique Enemies": [
+"crafted.stat_2161689853",
+"explicit.stat_2161689853",
+"fractured.stat_2161689853"
+],
+"#% increased Rarity of Items Dropped by Slain Shocked Enemies": [
+"explicit.stat_3188291252"
+],
+"#% increased Rarity of Items found": [
+"crafted.stat_3917489142",
+"explicit.stat_3917489142",
+"fractured.stat_3917489142",
+"implicit.stat_3917489142",
+"scourge.stat_3917489142"
+],
+"#% increased Rarity of Items found during Effect": [
+"crafted.stat_3251705960",
+"explicit.stat_1740200922",
+"explicit.stat_3251705960"
+],
+"#% increased Rarity of Items found from Hiveborn Monsters": [
+"explicit.stat_3967804254"
+],
+"#% increased Rarity of Items found from Slain Unique Enemies": [
+"explicit.stat_121185030",
+"fractured.stat_121185030"
+],
+"#% increased Rarity of Items found per Mana Burn, up to a maximum of 100%": [
+"explicit.stat_3226452989"
+],
+"#% increased Rarity of Items found when on Low Life": [
+"explicit.stat_2929867083",
+"implicit.stat_2929867083"
+],
+"#% increased Rarity of Items found with a Normal Item Equipped": [
+"explicit.stat_4151190513"
+],
+"#% increased Scarabs found in your Maps": [
+"explicit.stat_1351268685"
+],
+"#% increased chance for Memory Threads to lead towards the Incarnation of Dread": [
+"explicit.stat_1415269999"
+],
+"#% increased chance for Memory Threads to lead towards the Incarnation of Fear": [
+"explicit.stat_1493453364"
+],
+"#% increased chance for Memory Threads to lead towards the Incarnation of Neglect": [
+"explicit.stat_3126598962"
+],
+"#% increased chance of Ritual Altars with Special Rewards": [
+"explicit.stat_2172921782"
+],
+"#% increased quantity of Artifacts dropped by Monsters": [
+"explicit.stat_4219583418",
+"implicit.stat_4219583418"
+],
+"#% of Life Recovery from Flasks is applied to nearby Allies instead of You": [
+"explicit.stat_2264655303",
+"fractured.stat_2264655303"
+],
+"+# to Accuracy Rating for each Empty Green Socket on any Equipped Item": [
+"explicit.stat_4280703528"
+],
+"+# to maximum Life for each Empty Red Socket on any Equipped Item": [
+"explicit.stat_726359715"
+],
+"+# to maximum Mana for each Empty Blue Socket on any Equipped Item": [
+"explicit.stat_2962020005"
+],
+"+#% Chance to Block Attack Damage if there are at least 5 nearby Enemies": [
+"explicit.stat_1214532298",
+"fractured.stat_1214532298"
+],
+"+#% Critical Strike Multiplier while a Rare or Unique Enemy is Nearby": [
+"crafted.stat_3992439283",
+"explicit.stat_3992439283",
+"fractured.stat_3992439283"
+],
+"+#% to all Elemental Resistances for each Empty White Socket on any Equipped Item": [
+"explicit.stat_597739519"
+],
+"1% increased Rarity of Items found per # Rampage Kills": [
+"explicit.stat_4260403588",
+"fractured.stat_4260403588"
+],
+"Abyss Pits in your Maps have #% chance to spawn 5 additional Rare Monsters": [
+"explicit.stat_4049011082"
+],
+"Abyss Pits in your Maps have #% chance to spawn all Monsters as at least Magic for each prior Pit closed": [
+"explicit.stat_440232197"
+],
+"Abyssal Troves and Stygian Spires in your Maps have #% chance to drop an Abyss Scarab": [
+"explicit.stat_1028265433"
+],
+"Area contains an Empowered Mirage which covers the entire Map": [
+"enchant.stat_2436559047"
+],
+"Area is infested with Fungal Growths\nMap's Item Quantity Modifiers also affect Blight Chest count at 25% value\nCan be Anointed up to 3 times": [
+"implicit.stat_299373046"
+],
+"Aspect of the Avian also grants Avian's Might and Avian's Flight to nearby Allies": [
+"explicit.stat_2544408546"
+],
+"Bleeding you inflict deals Damage #% faster": [
+"explicit.stat_3828375170",
+"fractured.stat_3828375170",
+"implicit.stat_3828375170",
+"scourge.stat_3828375170"
+],
+"Bleeding you inflict deals Damage #% faster per Frenzy Charge": [
+"explicit.stat_1670470989"
+],
+"Blight Encounters in your Maps spawn #% more Non-Unique Monsters": [
+"explicit.stat_4091793171"
+],
+"Blight Towers in your Maps can be Salvaged after the Blight Encounter\nHigher Tier Towers grant better Salvaged Rewards\nSalvaged Rewards are improved for each different Tower Type built during Encounter": [
+"explicit.stat_1421406768"
+],
+"Chill Nearby Enemies when you Block": [
+"explicit.stat_583277599",
+"fractured.stat_583277599"
+],
+"Chill nearby Enemies when you Focus, causing 30% reduced Action Speed": [
+"explicit.stat_2384145996"
+],
+"Damaging Ailments deal damage #% faster": [
+"explicit.stat_538241406",
+"fractured.stat_538241406"
+],
+"Damaging Ailments inflicted by Skills used by this Graft deal damage #% faster": [
+"explicit.stat_4230320163"
+],
+"Damaging Ailments you inflict deal Damage #% faster while affected by Malevolence": [
+"explicit.stat_3468843137"
+],
+"Deal #% of your maximum Life as Fire Damage to nearby Enemies when Hit": [
+"scourge.stat_3643913768"
+],
+"Deals # Chaos Damage per second to nearby Enemies": [
+"explicit.stat_2280313599"
+],
+"Debilitate nearby Enemies for # Seconds when Effect ends": [
+"explicit.stat_545593248"
+],
+"Decoy, Devouring and Rejuvenation Totems Reflect 100% of their maximum Life as Fire Damage to nearby Enemies when Hit (Tier 1)": [
+"crucible.mod_23155"
+],
+"Decoy, Devouring and Rejuvenation Totems Reflect 200% of their maximum Life as Fire Damage to nearby Enemies when Hit (Tier 1)": [
+"crucible.mod_47012"
+],
+"Delirium Reward Type: Fragments": [
+"enchant.delirium_reward_fragments"
+],
+"Delirium Reward Type: Scarabs": [
+"enchant.delirium_reward_scarabs"
+],
+"Enemies inflict Elemental Ailments on you instead of nearby Allies": [
+"explicit.stat_979288792"
+],
+"Every 3 seconds, Consume a nearby Corpse to Recover #% of Life": [
+"enchant.stat_3764198549"
+],
+"Final Map Boss in each Map has #% chance to drop an additional Scarab": [
+"explicit.stat_4086926366"
+],
+"For each nearby corpse, #% increased Movement Speed": [
+"explicit.stat_504462346"
+],
+"For each nearby corpse, Regenerate # Life per second": [
+"explicit.stat_2500585555"
+],
+"For each nearby corpse, Regenerate #% Life per second, up to 3%": [
+"explicit.stat_3845048660"
+],
+"Grant a Frenzy Charge to nearby Allies on Kill": [
+"explicit.stat_1243641369",
+"implicit.stat_1243641369"
+],
+"Grant an Endurance Charge to nearby Allies on Hit": [
+"explicit.stat_3174788165",
+"implicit.stat_3174788165"
+],
+"Grants Armour equal to #% of your Reserved Mana to you and nearby Allies": [
+"explicit.stat_681709908"
+],
+"Grants Level # Elemental Weakness Skill": [
+"implicit.stat_3792821911"
+],
+"Grants Level # Frostbite Skill": [
+"explicit.stat_1169502663",
+"implicit.stat_1169502663"
+],
+"Grants Level 20 Summon Shaper Memory\nGrants Level 20 Shaper's Devastation, which will be used by Shaper Memory": [
+"explicit.stat_367775264"
+],
+"Harvest Crops in your Maps have #% increased chance to contain Tier 3 Plants": [
+"explicit.stat_2992379436"
+],
+"Harvest Crops in your Maps have #% increased chance to contain a Tier 4 Plant": [
+"explicit.stat_1505882627"
+],
+"Harvest Monsters in your Maps drop #% increased Quantity of Lifeforce": [
+"explicit.stat_3483648190"
+],
+"Harvest Monsters in your Maps grant #% increased Experience": [
+"explicit.stat_4251234305"
+],
+"Harvest Monsters in your Maps have #% more Life": [
+"enchant.stat_2067409550"
+],
+"Harvested Plants in your Maps have #% chance to spawn an additional Monster": [
+"explicit.stat_4128958145"
+],
+"Heist Chests have a #% chance to Duplicate contained Scarabs": [
+"explicit.stat_4216809421",
+"fractured.stat_4216809421"
+],
+"Heist Targets are always Currency or Scarabs": [
+"enchant.stat_4168369352"
+],
+"Hinders nearby Enemies with #% reduced Movement Speed if used while not on Full Life": [
+"explicit.stat_1462364052",
+"fractured.stat_1462364052"
+],
+"Hinders nearby Enemies with #% reduced Movement Speed if used while not on Full Mana": [
+"explicit.stat_2313899959",
+"fractured.stat_2313899959"
+],
+"Hits against Nearby Enemies have #% increased Critical Strike Chance": [
+"explicit.stat_3896241826"
+],
+"Hits against Nearby Enemies have 50% increased Critical Strike Chance": [
+"explicit.stat_992435560"
+],
+"If you Consumed a corpse Recently, you and nearby Allies Regenerate #% of Life per second": [
+"explicit.stat_4089969970"
+],
+"If you have Blocked Recently, you and nearby Allies Regenerate #% of Life per second": [
+"explicit.stat_176085824"
+],
+"If you've Attacked Recently, you and nearby Allies have +#% Chance to Block Attack Damage": [
+"explicit.stat_1453771408"
+],
+"If you've Cast a Spell Recently, you and nearby Allies have +#% Chance to Block Spell Damage": [
+"explicit.stat_1952992278"
+],
+"If you've Warcried Recently, you and nearby allies have #% increased Attack, Cast and Movement Speed": [
+"explicit.stat_1464115829"
+],
+"Ignites you inflict deal Damage #% faster": [
+"explicit.stat_2443492284",
+"fractured.stat_2443492284",
+"implicit.stat_2443492284",
+"scourge.stat_2443492284"
+],
+"Ignites you inflict with Attacks deal Damage #% faster": [
+"explicit.stat_1420236871"
+],
+"Immortal Syndicate Members Executed in your Maps have #% chance to gain an additional Rank": [
+"explicit.stat_3615401038"
+],
+"Immortal Syndicate Members in your Maps are #% more\nlikely to offer to Bargain for Items": [
+"explicit.stat_1259656520"
+],
+"Immortal Syndicate Members in your Maps are #% more likely to be accompanied by their Leader": [
+"explicit.stat_1820067107"
+],
+"Immortal Syndicate Members in your Maps have #% chance to drop an additional Veiled Item": [
+"explicit.stat_4122946258"
+],
+"Immortal Syndicate Members in your Maps have #% increased chance to be accompanied by reinforcements": [
+"explicit.stat_2181411965"
+],
+"Inflict Fire, Cold and Lightning Exposure on nearby Enemies when used": [
+"explicit.stat_3933226405"
+],
+"Item sells for 2 additional Cartography Scarabs of every type (Tier 2)": [
+"crucible.mod_42738"
+],
+"Item sells for an additional Cartography Scarab of every type (Tier 1)": [
+"crucible.mod_48243"
+],
+"Karui Stone Hook": [
+"explicit.stat_2054162825",
+"fractured.stat_2054162825"
+],
+"Killing resident Architects in your Maps adds their Upgrade Tier to the surviving Architect's Room": [
+"explicit.stat_3052174721"
+],
+"Lifeforce dropped by Harvest Monsters in your Maps has #% chance to be Duplicated": [
+"explicit.stat_2591612078"
+],
+"Lifeforce dropped by Harvest Monsters in your Maps is Duplicated": [
+"enchant.stat_3250634678"
+],
+"Map Device has #% chance not to consume Scarabs": [
+"explicit.stat_4140427516"
+],
+"Map contains Al-Hezmin's Citadel\nItem Quantity increases amount of Rewards Al-Hezmin drops by 20% of its value": [
+"implicit.stat_2563183002|3"
+],
+"Map contains Baran's Citadel\nItem Quantity increases amount of Rewards Baran drops by 20% of its value": [
+"implicit.stat_2563183002|1"
+],
+"Map contains Drox's Citadel\nItem Quantity increases amount of Rewards Drox drops by 20% of its value": [
+"implicit.stat_2563183002|4"
+],
+"Map contains Veritania's Citadel\nItem Quantity increases amount of Rewards Veritania drops by 20% of its value": [
+"implicit.stat_2563183002|2"
+],
+"Nearby Allies gain #% increased Mana Regeneration Rate": [
+"explicit.stat_778848857"
+],
+"Nearby Allies gain #% of Life Regenerated per second": [
+"explicit.stat_3462673103"
+],
+"Nearby Allies have #% Chance to Block Attack Damage per 100 Strength you have": [
+"explicit.stat_3941641418"
+],
+"Nearby Allies have #% increased Cast Speed per 100 Intelligence you have": [
+"explicit.stat_2373999301"
+],
+"Nearby Allies have #% increased Defences per 100 Strength you have": [
+"explicit.stat_3767939384"
+],
+"Nearby Allies have #% increased Item Rarity": [
+"explicit.stat_1722463112"
+],
+"Nearby Allies have +# Fortification": [
+"explicit.stat_244825991"
+],
+"Nearby Allies have +#% to Critical Strike Multiplier": [
+"explicit.stat_3152714748"
+],
+"Nearby Allies have +#% to Critical Strike Multiplier per 100 Dexterity you have": [
+"explicit.stat_1438488526"
+],
+"Nearby Allies have Culling Strike": [
+"explicit.stat_1560540713"
+],
+"Nearby Allies' Action Speed cannot be modified to below Base Value": [
+"explicit.stat_1356468153"
+],
+"Nearby Allies' Damage with Hits is Lucky": [
+"explicit.stat_655871604"
+],
+"Nearby Enemies Convert #% of their Physical Damage to Fire": [
+"explicit.stat_3729324251"
+],
+"Nearby Enemies Killed by anyone count as being Killed by you instead": [
+"explicit.stat_2307982579",
+"implicit.stat_2307982579"
+],
+"Nearby Enemies are Blinded": [
+"explicit.stat_2826979740",
+"fractured.stat_2826979740",
+"implicit.stat_2826979740"
+],
+"Nearby Enemies are Blinded if 2 Redeemer Items are Equipped": [
+"explicit.stat_3844045281"
+],
+"Nearby Enemies are Blinded while Physical Aegis is not depleted": [
+"explicit.stat_2504709365"
+],
+"Nearby Enemies are Chilled": [
+"explicit.stat_2159555743",
+"explicit.stat_2480873346"
+],
+"Nearby Enemies are Covered in Ash": [
+"explicit.stat_746994389"
+],
+"Nearby Enemies are Crushed": [
+"implicit.stat_3608782127"
+],
+"Nearby Enemies are Crushed while you have at least # Rage": [
+"explicit.stat_3069588220"
+],
+"Nearby Enemies are Debilitated": [
+"explicit.stat_2006060276"
+],
+"Nearby Enemies are Hindered, with #% reduced Movement Speed": [
+"explicit.stat_607839150"
+],
+"Nearby Enemies are Intimidated": [
+"explicit.stat_2899095498"
+],
+"Nearby Enemies are Intimidated if 2 Warlord Items are Equipped": [
+"explicit.stat_1142276332"
+],
+"Nearby Enemies are Scorched": [
+"explicit.stat_3733114005",
+"implicit.stat_3733114005"
+],
+"Nearby Enemies are Unnerved": [
+"explicit.stat_1439308328"
+],
+"Nearby Enemies are Unnerved if 2 Elder Items are Equipped": [
+"explicit.stat_282325999"
+],
+"Nearby Enemies cannot deal Critical Strikes": [
+"explicit.stat_1177959871",
+"implicit.stat_1177959871"
+],
+"Nearby Enemies cannot gain Power, Frenzy or Endurance Charges": [
+"explicit.stat_4031527864"
+],
+"Nearby Enemies grant #% increased Flask Charges": [
+"explicit.stat_3547189490"
+],
+"Nearby Enemies have #% increased Effect of Curses on them": [
+"explicit.stat_443525707"
+],
+"Nearby Enemies have #% increased Fire and Cold Resistances": [
+"explicit.stat_4273356746"
+],
+"Nearby Enemies have #% reduced Stun and Block Recovery": [
+"explicit.stat_3169825297"
+],
+"Nearby Enemies have #% to all Resistances": [
+"explicit.stat_668145148",
+"implicit.stat_668145148"
+],
+"Nearby Enemies have +#% to Chaos Resistance": [
+"explicit.stat_1902595112",
+"fractured.stat_1902595112",
+"scourge.stat_1902595112"
+],
+"Nearby Enemies have +#% to Cold Resistance": [
+"explicit.stat_2674336304",
+"fractured.stat_2674336304",
+"scourge.stat_2674336304"
+],
+"Nearby Enemies have +#% to Fire Resistance": [
+"explicit.stat_3914021960",
+"fractured.stat_3914021960",
+"scourge.stat_3914021960"
+],
+"Nearby Enemies have +#% to Lightning Resistance": [
+"explicit.stat_1849749435",
+"fractured.stat_1849749435",
+"scourge.stat_1849749435"
+],
+"Nearby Enemies have Fire Exposure while at maximum Rage": [
+"explicit.stat_3952509108"
+],
+"Nearby Enemies have Lightning Resistance equal to yours": [
+"explicit.stat_3549734978"
+],
+"Nearby Enemies have Malediction": [
+"implicit.stat_2774148053"
+],
+"Nearby Enemies take #% increased Elemental Damage": [
+"explicit.stat_639595152",
+"fractured.stat_639595152"
+],
+"Nearby Enemies take #% increased Physical Damage": [
+"explicit.stat_415837237",
+"fractured.stat_415837237",
+"scourge.stat_415837237"
+],
+"Nearby Enemies take #% increased Physical Damage per two Fortification on you": [
+"explicit.stat_4187518631",
+"fractured.stat_4187518631"
+],
+"Nearby Enemies' Chaos Resistance is 0": [
+"explicit.stat_663080464"
+],
+"Nearby Enemy Monsters have at least #% of Life Reserved": [
+"explicit.stat_1063263585",
+"implicit.stat_1063263585"
+],
+"Nearby allies Recover #% of your Maximum Life when you Die": [
+"explicit.stat_3484267929",
+"implicit.stat_3484267929"
+],
+"Nearby allies gain #% increased Damage": [
+"explicit.stat_3175679225"
+],
+"Nearby stationary Enemies gain a Grasping Vine every second": [
+"explicit.stat_3469279727",
+"implicit.stat_3469279727"
+],
+"Plants Harvested in your Maps have #% chance to spawn duplicated Monsters": [
+"explicit.stat_2634325281"
+],
+"Players have #% increased Rarity of Items Found per 15 Rampage Kills": [
+"explicit.stat_1489997462"
+],
+"Players in Area take #% increased Damage per nearby Ally": [
+"explicit.stat_4045850340",
+"fractured.stat_4045850340"
+],
+"Poisons you inflict deal Damage #% faster": [
+"explicit.stat_2907156609",
+"fractured.stat_2907156609",
+"implicit.stat_2907156609",
+"scourge.stat_2907156609"
+],
+"Prefixes Cannot Be Changed": [
+"crafted.stat_2879723104",
+"explicit.stat_2879723104",
+"fractured.stat_2879723104"
+],
+"Projectiles Pierce all nearby Targets": [
+"explicit.stat_1284333657"
+],
+"Quicksilver Flasks you Use also apply to nearby Allies": [
+"explicit.stat_699756626",
+"implicit.stat_699756626"
+],
+"Rare Monsters in your Maps have # additional Modifier": [
+"explicit.stat_2550456553",
+"fractured.stat_2550456553"
+],
+"Rare Monsters in your Maps have #% increased chance to drop Scarabs per Monster Modifier affecting them": [
+"explicit.stat_829341851"
+],
+"Rare Scourge Monsters drop # additional Scarab": [
+"scourge.stat_2537141444"
+],
+"Reflect Shocks applied to you to all Nearby Enemies": [
+"explicit.stat_615884286"
+],
+"Regenerate # Energy Shield per second while a Rare or Unique Enemy is Nearby": [
+"crafted.stat_2238019079",
+"explicit.stat_2238019079",
+"fractured.stat_2238019079"
+],
+"Rerolling Favours at Ritual Altars in your Maps has no Cost the first # time": [
+"enchant.stat_2425554673"
+],
+"Rhoa Feather Lure": [
+"explicit.stat_3360430812",
+"fractured.stat_3360430812"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Abyss Scarabs": [
+"explicit.stat_1849225887"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Bestiary Scarabs": [
+"explicit.stat_9949109"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Betrayal Scarabs": [
+"explicit.stat_1048062553"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Blight Scarabs": [
+"explicit.stat_3866432319"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Expedition Scarabs": [
+"explicit.stat_46751559"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Incursion Scarabs": [
+"explicit.stat_1215465898"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Legion Scarabs": [
+"explicit.stat_1858240316"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Ritual Scarabs": [
+"explicit.stat_2810822634"
+],
+"Scarabs dropped in your Maps have #% increased chance to be Ultimatum Scarabs": [
+"explicit.stat_2263557454"
+],
+"Scarabs found in your Maps cannot be Abyss Scarabs": [
+"explicit.stat_1978710645"
+],
+"Scarabs found in your Maps cannot be Blight Scarabs": [
+"explicit.stat_785938790"
+],
+"Scarabs found in your Maps cannot be Breach Scarabs": [
+"explicit.stat_1089629910"
+],
+"Scarabs found in your Maps cannot be Expedition Scarabs": [
+"explicit.stat_3965835074"
+],
+"Scarabs found in your Maps cannot be Legion Scarabs": [
+"explicit.stat_3777973541"
+],
+"Scarabs found in your Maps cannot be Ritual Scarabs": [
+"explicit.stat_1693489030"
+],
+"Scarabs found in your Maps cannot be Ultimatum Scarabs": [
+"explicit.stat_264552782"
+],
+"Share Endurance Charges with nearby party members": [
+"explicit.stat_1881314095",
+"implicit.stat_1881314095"
+],
+"Shock nearby Enemies for # Seconds when you Focus": [
+"crafted.stat_3031766858",
+"explicit.stat_3031766858",
+"fractured.stat_3031766858"
+],
+"Shocks nearby Enemies during Effect, causing 10% increased Damage taken": [
+"explicit.stat_3446170049"
+],
+"Suffixes Cannot Be Changed": [
+"crafted.stat_3464137628",
+"explicit.stat_3464137628",
+"fractured.stat_3464137628"
+],
+"Taunts nearby Enemies on use": [
+"implicit.stat_2005503156"
+],
+"This Area's Modifiers to Quantity of Items found also apply to Rarity": [
+"explicit.stat_436556261",
+"fractured.stat_436556261"
+],
+"Totems Reflect #% of their maximum Life as Fire Damage to nearby Enemies when Hit": [
+"explicit.stat_1723061251",
+"implicit.stat_1723061251"
+],
+"Trigger Level # Stalking Pustule on Kill": [
+"enchant.stat_1662669872",
+"explicit.stat_1662669872"
+],
+"Trigger Level 20 Stance Swap when you Attack with Perforate or Lacerate (Tier 1)": [
+"crucible.mod_42448"
+],
+"Unique Monsters in your Maps have #% increased chance to drop Scarabs": [
+"explicit.stat_3190161627"
+],
+"When a nearby Minion dies, gain Rotten Bulwark equal to #% of its maximum Life": [
+"explicit.stat_1960869129"
+],
+"When you Kill a Shocked Enemy, inflict an equivalent Shock on each nearby Enemy": [
+"enchant.stat_3462132936",
+"explicit.stat_3462132936"
+],
+"When you Kill an Ignited Enemy, inflict an equivalent Ignite on each nearby Enemy": [
+"enchant.stat_2638352064",
+"explicit.stat_2638352064"
+],
+"While a Pinnacle Atlas Boss is in your Presence, Bleeding you inflict deals Damage #% faster": [
+"implicit.stat_4106235309"
+],
+"While a Pinnacle Atlas Boss is in your Presence, Ignites you inflict deal Damage #% faster": [
+"implicit.stat_1053495752"
+],
+"While a Pinnacle Atlas Boss is in your Presence, Poisons you inflict deal Damage #% faster": [
+"implicit.stat_995369618"
+],
+"While a Unique Enemy is in your Presence, Bleeding you inflict deals Damage #% faster": [
+"implicit.stat_738837643"
+],
+"While a Unique Enemy is in your Presence, Ignites you inflict deal Damage #% faster": [
+"implicit.stat_2349328837"
+],
+"While a Unique Enemy is in your Presence, Poisons you inflict deal Damage #% faster": [
+"implicit.stat_3828039449"
+],
+"While there are at least five nearby Allies, you and nearby Allies have Onslaught": [
+"explicit.stat_3730497630"
+],
+"With at least 40 Strength in Radius, #% increased\nRarity of Items dropped by Enemies Shattered by Glacial Hammer": [
+"explicit.stat_1250317014"
+],
+"With at least 40 Strength in Radius, Cleave has +0.1 metres to Radius per Nearby\nEnemy, up to a maximum of +1 metre": [
+"explicit.stat_1539696482",
+"fractured.stat_1539696482"
+],
+"With at least 40 Strength in Radius, Hits with Vigilant Strike Fortify you and Nearby Allies for # seconds": [
+"explicit.stat_530280833"
+],
+"You and Nearby Allies have # to # added Chaos Damage per White Socket": [
+"explicit.stat_3232695173"
+],
+"You and Nearby Allies have # to # added Cold Damage per Green Socket": [
+"explicit.stat_2665149933"
+],
+"You and Nearby Allies have # to # added Fire Damage per Red Socket": [
+"explicit.stat_1666896662"
+],
+"You and Nearby Allies have # to # added Lightning Damage per Blue Socket": [
+"enchant.stat_3726585224",
+"explicit.stat_3726585224"
+],
+"You and Nearby Allies have #% increased Item Rarity": [
+"explicit.stat_549203380"
+],
+"You and nearby Allies deal #% increased Damage": [
+"implicit.stat_1419713278"
+],
+"You and nearby Allies have +#% to Elemental Resistances": [
+"explicit.stat_319842716"
+],
+"You and nearby Allies have 30% increased Mana Regeneration Rate": [
+"explicit.stat_2936084533",
+"implicit.stat_2936084533"
+],
+"You and nearby allies gain #% increased Damage": [
+"explicit.stat_637766438",
+"implicit.stat_637766438"
+],
+"You grant # Frenzy Charges to allies on Death": [
+"explicit.stat_2105456174"
+],
+"You have Acceleration Shrine Buff while affected by no Flasks": [
+"explicit.stat_845062586"
+],
+"You have Brutal Shrine Buff while affected by no Flasks": [
+"explicit.stat_1665800734"
+],
+"You have Diamond Shrine Buff while affected by no Flasks": [
+"explicit.stat_1962944794"
+],
+"You have Echoing Shrine Buff while affected by no Flasks": [
+"explicit.stat_1941745370"
+],
+"You have Gloom Shrine Buff while affected by no Flasks": [
+"explicit.stat_1525347447"
+],
+"You have Greater Freezing Shrine Buff while affected by no Flasks": [
+"explicit.stat_3677336814"
+],
+"You have Greater Shocking Shrine Buff while affected by no Flasks": [
+"explicit.stat_1838429243"
+],
+"You have Greater Skeletal Shrine Buff while affected by no Flasks": [
+"explicit.stat_3878995435"
+],
+"You have Impenetrable Shrine Buff while affected by no Flasks": [
+"explicit.stat_1451444229"
+],
+"You have Massive Shrine Buff while affected by no Flasks": [
+"explicit.stat_3810260531"
+],
+"You have Replenishing Shrine Buff while affected by no Flasks": [
+"explicit.stat_2752009372"
+],
+"You have Resistance Shrine Buff while affected by no Flasks": [
+"explicit.stat_3934633832"
+],
+"You have Resonating Shrine Buff while affected by no Flasks": [
+"explicit.stat_736980450"
+],
+"Your Maps have # additional random Modifier": [
+"explicit.stat_588512487"
+],
+"Your Mark Transfers to another Enemy when Marked Enemy dies": [
+"explicit.stat_1104120660"
+],
+"Your nearby party members maximum Endurance Charges is equal to yours": [
+"explicit.stat_598215770"
+]
+}

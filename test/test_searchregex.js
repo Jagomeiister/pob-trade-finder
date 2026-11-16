@@ -16,12 +16,12 @@ function check(name, cond, detail) {
 
 // at least n: exact on whole numbers, safe after ".*"
 for (let n = 1; n <= 1200; n++) {
-  const re = atLeastRegex(n), whole = new RegExp('^' + re + '$'), loose = new RegExp('m q.*' + re + '%', 'i');
+  const re = atLeastRegex(n), whole = new RegExp('^' + re + '$'), loose = new RegExp('as drops:.*' + re + '%', 'i');
   let bad = null;
   for (let v = 0; v <= 2500 && !bad; v++) {
     // whole-number form: \d{L+1} stands for "more digits", so only check numbers of n's length or one more
     if (String(v).length <= String(n).length + 1 && whole.test(String(v)) !== (v >= n)) bad = ['whole', v];
-    if (loose.test('Item Quantity: +' + v + '% (augmented)') !== (v >= n)) bad = ['after .*', v];
+    if (loose.test('Atlas Drops: +' + v + '% (augmented)') !== (v >= n)) bad = ['after .*', v];
   }
   check('atLeastRegex(' + n + ') = ' + re, !bad, bad);
 }
@@ -54,13 +54,14 @@ check('round to tens', searchRound(87, true) === 80 && searchRound(87, false) ==
 // maps: totals and state
 const mt = mapSearchText({ picks: { abc: 'avoid', def: 'want' }, yields: { quant: 80, pack: 25 }, quality: {}, rarity: { rare: true },
   types: {}, corrupted: 'no' });
-check('map search parts', mt === '"!abc" "def" "m q.*([8-9]\\d|\\d{3})%" "k size:.*(2[5-9]|[3-9]\\d|\\d{3})%" "y: (r)" "!^corrupted$"', mt);
-const MAP = 'Item Class: Maps\nRarity: Rare\nDread Paradise\nCrater Map\nMap Tier: 16\nItem Quantity: +85% (augmented)\n' +
+check('map search parts', mt === '"!abc" "def" "as drops:.*([8-9]\\d|\\d{3})%" "k size:.*(2[5-9]|[3-9]\\d|\\d{3})%" "y: (r)" "!^corrupted$"', mt);
+const MAP = 'Item Class: Maps\nRarity: Rare\nDread Paradise\nCrater Map\nMap Tier: 16\nAtlas Drops: +85% (augmented)\n' +
   'Item Rarity: +45% (augmented)\nMonster Pack Size: +30% (augmented)\nQuality (Pack Size): +20% (augmented)\n' +
-  'More Maps: +40% (augmented)\nMore Scarabs: +10% (augmented)\nMore Currency: +12% (augmented)\nItem Level: 83';
+  'More Maps: +40% (augmented)\nMore Threads: +10% (augmented)\nQuality (Threads): +20% (augmented)\nMore Currency: +12% (augmented)\nItem Quantity: +95% (augmented)\n' +
+  'Item Level: 83';
 function hits(term, text) { return new RegExp(term.replace(/^"|"$/g, ''), 'im').test(text); }
-check('quantity 80 finds 85', hits(mapSearchText({ yields: { quant: 80 } }), MAP));
-check('quantity 90 skips 85', !hits(mapSearchText({ yields: { quant: 90 } }), MAP));
+check('Atlas Drops 80 finds 85', hits(mapSearchText({ yields: { quant: 80 } }), MAP));
+check('Atlas Drops 90 skips 85 (Item Quantity +95 does not count)', !hits(mapSearchText({ yields: { quant: 90 } }), MAP));
 check('pack size 30 finds +30 (not the quality line)', hits(mapSearchText({ yields: { pack: 30 } }), MAP));
 check('pack size 31 skips (quality 20 stays out)', !hits(mapSearchText({ yields: { pack: 31 } }), MAP) &&
   !hits(mapSearchText({ yields: { pack: 15 } }), MAP.replace('Monster Pack Size: +30%', 'Monster Pack Size: +10%')));
@@ -69,6 +70,9 @@ check('more currency 12 vs quality', hits(mapSearchText({ yields: { currency: 12
   !hits(mapSearchText({ yields: { currency: 13 } }), MAP));
 check('rarity 45 vs "Rarity: Rare"', hits(mapSearchText({ yields: { rarity: 45 } }), MAP) && !hits(mapSearchText({ yields: { rarity: 46 } }), MAP));
 check('quality (pack size) 20', hits(mapSearchText({ quality: { pack: 20 } }), MAP) && !hits(mapSearchText({ quality: { pack: 21 } }), MAP));
+check('more threads 10 (not Quality (Threads) 20)', hits(mapSearchText({ yields: { scarabs: 10 } }), MAP) &&
+  !hits(mapSearchText({ yields: { scarabs: 11 } }), MAP));
+check('quality (threads) 20', hits(mapSearchText({ quality: { scarabs: 20 } }), MAP) && !hits(mapSearchText({ quality: { scarabs: 21 } }), MAP));
 check('plain quality skips typed quality', !hits(mapSearchText({ quality: { plain: 5 } }), MAP));
 check('map price note', hits(mapSearchText({ priceOn: true, priceMin: 5, priceMax: 20 }), MAP + '\nNote: ~price 15 chaos') &&
   !hits(mapSearchText({ priceOn: true, priceMin: 5, priceMax: 20 }), MAP + '\nNote: ~price 25 chaos'));

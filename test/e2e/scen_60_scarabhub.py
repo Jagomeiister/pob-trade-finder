@@ -3,13 +3,21 @@ Loaded by run_e2e.py (_extra_scenarios). Prices come from the mech_prices stub: 
 item at a fixed price, Ambush Scarab of Containment 30c, Horned Scarab of Bloodlines 50c,
 Divine Orb 200c, no icons."""
 import json
+import os
 import urllib.parse
 
 TAG = "60 scarabhub"
 
+# The hub is a 3.29 tool (3.30 removed scarabs; the test clock sits before launch), so it runs on
+# the 3.29 atlas strategies and profit lines, frozen here: the shipped guide's 3.30 update rewrote them.
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "atlas-3.29.json"),
+          encoding="utf-8") as _f:
+    ATLAS_329 = json.dumps(json.load(_f), ensure_ascii=False)
+
 # open Cheat sheets -> Scarabs; both tools sit at the top of that sheet
 OPEN = r"""
 const H = window.__e2e;
+Object.assign(window.POE_GUIDES.guides.atlas, __ATLAS_329__);
 // these steps test the atlas guide's strategies (the fallback): no tool-data strategies unless a
 // script sets its own (S60_TOOLS)
 if (!window.__e2eKeepTools) window.POE_GUIDES.tools = null;
@@ -42,6 +50,8 @@ const pickStrategy = async (sel, name, answer) => {
   return null;
 };
 """
+
+OPEN = OPEN.replace("__ATLAS_329__", ATLAS_329)
 
 S60_HUB = OPEN + r"""
 const out = {};

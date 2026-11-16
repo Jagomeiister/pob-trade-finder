@@ -75,7 +75,7 @@ function searchEscape(text) { return String(text).replace(/[.*+?^${}()|[\]\\]/g,
 function buildSearchText(s) {
   var parts = [searchNone(s.avoid || [])];
   if ((s.want || []).length) parts.push(s.wantAll ? searchAll(s.want) : searchAny(s.want));
-  if (s.quant) parts.push(searchQuote('m q.*' + atLeastRegex(s.quant) + '%'));
+  if (s.quant) parts.push(searchQuote('as drops:.*' + atLeastRegex(s.quant) + '%'));
   return searchJoin(parts);
 }
 
@@ -376,17 +376,18 @@ function makeSearchText() {
 // ==== Maps ===============================================================================
 // Data: data/mapmods.js (tools/make_mapmods.py): each map mod with the shortest piece of its
 // text that no other map mod has (no digits, so every roll matches).
-// The totals a map shows: "Item Quantity: +80%", "Monster Pack Size: +30%", "More Maps: +40%"…
+// The totals a map shows: "Atlas Drops: +80%" (Item Quantity before 3.30), "Monster Pack Size: +30%",
+// "More Maps: +40%", "More Threads: +12%" (More Scarabs before 3.30)…
 // each anchor matches only its own line (a quality type reads "Quality (Pack Size): +20%").
 var MAP_YIELDS = [
-  ['quant', 'Item quantity', 'm q'], ['pack', 'Pack size', 'k size:'], ['rarity', 'Item rarity', 'm rarity:'],
-  ['maps', 'More maps', 're maps:'], ['currency', 'More currency', 'currency:'], ['scarabs', 'More scarabs', 'scarabs:'],
+  ['quant', 'Atlas drops', 'as drops:'], ['pack', 'Pack size', 'k size:'], ['rarity', 'Item rarity', 'm rarity:'],
+  ['maps', 'More maps', 're maps:'], ['currency', 'More currency', 'currency:'], ['scarabs', 'More threads', 're threads:'],
   ['div', 'More div cards', 'n cards:']
 ];
 var MAP_QUALITY = [
   ['plain', 'Quality', 'quality: \\+'], ['pack', 'Quality (pack size)', 'quality.*pack'],
   ['rarity', 'Quality (rarity)', 'quality.*rarity'], ['currency', 'Quality (currency)', 'quality.*currency'],
-  ['div', 'Quality (div cards)', 'quality.*divination'], ['scarabs', 'Quality (scarabs)', 'quality.*scarab']
+  ['div', 'Quality (div cards)', 'quality.*divination'], ['scarabs', 'Quality (threads)', 'quality.*thread']
 ];
 var MAP_TYPES = [
   ['shaper', 'Shaper', 'the shaper'], ['elder', 'Elder', 'the elder'], ['originator', 'Originator', 'originator'],
@@ -440,7 +441,7 @@ registerSearchTab({
     yb.appendChild(searchCheck('Any one of these is enough', m.anyYield, function (v) { m.anyYield = v; ctx.out(); }));
     yb.appendChild(searchCheck('Shorter numbers', m.short, function (v) { m.short = v; ctx.out(); },
       'Rounds each minimum down to tens: shorter search, a few more maps light up'));
-    body.appendChild(searchSection('Totals (quantity, pack size, more maps…)', yb, true));
+    body.appendChild(searchSection('Totals (Atlas Drops, pack size, more maps…)', yb, true));
     // quality, state, types, price
     var qb = UI.el('div', 'st-controls');
     MAP_QUALITY.forEach(function (d) {

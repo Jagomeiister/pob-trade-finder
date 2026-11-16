@@ -1,0 +1,752 @@
+{
+"veiled-scarab": {
+"id": "Metadata/Items/Currency/CurrencyStackedScarab",
+"name": "Veiled Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdGFja2VkU2NhcmFiIiwic2NhbGUiOjF9XQ/4674c86ff2/StackedScarab.png",
+"cat": "Currency"
+},
+"titanic-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabUniquesNew1",
+"name": "Titanic Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJVbmlxdWUiLCJzY2FsZSI6MX1d/9ed658ddba/LesserScarabUnique.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"titanic-scarab-of-treasures": {
+"id": "Metadata/Items/Scarabs/ScarabUniquesNew2",
+"name": "Titanic Scarab of Treasures",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJVbmlxdWUiLCJzY2FsZSI6MX1d/e2945f5878/NormalScarabUnique.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"titanic-scarab-of-legend": {
+"id": "Metadata/Items/Scarabs/ScarabUniquesNew3",
+"name": "Titanic Scarab of Legend",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiVW5pcXVlIiwic2NhbGUiOjF9XQ/0194f878a0/GreaterScarabUnique.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"sulphite-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabSulphiteNew1",
+"name": "Sulphite Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJTdWxwaGl0ZSIsInNjYWxlIjoxfV0/9bdde2cec0/LesserScarabSulphite.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"sulphite-scarab-of-greed": {
+"id": "Metadata/Items/Scarabs/ScarabSulphiteNew2",
+"name": "Sulphite Scarab of Greed",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJTdWxwaGl0ZSIsInNjYWxlIjoxfV0/8121093ec0/NormalScarabSulphite.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"sulphite-scarab-of-fumes": {
+"id": "Metadata/Items/Scarabs/ScarabSulphiteNew3",
+"name": "Sulphite Scarab of Fumes",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiU3VscGhpdGUiLCJzY2FsZSI6MX1d/55c0fed4b6/GreaterScarabSulphite.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"divination-scarab-of-the-cloister": {
+"id": "Metadata/Items/Scarabs/ScarabDivinationCardsNew1",
+"name": "Divination Scarab of The Cloister",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJEaXZpbmF0aW9uIiwic2NhbGUiOjF9XQ/20ff060a8d/LesserScarabDivination.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"divination-scarab-of-plenty": {
+"id": "Metadata/Items/Scarabs/ScarabDivinationCardsNew2",
+"name": "Divination Scarab of Plenty",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJEaXZpbmF0aW9uIiwic2NhbGUiOjF9XQ/acb5d1754a/NormalScarabDivination.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"divination-scarab-of-pilfering": {
+"id": "Metadata/Items/Scarabs/ScarabDivinationCardsNew3",
+"name": "Divination Scarab of Pilfering",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiRGl2aW5hdGlvbiIsInNjYWxlIjoxfV0/73ab11f6bd/GreaterScarabDivination.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"torment-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabTormentNew1",
+"name": "Torment Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJUb3JtZW50Iiwic2NhbGUiOjF9XQ/8c43bf8c64/LesserScarabTorment.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"torment-scarab-of-peculiarity": {
+"id": "Metadata/Items/Scarabs/ScarabTormentNew2",
+"name": "Torment Scarab of Peculiarity",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJUb3JtZW50Iiwic2NhbGUiOjF9XQ/4c94a84fd8/NormalScarabTorment.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"torment-scarab-of-release": {
+"id": "Metadata/Items/Scarabs/ScarabTormentNew3",
+"name": "Torment Scarab of Release",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiVG9ybWVudCIsInNjYWxlIjoxfV0/548c57abc3/GreaterScarabTorment.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"torment-scarab-of-possession": {
+"id": "Metadata/Items/Scarabs/ScarabTormentNew4",
+"name": "Torment Scarab of Possession",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYlRvcm1lbnQiLCJzY2FsZSI6MX1d/5b3bed9d3d/Tier4ScarabTorment.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"anarchy-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabAnarchy1",
+"name": "Anarchy Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJBbmFyY2h5Iiwic2NhbGUiOjF9XQ/73d1ee9b23/LesserScarabAnarchy.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"anarchy-scarab-of-gigantification": {
+"id": "Metadata/Items/Scarabs/ScarabAnarchy2",
+"name": "Anarchy Scarab of Gigantification",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJBbmFyY2h5Iiwic2NhbGUiOjF9XQ/d391e90e68/NormalScarabAnarchy.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"anarchy-scarab-of-partnership": {
+"id": "Metadata/Items/Scarabs/ScarabAnarchy3",
+"name": "Anarchy Scarab of Partnership",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiQW5hcmNoeSIsInNjYWxlIjoxfV0/4697e57871/GreaterScarabAnarchy.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"anarchy-scarab-of-the-exceptional": {
+"id": "Metadata/Items/Scarabs/ScarabAnarchy4",
+"name": "Anarchy Scarab of the Exceptional",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkFuYXJjaHkiLCJzY2FsZSI6MX1d/3f5f6a8671/Tier4ScarabAnarchy.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ritual-scarab-of-selectiveness": {
+"id": "Metadata/Items/Scarabs/ScarabRitual1",
+"name": "Ritual Scarab of Selectiveness",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJSaXR1YWwiLCJzY2FsZSI6MX1d/08f82dab28/LesserScarabRitual.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ritual-scarab-of-wisps": {
+"id": "Metadata/Items/Scarabs/ScarabRitual2",
+"name": "Ritual Scarab of Wisps",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJSaXR1YWwiLCJzY2FsZSI6MX1d/f2c3231213/NormalScarabRitual.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ritual-scarab-of-abundance": {
+"id": "Metadata/Items/Scarabs/ScarabRitual3",
+"name": "Ritual Scarab of Abundance",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiUml0dWFsIiwic2NhbGUiOjF9XQ/a990c91de5/GreaterScarabRitual.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ritual-scarab-of-corpses": {
+"id": "Metadata/Items/Scarabs/ScarabRitual4",
+"name": "Ritual Scarab of Corpses",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYlJpdHVhbCIsInNjYWxlIjoxfV0/323f689e68/Tier4ScarabRitual.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"harvest-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabHarvest1",
+"name": "Harvest Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJIYXJ2ZXN0Iiwic2NhbGUiOjF9XQ/976dcf6526/LesserScarabHarvest.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"harvest-scarab-of-doubling": {
+"id": "Metadata/Items/Scarabs/ScarabHarvest2",
+"name": "Harvest Scarab of Doubling",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiSGFydmVzdCIsInNjYWxlIjoxfV0/6077972903/GreaterScarabHarvest.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"harvest-scarab-of-cornucopia": {
+"id": "Metadata/Items/Scarabs/ScarabHarvest3",
+"name": "Harvest Scarab of Cornucopia",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkhhcnZlc3QiLCJzY2FsZSI6MX1d/35e8847de2/Tier4ScarabHarvest.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"bestiary-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabBeastsNew1",
+"name": "Bestiary Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJCZWFzdHMiLCJzY2FsZSI6MX1d/a13711c8ed/LesserScarabBeasts.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"bestiary-scarab-of-the-herd": {
+"id": "Metadata/Items/Scarabs/ScarabBeastsNew2",
+"name": "Bestiary Scarab of the Herd",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJCZWFzdHMiLCJzY2FsZSI6MX1d/0d5c9d2d30/NormalScarabBeasts.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"bestiary-scarab-of-duplicating": {
+"id": "Metadata/Items/Scarabs/ScarabBeastsNew3",
+"name": "Bestiary Scarab of Duplicating",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiQmVhc3RzIiwic2NhbGUiOjF9XQ/09caa391c6/GreaterScarabBeasts.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"bestiary-scarab-of-the-shadowed-crow": {
+"id": "Metadata/Items/Scarabs/ScarabBeastsNew4",
+"name": "Bestiary Scarab of the Shadowed Crow",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkJlYXN0cyIsInNjYWxlIjoxfV0/c8a03d1108/Tier4ScarabBeasts.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"influencing-scarab-of-the-shaper": {
+"id": "Metadata/Items/Scarabs/ScarabInfluenceNew1",
+"name": "Influencing Scarab of the Shaper",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJTaGFwZXIiLCJzY2FsZSI6MX1d/caf0ac9307/LesserScarabShaper.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"influencing-scarab-of-the-elder": {
+"id": "Metadata/Items/Scarabs/ScarabInfluenceNew2",
+"name": "Influencing Scarab of the Elder",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJFbGRlciIsInNjYWxlIjoxfV0/8828d3f4eb/LesserScarabElder.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"influencing-scarab-of-hordes": {
+"id": "Metadata/Items/Scarabs/ScarabInfluenceNew3",
+"name": "Influencing Scarab of Hordes",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiRWxkZXIiLCJzY2FsZSI6MX1d/660528eb40/GreaterScarabElder.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"influencing-scarab-of-conversion": {
+"id": "Metadata/Items/Scarabs/ScarabInfluenceNew4",
+"name": "Influencing Scarab of Interference",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYlNoYXBlciIsInNjYWxlIjoxfV0/320c05daeb/Tier4ScarabShaper.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"trarthan-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabMercenaries1",
+"name": "Trarthan Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJNZXJjZW5hcmllcyIsInNjYWxlIjoxfV0/2d075bbafc/LesserScarabMercenaries.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"trarthan-scarab-of-infamy": {
+"id": "Metadata/Items/Scarabs/ScarabMercenaries2",
+"name": "Trarthan Scarab of Infamy",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJNZXJjZW5hcmllcyIsInNjYWxlIjoxfV0/f880a011d3/NormalScarabMercenaries.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"trarthan-scarab-of-renown": {
+"id": "Metadata/Items/Scarabs/ScarabMercenaries3",
+"name": "Trarthan Scarab of Renown",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiTWVyY2VuYXJpZXMiLCJzY2FsZSI6MX1d/552723764a/GreaterScarabMercenaries.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"trarthan-scarab-of-surprising-alliances": {
+"id": "Metadata/Items/Scarabs/ScarabMercenaries4",
+"name": "Trarthan Scarab of Surprising Alliances",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYk1lcmNlbmFyaWVzIiwic2NhbGUiOjF9XQ/ec12948f39/Tier4ScarabMercenaries.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"abyss-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabAbyssNew1",
+"name": "Abyss Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJBYnlzcyIsInNjYWxlIjoxfV0/05f3ac3c5c/LesserScarabAbyss.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"abyss-scarab-of-multitudes": {
+"id": "Metadata/Items/Scarabs/ScarabAbyssNew2",
+"name": "Abyss Scarab of Multitudes",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJBYnlzcyIsInNjYWxlIjoxfV0/e28a53e1a0/NormalScarabAbyss.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"abyss-scarab-of-descending": {
+"id": "Metadata/Items/Scarabs/ScarabAbyssNew3",
+"name": "Abyss Scarab of Descending",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkFieXNzIiwic2NhbGUiOjF9XQ/c1d1da69d6/Tier4ScarabAbyss.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"abyss-scarab-of-crystals": {
+"id": "Metadata/Items/Scarabs/ScarabAbyssNew4",
+"name": "Abyss Scarab of Crystals",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiQWJ5c3MiLCJzY2FsZSI6MX1d/84851bd122/GreaterScarabAbyss.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"abyss-scarab-of-the-consort": {
+"id": "Metadata/Items/Scarabs/ScarabAbyssNew5",
+"name": "Abyss Scarab of the Consort",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRUaWVyNFNjYXJhYkFieXNzIiwic2NhbGUiOjF9XQ/b40fb2422b/AltTier4ScarabAbyss.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"essence-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabEssence1",
+"name": "Essence Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJFc3NlbmNlIiwic2NhbGUiOjF9XQ/4c99af0610/LesserScarabEssence.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"essence-scarab-of-ascent": {
+"id": "Metadata/Items/Scarabs/ScarabEssence2",
+"name": "Essence Scarab of Ascent",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJFc3NlbmNlIiwic2NhbGUiOjF9XQ/3a091b8052/NormalScarabEssence.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"essence-scarab-of-stability": {
+"id": "Metadata/Items/Scarabs/ScarabEssence3",
+"name": "Essence Scarab of Stability",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiRXNzZW5jZSIsInNjYWxlIjoxfV0/28e74041a5/GreaterScarabEssence.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"essence-scarab-of-calcification": {
+"id": "Metadata/Items/Scarabs/ScarabEssence4",
+"name": "Essence Scarab of Calcification",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkVzc2VuY2UiLCJzY2FsZSI6MX1d/d7e7534a07/Tier4ScarabEssence.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"essence-scarab-of-adaptation": {
+"id": "Metadata/Items/Scarabs/ScarabEssence5",
+"name": "Essence Scarab of Adaptation",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRUaWVyNFNjYXJhYkVzc2VuY2UiLCJzY2FsZSI6MX1d/56560d691e/AltTier4ScarabEssence.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"domination-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabDomination1",
+"name": "Domination Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJEb21pbmF0aW9uIiwic2NhbGUiOjF9XQ/76cedf832c/LesserScarabDomination.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"domination-scarab-of-apparitions": {
+"id": "Metadata/Items/Scarabs/ScarabDomination2",
+"name": "Domination Scarab of Apparitions",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJEb21pbmF0aW9uIiwic2NhbGUiOjF9XQ/c907d44dec/NormalScarabDomination.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"domination-scarab-of-evolution": {
+"id": "Metadata/Items/Scarabs/ScarabDomination3",
+"name": "Domination Scarab of Evolution",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiRG9taW5hdGlvbiIsInNjYWxlIjoxfV0/8913234164/GreaterScarabDomination.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"domination-scarab-of-terrors": {
+"id": "Metadata/Items/Scarabs/ScarabDomination4",
+"name": "Domination Scarab of Terrors",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkRvbWluYXRpb24iLCJzY2FsZSI6MX1d/0d55e72414/Tier4ScarabDomination.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"incursion-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabIncursion1",
+"name": "Incursion Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJJbmN1cnNpb24iLCJzY2FsZSI6MX1d/4afd758a13/LesserScarabIncursion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"incursion-scarab-of-invasion": {
+"id": "Metadata/Items/Scarabs/ScarabIncursion2",
+"name": "Incursion Scarab of Invasion",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJJbmN1cnNpb24iLCJzY2FsZSI6MX1d/a38b517f35/NormalScarabIncursion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"incursion-scarab-of-champions": {
+"id": "Metadata/Items/Scarabs/ScarabIncursion3",
+"name": "Incursion Scarab of Champions",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiSW5jdXJzaW9uIiwic2NhbGUiOjF9XQ/ff92bda004/GreaterScarabIncursion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"incursion-scarab-of-timelines": {
+"id": "Metadata/Items/Scarabs/ScarabIncursion4",
+"name": "Incursion Scarab of Timelines",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkluY3Vyc2lvbiIsInNjYWxlIjoxfV0/748b10e2cf/Tier4ScarabIncursion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"betrayal-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabBetrayal1",
+"name": "Betrayal Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJCZXRyYXlhbCIsInNjYWxlIjoxfV0/d53970be47/LesserScarabBetrayal.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"betrayal-scarab-of-the-allflame": {
+"id": "Metadata/Items/Scarabs/ScarabBetrayal2",
+"name": "Betrayal Scarab of the Allflame",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJCZXRyYXlhbCIsInNjYWxlIjoxfV0/3e4a843098/NormalScarabBetrayal.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"betrayal-scarab-of-reinforcements": {
+"id": "Metadata/Items/Scarabs/ScarabBetrayal3",
+"name": "Betrayal Scarab of Reinforcements",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiQmV0cmF5YWwiLCJzY2FsZSI6MX1d/7dd831f857/GreaterScarabBetrayal.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"betrayal-scarab-of-perpetuation": {
+"id": "Metadata/Items/Scarabs/ScarabBetrayal4",
+"name": "Betrayal Scarab of Unbreaking",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkJldHJheWFsIiwic2NhbGUiOjF9XQ/4290457e94/Tier4ScarabBetrayal.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"blight-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabBlightNew1",
+"name": "Blight Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJCbGlnaHQiLCJzY2FsZSI6MX1d/401222e4f4/LesserScarabBlight.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"blight-scarab-of-bounty": {
+"id": "Metadata/Items/Scarabs/ScarabBlightNew2",
+"name": "Blight Scarab of Bounty",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJCbGlnaHQiLCJzY2FsZSI6MX1d/de78905e90/NormalScarabBlight.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"blight-scarab-of-the-blightheart": {
+"id": "Metadata/Items/Scarabs/ScarabBlightNew3",
+"name": "Blight Scarab of the Blightheart",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiQmxpZ2h0Iiwic2NhbGUiOjF9XQ/d0aa6a6d55/GreaterScarabBlight.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"blight-scarab-of-blooming": {
+"id": "Metadata/Items/Scarabs/ScarabBlightNew4",
+"name": "Blight Scarab of Blooming",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkJsaWdodCIsInNjYWxlIjoxfV0/7ecd3dcebc/Tier4ScarabBlight.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"blight-scarab-of-invigoration": {
+"id": "Metadata/Items/Scarabs/ScarabBlightNew5",
+"name": "Blight Scarab of Invigoration",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRUaWVyNFNjYXJhYkJsaWdodCIsInNjYWxlIjoxfV0/34e07da01c/AltTier4ScarabBlight.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"breach-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabBreachNew1",
+"name": "Breach Scarab of the Hive",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJCcmVhY2giLCJzY2FsZSI6MX1d/769139d13b/LesserScarabBreach.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"breach-scarab-of-the-dreamer": {
+"id": "Metadata/Items/Scarabs/ScarabBreachNew2",
+"name": "Breach Scarab of the Dreamer",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJCcmVhY2giLCJzY2FsZSI6MX1d/d8bc60711f/NormalScarabBreach.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"breach-scarab-of-lordship": {
+"id": "Metadata/Items/Scarabs/ScarabBreachNew3",
+"name": "Breach Scarab of Instability",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRMZXNzZXJTY2FyYWJCcmVhY2giLCJzY2FsZSI6MX1d/91af1cf6e9/AltLesserScarabBreach.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"breach-scarab-of-splintering": {
+"id": "Metadata/Items/Scarabs/ScarabBreachNew4",
+"name": "Breach Scarab of the Marshal",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHROb3JtYWxTY2FyYWJCcmVhY2giLCJzY2FsZSI6MX1d/864e785561/AltNormalScarabBreach.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"breach-scarab-of-snares": {
+"id": "Metadata/Items/Scarabs/ScarabBreachNew5",
+"name": "Breach Scarab of the Incensed Swarm",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkJyZWFjaCIsInNjYWxlIjoxfV0/2e4da41035/Tier4ScarabBreach.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"breach-scarab-of-resonant-cascade": {
+"id": "Metadata/Items/Scarabs/ScarabBreachNew6",
+"name": "Breach Scarab of Resonant Cascade",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRUaWVyNFNjYXJhYkJyZWFjaCIsInNjYWxlIjoxfV0/d6fe5cdce6/AltTier4ScarabBreach.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"legion-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabLegionNew1",
+"name": "Legion Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJMZWdpb24iLCJzY2FsZSI6MX1d/e7b6e5659c/LesserScarabLegion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"legion-scarab-of-officers": {
+"id": "Metadata/Items/Scarabs/ScarabLegionNew2",
+"name": "Legion Scarab of Officers",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJMZWdpb24iLCJzY2FsZSI6MX1d/986b842d3f/NormalScarabLegion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"legion-scarab-of-command": {
+"id": "Metadata/Items/Scarabs/ScarabLegionNew3",
+"name": "Legion Scarab of Treasures",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHROb3JtYWxTY2FyYWJMZWdpb24iLCJzY2FsZSI6MX1d/5d88c1f891/AltNormalScarabLegion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"legion-scarab-of-the-sekhema": {
+"id": "Metadata/Items/Scarabs/ScarabLegionNew4",
+"name": "Legion Scarab of The Sekhema",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiTGVnaW9uIiwic2NhbGUiOjF9XQ/d687801212/GreaterScarabLegion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"legion-scarab-of-eternal-conflict": {
+"id": "Metadata/Items/Scarabs/ScarabLegionNew5",
+"name": "Legion Scarab of Eternal Conflict",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkxlZ2lvbiIsInNjYWxlIjoxfV0/4a56211137/Tier4ScarabLegion.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"cartography-scarab-of-escalation": {
+"id": "Metadata/Items/Scarabs/ScarabMapsNew1",
+"name": "Cartography Scarab of Escalation",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJNYXBzIiwic2NhbGUiOjF9XQ/e7d11bcc5b/LesserScarabMaps.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"cartography-scarab-of-risk": {
+"id": "Metadata/Items/Scarabs/ScarabMapsNew2",
+"name": "Cartography Scarab of Risk",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJNYXBzIiwic2NhbGUiOjF9XQ/b41df1ff07/NormalScarabMaps.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"cartography-scarab-of-singularity": {
+"id": "Metadata/Items/Scarabs/ScarabMapsNew3",
+"name": "Cartography Scarab of Singularity",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHROb3JtYWxTY2FyYWJNYXBzIiwic2NhbGUiOjF9XQ/41c689bbef/AltNormalScarabMaps.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"cartography-scarab-of-corruption": {
+"id": "Metadata/Items/Scarabs/ScarabMapsNew4",
+"name": "Cartography Scarab of Corruption",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiTWFwcyIsInNjYWxlIjoxfV0/7c589dbe02/GreaterScarabMaps.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"cartography-scarab-of-the-multitude": {
+"id": "Metadata/Items/Scarabs/ScarabMapsNew5",
+"name": "Cartography Scarab of the Multitude",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHROb3JtYWxTY2FyYWJNYXBzIiwic2NhbGUiOjF9XQ/41c689bbef/AltNormalScarabMaps.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"beyond-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabBeyond1",
+"name": "Beyond Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJCZXlvbmQiLCJzY2FsZSI6MX1d/28f0c03cf7/LesserScarabBeyond.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"beyond-scarab-of-haemophilia": {
+"id": "Metadata/Items/Scarabs/ScarabBeyond3",
+"name": "Beyond Scarab of Haemophilia",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJCZXlvbmQiLCJzY2FsZSI6MX1d/6d3487e108/NormalScarabBeyond.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"beyond-scarab-of-corruption": {
+"id": "Metadata/Items/Scarabs/ScarabBeyond2",
+"name": "Beyond Scarab of Corruption",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiQmV5b25kIiwic2NhbGUiOjF9XQ/a7736e43ae/GreaterScarabBeyond.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"beyond-scarab-of-resurgence": {
+"id": "Metadata/Items/Scarabs/ScarabBeyond4",
+"name": "Beyond Scarab of Resurgence",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRHcmVhdGVyU2NhcmFiQmV5b25kIiwic2NhbGUiOjF9XQ/4e3cafe44b/AltGreaterScarabBeyond.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"beyond-scarab-of-the-invasion": {
+"id": "Metadata/Items/Scarabs/ScarabBeyond5",
+"name": "Beyond Scarab of the Invasion",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkJleW9uZCIsInNjYWxlIjoxfV0/a1d0b3e27b/Tier4ScarabBeyond.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ambush-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabStrongboxNew1",
+"name": "Ambush Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJTdHJvbmdib3hlcyIsInNjYWxlIjoxfV0/137917584a/LesserScarabStrongboxes.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ambush-scarab-of-hidden-compartments": {
+"id": "Metadata/Items/Scarabs/ScarabStrongboxNew2",
+"name": "Ambush Scarab of Hidden Compartments",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJTdHJvbmdib3hlcyIsInNjYWxlIjoxfV0/2654dacfee/NormalScarabStrongboxes.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ambush-scarab-of-potency": {
+"id": "Metadata/Items/Scarabs/ScarabStrongboxNew3",
+"name": "Ambush Scarab of Potency",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiU3Ryb25nYm94ZXMiLCJzY2FsZSI6MX1d/c2cb4efc18/GreaterScarabStrongboxes.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ambush-scarab-of-containment": {
+"id": "Metadata/Items/Scarabs/ScarabStrongboxNew4",
+"name": "Ambush Scarab of Containment",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYlN0cm9uZ2JveGVzIiwic2NhbGUiOjF9XQ/da665a65ee/Tier4ScarabStrongboxes.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ambush-scarab-of-discernment": {
+"id": "Metadata/Items/Scarabs/ScarabStrongboxNew5",
+"name": "Ambush Scarab of Discernment",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRUaWVyNFNjYXJhYlN0cm9uZ2JveGVzIiwic2NhbGUiOjF9XQ/72722370df/AltTier4ScarabStrongboxes.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ultimatum-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabUltimatum1",
+"name": "Ultimatum Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJVbHRpbWF0dW0iLCJzY2FsZSI6MX1d/b1b423625d/LesserScarabUltimatum.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ultimatum-scarab-of-bribing": {
+"id": "Metadata/Items/Scarabs/ScarabUltimatum2",
+"name": "Ultimatum Scarab of Bribing",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJVbHRpbWF0dW0iLCJzY2FsZSI6MX1d/d688264f91/NormalScarabUltimatum.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ultimatum-scarab-of-dueling": {
+"id": "Metadata/Items/Scarabs/ScarabUltimatum3",
+"name": "Ultimatum Scarab of Dueling",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiVWx0aW1hdHVtIiwic2NhbGUiOjF9XQ/be3b513bfe/GreaterScarabUltimatum.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ultimatum-scarab-of-catalysing": {
+"id": "Metadata/Items/Scarabs/ScarabUltimatum4",
+"name": "Ultimatum Scarab of Catalysing",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYlVsdGltYXR1bSIsInNjYWxlIjoxfV0/abfc80cf45/Tier4ScarabUltimatum.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"ultimatum-scarab-of-inscription": {
+"id": "Metadata/Items/Scarabs/ScarabUltimatum5",
+"name": "Ultimatum Scarab of Inscription",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRUaWVyNFNjYXJhYlVsdGltYXR1bSIsInNjYWxlIjoxfV0/080e60e969/AltTier4ScarabUltimatum.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"expedition-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabExpedition1",
+"name": "Expedition Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJFeHBlZGl0aW9uIiwic2NhbGUiOjF9XQ/fa49f53ac8/LesserScarabExpedition.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"expedition-scarab-of-runefinding": {
+"id": "Metadata/Items/Scarabs/ScarabExpedition2",
+"name": "Expedition Scarab of Runefinding",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJFeHBlZGl0aW9uIiwic2NhbGUiOjF9XQ/a751f91a8e/NormalScarabExpedition.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"expedition-scarab-of-verisium-powder": {
+"id": "Metadata/Items/Scarabs/ScarabExpedition3",
+"name": "Expedition Scarab of Verisium Powder",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiRXhwZWRpdGlvbiIsInNjYWxlIjoxfV0/1bf78dd20a/GreaterScarabExpedition.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"expedition-scarab-of-the-skald": {
+"id": "Metadata/Items/Scarabs/ScarabExpedition4",
+"name": "Expedition Scarab of Infusion",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRHcmVhdGVyU2NhcmFiRXhwZWRpdGlvbiIsInNjYWxlIjoxfV0/cbeb3c974b/AltGreaterScarabExpedition.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"expedition-scarab-of-archaeology": {
+"id": "Metadata/Items/Scarabs/ScarabExpedition5",
+"name": "Expedition Scarab of Archaeology",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkV4cGVkaXRpb24iLCJzY2FsZSI6MX1d/6bd03eec75/Tier4ScarabExpedition.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"delirium-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabDelirium1",
+"name": "Delirium Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJEZWxpcml1bSIsInNjYWxlIjoxfV0/0b8b887e88/LesserScarabDelirium.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"delirium-scarab-of-mania": {
+"id": "Metadata/Items/Scarabs/ScarabDelirium2",
+"name": "Delirium Scarab of Mania",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJEZWxpcml1bSIsInNjYWxlIjoxfV0/9de6ce65c5/NormalScarabDelirium.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"delirium-scarab-of-paranoia": {
+"id": "Metadata/Items/Scarabs/ScarabDelirium3",
+"name": "Delirium Scarab of Paranoia",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiRGVsaXJpdW0iLCJzY2FsZSI6MX1d/e6730494ae/GreaterScarabDelirium.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"delirium-scarab-of-neuroses": {
+"id": "Metadata/Items/Scarabs/ScarabDelirium4",
+"name": "Delirium Scarab of Neuroses",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRHcmVhdGVyU2NhcmFiRGVsaXJpdW0iLCJzY2FsZSI6MX1d/5690762715/AltGreaterScarabDelirium.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"delirium-scarab-of-delusions": {
+"id": "Metadata/Items/Scarabs/ScarabDelirium5",
+"name": "Delirium Scarab of Delusions",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYkRlbGlyaXVtIiwic2NhbGUiOjF9XQ/aa8241bb6c/Tier4ScarabDelirium.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"kalguuran-scarab": {
+"id": "Metadata/Items/Scarabs/ScarabSettlers1",
+"name": "Kalguuran Scarab",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJTZXR0bGVycyIsInNjYWxlIjoxfV0/591426ae68/LesserScarabSettlers.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"kalguuran-scarab-of-guarded-riches": {
+"id": "Metadata/Items/Scarabs/ScarabSettlers2",
+"name": "Kalguuran Scarab of Guarded Riches",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJTZXR0bGVycyIsInNjYWxlIjoxfV0/5ab4be93db/NormalScarabSettlers.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"kalguuran-scarab-of-refinement": {
+"id": "Metadata/Items/Scarabs/ScarabSettlers3",
+"name": "Kalguuran Scarab of Refinement",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiU2V0dGxlcnMiLCJzY2FsZSI6MX1d/24f57aa157/GreaterScarabSettlers.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"kalguuran-scarab-of-enriching": {
+"id": "Metadata/Items/Scarabs/ScarabSettlers4",
+"name": "Kalguuran Scarab of Enriching",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYlNldHRsZXJzIiwic2NhbGUiOjF9XQ/62d3e05936/Tier4ScarabSettlers.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-monstrous-lineage": {
+"id": "Metadata/Items/Scarabs/ScarabMisc1",
+"name": "Scarab of Monstrous Lineage",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9MZXNzZXJTY2FyYWJNaXNjIiwic2NhbGUiOjF9XQ/9196715e8d/LesserScarabMisc.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-adversaries": {
+"id": "Metadata/Items/Scarabs/ScarabMisc2",
+"name": "Scarab of Adversaries",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRMZXNzZXJTY2FyYWJNaXNjIiwic2NhbGUiOjF9XQ/ab24a34cd1/AltLesserScarabMisc.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-divinity": {
+"id": "Metadata/Items/Scarabs/ScarabMisc3",
+"name": "Scarab of Divinity",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9Ob3JtYWxTY2FyYWJNaXNjIiwic2NhbGUiOjF9XQ/6d4755a692/NormalScarabMisc.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-hunted-traitors": {
+"id": "Metadata/Items/Scarabs/ScarabMisc4",
+"name": "Scarab of Hunted Traitors",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiTWlzYyIsInNjYWxlIjoxfV0/7a40f7ea9f/GreaterScarabMisc.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-stability": {
+"id": "Metadata/Items/Scarabs/ScarabMisc5",
+"name": "Scarab of Stability",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYk1pc2MiLCJzY2FsZSI6MX1d/c80f553284/Tier4ScarabMisc.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-wisps": {
+"id": "Metadata/Items/Scarabs/ScarabMisc8",
+"name": "Scarab of Wisps",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiTWlzYzEiLCJzY2FsZSI6MX1d/303001a475/GreaterScarabMisc1.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-the-sinistral": {
+"id": "Metadata/Items/Scarabs/ScarabMisc9",
+"name": "Scarab of the Sinistral",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9HcmVhdGVyU2NhcmFiTWlzYzIiLCJzY2FsZSI6MX1d/6f752909bb/GreaterScarabMisc2.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-the-dextral": {
+"id": "Metadata/Items/Scarabs/ScarabMisc10",
+"name": "Scarab of the Dextral",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9BbHRHcmVhdGVyU2NhcmFiTWlzYyIsInNjYWxlIjoxfV0/4b55da6494/AltGreaterScarabMisc.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"scarab-of-radiant-storms": {
+"id": "Metadata/Items/Scarabs/ScarabMisc11",
+"name": "Scarab of Radiant Storms",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9UaWVyNFNjYXJhYk1pc2MyIiwic2NhbGUiOjF9XQ/d19b59b6b8/Tier4ScarabMisc2.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"horned-scarab-of-bloodlines": {
+"id": "Metadata/Items/Scarabs/ScarabUber1",
+"name": "Horned Scarab of Bloodlines",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdXBlclNjYXJhYjEiLCJzY2FsZSI6MX1d/acc1b258a3/SuperScarab1.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"horned-scarab-of-nemeses": {
+"id": "Metadata/Items/Scarabs/ScarabUber2",
+"name": "Horned Scarab of Nemeses",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdXBlclNjYXJhYjIiLCJzY2FsZSI6MX1d/c4f92c444d/SuperScarab2.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"horned-scarab-of-preservation": {
+"id": "Metadata/Items/Scarabs/ScarabUber3",
+"name": "Horned Scarab of Preservation",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdXBlclNjYXJhYjMiLCJzY2FsZSI6MX1d/64d9f06e78/SuperScarab3.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"horned-scarab-of-awakening": {
+"id": "Metadata/Items/Scarabs/ScarabUber4",
+"name": "Horned Scarab of Awakening",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdXBlclNjYXJhYjQiLCJzY2FsZSI6MX1d/c939905663/SuperScarab4.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"horned-scarab-of-tradition": {
+"id": "Metadata/Items/Scarabs/ScarabUber5",
+"name": "Horned Scarab of Tradition",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdXBlclNjYXJhYjUiLCJzY2FsZSI6MX1d/cbdd57fa7e/SuperScarab5.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"horned-scarab-of-glittering": {
+"id": "Metadata/Items/Scarabs/ScarabUber6",
+"name": "Horned Scarab of Glittering",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdXBlclNjYXJhYjYiLCJzY2FsZSI6MX1d/f74c2fdd4f/SuperScarab6.png",
+"cat": "Fragments, Scarabs & Mapping"
+},
+"horned-scarab-of-pandemonium": {
+"id": "Metadata/Items/Scarabs/ScarabUber7",
+"name": "Horned Scarab of Pandemonium",
+"img": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvU2NhcmFicy9TdXBlclNjYXJhYjciLCJzY2FsZSI6MX1d/28b95bae7b/SuperScarab7.png",
+"cat": "Fragments, Scarabs & Mapping"
+}
+}

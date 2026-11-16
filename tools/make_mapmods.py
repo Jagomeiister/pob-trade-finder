@@ -3,8 +3,8 @@ poe.re does), for the Search text builder (js/app/21-search-text.js).
 
 Source: data/mods.min.json (RePoE, already bundled). Map mods = area-domain prefixes/suffixes
 that spawn on tiered maps (low/mid/top/uber tier tags); logbook, corrupted side-area and
-Maven-only mods are left out. Quantity / rarity / pack size lines are dropped (a map shows
-those as its totals, not per mod).
+Maven-only mods are left out. Quantity / rarity / pack size / Atlas Drops lines are dropped (a map
+shows those as its totals, not per mod; 3.30 replaced quantity on map mods with Atlas Drops).
 
 A token is the shortest lower-case piece of the mod's text (no digits, so it matches every
 roll) that appears in no other map mod and in none of the text every map carries (name,
@@ -17,10 +17,11 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP_TAGS = {"low_tier_map", "mid_tier_map", "top_tier_map", "uber_tier_map"}
-DROP = re.compile(r"increased (quantity|rarity) of items found in this area|monster pack size|"
+DROP = re.compile(r"increased (quantity|rarity) of items found in this area|increased \[?(atlasdropscaling\|)?atlas drops\]? in this area|"
+                  r"monster pack size|"
                   r"increased pack size|more maps|more currency|more scarabs|chance for .* to drop", re.I)
 # text on every map item: a token must not match these (it would select every map)
-COMMON = ("map tier: item quantity: item rarity: monster pack size: more currency: more maps: more scarabs: "
+COMMON = ("map tier: item quantity: item rarity: atlas drops: monster pack size: more currency: more maps: more scarabs: "
           "quality: corrupted unidentified travel to this map by using it in a personal map device. "
           "maps can only be used once. rarity: normal magic rare unique map item class: maps area level "
           "delirium blighted uber elder shaper conqueror influenced originator memory nightmare")

@@ -31,8 +31,31 @@
   /* Build lookups:
    *   norm:  normalizedText -> { sectionId: [entries...] }
    *   exact: exactText      -> { sectionId: [entries...] }
-   *   byId:  statId -> entry */
-  function buildStatIndex(statsJson) {
+   *   byId:  statId -> entry
+   * legacy (optional, data/statslegacy.json): old stat text -> [stat ids], for texts GGG
+   * reworded (items saved in PoB before the patch keep the old text). Indexed after every
+   * current text, so a current text always wins. */
+  function buildStatIndex(statsJson, legacy) {
+    var index = buildCurrentIndex(statsJson);
+    Object.keys(legacy || {}).forEach(function (text) {
+      var nk = normalize(text), ek = exactKey(text);
+      [].concat(legacy[text]).forEach(function (id) {
+        var entry = index.byId[id];
+        if (!entry) return;
+        var secId = id.split('.')[0];
+        [[index.norm, nk], [index.exact, ek]].forEach(function (p, i) {
+          var map = p[0], k = p[1];
+          if (i && ek === nk) return; // exact only when the text has literal digits
+          if (map[k] && map[k][secId]) return;
+          if (!map[k]) map[k] = {};
+          map[k][secId] = [entry];
+        });
+      });
+    });
+    return index;
+  }
+
+  function buildCurrentIndex(statsJson) {
     var index = { norm: {}, exact: {}, byId: {} };
     var sections = statsJson.result || [];
     for (var s = 0; s < sections.length; s++) {

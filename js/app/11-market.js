@@ -539,18 +539,19 @@ function renderMarketPage() {
 }
 
 // ---- categories: the exchange feed split like poe.ninja's sidebar, then its item snapshot ----
-var MK_CX_CATS = [['cx:currency', 'Currency'], ['cx:fragments', 'Fragments'], ['cx:scarabs', 'Scarabs'],
+var MK_CX_CATS = [['cx:currency', 'Currency'], ['cx:fragments', 'Fragments'], ['cx:threads', 'Threads'], ['cx:scarabs', 'Scarabs'],
   ['cx:essences', 'Essences'], ['cx:fossils', 'Fossils & Resonators'], ['cx:oils', 'Oils'],
   ['cx:catalysts', 'Catalysts'], ['cx:delirium', 'Delirium Orbs'], ['cx:tattoos', 'Tattoos & Omens'],
   ['cx:runegrafts', 'Runegrafts'], ['cx:embers', 'Allflame Embers'], ['cx:expedition', 'Expedition'],
   ['cx:cards', 'Divination cards'], ['cx:other', 'Other']];
 // the feed's own category names
-var MK_FEED_CAT = { 'Currency': 'cx:currency', 'Fragments, Scarabs & Mapping': 'cx:fragments', 'Essences': 'cx:essences',
+var MK_FEED_CAT = { 'Currency': 'cx:currency', 'Fragments, Scarabs & Mapping': 'cx:fragments',
+  'Fragments, Threads & Mapping': 'cx:fragments', 'Essences': 'cx:essences',
   'Fossils & Resonators': 'cx:fossils', 'Oils & Extractor': 'cx:oils', 'Catalysts': 'cx:catalysts',
   'Delirium Orbs': 'cx:delirium', 'Tattoos & Omens': 'cx:tattoos', 'Runegrafts': 'cx:runegrafts',
   'Allflame Embers': 'cx:embers', 'Expedition Currency': 'cx:expedition', 'Cards': 'cx:cards' };
 // names that say what an item is when the feed's category does not (new leagues rename categories)
-var MK_NAME_CAT = [[/Scarab/, 'cx:scarabs'], [/Tattoo|^Omen of /, 'cx:tattoos'], [/Fossil$|Resonator$/, 'cx:fossils'],
+var MK_NAME_CAT = [[/ Thread$/, 'cx:threads'], [/Scarab/, 'cx:scarabs'], [/Tattoo|^Omen of /, 'cx:tattoos'], [/Fossil$|Resonator$/, 'cx:fossils'],
   [/ Oil$/, 'cx:oils'], [/Catalyst$/, 'cx:catalysts'], [/Delirium Orb$/, 'cx:delirium'],
   [/Essence of |^Remnant of Corruption$/, 'cx:essences'], [/^Runegraft /, 'cx:runegrafts'],
   [/^Allflame Ember /, 'cx:embers']];
@@ -558,6 +559,7 @@ var MK_NAME_CAT = [[/Scarab/, 'cx:scarabs'], [/Tattoo|^Omen of /, 'cx:tattoos'],
 function marketCatOf(it) {
   var n = it.name || '';
   if (/Scarab/.test(n)) return 'cx:scarabs'; // filed with fragments in the feed
+  if (/ Thread$/.test(n) && !/^Memory /.test(n)) return 'cx:threads'; // 3.30: Threads replace scarabs
   if (!it.cat) return 'cx:currency';
   if (MK_FEED_CAT[it.cat]) return MK_FEED_CAT[it.cat];
   for (var i = 0; i < MK_NAME_CAT.length; i++) if (MK_NAME_CAT[i][0].test(n)) return MK_NAME_CAT[i][1];
@@ -852,7 +854,8 @@ function marketNinjaCategory(it) {
   if (/Resonator$/.test(n)) return 'resonators';
   if (/ Oil$/.test(n)) return 'oils';
   return { 'Currency': 'currency', 'Cards': 'divination-cards', 'Essences': 'essences',
-           'Delirium Orbs': 'delirium-orbs', 'Fragments, Scarabs & Mapping': 'fragments' }[cat] || null;
+           'Delirium Orbs': 'delirium-orbs', 'Fragments, Scarabs & Mapping': 'fragments',
+           'Fragments, Threads & Mapping': 'fragments' }[cat] || null;
 }
 
 // the Overview's chart, and the drawer when it shows an exchange item

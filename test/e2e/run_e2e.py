@@ -2039,7 +2039,7 @@ row('Players are Cursed with Vulnerability').querySelector('button[title="Avoid"
 await H.sleep(10);
 row('Monster Damage Penetrates #% Elemental Resistances').querySelector('button[title="Want"]').click();
 await H.sleep(10);
-const q = sec.querySelector('input[aria-label="Minimum item quantity"]');
+const q = sec.querySelector('input[aria-label="Minimum atlas drops"]');
 q.value = '60'; q.dispatchEvent(new Event('input'));
 await H.sleep(10);
 out.tokens = { regen: row(regen).querySelector('.st-token').textContent,
@@ -2085,7 +2085,7 @@ def scenario_search(s, tag):
     r = s.run(S22_SEARCH, timeout=60)
     check(tag + " Search text view visible with the map mods", r["visible"] and r["mods"] > 60, (r["visible"], r["mods"]))
     t = r["tokens"]
-    want = '"!%s|%s" "%s" "m q.*([6-9]\d|\d{3})%%"' % (t["regen"], t["vuln"], t["pen"])
+    want = '"!%s|%s" "%s" "as drops:.*([6-9]\d|\d{3})%%"' % (t["regen"], t["vuln"], t["pen"])
     check(tag + " avoid + want + quantity build one search string", r["text"] == want, (r["text"], want))
     check(tag + " length shown against the 250 limit", r["count"] == "%d / 250" % len(want), r["count"])
     check(tag + " filter narrows the list", 0 < r["filtered"] < 15, r["filtered"])
@@ -2704,7 +2704,9 @@ out.mStates = [chosenM, connM, lockedM].map(n => n ? treeMasteryState(T, n) : nu
 cv.cx = chosenM.x; cv.cy = chosenM.y; cv.s = 0.5; mDraw();
 await H.waitFor(() => TREE_SPRITES && TREE_SPRITES.state !== 'loading', 5000, 'mastery sheets');
 out.mSprites = [TREE_SPRITES.state, !!TREE_SPRITES.mastery, !!(TREE_SPRITES.mastery && TREE_SPRITES.mastery.effect)];
-out.mCalls = H.calls('cache_art').slice(nM).map(c => JSON.parse(c.args[0]));
+// only the tree's own art: the build page may fetch its gear icons in the same window
+out.mCalls = H.calls('cache_art').slice(nM).map(c => JSON.parse(c.args[0]))
+  .filter(a => a.some(u => u.indexOf('/passive-skill/') >= 0));
 out.mCentre = {}; out.mDrawn = {};
 [['chosen', chosenM], ['connected', connM], ['locked', lockedM]].forEach(([k, n]) => {
   cv.cx = n.x; cv.cy = n.y; cv.s = 0.5; mDraw();
@@ -5348,9 +5350,12 @@ def scenario_guides(s, tag):
     check(tag + " Mercenaries listed as a sheet", "Mercenaries of Trarthus" in r["listed"], r["listed"])
     check(tag + " Betrayal guide renders with the 3.29 disclaimer", r["has"] and
           "Information as of 3.29 — checked " in (r["asof"] or "") and "may change with 3.30" in r["asof"], r["asof"])
-    check(tag + " summary, sections in order, How to open, Strategies folded", r["summary"] and r["secs"] ==
+    # a patch update (tools/guides/updates-*.json) adds "Changed in <patch>" first, open
+    cur = json.load(open(os.path.join(ROOT, "server", "public", "guides.json"), encoding="utf-8")).get("currentPatch")
+    new_secs, new_open = (["Changed in " + cur], ["changesNew"]) if cur else ([], [])
+    check(tag + " summary, sections in order, How to open, Strategies folded", r["summary"] and r["secs"] == new_secs +
           ["How to run it", "Strategies", "Dangers", "What to sell", "Profit", "Changes by patch", "Tables", "Read more"]
-          and r["openSecs"] == ["howTo"], (r["secs"], r["openSecs"]))
+          and r["openSecs"] == new_open + ["howTo"], (r["secs"], r["openSecs"]))
     check(tag + " jump bar under the as-of note: every section, then Reference data", r["jumpAfterNote"] and
           r["jumpKeys"] == r["secKeys"] and r["jumpKeys"][-1] == "ref", (r["jumpKeys"], r["secKeys"]))
     check(tag + " jump bar scrolls to Reference data and focuses its filter", r["refBelow"] and r["refInView"] and
@@ -5359,7 +5364,8 @@ def scenario_guides(s, tag):
     check(tag + " the mechanic's own tool (__mechanicExtras) mounts first, open, app only", r["extra"], r["extra"])
     check(tag + " strategy cards with investment", r["strats"] == r["wantStrats"] and r["inv"] == len(r["wantStrats"]), r["strats"])
     check(tag + " profit labelled rough community estimates", "Rough community estimates" in (r["profitNote"] or ""), r["profitNote"])
-    check(tag + " changes grouped by patch, newest first", r["patchTags"] and r["patchTags"][0].startswith("3.29"), r["patchTags"])
+    check(tag + " changes grouped by patch, newest first", r["patchTags"] and r["patchTags"][0].startswith(cur or "3.29") and
+          r["patchTags"] == sorted(r["patchTags"], key=lambda p: [int(x) for x in p.split(".")], reverse=True), r["patchTags"])
     check(tag + " wiki tables stay under Reference data, filter on its heading", r["refTitle"] == "Reference data" and
           r["refRows"] > 10 and r["filterInRef"], (r["refTitle"], r["refRows"], r["filterInRef"]))
     check(tag + " scarab names get GGG icons (CDN url, via the art cache)", r["icons"] and
@@ -5473,7 +5479,11 @@ def mech_data():
     from the name, with a few round ones scenarios can count on."""
     import types
     cm = json.load(open(os.path.join(ROOT, "data", "currencymap.json"), encoding="utf-8"))
-    fixed = {"Divine Orb": 200, "Ambush Scarab of Containment": 30, "Horned Scarab of Bloodlines": 50,
+    # 3.30 removed scarabs from the exchange data; the scarab hub (still live before the
+    # pinned test date) is tested against the frozen 3.29 list
+    for k, v in json.load(open(os.path.join(ROOT, "data", "retired-scarabs.json"), encoding="utf-8")).items():
+        cm.setdefault(k, dict(v, cat="Fragments, Scarabs & Mapping"))
+    fixed ={"Divine Orb": 200, "Ambush Scarab of Containment": 30, "Horned Scarab of Bloodlines": 50,
              "Primal Crystallised Lifeforce": 0.5, "Sacred Crystallised Lifeforce": 40}
 
     class Feed:

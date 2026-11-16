@@ -1,0 +1,548 @@
+{
+"strategies": [
+{
+"name": "Ethereal Allflame Scarab Farm",
+"investment": "High (Maxroll). Very hard and needs a lot of management. Three embers are about 1,577c (about 3.8 div) per map on 4 Nov 2026.",
+"stage": [
+"late"
+],
+"steps": [
+"Run T16 Originator-influenced Crater, chosen for its very high monster density.",
+"Roll maps for 80%+ more Scarabs before you apply the chisel.",
+"Add a Maven's Chisel of Scarabs, 1-5 Blacksmith's Delirium Orbs and a Templar Astrolabe.",
+"Use Eater of Worlds altars for quantity and scarab duplication.",
+"Rush the boss first, then clear the map.",
+"Expect at least 2-3 portal trips to pick up the loot.",
+"Sell the top scarabs. Vendor cheap scarabs 3-for-1."
+],
+"atlasPassives": [
+"Ultimatum cluster, taken only for better odds on Ultimatum scarab drops (mostly Catalysing). You don't run the encounters.",
+"Complete the full Originator questline so Originator maps drop."
+],
+"scarabs": [
+"3x Allflame Ember of the Ethereal (up to 4 allowed)",
+"Horned Scarab of Bloodlines",
+"Betrayal Scarab of the Allflame (limit 1)"
+],
+"cite": [
+0,
+29,
+30,
+33,
+41,
+31
+]
+},
+{
+"name": "Nightmare Boss Rush",
+"investment": "Below average (Maxroll). The three scarabs cost under 10c per map on 4 Nov 2026.",
+"stage": [
+"mid",
+"late"
+],
+"steps": [
+"Buy Nightmare maps in bulk through Asynchronous Trade.",
+"Abomination is the main map because it biases Reality fragments. Ziggurat is the slower backup because its boss has invulnerability phases.",
+"Use Searing Exarch influence and Wrath of the Cosmos.",
+"Rush the boss and skip full clears.",
+"Only add mechanics you pass on the way, such as Delirium or Beasts.",
+"Sell the fragments on the Currency Exchange."
+],
+"atlasPassives": [
+"Settlers nodes for Starfall Craters, which can hold Svalinn. Only do them if they are on the way to the boss.",
+"Voidstones raise the chance of Nightmare maps dropping."
+],
+"scarabs": [
+"Scarab of the Dextral",
+"Scarab of the Sinistral",
+"Scarab of Stability"
+],
+"cite": [
+1,
+31,
+15,
+39
+]
+},
+{
+"name": "Inscribed Ultimatum",
+"investment": "High (Maxroll). Very hard. Scarabs cost 2.5-9c each on 4 Nov 2026.",
+"stage": [
+"late"
+],
+"steps": [
+"Run T16 Jungle Valley with Searing Exarch altars.",
+"Clear for Eldritch Altars and click Domination Shrines before you start the encounter.",
+"Skip harsh Ultimatum modifiers (see Dangers).",
+"Keep Inscribed Ultimatums that have 'more Monster Life'.",
+"Vendor weak ones 5:1 to reroll them, using about 20c of value as the cut-off."
+],
+"scarabs": [
+"2x Ultimatum Scarab of Bribing",
+"Domination Scarab",
+"Optional: Ultimatum Scarab of Dueling or Inscription"
+],
+"cite": [
+2,
+28,
+39
+]
+},
+{
+"name": "Cornucopia Harvest (Maxroll B tier)",
+"investment": "Average (Maxroll), with low management.",
+"stage": [
+"mid"
+],
+"steps": [
+"Run 8-mod T16 Jungle Valley with Eater of Worlds altars and a Fruiting Astrolabe.",
+"Clear the map and leave the Grove for last.",
+"Kill the Tier 4 seed bosses first (usually Vivid).",
+"Walk out of the thorn ring instead of using a movement skill.",
+"Sell lifeforce on the Currency Exchange."
+],
+"atlasPassives": [
+"Farm of Exile / ImSidVicious tree: poeplanner.com/a/65ht"
+],
+"scarabs": [
+"Harvest Scarab of Cornucopia",
+"Harvest Scarab of Doubling",
+"Cartography Scarab of Escalation",
+"Scarab of Monstrous Lineage",
+"Influencing Scarab of Hordes"
+],
+"cite": [
+3,
+34
+]
+},
+{
+"name": "League Start Harvest (pohx)",
+"investment": "None to low. The base version needs no scarabs.",
+"stage": [
+"league-start",
+"ssf",
+"mid"
+],
+"steps": [
+"Run Mesa or City Square.",
+"Juiced version: add Harvest Scarab of Doubling, 2x Monstrous Lineage and 2x Mortal or Sacrifice Fragments.",
+"pohx calls Jungle Valley a bad map for this strategy.",
+"Alternatives: AOEAH runs only Doubling on 8-mod corrupted Mausoleum. ExpCarry lists a City Square rush with one Harvest Scarab and an optional Sacrifice Fragment."
+],
+"atlasPassives": [
+"40 points: poeplanner.com/a/6ZV1",
+"80 points: poeplanner.com/a/6ZVX",
+"120 points: poeplanner.com/a/6gL0"
+],
+"scarabs": [
+"None (base)",
+"Harvest Scarab of Doubling (juiced)",
+"2x Scarab of Monstrous Lineage (juiced)"
+],
+"cite": [
+11,
+19,
+10
+]
+},
+{
+"name": "Unstable Breach",
+"investment": "Extremely high (Maxroll). Above-average difficulty. Still rated the best raw currency farm.",
+"stage": [
+"late"
+],
+"steps": [
+"Run T16 Originator Dunes with Eater of Worlds altars and a Grasping Astrolabe.",
+"Add a Maven's Chisel of Avarice and 1-5 Armoursmith's Delirium Orbs.",
+"Roll 92%+ more Currency for the budget version or 140%+ for high investment.",
+"Open at most 2 Unstable Breaches at once. The patch cap is 2, even though Maxroll still says 3."
+],
+"atlasPassives": [
+"Synthesised Stability, plus the generic Breach passives"
+],
+"scarabs": [
+"Scarab of Wisps",
+"2x Breach Scarab of Instability",
+"Budget: 2x Scarab of Monstrous Lineage",
+"High investment: Horned Scarab of Bloodlines and Cartography Scarab of Risk"
+],
+"cite": [
+4,
+22,
+31
+]
+},
+{
+"name": "Stacked Deck (Cloister)",
+"investment": "Low (Maxroll). Five Cloisters were about 233c per map on 4 Nov 2026.",
+"stage": [
+"mid"
+],
+"steps": [
+"Run T16 8-mod Jungle Valley with Eater of Worlds.",
+"Complete Rituals so the Doedre's Devoted packs respawn.",
+"Each Devoted monster has a 5% chance to drop a Stacked Deck, and there are 40-60 packs.",
+"Note: Maxroll's page body is still the 3.28 version."
+],
+"atlasPassives": [
+"The 5th map-device slot is needed to run 5 scarabs"
+],
+"scarabs": [
+"5x Divination Scarab of the Cloister"
+],
+"cite": [
+5,
+13,
+39
+]
+},
+{
+"name": "Targeted Divination Cards",
+"investment": "Not stated in sources.",
+"stage": [
+"mid",
+"late"
+],
+"steps": [
+"The Apothecary (Mageblood) now drops only in Cage Map, because Defiled Cathedral was removed.",
+"The Doctor (Headhunter) drops in Burial Chambers.",
+"Scrying Orbs store the map they dropped in, so you can scry that map's cards onto another atlas map."
+],
+"atlasPassives": [
+"Altered Prophecy cluster: its notable gives T14+ maps a 4% chance to drop a Scrying Orb, and its small passives raise card drop chance"
+],
+"cite": [
+14,
+22
+]
+},
+{
+"name": "Mercenary Rushing",
+"investment": "Low per map. The two scarabs were about 23c together on 4 Nov 2026.",
+"stage": [
+"league-start",
+"mid"
+],
+"steps": [
+"Run white maps, or City Square with a Templar Astrolabe.",
+"Kill the boss and the Mercenary, then leave within about 30 seconds.",
+"Since 3.29.3 you must actually defeat the Infamy Wild Mercenaries to get their loot.",
+"Since 3.29.2 Wild Mercenaries keep fighting after their leader dies."
+],
+"atlasPassives": [
+"Contract Killers: allied Mercenaries deal 100% more damage to Mercenaries and Rogue Exiles"
+],
+"scarabs": [
+"Trarthan Scarab of Renown (all Mercenary gear is Unique)",
+"Trarthan Scarab of Infamy (Infamous Mercenary plus 2 Wild Mercenaries)"
+],
+"cite": [
+21,
+28,
+31,
+47,
+46,
+15,
+39
+]
+},
+{
+"name": "Curse of the Allflame: Charts & Voyages",
+"investment": "Not stated. Dead Man's Sulphur is about 0.01c each, so a 9,000-Sulphur reroll ceiling is about 94c.",
+"stage": [
+"mid",
+"late"
+],
+"steps": [
+"Stock at least 50 Charts. Each Voyage uses 9.",
+"Roll Charts before charting them, because you can't change them once placed.",
+"Reroll border modifiers with up to 9,000 Sulphur, looking for 'Rare Monsters drop an additional Divine Orb'. The cost doubles with each reroll.",
+"If you don't find it, prioritise Operative Strongbox Charts.",
+"Sea Pillars is the only required Unique Room.",
+"After the 7th lantern, return to the Bathysphere or you drown and lose the loot.",
+"From 3.29.3 you can socket up to 3 Cursed Ducats in the Voyage Planner to Empower runs."
+],
+"atlasPassives": [
+"3.29 added atlas nodes for the Voyage system"
+],
+"cite": [
+7,
+47,
+40,
+15
+]
+},
+{
+"name": "Map Farming (Nightmare/Originator)",
+"investment": "Low (Maxroll), with excellent profitability.",
+"stage": [
+"mid",
+"late"
+],
+"steps": [
+"Run T16 Originator Dunes under Searing Exarch.",
+"Run 8-mod maps that have 100%+ More Maps and sell the rest.",
+"List Nightmare maps in a higher-priced tab and move unsold ones back from time to time."
+],
+"scarabs": [
+"Cartography Scarab of Escalation",
+"3x Cartography Scarab of the Multitude"
+],
+"cite": [
+8
+]
+},
+{
+"name": "Kalguuran Map Farming",
+"investment": "Not stated. Needs solid survivability and damage.",
+"stage": [
+"mid"
+],
+"steps": [
+"Run T16 Originator Jungle Valley with 70%+ More Maps under Searing Exarch.",
+"Sell the 8-mod corrupted Nightmare and Originator maps."
+],
+"scarabs": [
+"Cartography Scarab of Escalation",
+"Kalguuran Scarab of Guarded Riches",
+"2x Kalguuran Scarab",
+"Cartography Scarab of Corruption"
+],
+"cite": [
+50
+]
+},
+{
+"name": "Destructive Play",
+"investment": "Zero",
+"stage": [
+"league-start"
+],
+"steps": [
+"Run T16 Silo (T14+ Maven-influenced Silo maps).",
+"Kill only the extra Destructive Play bosses and leave the main boss alive.",
+"Sell Maven's Chisels, Shaped Astrolabes and influenced maps."
+],
+"cite": [
+9,
+32
+]
+},
+{
+"name": "Alch & Go",
+"investment": "Very low, with low profit",
+"stage": [
+"league-start",
+"ssf"
+],
+"steps": [
+"Run any map. Transmute, alch or vaal it as needed.",
+"Push to yellow maps for Shrieking Essences.",
+"Sell most drops to fund your build until your Voidstones are done."
+],
+"cite": [
+6
+]
+},
+{
+"name": "80% Deli Farm (PoE Vault)",
+"investment": "Low to medium",
+"stage": [
+"mid"
+],
+"steps": [
+"Run Dunes with 4 Fine or Diviner's Delirium Orbs."
+],
+"atlasPassives": [
+"poeplanner.com/a/6glO"
+],
+"scarabs": [
+"2x Delirium Scarab of Mania",
+"3x Delirium Scarab of Paranoia"
+],
+"cite": [
+12
+]
+},
+{
+"name": "Manni's Delirium Orb Printer (pohx)",
+"investment": "Not stated",
+"stage": [
+"late",
+"ssf"
+],
+"steps": [
+"Run Strand, Tropical Island, City Square or Dunes.",
+"Juiced version adds Mania and Neuroses scarabs (T11+)."
+],
+"atlasPassives": [
+"40: poeplanner.com/a/6g3b",
+"80: poeplanner.com/a/6g3a",
+"120: poeplanner.com/a/6g3F",
+"138: poeplanner.com/a/6g3V"
+],
+"scarabs": [
+"3x Delirium Scarab of Paranoia",
+"Juiced: Mania and Neuroses"
+],
+"cite": [
+11
+]
+},
+{
+"name": "Strongboxes + Deli + Beyond (pohx, SC only)",
+"investment": "Not stated",
+"stage": [
+"late"
+],
+"steps": [
+"Run Haunted Mansion on T16.5 maps rolled for 90%+ Currency or Scarabs.",
+"Avoid -max res, no regen and less recovery mods."
+],
+"atlasPassives": [
+"poeplanner.com/a/65Dr"
+],
+"scarabs": [
+"Ambush Scarab of Containment",
+"Ambush Scarab of Discernment",
+"Ambush Scarab of Potency",
+"Ambush Scarab",
+"Ambush Scarab of Compartments"
+],
+"cite": [
+11
+]
+},
+{
+"name": "Starter Atlas with Breach & Shrines (pohx)",
+"investment": "Low. Skip the scarabs if they are expensive.",
+"stage": [
+"league-start",
+"ssf"
+],
+"steps": [
+"Run open maps such as Jungle Valley or Beach."
+],
+"atlasPassives": [
+"80 points: poeplanner.com/a/6g4N (40 and 120-point versions also on pohx.net)"
+],
+"scarabs": [
+"2x Breach Scarab of Instability"
+],
+"cite": [
+11
+]
+}
+],
+"profit": [
+{
+"text": "Ethereal Allflame: about 42 div/h (rough, seller claim). It used about 100c embers, which now cost about 526c.",
+"who": "AOEAH (currency seller)",
+"date": "2026-07-29",
+"cite": [
+17,
+41
+]
+},
+{
+"text": "Ethereal Allflame rated Good profitability. No div/h given.",
+"who": "Maxroll (BawLoch)",
+"date": "2026-08-11",
+"cite": [
+0
+]
+},
+{
+"text": "Inscribed Ultimatum on white T16 Jungle Valley: about 5.3 div/h net after about 1.2 div/h input (rough, community test).",
+"who": "ExpCarry",
+"date": "2026-09-01",
+"cite": [
+10
+]
+},
+{
+"text": "4x Cloister Stacked Decks: about 11 div/h gross, about 5.2 div/h net (rough, early 3.29 test).",
+"who": "ExpCarry",
+"date": "2026-09-01",
+"cite": [
+10
+]
+},
+{
+"text": "5x Cloister: about 65c in, about 60c net per map (rough). Outdated now that Cloisters are about 47c each.",
+"who": "Timesaver.gg (currency seller)",
+"date": "2026-09-05",
+"cite": [
+13,
+39
+]
+},
+{
+"text": "Cornucopia Jungle Valley: about 11.3 div/h, a little over 1 div per map (rough, a price model, not a measured rate).",
+"who": "Farm of Exile (ImSidVicious)",
+"date": "2026-11-03",
+"cite": [
+34,
+36
+]
+},
+{
+"text": "Harvest: about 0.2 div per 3-minute map. League start with the full tree: 600-1,000c/h (rough).",
+"who": "AOEAH (currency seller)",
+"date": "2026-07-28",
+"cite": [
+19
+]
+},
+{
+"text": "Charts and Voyages: 21.65 div/h over 100 Charts and 11 Voyages (rough, one logged test).",
+"who": "Timesaver.gg citing empyriangaming",
+"date": "2026-09-05",
+"cite": [
+13
+]
+},
+{
+"text": "Voyage best case: 105 guaranteed divines with the Divine border mod and 15 strongboxes. This is a ceiling, not a per-hour figure.",
+"who": "Maxroll",
+"date": "2026-08-03",
+"cite": [
+7
+]
+},
+{
+"text": "Mercenary rushing: 15-20 div/h fast, 8-10 div/h slower, without jackpots (rough, no source given).",
+"who": "MMOEXP (currency seller)",
+"date": "2026-08-10",
+"cite": [
+21
+]
+},
+{
+"text": "Fortress boss rush: about 30 div/h with late-league quantity stacking (rough). IGGM's figure of over 25 div/h is from 3.28.",
+"who": "AOEAH (currency seller)",
+"date": "2026-08-01",
+"cite": [
+20,
+37
+]
+},
+{
+"text": "High-investment Abyss with Searing Exarch altars on Jungle Valley: 20-30 div/h, about half from altars (rough, late 3.29 test).",
+"who": "ExpCarry",
+"date": "2026-09-01",
+"cite": [
+10
+]
+},
+{
+"text": "pohx publishes no div/h figures, because they change weekly.",
+"who": "pohx.net",
+"date": "unknown",
+"cite": [
+11
+]
+}
+]
+}
