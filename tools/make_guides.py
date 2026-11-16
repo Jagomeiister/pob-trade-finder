@@ -320,6 +320,11 @@ def corrected_research(path, updates=True):
 UPDATES_APPLIED = []
 
 
+def league_sheet_paths():
+    """tools/guides/league-sheets-*.json: guide-only sheets for a new league (3.30: Covens, Threads)"""
+    return sorted(glob.glob(os.path.join(ROOT, "tools", "guides", "league-sheets-*.json")))
+
+
 def update_paths(research_path):
     """tools/guides/guides-3.29.json -> [tools/guides/updates-3.29-to-3.30.json, ...]"""
     folder, base = os.path.split(research_path)
@@ -440,6 +445,12 @@ def build_guide(g):
     # "planner" (Betrayal) is left out: tools/make_syndicate.py builds the Syndicate planner's own data
     # from the same research file (data/syndicate.js)
     out["readMore"] = sources
+    # section headings a sheet renames ("Rewards" for a league sheet's sell list); the app falls back
+    # to its own headings
+    labels = g.get("labels") or {}
+    need(isinstance(labels, dict) and all(k in SECTIONS and is_text(v) and len(v) <= 40 for k, v in labels.items()),
+         "%s: labels must map a section to a short heading" % gid)
+    out["labels"] = {k: v.strip() for k, v in labels.items()}
     return {k: v for k, v in out.items() if v not in (None, "", [], {})}
 
 
@@ -749,6 +760,22 @@ def main(argv):
                 extra[sid] = dict(EXTRA_SHEETS[sid], id=sid)
         except Bad as e:
             problems.append(str(e))
+    # guide-only sheets for a league (tools/guides/league-sheets-<patch>.json): their own title,
+    # group and as-of patch; written from quote-checked claims like the patch updates
+    league_order = []
+    for lpath in league_sheet_paths():
+        with open(lpath, encoding="utf-8") as f:
+            ldoc = json.load(f)
+        for g in ldoc.get("guides") or []:
+            try:
+                sid = g.get("id")
+                need(sid not in guides and sid not in sheets, "%s: %s clashes with a sheet or guide" % (os.path.basename(lpath), sid))
+                need(is_text(g.get("group")), "%s: no group" % sid)
+                guides[sid] = build_guide(g)
+                extra[sid] = {"title": g["title"].strip(), "group": g["group"].strip(), "id": sid}
+                league_order.append(sid)
+            except Bad as e:
+                problems.append(str(e))
     for p in problems:
         print("  - " + p)
     for d in DROPPED:
@@ -758,7 +785,7 @@ def main(argv):
     if problems or len(guides) < MIN_GUIDES:
         print("%d problems, %d guides (need %d): not writing" % (len(problems), len(guides), MIN_GUIDES))
         return 1
-    order = [ID_MAP.get(g["id"], g["id"]) for g in research["guides"]]
+    order = league_order + [ID_MAP.get(g["id"], g["id"]) for g in research["guides"]]
     data = {"asOf": str(research.get("asOf") or "").strip(), "checked": checked,
             "guides": {sid: guides[sid] for sid in order},
             "sheets": [extra[s] for s in order if s in extra],

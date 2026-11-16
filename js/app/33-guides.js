@@ -273,6 +273,8 @@ function guideContent(m, opts) {
   if (g.summary) root.appendChild(guideText(g.summary, 'guide-summary'));
 
   function section(key, title, body, count) {
+    // a sheet may rename a section ("Rewards" for a league sheet's sell list): payload "labels"
+    if (g.labels && typeof g.labels[key] === 'string' && g.labels[key]) title = g.labels[key];
     var det = UI.el('details', 'guide-sec');
     det.dataset.key = key;
     det.open = !!GUIDE_OPEN[key];

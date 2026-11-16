@@ -5344,7 +5344,33 @@ return out;
 """
 
 
+S48_LEAGUE = r"""
+const H = window.__e2e;
+const out = {};
+document.getElementById('open-sheets').click();
+await H.sleep(80);
+const btn = [...document.querySelectorAll('#view-sheets .sheet-pick')].find(b => b.textContent === 'Covens of Umbra');
+out.listed = !!btn;
+out.threads = [...document.querySelectorAll('#view-sheets .sheet-pick')].some(b => b.textContent === 'Threads and Shaped Regions');
+if (btn) {
+  btn.click();
+  await H.sleep(60);
+  const g = document.querySelector('#view-sheets .sheet-panel .guide');
+  out.secs = g ? [...g.querySelectorAll('.guide-sec-title')].map(e => e.textContent) : [];
+  out.jump = g ? [...g.querySelectorAll('.guide-jump a, .guide-jump button')].map(e => e.textContent) : [];
+  out.asof = g ? H.text('.guide-asof', g) : '';
+  out.notice = !!document.querySelector('#view-sheets .sheet-panel .guide-notice');
+}
+return out;
+"""
+
+
 def scenario_guides(s, tag):
+    s.fresh()
+    r = s.run(S48_LEAGUE, timeout=60)
+    check(tag + " league sheets: Covens and Threads listed; Covens renders with Rewards, no 3.29 notice",
+          r["listed"] and r["threads"] and "Rewards" in r["secs"] and "What to sell" not in r["secs"] and
+          "Rewards" in " ".join(r["jump"]) and "3.30" in (r["asof"] or "") and not r["notice"], r)
     s.fresh()
     r = s.run(S48_APP, timeout=60)
     check(tag + " Mercenaries listed as a sheet", "Mercenaries of Trarthus" in r["listed"], r["listed"])

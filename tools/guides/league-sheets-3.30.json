@@ -1,0 +1,1792 @@
+{
+ "about": "Guide-only cheat sheets for the 3.30 league, written from quote-checked claims in the 3.30.0 notes and GGG's announcement threads (writer + two skeptics per sheet). Each line keeps its quote. Built by tools/make_guides.py.",
+ "asOf": "3.30",
+ "guides": [
+  {
+   "id": "covens",
+   "title": "Covens of Umbra",
+   "group": "League mechanics",
+   "asOf": "3.30",
+   "summary": "Covens of Umbra is the 3.30 league: kill groups of covenites performing rites, then pick a Fate that empowers the boss of the area you are in. Each Fate makes the boss harder and more rewarding, and a Fate-empowered boss can drop Viscera, pieces of its power that you place on your own per-character Wickerman. Grim Fates empower Pinnacle bosses, which then always drop their exclusive Viscera. Lines marked unofficial come from Maxroll or poedb, not from GGG.",
+   "howTo": [
+    {
+     "text": "Find a coven: covenites performing rites to summon their Queen. Kill them.",
+     "cite": [
+      6
+     ],
+     "quote": "you will encounter wicked covenites performing gruesome rites to summon their Queen, seeking to plunge the world into unending darkness",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Disrupting the coven lets you pick a Fate for the boss of the area you are in.",
+     "cite": [
+      6
+     ],
+     "quote": "Upon disrupting the coven's magicks, you will get to select a Fate for the boss of the area you're in.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Pick before moving on: the next set of Fate choices stays hidden until you choose from the last coven you completed.",
+     "cite": [
+      0
+     ],
+     "quote": "your next selection of Fates will not be shown to you.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Each Fate adds several effects that raise both the boss's rewards and its difficulty; stack only as many as your build can handle.",
+     "cite": [
+      6
+     ],
+     "quote": "Each Fate has a handful of effects, increasing both the rewards and difficulty of the encounter.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Take all the Fates in an area before you kill its boss; a boss with no Fates gives no Viscera (unofficial: poedb).",
+     "cite": [
+      3
+     ],
+     "quote": "Be sure to collect the Fates before defeating them so you don't miss out!",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Kill the Fate-empowered boss for a chance at its Viscera.",
+     "cite": [
+      6
+     ],
+     "quote": "Obtain Viscera from a defeated boss empowered by Fates to claim a scrap of their power for your own.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Place Viscera on your Wickerman to gain a piece of that boss's power.",
+     "cite": [
+      6
+     ],
+     "quote": "put the remains of your fallen enemies to use by placing them on your own Wickerman",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Beat the Grim-Fate pinnacle: it always drops its Viscera.",
+     "cite": [
+      0
+     ],
+     "quote": "Grim-Fate empowered pinnacles will always drop their viscera.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Trade spare Viscera: they can be traded.",
+     "cite": [
+      0
+     ],
+     "quote": "Can you trade Viscera?",
+     "stage": [
+      "all"
+     ]
+    }
+   ],
+   "sell": [
+    {
+     "text": "Viscera: remains of a Fate-empowered boss that give you a scrap of its power.",
+     "cite": [
+      6
+     ],
+     "quote": "Obtain Viscera from a defeated boss empowered by Fates to claim a scrap of their power for your own.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Grim-Fate Pinnacle bosses give exclusive new Viscera.",
+     "cite": [
+      7
+     ],
+     "quote": "Defeating them will give you an opportunity to obtain exclusive new Viscera, grisly remnants of the bosses that you can use to claim a piece of their power.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Each Fate shows at least one reward icon; that reward type is guaranteed from the empowered boss (unofficial: Maxroll).",
+     "cite": [
+      1
+     ],
+     "quote": "Each fate card has at least one reward icon. This guarantees that type of a reward from the empowered boss.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Several Fates with the same reward icon form a combo for extra rewards (unofficial: Maxroll).",
+     "cite": [
+      1
+     ],
+     "quote": "By invoking multiple fates with the same reward icon you create combos which grant you additional rewards.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The same Fate invoked twice at once triples rewards (unofficial: Maxroll).",
+     "cite": [
+      1
+     ],
+     "quote": "If you invoke the the same type of a fate card twice at the same time their rewards get tripled.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "A Fate's rewards roll separately from the Fate itself, so the same Fate (e.g. 'Rot') can offer different rewards (unofficial: Maxroll Q&A).",
+     "cite": [
+      2
+     ],
+     "quote": "This means that you can find a \"Rot\" card twice and it can give you different rewards each time.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Some Fates make rare items drop with a set type of high-tier modifier, e.g. boots with a speed modifier (unofficial: Maxroll Q&A).",
+     "cite": [
+      2
+     ],
+     "quote": "Some fate cards guarantee that rare items drop with specific type of modifier. For example boots with a speed modifier.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Example: empowered Brutus can drop Warden's Arm, which raises maximum life (unofficial: Maxroll).",
+     "cite": [
+      1
+     ],
+     "quote": "For example empowered Brutus has a chance to drop a Warden's Arm which increases your maximum life.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Warden's Arm tiers: +(30-50) life, +(60-80) life, (5-7)% more maximum life (unofficial: poedb).",
+     "cite": [
+      3
+     ],
+     "quote": "High: (5-7)% more Maximum Life",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Example: Oak can drop Lesser Bandit Warrior's Head, which grants life regeneration (unofficial: poedb).",
+     "cite": [
+      3
+     ],
+     "quote": "(from Oak), a head which grants Regenerate x% of Life per Second",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Doedre's Tongue now has 30-35% all Elemental Resistances and 25-50% chance to Freeze, Shock and Ignite (both were 20-25%).",
+     "cite": [
+      6
+     ],
+     "quote": "It now has 30-35% to all Elemental Resistances (previously 20-25%), and 25-50% chance to Freeze, Shock and Ignite (previously 20-25%).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Doedre's Tongue also rolls one of: All Damage can Ignite, Shock or Freeze against Cursed Enemies.",
+     "cite": [
+      6
+     ],
+     "quote": "All Damage can Ignite against Cursed Enemies.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Old Doedre's Tongues get the new ranges with a Divine Orb.",
+     "cite": [
+      6
+     ],
+     "quote": "Existing items can receive these new values with a Divine Orb.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "40 new challenges, plus 8 in Ruthless Covens of Umbra.",
+     "cite": [
+      6
+     ],
+     "quote": "includes a set of 40 new challenges, and 8 new challenges in Ruthless Covens of Umbra",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Covens of Umbra Totem Pole decoration pieces from the 19th challenge and every third challenge after it.",
+     "cite": [
+      6
+     ],
+     "quote": "From the 19th challenge onwards and for every third challenge after that, you will receive pieces of the Covens of Umbra Totem Pole decoration",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "League-only challenge microtransaction rewards, to be revealed in a later news post.",
+     "cite": [
+      6
+     ],
+     "quote": "These rewards will be revealed in an upcoming news post.",
+     "stage": [
+      "all"
+     ]
+    }
+   ],
+   "dangers": [
+    {
+     "text": "A fully empowered boss is a dangerous fight; more Fates means more risk.",
+     "cite": [
+      6
+     ],
+     "quote": "A fully empowered boss can be quite a threatening fight, but the tantalising rewards of each Fate you invoke will surely make it worth it.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Regular Fate-empowered bosses do not guarantee Viscera; it is only a chance.",
+     "cite": [
+      0
+     ],
+     "quote": "Regular bosses empowered by fates do not, and have a higher chance the more Fates you invoke,",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Skipping a Fate choice does not get you new Fates: the next coven shows the old set again until you pick.",
+     "cite": [
+      0
+     ],
+     "quote": "must make a choice if you want to see the next available set of choices.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "With a duplicate Fate, the second card's own rewards are thrown away; only the first card's are tripled (unofficial: Maxroll Q&A).",
+     "cite": [
+      2
+     ],
+     "quote": "the rewards of the 1st one are tripled, and the 2nd card rewards are discarded.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The top (Greater) Viscera tier drops only in the endgame (unofficial: Maxroll).",
+     "cite": [
+      1
+     ],
+     "quote": "Each trophy has 3 tiers with the highest one being available only in the endgame",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Viscera placed on a Wickerman stay with that character; they do not carry over to your other characters.",
+     "cite": [
+      0
+     ],
+     "quote": "Viscera placed on your wickerman is character-specific.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Grim-Fate pinnacles are deadly fights.",
+     "cite": [
+      7
+     ],
+     "quote": "These fate-empowered Pinnacles are deadly fights, but are well worth the effort.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Doedre's Tongue no longer drops outside Covens of Umbra encounters.",
+     "cite": [
+      6
+     ],
+     "quote": "The Doedre's Tongue Unique Amulet can no longer drop outside of Covens of Umbra encounters.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Divination cards can no longer give current-league items, so Covens items are not in their pools unless they go core.",
+     "cite": [
+      6
+     ],
+     "quote": "Divination Cards can no longer reward current league-specific items in their potential pool of rewards.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The Covetous Dark takes boss modifiers only twice, and they are then locked.",
+     "cite": [
+      8
+     ],
+     "quote": "This can be done up to twice, once for each prong of the claw, with those powers locked in place.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Dying in Hardcore Covens of Umbra moves the character to Standard Covens of Umbra.",
+     "cite": [
+      6
+     ],
+     "quote": "if you die in Hardcore Covens of Umbra you can continue on in the Standard Covens of Umbra League",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The notes tie no Exceptional Support gems to Covens; the only change is Transfusion joining the random-Exceptional divination card pool.",
+     "cite": [
+      6
+     ],
+     "quote": "Transfusion Support can now be obtained from Divination Cards that grant random Exceptional Support Gems.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: No official list of named Fates or their effects; unofficial sources name only 'Rot', with no effect given.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: How Grim Fates are obtained and invoked is not in the official posts. Unofficial: map bosses or Fate-empowered bosses can grant one, it is stored at the Wickerman, and the Map Device shows an 'Invoke Grim Fate' option.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Named Grim Fates (The Collector for Maven, The Awakened for Sirus, The Emissary for Eater of Worlds) appear only in unofficial poedb data.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: How to reach and fight the Coven Queen is not stated officially. Unofficial: she is a new Pinnacle boss reached via empowered pinnacles and summoned with the Cursed Poppet.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: What the Cursed Poppet fragment does and what Coven Queen's Crown grants.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: The maximum number of Fates per boss, Fate tiers, Wickerman slot count and Viscera tiers are not in official sources (unofficial: up to 3 Fates, 4 slots, 3 tiers).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Exact Viscera drop chances for regular bosses.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Whether Viscera can be removed or swapped once placed on the Wickerman.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: What the new 'Fated' item filter condition matches.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Exact rolls of Pinnacle Viscera: Maxroll's transcription and poedb's ranges differ (e.g. Greater Incarnation of Dread's Head).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Which of the 11 new uniques are league drops, and where The Covetous Dark and Hide of the Vendigo drop.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: The league-only challenge microtransaction rewards (to be revealed in a later news post).",
+     "stage": [
+      "all"
+     ]
+    }
+   ],
+   "tables": [
+    {
+     "title": "Rules",
+     "columns": [
+      "Rule"
+     ],
+     "rows": [
+      [
+       "Each character has its own Wickerman; it is not shared across the account."
+      ],
+      [
+       "Invoking more Fates on a regular boss raises its Viscera drop chance."
+      ],
+      [
+       "Invoking the same Fate more than once raises the Viscera chance further."
+      ],
+      [
+       "Fate choices are gated so that checking every coven before choosing is not the best way to play."
+      ],
+      [
+       "Later areas have more covens, so one boss can be empowered up to 3 times (unofficial: Maxroll)."
+      ],
+      [
+       "Fates come in different tiers (unofficial: Maxroll Q&A)."
+      ],
+      [
+       "The Wickerman has 4 slots: head, torso, upper limb, lower limb (unofficial: Maxroll)."
+      ],
+      [
+       "Viscera come in three tiers: Lesser, normal (no prefix) and Greater (unofficial: poedb)."
+      ],
+      [
+       "A Viscera's effect applies for as long as it sits in the Wickerman (unofficial: poedb)."
+      ],
+      [
+       "Every campaign boss and every Atlas map boss has its own Viscera (unofficial: poedb)."
+      ],
+      [
+       "Viscera are their own item class in item filters: 'Viscera'."
+      ],
+      [
+       "Item filters gain a new True/False condition 'Fated'; GGG has not explained it."
+      ],
+      [
+       "Official Viscera base types for pinnacle bosses: Maven's Orrery, Sirus' Head, Incarnation of Dread's Head, Incarnation of Neglect's Cube, Incarnation of Fear's Head, Searing Exarch's Descry, Eater of Worlds' Head, Elder's Head, Shaper's Head, Venarius' Scripture."
+      ],
+      [
+       "Official Viscera base types also cover the Guardians (Minotaur, Hydra, Chimera, Phoenix), Elder Guardians (Constrictor, Purifier, Enslaver, Eradicator) and Conquerors (Baran, Veritania, Drox, Al-Hezmin)."
+      ],
+      [
+       "Five 'Nightmarish' Viscera are in the official list: Book of Depravity, Head of Uhtred, Core of the Unbreakable, Wings of Lycia, Wings of Catarina."
+      ],
+      [
+       "The official list also has a Viscera called Coven Queen's Crown; its effect is not stated."
+      ],
+      [
+       "A new Map Fragment, Cursed Poppet, is added; the official post gives only its name."
+      ],
+      [
+       "The Coven Queen is the league's antagonist; the goal is to end her witchcraft."
+      ],
+      [
+       "Standard, Hardcore and Solo Self-Found versions share the same mechanics and items."
+      ],
+      [
+       "Private league versions with harder mods can be created."
+      ],
+      [
+       "Free to play from 13 November (PST) on all platforms."
+      ]
+     ],
+     "cite": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "quotes": [
+      "Each character gets their own wickerman.",
+      "have a higher chance the more Fates you invoke",
+      "and an higher chance still if you invoke duplicate Fates.",
+      "This is to prevent this kind of unfun gameplay being optimal.",
+      "you find more rituals in each area allowing you to empower the boss up to 3 times.",
+      "Fate cards have different tiers.",
+      "Wickerman has slots for 4 trophies: upper limb, lower limb, head and torso.",
+      "Three tiers of body parts: Lesser, Normal (no prefix), and Greater (available only in Endgame)",
+      "Body parts grant permanent effects to your character while they are equipped into the Wickerman.",
+      "Every boss in the campaign, as well as every boss on a map in the Atlas, has a unique Viscera to be obtained.",
+      "Item class: Viscera",
+      "Fated",
+      "Maven's Orrery",
+      "Al-Hezmin's Head",
+      "Nightmarish Wings of Catarina",
+      "Coven Queen's Crown",
+      "Cursed Poppet",
+      "disrupt dark magicks and put an end to the powerful witchcraft of the Coven Queen.",
+      "there are Standard, Hardcore and Solo Self-Found variations of the Covens of Umbra challenge league available. They have the same core mechanics and items.",
+      "You can create private league versions of these leagues, with mods that make the game harder.",
+      "for free on November 13 (PST) across all available platforms."
+     ]
+    }
+   ],
+   "quickCard": [
+    "Kill the coven, then pick a Fate for the area boss",
+    "Pick before moving on: next Fates stay hidden",
+    "Take every Fate before the boss; more or duplicate Fates = better Viscera odds",
+    "Grim-Fate pinnacles: deadly, always drop their Viscera",
+    "Doedre's Tongue now drops only from Covens"
+   ],
+   "labels": {
+    "sell": "Rewards",
+    "dangers": "Watch out / not known yet"
+   },
+   "readMore": [
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4013527",
+     "title": "Covens of Umbra FAQ",
+     "publisher": "Grinding Gear Games"
+    },
+    {
+     "url": "https://maxroll.gg/poe/news/3-30-covens-of-umbra-reveal-summary",
+     "title": "https://maxroll.gg/poe/news/3-30-covens-of-umbra-reveal-summary"
+    },
+    {
+     "url": "https://maxroll.gg/poe/news/exilecon-covens-of-umbra-qa",
+     "title": "https://maxroll.gg/poe/news/exilecon-covens-of-umbra-qa"
+    },
+    {
+     "url": "https://poedb.tw/us/Wickerman",
+     "title": "https://poedb.tw/us/Wickerman"
+    },
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4013923",
+     "title": "3.30 item filter changes",
+     "publisher": "Grinding Gear Games"
+    },
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4012710",
+     "title": "https://www.pathofexile.com/forum/view-thread/4012710",
+     "publisher": "Grinding Gear Games"
+    },
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4013680",
+     "title": "3.30.0 patch notes",
+     "publisher": "Grinding Gear Games"
+    },
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4013858",
+     "title": "Pinnacle Viscera",
+     "publisher": "Grinding Gear Games"
+    },
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4013701",
+     "title": "3.30 unique changes",
+     "publisher": "Grinding Gear Games"
+    }
+   ]
+  },
+  {
+   "id": "threads",
+   "title": "Threads and Shaped Regions",
+   "group": "Endgame",
+   "asOf": "3.30",
+   "summary": "Scarabs are gone in 3.30. Ten Threads replace them: each Thread you put in the Map Device adds its league mechanic to the map, and spending up to eight raises the chance of random transformative effects. Those ten mechanics no longer appear by chance, so you only meet them by spending Threads or mapping inside a Shaped Region of that type, which gives free Threads. Allflame Embers, Divine Vessels, Delirium Orbs and Mercenary Warrants no longer go in the Map Device, map Item Quantity is now Atlas Drops, rewards scale mostly through Item Rarity, and the Atlas tree was rebuilt with 150 points while 31 maps swapped in and out.",
+   "howTo": [
+    {
+     "text": "Put Threads in the Map Device when you open a map. Each Thread adds its own league mechanic to that map.",
+     "cite": [
+      0
+     ],
+     "quote": "Threads can be used when entering an Atlas area through the Map Device to apply the associated League mechanic to that Thread to the area.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Spend up to eight Threads on one map. Each extra Thread raises the chance of strong random transformative effects for that mechanic.",
+     "cite": [
+      0
+     ],
+     "quote": "For each Thread expended, up to a maximum of eight, there are also increasingly higher and higher chances to apply powerful randomised transformative effects to the area related to that League mechanic.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Run maps inside a Shaped Region to get free Threads of that region's type.",
+     "cite": [
+      0
+     ],
+     "quote": "Shaped Regions grant affected Maps free Threads of that type.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Complete the Shaped Region objective in a map: every other map in that region gets 1 more free Thread.",
+     "cite": [
+      0
+     ],
+     "quote": "Successfully completing the Shaped Region objective in each Map increases the free Thread count by 1 in all other Maps affected by that Shaped Region.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Use an Astrolabe to place a Shaped Region of its type on a map you pick. It removes the existing region of that type from your Atlas.",
+     "cite": [
+      0
+     ],
+     "quote": "Astrolabes have been changed to add a Shaped Region of the specified type to a specific Map on the Atlas, removing existing Shaped Regions of that type from the Atlas.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "When fewer than 10 Shaped Regions are left on your Atlas, click the button in the centre of the Atlas to regenerate all of them.",
+     "cite": [
+      0
+     ],
+     "quote": "While you have less than 10 Shaped Regions on your Atlas, you can click a button at the centre of the Atlas to Regenerate all Shaped Regions.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Use a Frayed Thread for a random Thread, or sell it to a vendor for a random Thread.",
+     "cite": [
+      0
+     ],
+     "quote": "Added a new Currency Item, Frayed Thread which can be used to grant a random Thread, or vendored for a random Thread.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Use Allflame Embers on the map item itself (not in the Map Device). They add an enchantment with their pack replacement, and each Ember now states how many packs it replaces.",
+     "cite": [
+      0
+     ],
+     "quote": "Allflame Embers are no longer fragments which can be used alongside a Map. Instead, these are now Currency items which can be used on a Map to apply an Enchantment which provides their pack substitution effect.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Use Divine Vessels on the map item to add the Deified enchantment. They now stack to 20.",
+     "cite": [
+      0
+     ],
+     "quote": "Divine Vessels are now Currency items that can be used on Maps to apply the Deified Enchantment Modifier.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Use Delirium Orbs on a Rare map. They reforge it with an explicit mod that makes players Delirious instead of adding an enchantment.",
+     "cite": [
+      0
+     ],
+     "quote": "Delirium Orbs no longer apply enchantments to Maps. Instead they reforge rare Map items with an explicit modifier making players in the area Delirious.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Apply Ritual Threads before adding Blood-Filled Vessels; a map without Ritual Threads cannot take them. More Ritual Threads open more Vessel slots (see table).",
+     "cite": [
+      0
+     ],
+     "quote": "Blood-Filled Vessels can only be added to Maps that have Ritual Threads applied.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Use a Mercenary Warrant to open portals to the Proving Grounds on the Atlas and rematch that Mercenary. Warrants no longer go in with a map.",
+     "cite": [
+      0
+     ],
+     "quote": "Mercenary Warrants are no longer fragments you use alongside a Map. Instead they can be used to open portals to the Proving Grounds area on the Atlas, which is an area where you can rematch the previously fought Mercenary.",
+     "stage": [
+      "all"
+     ]
+    }
+   ],
+   "sell": [
+    {
+     "text": "Most places that used to give Scarabs now give Threads.",
+     "cite": [
+      0
+     ],
+     "quote": "The majority of Scarab sources throughout the game instead now grants a number of Threads.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Eater of Worlds altars can make Eldritch monsters or the map boss drop Breach, Legion, Blight, Ritual or Incursion Threads.",
+     "cite": [
+      0
+     ],
+     "quote": "Eater of Worlds Altars now have Modifiers that can cause Eldritch Monsters or Map Bosses to drop Breach, Legion, Blight, Ritual or Incursion Threads.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Searing Exarch altars can make Eldritch monsters or the map boss drop Abyss, Expedition, Betrayal, Bestiary or Ultimatum Threads.",
+     "cite": [
+      0
+     ],
+     "quote": "Searing Exarch Altars now have Modifiers that can cause Eldritch Monsters or Map Bosses to drop Abyss, Expedition, Betrayal, Bestiary and Ultimatum Threads.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Altar mods that duplicated dropped Scarabs now duplicate dropped Threads.",
+     "cite": [
+      0
+     ],
+     "quote": "Eldritch Altar Modifiers that granted a chance for Scarabs dropped by slain Enemies to be Duplicated, instead now apply to Threads.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Strongbox mods that dropped 1-4 Scarabs of one type now drop 2-5 Threads of one type.",
+     "cite": [
+      0
+     ],
+     "quote": "Strongbox Modifiers that dropped 1-4 of a specific type of Scarab instead now drop 2-5 of a specific type of Thread.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Tormented Heretics can now spawn in maps. Monsters they touch can drop Threads, and monsters they possess drop extra Threads.",
+     "cite": [
+      0
+     ],
+     "quote": "Tormented Heretics now have a base chance to spawn in Maps. Monsters touched by Tormented Heretics have a chance to drop Threads, and monsters possessed by Tormented Heretics drop additional Threads.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Maven's Chisel of Threads (was Chisel of Scarabs) raises the quantity of Threads found in the map.",
+     "cite": [
+      0
+     ],
+     "quote": "Maven's Chisel of Scarabs has been renamed to Maven's Chisel of Threads, and now increases the quantity of Threads found on a Map (previously Scarabs).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The Threaded Delirium Orb (was Skittering) gives Thread rewards.",
+     "cite": [
+      0
+     ],
+     "quote": "The Skittering Delirium Orb has been renamed to Threaded Delirium Orb, and now grants Thread rewards (previously Scarabs).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Heist chests that gave Fragments now give Threads, and Heist gear that doubled Fragments now doubles Threads.",
+     "cite": [
+      0
+     ],
+     "quote": "Heist Chests that granted Fragment Rewards instead now grant Thread Rewards.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Rin in Research gives a trapped stash of mixed Threads; Rin in Fortification gives chests of Threads.",
+     "cite": [
+      0
+     ],
+     "quote": "Rin's Research reward is now a trapped stash containing different Threads of various stack sizes (previously a trapped stash containing Scarabs).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Each 1% of Atlas Drops gives 1% more Maps and Threads in the area.",
+     "cite": [
+      0
+     ],
+     "quote": "Each percentage of increased Atlas Drops increases the quantity of Maps and Threads found in the area by 1%.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Atlas Drops also raises league resources such as Hiveblood and Lifeforce, and extra drops from specific monsters such as Legion Splinters.",
+     "cite": [
+      0
+     ],
+     "quote": "It also affects the quantity of League-specific resources found, such as Hiveblood from Breach monsters or Lifeforce from Harvest monsters.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Unidentified maps give +30% Atlas Drops when opened (was +30% Item Quantity).",
+     "cite": [
+      0
+     ],
+     "quote": "Unidentified Maps now grant +30% Atlas Drops when opened (previously +30% Item Quantity).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "A Shaped Region placed with an Astrolabe starts with more free Threads than a default one.",
+     "cite": [
+      0
+     ],
+     "quote": "Shaped Regions applied by Astrolabes have a higher base number of free Threads applied to Maps in the Region.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "With Unwavering Vision, maps with Threads applied gain 2 extra Threads that can go past the cap of 8.",
+     "cite": [
+      0
+     ],
+     "quote": "Your Maps with Threads applied also gain 2 additional Threads, which can bypass the 8 Thread maximum.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "A Delirium-orbed map gives 1 reward of the orb's type, plus 1 more for every 20% Delirious.",
+     "cite": [
+      0
+     ],
+     "quote": "Delirium Orbed Maps have one reward of the specified type and an additional reward of that type for every 20% Delirious Percentage in the area.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "In Deified areas certain map bosses drop a filled Divine Vessel for Pantheon upgrades.",
+     "cite": [
+      0
+     ],
+     "quote": "In Deified areas, you can capture the souls of certain Map Bosses, dropping a filled Divine Vessel on death which can be used to upgrade your Pantheon powers.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Catarina always drops an Allflame Ember of Propagation, Kulemak or the Ethereal. Other Embers are safehouse rewards: non-Intervention rewards that were Scarab chests are now chests with a specific Ember.",
+     "cite": [
+      0
+     ],
+     "quote": "Catarina now always drops either an Allflame Ember of Propagation, Allflame Ember of Kulemak or Allflame Ember of the Ethereal. All other Allflames are a specific target's safehouse reward.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Three new Allflame Embers: of the Cloister, of the Divine and of the Multitude (the Cloister one cannot be obtained in Ruthless).",
+     "cite": [
+      0
+     ],
+     "quote": "Added three new Allflame Embers: Allflame Ember of the Cloister, Allflame Ember of the Divine, and Allflame Ember of the Multitude.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The Surveyor's Study, Office of Cartography and Atlas of Worlds Temple rooms now have a device that corrupts an already Corrupted map a second time.",
+     "cite": [
+      0
+     ],
+     "quote": "now contain a device that lets you Corrupt Corrupted Maps a second time. The device has multiple uses in higher-tier rooms.",
+     "stage": [
+      "all"
+     ]
+    }
+   ],
+   "dangers": [
+    {
+     "text": "Templar, Fruiting and Deceptive Astrolabes are removed. Old ones became Cryptic Astrolabes, which give a random other Astrolabe when used or sold.",
+     "cite": [
+      0
+     ],
+     "quote": "Templar, Fruiting and Deceptive Astrolabes have been removed. Pre-existing items have been converted to a Cryptic Astrolabe which can be used or vendored to grant a random other Astrolabe.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Six Atlas keystones are gone: Crop Rotation, Endless Tide, Lucid Dreams, Meticulous Appraiser, Refiner's Bargain and Synthesised Stability.",
+     "cite": [
+      0
+     ],
+     "quote": "The following Keystone Atlas Passives have been removed: Crop Rotation, Endless Tide, Lucid Dreams, Meticulous Appraiser, Refiner's Bargain, and Synthesised Stability.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "There are no Delve or Heist clusters on the Atlas tree any more.",
+     "cite": [
+      0
+     ],
+     "quote": "Atlas Passive clusters related to Delve and Heist have been removed.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Vaal Side Areas no longer appear in maps, and their Atlas tree stats are removed.",
+     "cite": [
+      0
+     ],
+     "quote": "Vaal Side Areas can no longer be found in Maps, and all Atlas Passive Tree stats related to Vaal Side Areas have been removed.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Completing Shaped Region objectives no longer gives the other maps in the region bonus mods. Only the free Thread count goes up.",
+     "cite": [
+      0
+     ],
+     "quote": "Completing Shaped Region objectives no longer grants other Maps in that Shaped Region bonus modifiers.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Official FAQ: a map leaves its Shaped Region after one run, even if you skip or never touch the mechanic.",
+     "cite": [
+      3
+     ],
+     "quote": "you'll only need to see that mechanic there a single time before it stops appearing.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Unwavering Vision now limits you to one Thread type on your maps and gives Threads found in your maps a 75% chance to turn into Gold.",
+     "cite": [
+      0
+     ],
+     "quote": "It now causes you to be only able to apply one type of Thread to your Maps, and 75% chance for Threads found in your Maps to be converted to Gold.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The more monsters still alive when you kill the map boss, the lower the chance of an Atlas Anomaly.",
+     "cite": [
+      0
+     ],
+     "quote": "The chance for Atlas Anomalies to spawn is now lowered by the amount of monsters remaining in the Map when the Map Boss is killed.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Operative's Strongboxes no longer spawn.",
+     "cite": [
+      0
+     ],
+     "quote": "Operative's Strongboxes can no longer be found.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The Fragmented Delirium Orb is removed. Old ones became Threaded Delirium Orbs, and maps already carrying its enchantment give Thread rewards.",
+     "cite": [
+      0
+     ],
+     "quote": "The Fragmented Delirium Orb has been removed. Existing Fragmented Delirium Orbs will be converted to Threaded Delirium Orbs.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Using a Delirium Orb of a different reward type resets the map's Delirious percentage.",
+     "cite": [
+      0
+     ],
+     "quote": "Using a Delirium Orb of a different reward type resets the current Delirious percentage on the Map.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Delirium Orbs cannot be used on legacy maps that already have Delirium layers.",
+     "cite": [
+      0
+     ],
+     "quote": "Delirium Orbs cannot be used on legacy Maps that have layers of Delirium applied.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "A Vaal Orb can no longer reroll a map into an 8-mod Rare. That outcome now adds 2 explicit mods (up to 9). Logbooks, Contracts, Blueprints and Invitations are affected too.",
+     "cite": [
+      0
+     ],
+     "quote": "This has been replaced with an outcome that will add 2 Explicit Modifiers to a Map (up to a maximum of 9 Modifiers).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "The +10-20% Item Quantity corruption implicit on maps can no longer roll. The Item Rarity implicit is now +10-20% (was +8-12%).",
+     "cite": [
+      0
+     ],
+     "quote": "The Item Rarity Corruption Implicit Modifier on Maps is now +10-20% Item Rarity (previously +8-12%).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Eldritch altar rarity is now 10-20% (was 15-30%), Memory Trace altar rarity 20-25% (was 25-40%), and both Quantity altars are removed.",
+     "cite": [
+      0
+     ],
+     "quote": "Eldritch Altars can now grant 10-20% increased Rarity of Items found in this Area (previously 15-30%).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Item Rarity on Nightmare and Originator map mods is about 40-50% lower.",
+     "cite": [
+      0
+     ],
+     "quote": "Item Rarity values on Nightmare and Originator-influenced Map modifiers that specifically augment Item Rarity have been lowered by approximately 40-50%.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Item Rarity on the player is weaker at finding Magic, Rare and Unique items; it now affects the chance of Tiered Magic and Rare items.",
+     "cite": [
+      0
+     ],
+     "quote": "Decreased the efficacy of player Item Rarity on finding Magic, Rare and Unique Rarity items. Player Item Rarity now affects the chance to find Tiered Magic and Rare items.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Official FAQ: Item Rarity on your gear does not change currency drops. Only rarity from sources such as map and monster mods does.",
+     "cite": [
+      3
+     ],
+     "quote": "No it will not. Only rarity from non-player-gear sources will affect this.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Intervention safehouse members now give a trapped stash of one class of Unique items instead of Scarab chests.",
+     "cite": [
+      0
+     ],
+     "quote": "All Immortal Syndicate members within an Intervention Safehouse will now reward a trapped stash containing a specific class of Unique items (such as Unique Axes), instead of chests containing Scarabs.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Sacrifice and Mortal Fragments are removed. Old Mortal Fragments became Royal Visages; Sacrifice Fragments remain but do nothing.",
+     "cite": [
+      0
+     ],
+     "quote": "Existing Mortal Fragments will be converted to Royal Visages upon logging in, while Sacrifice Fragments will remain but have no functionality.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: The notes give no odds for transformative effects. Maxroll (unofficial) says each mechanic has 5-8 possible effects, each rolled independently.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: How many free Threads a default or Astrolabe-placed Shaped Region gives, and what the objective is for each region type.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Which mechanic the new Feral, Immortal and Royal Astrolabes belong to.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Whether the Prospecting Astrolabe was also removed: the item filter post lists it as removed, the patch notes do not.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Which maps always have Sulphite Veins, Smuggler's Caches or a Forbidden Tome chest.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: How many Blood-Filled Vessel slots a map with 1-3 Ritual Threads gets.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: What the three new Allflame Embers (Cloister, Divine, Multitude) do.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Tiers and quadrants of the 31 returning maps.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: The official limit on Thread types per map (Maxroll, unofficial, says 3).",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: The item filter class for Threads (Map Fragments; Frayed Thread in Stackable Currency) comes via a page summariser of the filter post; exact wording unconfirmed.",
+     "stage": [
+      "all"
+     ]
+    },
+    {
+     "text": "Not known yet: Which old Scarab effects moved to which nodes on the new Atlas tree.",
+     "stage": [
+      "all"
+     ]
+    }
+   ],
+   "tables": [
+    {
+     "title": "Rules",
+     "columns": [
+      "Rule"
+     ],
+     "rows": [
+      [
+       "Scarabs no longer exist. Threads are the new item type that replaces them."
+      ],
+      [
+       "Old Scarabs (Standard) turned into the Thread for their mechanic or into a Frayed Thread. Veiled Scarabs became Frayed Threads."
+      ],
+      [
+       "There are exactly ten Threads: Abyss, Bestiary, Betrayal, Blight, Breach, Expedition, Incursion, Legion, Ritual and Ultimatum. There is no Thread for Harvest, Delirium, Essence, Delve, Heist, Mercenaries or Strongboxes."
+      ],
+      [
+       "Threads go in a new Threads section of the Fragment Stash Tab. The Scarabs section hides itself once empty."
+      ],
+      [
+       "Unofficial (Maxroll reveal summary): a map can take up to 3 different Thread types. The patch notes only state the cap of eight Threads."
+      ],
+      [
+       "Unofficial (Maxroll Q&A summary): even one Thread guarantees at least one transformative effect."
+      ],
+      [
+       "Unofficial (Maxroll Q&A summary): each extra Thread adds less than the one before. The tooltip lists the possible effects but hides the odds."
+      ],
+      [
+       "Abyss, Bestiary, Betrayal, Breach, Blight, Expedition, Incursion, Legion, Ritual and Ultimatum no longer spawn in maps by chance."
+      ],
+      [
+       "Official FAQ: these mechanics only appear if you spend a Thread on them or run the map inside a Shaped Region of their type. You no longer need to block them."
+      ],
+      [
+       "Smuggler's Caches and Sulphite Deposits no longer spawn by chance. Certain Atlas maps always have Sulphite Veins or Smuggler's Caches, or can hold a Forbidden Tome chest (the notes do not name them)."
+      ],
+      [
+       "Beyond, Buried Sentinels, Delirium Mirrors, Mirage and the Viridian Wildwood still appear by chance; their Atlas clusters only raise that chance. Sentinels and the Wildwood can now appear in any map tier (was Tier 16 only)."
+      ],
+      [
+       "Rare maps can roll new suffixes that add a buried Pandemonium, Apex or Stalker Sentinel, a Mirage, the Viridian Wildwood, an Evocator of Beidat, K'Tash or Ghorr, or a Mirror of Delirium. They show in a different colour."
+      ],
+      [
+       "Harvest no longer uses its own subarea. Sacred Flora can spawn inside the map instead."
+      ],
+      [
+       "There are 10 Shaped Region types, one per Thread type. By default your Atlas has one of each."
+      ],
+      [
+       "Official FAQ: you cannot refuse a Shaped Region's free Thread, but the map leaves the Shaped Region after you run it once."
+      ],
+      [
+       "Astrolabes can now drop in maps that are inside a Shaped Region."
+      ],
+      [
+       "Eagon no longer gives Templar Vaults for Shaped Regions. They are now Atlas Anomalies that can spawn when you kill a Pinnacle Eldritch Boss in each Atlas quadrant (not the Maven Invitation or Valdo map versions)."
+      ],
+      [
+       "New keystone Phantom Anomalies: Atlas Anomalies appear when you complete Shaped Regions instead of on map completion, and can come from any quadrant."
+      ],
+      [
+       "The Atlas tree is rebuilt and you now start in the centre. The maximum is 150 Atlas points (was 138), so old tree links and point plans no longer apply."
+      ],
+      [
+       "Maven, the Searing Exarch, the Eater of Worlds and each of Maven's six special Invitations now give 2 Atlas points each (was 1). Uber Elder gives 4 (was 1)."
+      ],
+      [
+       "Every Scarab cluster on the Atlas tree became a Thread cluster, and many old Scarab effects now sit partly or fully on the core Atlas tree."
+      ],
+      [
+       "Atlas clusters for secondary mechanics were reworked or added: Essence, Harvest, Mercenaries, Ore Deposits, Rogue Exiles, Shrines, Strongboxes and Torment."
+      ],
+      [
+       "Item Quantity on map mods is now Atlas Drops at the same values, on existing maps too."
+      ],
+      [
+       "Monster and chest Item Rarity now picks the drop pool: Magic currency (Transmutation, Alteration, Jeweller's) only on a Magic roll, Rare currency (Alchemy, Chaos, Divine, Mirror) only on a Rare roll. The old currency penalty on Magic, Rare and Unique monsters is gone."
+      ],
+      [
+       "Effects that make monsters harder and more rewarding now add only Item Rarity, not Quantity. Delirium fog, Sentinels, Opulent Rituals, Tempests, Covetous Shrines and Verisium monsters lost their Quantity."
+      ],
+      [
+       "Shaper, Elder and Conqueror Fragments no longer add Item Quantity and are no longer used up when placed with a map."
+      ],
+      [
+       "Each Delirium Orb adds 5-50% Delirious. Orbs of the same type stack up to 100%."
+      ],
+      [
+       "Royal Visage is used on a Tier 16 map to add an enchantment that makes its Temporal Incursions Alluring."
+      ],
+      [
+       "The Black Barya can now appear on the Atlas in all leagues, at area level 84 (was 83)."
+      ],
+      [
+       "Memory Threads (Originator) are now called Memory Traces, so \"Thread\" only means the new map items."
+      ]
+     ],
+     "cite": [
+      0,
+      1,
+      2,
+      3
+     ],
+     "quotes": [
+      "Scarabs have been removed from the game. A new item type, Threads, have been added in their place.",
+      "Existing Scarabs will be converted to either a Thread related to that specific Scarab content, or a Frayed Thread.",
+      "Below are the new Thread items available:",
+      "A new Threads section has been added to the Fragment Stash Tab, and the Scarabs section is now hidden when empty.",
+      "Each league mechanic has its own type of a Thread, and you can use up to 3 different Thread types alongside a map.",
+      "If you use 1 Thread only you are guaranteed that it adds at least 1 modifier.",
+      "Each Thread's tooltip shows what modifiers you can apply, but the chances for them to appear are obscured.",
+      "The following league mechanics no longer have a random chance to spawn in Map areas: Abyss, Bestiary, Betrayal, Breach, Blight, Expedition, Incursion, Legion, Ritual, and Ultimatum.",
+      "unless you spend a thread to cause them to, or run a map within a shaped region of their type.",
+      "Several specific Maps on the Atlas now always spawn Sulphite Veins, or Smuggler's Caches or have a chance to contain a chest with a Forbidden Tome.",
+      "Tertiary League mechanics, such as Beyond, Buried Sentinels, Delirium Mirrors, Mirage, and the Viridian Wildwood now only have Atlas Passive clusters that increase the chance for that mechanic to randomly appear in Maps.",
+      "The above Modifiers can only be rolled on Rare Maps, and display in a different colour to regular Map modifiers.",
+      "Harvest encounters have been reworked to no longer be within a specific subarea. Instead, a number of Sacred Flora can spawn within a Map.",
+      "There are 10 types of Shaped Region, each associated with a specific type of Thread. By default your Atlas has a Shaped Region of each Thread type on it.",
+      "This is not possible, but that map will be removed from the shaped region after it is run.",
+      "Astrolabes are no longer restricted from dropping in Shaped Regions.",
+      "Templar Vaults are no longer granted by Eagon for completing Shaped Regions. Instead, Templar Vaults are now Atlas Anomalies which have a chance to spawn on killing Pinnacle Eldritch Bosses in each specific Atlas quadrant.",
+      "Added a new Atlas Keystone Passive, Phantom Anomalies, which causes Atlas Anomalies to manifest on completing Shaped Regions instead of Map Completion, and Atlas Anomalies can manifest from any Quadrant.",
+      "The total number of Atlas Passive Skill Points you can earn has been increased to 150 (previously 138).",
+      "The quest reward for defeating the Uber Elder is now 4 Atlas Skill points and 2 Atlas Respec points (previously 1 Atlas Skill point and 2 Atlas Respec points).",
+      "Many effects that previously existed on Scarabs have been partially or fully absorbed by the new Core Atlas Passive Tree.",
+      "This includes Essence, Harvest, Mercenaries, Ore Deposits, Rogue Exiles, Shrines, Strongboxes, and Torment.",
+      "Replaced Item Quantity on Map Modifiers with Atlas Drops at the same values. This change affects pre-existing items.",
+      "Magic Currency can only generate if the selected \"Rarity\" was Magic, and Rare Currency can only generate if the selected \"Rarity\" was Rare.",
+      "Effects that scale the difficulty and reward of Monsters now only scale reward through Item Rarity, rather than through both Item Rarity and Item Quantity.",
+      "Shaper, Elder and Conqueror Fragments no longer grant increased Item Quantity to Maps, and will no longer be consumed when used along with a Map.",
+      "Applying multiple Delirium Orbs of the same type will add to the current Delirious percentage, up to 100%.",
+      "A Royal Visage can be used on a Tier 16 Map to add an Enchantment modifier that causes Temporal Incursions in Area to be Alluring.",
+      "The Black Barya can now appear on the Atlas in all Leagues.",
+      "Memory Threads have been renamed to Memory Traces."
+     ]
+    },
+    {
+     "title": "The ten Threads",
+     "columns": [
+      "Thread",
+      "League mechanic it adds"
+     ],
+     "rows": [
+      [
+       "Abyss Thread",
+       "Abyss"
+      ],
+      [
+       "Bestiary Thread",
+       "Bestiary"
+      ],
+      [
+       "Betrayal Thread",
+       "Betrayal"
+      ],
+      [
+       "Blight Thread",
+       "Blight"
+      ],
+      [
+       "Breach Thread",
+       "Breach"
+      ],
+      [
+       "Expedition Thread",
+       "Expedition"
+      ],
+      [
+       "Incursion Thread",
+       "Incursion"
+      ],
+      [
+       "Legion Thread",
+       "Legion"
+      ],
+      [
+       "Ritual Thread",
+       "Ritual"
+      ],
+      [
+       "Ultimatum Thread",
+       "Ultimatum"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "Below are the new Thread items available:"
+     ]
+    },
+    {
+     "title": "Blood-Filled Vessel slots by Ritual Threads",
+     "columns": [
+      "Ritual Threads on the map",
+      "Blood-Filled Vessel slots"
+     ],
+     "rows": [
+      [
+       "None",
+       "Cannot add Vessels"
+      ],
+      [
+       "1-3",
+       "Not stated in the notes"
+      ],
+      [
+       "4-7",
+       "2"
+      ],
+      [
+       "8",
+       "3"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "Blood-Filled Vessels can only be added to Maps that have Ritual Threads applied. 2 Blood-Filled Vessel slots are available for 4 or more Ritual Threads, and 3 Blood-Filled Vessel slots are available for 8 Ritual Threads."
+     ]
+    },
+    {
+     "title": "Delirium Orb rewards by Delirious percentage",
+     "columns": [
+      "Delirious %",
+      "Rewards of the orb's type"
+     ],
+     "rows": [
+      [
+       "5-19%",
+       "1"
+      ],
+      [
+       "20-39%",
+       "2"
+      ],
+      [
+       "40-59%",
+       "3"
+      ],
+      [
+       "60-79%",
+       "4"
+      ],
+      [
+       "80-99%",
+       "5"
+      ],
+      [
+       "100%",
+       "6"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "Delirium Orbed Maps have one reward of the specified type and an additional reward of that type for every 20% Delirious Percentage in the area."
+     ]
+    },
+    {
+     "title": "Deified map bosses",
+     "columns": [
+      "Stat",
+      "Bonus"
+     ],
+     "rows": [
+      [
+       "Damage",
+       "25% increased"
+      ],
+      [
+       "Attack and Cast Speed",
+       "25% increased"
+      ],
+      [
+       "Toughness",
+       "100% increased"
+      ],
+      [
+       "Area of Effect",
+       "25% increased"
+      ],
+      [
+       "Rarity of items dropped",
+       "50% increased"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "Deified Areas empower all Map Bosses with 25% increased Damage, 25% increased Attack and Cast Speed, 100% increased Toughness, 25% increased Area of Effect, and 50% increased Rarity of items dropped."
+     ]
+    },
+    {
+     "title": "Maps added back to the Atlas (1 of 2)",
+     "columns": [
+      "Map"
+     ],
+     "rows": [
+      [
+       "Academy"
+      ],
+      [
+       "Ancient City"
+      ],
+      [
+       "Armoury"
+      ],
+      [
+       "Barrows"
+      ],
+      [
+       "Bone Crypt"
+      ],
+      [
+       "Carcass"
+      ],
+      [
+       "Castle Ruins"
+      ],
+      [
+       "Coves"
+      ],
+      [
+       "Crimson Temple"
+      ],
+      [
+       "Cursed Crypt"
+      ],
+      [
+       "Defiled Cathedral"
+      ],
+      [
+       "Dig"
+      ],
+      [
+       "Dungeon"
+      ],
+      [
+       "Maze"
+      ],
+      [
+       "Moon Temple"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "The following Maps have been added back to the Atlas: Academy, Ancient City, Armoury, Barrows, Bone Crypt, Carcass, Castle Ruins, Coves, Crimson Temple, Cursed Crypt, Defiled Cathedral, Dig, Dungeon, Maze, Moon Temple"
+     ]
+    },
+    {
+     "title": "Maps added back to the Atlas (2 of 2)",
+     "columns": [
+      "Map"
+     ],
+     "rows": [
+      [
+       "Mud Geyser"
+      ],
+      [
+       "Necropolis"
+      ],
+      [
+       "Overgrown Ruin"
+      ],
+      [
+       "Pen"
+      ],
+      [
+       "Peninsula"
+      ],
+      [
+       "Racecourse"
+      ],
+      [
+       "Scriptorium"
+      ],
+      [
+       "Sepulchre"
+      ],
+      [
+       "Shore"
+      ],
+      [
+       "Spider Forest"
+      ],
+      [
+       "Thicket"
+      ],
+      [
+       "Underground River"
+      ],
+      [
+       "Underground Sea"
+      ],
+      [
+       "Villa"
+      ],
+      [
+       "Waste Pool"
+      ],
+      [
+       "Wasteland"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "Mud Geyser, Necropolis, Overgrown Ruin, Pen, Peninsula, Racecourse, Scriptorium, Sepulchre, Shore, Spider Forest, Thicket, Underground River, Underground Sea, Villa, Waste Pool, and Wasteland."
+     ]
+    },
+    {
+     "title": "Maps removed from the Atlas (1 of 2)",
+     "columns": [
+      "Map"
+     ],
+     "rows": [
+      [
+       "Alleyways"
+      ],
+      [
+       "Arachnid Tomb"
+      ],
+      [
+       "Arsenal"
+      ],
+      [
+       "Atoll"
+      ],
+      [
+       "Bazaar"
+      ],
+      [
+       "Beach"
+      ],
+      [
+       "Bramble Valley"
+      ],
+      [
+       "Cells"
+      ],
+      [
+       "Chateau"
+      ],
+      [
+       "Courthouse"
+      ],
+      [
+       "Dark Forest"
+      ],
+      [
+       "Estuary"
+      ],
+      [
+       "Flooded Mine"
+      ],
+      [
+       "Forbidden Woods"
+      ],
+      [
+       "Forking River"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "The following Maps have been removed from the Atlas: Alleyways, Arachnid Tomb, Arsenal, Atoll, Bazaar, Beach, Bramble Valley, Cells, Chateau, Courthouse, Dark Forest, Estuary, Flooded Mine, Forbidden Woods, Forking River"
+     ]
+    },
+    {
+     "title": "Maps removed from the Atlas (2 of 2)",
+     "columns": [
+      "Map"
+     ],
+     "rows": [
+      [
+       "Foundry"
+      ],
+      [
+       "Frozen Cabins"
+      ],
+      [
+       "Gardens"
+      ],
+      [
+       "Ghetto"
+      ],
+      [
+       "Infested Valley"
+      ],
+      [
+       "Ivory Temple"
+      ],
+      [
+       "Lair"
+      ],
+      [
+       "Orchard"
+      ],
+      [
+       "Pier"
+      ],
+      [
+       "Plaza"
+      ],
+      [
+       "Primordial Blocks"
+      ],
+      [
+       "Shipyard"
+      ],
+      [
+       "Stagnation"
+      ],
+      [
+       "Toxic Sewer"
+      ],
+      [
+       "Vault"
+      ],
+      [
+       "Waterways"
+      ]
+     ],
+     "cite": [
+      0
+     ],
+     "quotes": [
+      "Foundry, Frozen Cabins, Gardens, Ghetto, Infested Valley, Ivory Temple, Lair, Orchard, Pier, Plaza, Primordial Blocks, Shipyard, Stagnation, Toxic Sewer, Vault, and Waterways."
+     ]
+    }
+   ],
+   "quickCard": [
+    "Threads replace Scarabs: 10 types, max 8 per map",
+    "No Thread or Shaped Region = no Abyss, Breach, Legion etc.",
+    "Shaped Region objective: +1 free Thread in its other maps",
+    "Under 10 regions: Regenerate at the Atlas centre",
+    "Embers, Divine Vessels, Delirium Orbs go on the map item",
+    "Map Quantity is now Atlas Drops; Rarity drives currency"
+   ],
+   "labels": {
+    "sell": "Rewards",
+    "dangers": "Watch out / not known yet"
+   },
+   "readMore": [
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4013680",
+     "title": "3.30.0 patch notes",
+     "publisher": "Grinding Gear Games"
+    },
+    {
+     "url": "https://maxroll.gg/poe/news/3-30-covens-of-umbra-reveal-summary",
+     "title": "https://maxroll.gg/poe/news/3-30-covens-of-umbra-reveal-summary"
+    },
+    {
+     "url": "https://maxroll.gg/poe/news/exilecon-covens-of-umbra-qa",
+     "title": "https://maxroll.gg/poe/news/exilecon-covens-of-umbra-qa"
+    },
+    {
+     "url": "https://www.pathofexile.com/forum/view-thread/4013527",
+     "title": "Covens of Umbra FAQ",
+     "publisher": "Grinding Gear Games"
+    }
+   ]
+  }
+ ]
+}

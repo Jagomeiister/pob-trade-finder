@@ -63,7 +63,23 @@ check("version is an int YYYYMMDDHHMM", isinstance(v, int) and not isinstance(v,
 check("asOf is a patch", bool(re.match(r"^\d+\.\d+$", data.get("asOf", ""))), data.get("asOf"))
 check("checked is a date", bool(re.match(r"^\d{4}-\d{2}-\d{2}$", data.get("checked", ""))), data.get("checked"))
 guides = data["guides"]
-check("all 21 guides, keyed by cheat sheet id", set(guides) == WANT, sorted(set(guides) ^ WANT))
+LEAGUE = {g["id"]: g for p in make_guides.league_sheet_paths()
+          for g in json.load(open(p, encoding="utf-8"))["guides"]}
+check("all 21 guides (+ the league sheets), keyed by cheat sheet id", set(guides) == WANT | set(LEAGUE),
+      sorted(set(guides) ^ (WANT | set(LEAGUE))))
+check("league sheets: guide-only sheets with their group, as of their patch, listed first",
+      all(any(s["id"] == k and s["group"] == v["group"] for s in data["sheets"]) and guides[k].get("asOf") == v["asOf"]
+          for k, v in LEAGUE.items()) and list(guides)[:len(LEAGUE)] == list(LEAGUE), list(guides)[:3])
+check("league sheets: every line cites a source; lines from non-GGG sources say 'unofficial'",
+      all(all(x.get("cite") or x["text"].startswith("Not known yet: ") for k in ("howTo", "sell", "dangers") for x in v[k]) and
+          all("unofficial" in x["text"].lower() for k in ("howTo", "sell", "dangers") for x in v[k] for c in x.get("cite", [])
+              if "pathofexile.com" not in v["readMore"][c]["url"])
+          for v in LEAGUE.values()))
+check("league sheets: every quoted line keeps its quote (audit trail)",
+      all(x.get("quote") for v in LEAGUE.values() for k in ("howTo", "sell", "dangers") for x in v[k] if x.get("cite")))
+check("labels rename sections only (Rewards for the league sheets' sell list)",
+      all(set(g.get("labels", {})) <= set(make_guides.SECTIONS) for g in guides.values()) and
+      guides.get("covens", {}).get("labels", {}).get("sell") == "Rewards")
 check("betrayal is the syndicate sheet", "syndicate" in guides and "betrayal" not in guides)
 
 # -- every guide maps to a sheet ---------------------------------------------------------
@@ -94,7 +110,7 @@ def cites(gid, where, c, n):
 
 
 ALLOWED = {"title", "asOf", "summary", "howTo", "strategies", "dangers", "sell", "profit", "changes", "tables",
-           "quickCard", "readMore"}
+           "quickCard", "readMore", "labels"}
 for gid, g in guides.items():
     if set(g) - ALLOWED:
         bad(gid, "unexpected keys %s" % sorted(set(g) - ALLOWED))
@@ -144,9 +160,9 @@ for gid, g in guides.items():
         if val in ("", [], {}, None):
             bad(gid, "empty field %s" % k)
 check("guide schema, stage tags and cite ranges", not problems, "; ".join(problems[:6]))
-check("every guide has how-to, strategies, dangers, quick card and sources",
-      all(g.get("howTo") and g.get("strategies") and g.get("dangers") and g.get("quickCard") and g.get("readMore")
-          for g in guides.values()), [k for k, g in guides.items() if not g.get("strategies")])
+check("every guide has how-to, strategies (not the league sheets yet), dangers, quick card and sources",
+      all(g.get("howTo") and (g.get("strategies") or k in LEAGUE) and g.get("dangers") and g.get("quickCard") and g.get("readMore")
+          for k, g in guides.items()), [k for k, g in guides.items() if not g.get("strategies") and k not in LEAGUE])
 
 
 def pkey(p):
@@ -182,7 +198,8 @@ with open(os.path.join(ROOT, "server", "public", "guides.json"), encoding="utf-8
     server_raw = f.read()
 check("server/public/guides.json is the same payload", server_raw == raw)
 size = len(raw.encode("utf-8"))
-check("payload size reasonable (< 800 KB)", size < 800 * 1024, "%.0f KB" % (size / 1024.0))
+# 3.30: the patch update and the two league sheets took it past 800 KB (lighter overlay windows: docs/TODO.md)
+check("payload size reasonable (< 900 KB)", size < 900 * 1024, "%.0f KB" % (size / 1024.0))
 
 # -- corrections layer ------------------------------------------------------------------------
 
@@ -501,7 +518,7 @@ if upd_files:
           [(gid, cite_urls(gid, c)) for gid, cs in got.items() for c in cs
            if not all(u.startswith("https://www.pathofexile.com/forum/view-thread/") for u in cite_urls(gid, c))][:3])
     check("guides marked up to date are the ones the update rated none/minor",
-          {k for k, g in shipped_guides.items() if g.get("asOf") == to} ==
+          {k for k, g in shipped_guides.items() if g.get("asOf") == to and k not in LEAGUE} ==
           {make_guides.ID_MAP.get(k, k) for k, s in upd["guides"].items() if s["impact"] in ("none", "minor")})
     check("update entries skipped for a reason", all(s.get("why") for s in upd.get("skipped", [])))
     no_spawn = [gid for gid in ("syndicate", "blight", "incursion", "expedition", "ultimatum", "ritual", "breach",
