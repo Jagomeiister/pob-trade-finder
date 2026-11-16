@@ -216,6 +216,11 @@ STUB_JS = r"""
     },
     notify: function () { return { ok: true }; },
     open_url: function () { return { ok: true }; },
+    // build-guide window (gui.py guide_*): the real host list; nothing opens in tests
+    guide_hosts: function () { return { ok: true, hosts: D.guideHosts, paths: D.guidePaths }; },
+    guide_open: function () { return { ok: true, reused: false, onTop: false }; },
+    guide_on_top: function (on) { return { ok: true, onTop: !!on, open: true }; },
+    guide_close: function () { return { ok: true }; },
     unique_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },  // dust explorer
     beast_prices: function () { return { ok: true, divine: D.rates.divine, items: [] }; },   // search text: beasts
     // mechanic tools (40-43): every item of the asked groups, with the price main() gave it (mech_data)
@@ -5557,6 +5562,8 @@ def main():
         "buildCode": build_code,
         "diagText": DIAG_TEXT,
         "mech": mech_data(),
+        "guideHosts": list(gui.GUIDE_HOSTS),
+        "guidePaths": gui.GUIDE_PATHS,
     }
     stub = STUB_JS.replace("__DATA__", json.dumps(data))
     only = sys.argv[1:]  # optional: run scenarios whose tag contains any argument
