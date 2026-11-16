@@ -362,6 +362,81 @@ async function main() {
   assert(st.tree.masteries.length === 2 && st.tree.sockets[0].nodeId === 26725, 'masteries + sockets per tree');
   assert(st.treeSpecs[0].sockets.length === 0 && st.treeSpecs[2].nodes.length === 7, 'self-closing and empty specs');
 
+  console.log('== skill sets (every set parsed) ==');
+  assert(build.skillSets.length === 2 && build.skillSets[0].title === 'Main' && build.skillSets[1].title === 'Leveling',
+    'both skill sets read with titles: ' + build.skillSets.map(s => s.title).join(', '));
+  assert(build.activeSkillSet === 0 && build.gemGroups === build.skillSets[0].gemGroups &&
+    build.gems === build.skillSets[0].gems && build.mainSkill === build.skillSets[0].mainSkill,
+    'gemGroups / gems / mainSkill mirror the active skill set');
+  assert(build.skillSets[1].gems.some(g => g.name === 'Summon Raging Spirit') &&
+    !build.skillSets[1].gems.some(g => g.name === 'Raise Spectre'), 'the inactive set has its own gems');
+  const gemSet = (title, gems) => '<SkillSet id="' + title.id + '"' + (title.t ? ' title="' + title.t + '"' : '') + '>' +
+    gems.map(g => '<Skill enabled="true" slot="Helmet"><Gem nameSpec="' + g + '" gemId="x/' + g + '" level="20" quality="0" enabled="true"/>' +
+      '<Gem nameSpec="Added Fire Damage" gemId="x/afd" level="20" enabled="true"/></Skill>').join('') + '</SkillSet>';
+  const ssXml = '<PathOfBuilding><Build className="Witch" mainSocketGroup="2"/><Skills activeSkillSet="7">' +
+    gemSet({ id: 3, t: 'Act 1' }, ['Freezing Pulse']) + gemSet({ id: 7 }, ['Arc', 'Fireball']) + '</Skills></PathOfBuilding>';
+  const ss = PoB.parseBuild(ssXml);
+  assert(ss.skillSets.length === 2 && ss.activeSkillSet === 1 && ss.skillSets[1].title === 'Skill set 2' && ss.skillSets[1].untitled,
+    'active set found by id, untitled set named "Skill set N": ' + JSON.stringify(ss.skillSets.map(s => [s.title, s.untitled])));
+  assert(ss.mainSkill.join() === 'Fireball,Added Fire Damage' && ss.gems.length === 4, 'main skill = Nth group of the active set: ' + ss.mainSkill);
+  assert(ss.skillSets[0].mainSkill.length === 0, 'another set without the main gem nor a group at that place: no main skill');
+  const ss2 = PoB.parseBuild('<PathOfBuilding><Build className="Witch" mainSocketGroup="1"/><Skills activeSkillSet="2">' +
+    gemSet({ id: 1, t: 'Leveling' }, ['Arc', 'Fireball']) + gemSet({ id: 2, t: 'Endgame' }, ['Fireball', 'Arc']) +
+    gemSet({ id: 3, t: 'Other' }, ['Spark']) + '</Skills></PathOfBuilding>');
+  assert(ss2.mainSkill[0] === 'Fireball' && ss2.skillSets[0].mainSkill[0] === 'Fireball' && ss2.skillSets[2].mainSkill[0] === 'Spark',
+    'other sets: the group with the main gem, else the same place: ' + ss2.skillSets.map(s => s.mainSkill[0]).join(', '));
+  const oldSkills = PoB.parseBuild('<PathOfBuilding><Build className="Witch" mainSocketGroup="1"/><Skills>' +
+    '<Skill enabled="true" slot="Gloves"><Gem nameSpec="Arc" gemId="x/arc" level="20"/></Skill></Skills></PathOfBuilding>');
+  assert(oldSkills.skillSets.length === 1 && oldSkills.gemGroups.length === 1 && oldSkills.mainSkill[0] === 'Arc' &&
+    oldSkills.skillSets[0].title === 'Skill set 1', 'old PoB without <SkillSet>: one set');
+  const noSkills = PoB.parseBuild('<PathOfBuilding><Build className="Witch"/></PathOfBuilding>');
+  assert(noSkills.skillSets.length === 0 && noSkills.gems.length === 0 && noSkills.mainSkill.length === 0 &&
+    noSkills.gemGroups === undefined, 'no <Skills>: no sets, empty gems (as before)');
+
+  console.log('== stages (gear set + skill set + tree per stage) ==');
+  const B = (items, skills, trees, act) => ({
+    itemSets: items.map(t => t === null ? { title: 'Gear set', untitled: true } : { title: t }),
+    skillSets: skills.map(t => t === null ? { title: 'Skill set', untitled: true } : { title: t }),
+    treeSpecs: trees.map(t => ({ title: t || '' })),
+    activeSetIndex: (act || [0, 0, 0])[0], activeSkillSet: (act || [0, 0, 0])[1], treeActive: (act || [0, 0, 0])[2] });
+  const S = (b) => PoB.buildStages(b).map(s => [s.title, String(s.itemSet), String(s.skillSet), String(s.treeSpec),
+    s.active ? 'A' : '', s.match].join('|'));
+  let got = S(B(['Leveling', 'Budget', 'Endgame'], ['endgame', ' BUDGET ', 'Leveling!'], ['Leveling', 'Budget', 'ENDGAME'], [2, 0, 2]));
+  assert(JSON.stringify(got) === JSON.stringify(['Leveling|0|2|0||name', 'Budget|1|1|1||name', 'Endgame|2|0|2|A|name']),
+    'names matched across lists (case, spaces, punctuation ignored), active stage marked: ' + JSON.stringify(got));
+  got = S(B(['Act 1-5', 'Maps', 'Pinnacle'], ['Freezing Pulse', 'Arc', 'Fireball'], ['Level 30', 'Level 70', 'Level 95'], [1, 1, 1]));
+  assert(JSON.stringify(got) === JSON.stringify(['Act 1-5|0|0|0||position', 'Maps|1|1|1|A|position', 'Pinnacle|2|2|2||position']),
+    'same-length lists whose names differ pair by position: ' + JSON.stringify(got));
+  got = S(B([null, null, null], [], ['Level 30', 'Level 60', 'Endgame']));
+  assert(JSON.stringify(got) === JSON.stringify(['Level 30|0|null|0|A|position', 'Level 60|1|null|1||position', 'Endgame|2|null|2||position']),
+    'untitled gear sets take the tree names; no skill sets: null: ' + JSON.stringify(got));
+  got = S(B(['Default'], [null], ['']));
+  assert(JSON.stringify(got) === JSON.stringify(['Stage 1|0|0|0|A|single']), 'one of each: one stage: ' + JSON.stringify(got));
+  assert(PoB.buildStages(PoB.parseBuild('<PathOfBuilding><Build className="Witch"/></PathOfBuilding>')).length === 1,
+    'a build with nothing gives one stage');
+  got = S(B(['Leveling', 'Budget', 'Endgame'], ['Main'], ['Tree'], [2, 0, 0]));
+  assert(JSON.stringify(got) === JSON.stringify(['Leveling|0|0|0||name', 'Budget|1|0|0||name', 'Endgame|2|0|0|A|name']),
+    'only gear sets differ: stages follow them, the lone skill set and tree stay: ' + JSON.stringify(got));
+  got = S(B(['Main'], ['Leveling', 'Mapping'], ['Tree'], [0, 1, 0]));
+  assert(JSON.stringify(got) === JSON.stringify(['Leveling|0|0|0||name', 'Mapping|0|1|0|A|name']),
+    'only skill sets differ: stages follow the skill sets: ' + JSON.stringify(got));
+  got = S(B(['Leveling', 'Endgame'], ['Leveling', 'Mapping', 'Bossing'], ['Endgame tree', 'Leveling tree'], [1, 1, 0]));
+  assert(JSON.stringify(got) === JSON.stringify(['Leveling|0|0|1||name', 'Endgame|1|null|0|A|name',
+    'Mapping|null|1|null||name', 'Bossing|null|2|null||name']),
+    'uneven lists: names matched (whole words inside a longer name too), the rest added after the gear sets: ' + JSON.stringify(got));
+  got = S(B(['Default', 'Endgame'], ['Endgame', null], ['', 'Endgame'], [1, 0, 1]));
+  assert(JSON.stringify(got) === JSON.stringify(['Default|0|1|0||name', 'Endgame|1|0|1|A|name']),
+    'PoB default names ("Default", untitled) match each other: ' + JSON.stringify(got));
+  got = S(B(['A', 'B'], ['B', 'C'], ['A', 'B'], [0, 0, 0]));
+  assert(JSON.stringify(got) === JSON.stringify(['A|0|0|0|A|position', 'B|1|1|1||position']),
+    'one unmatched name in same-length lists: that list pairs by position: ' + JSON.stringify(got));
+  got = S(B(['Leveling', 'End-game'], ['end game', 'leveling'], []));
+  assert(JSON.stringify(got) === JSON.stringify(['Leveling|0|1|null|A|name', 'End-game|1|0|null||name']),
+    'punctuation inside a name folds to a space ("End-game" = "end game"): ' + JSON.stringify(got));
+  const realStages = PoB.buildStages(build);
+  assert(realStages.length === 2 && realStages[0].title === 'Budget' && realStages[0].active &&
+    realStages[1].skillSet === 1, 'parsed build: 2 gear sets + 2 skill sets pair by position: ' + JSON.stringify(realStages));
+
   console.log('== pseudo ids exist in DB ==');
   ['pseudo.pseudo_total_life', 'pseudo.pseudo_total_fire_resistance',
    'pseudo.pseudo_total_elemental_resistance', 'pseudo.pseudo_total_all_elemental_resistances',

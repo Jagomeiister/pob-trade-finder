@@ -101,7 +101,8 @@ function upgradeSource() {
 
 function buildItemFor(b, slot) {
   var sets = b.itemSets || [];
-  var set = sets[b.activeSetIndex || 0] || { slots: b.slots || [] };
+  // the gear set on show (the Stage control / gear set picker: 03-shell.js), else PoB's active one
+  var set = sets[b.gearSet !== undefined ? b.gearSet : (b.activeSetIndex || 0)] || { slots: b.slots || [] };
   var entry = (set.slots || []).find(function (x) { return x.slot === slot; });
   return entry && b.items[entry.itemId] ? b.items[entry.itemId] : null;
 }

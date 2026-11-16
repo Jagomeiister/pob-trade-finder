@@ -69,6 +69,16 @@ body.shell:not(.has-build) #open-all, body.shell:not(.has-build) #check-all { di
   mask-image: linear-gradient(90deg, black calc(100% - 24px), transparent);
 }
 .topbar > .btn, .view-title { flex: none; }
+/* Stage control: a build's gear set + gems + tree per stage (03-shell.js); long names shrink first */
+.stage-slot { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
+.stage-slot[hidden] { display: none; }
+.stage-label { flex: none; color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; }
+.stage-seg { min-width: 0; max-width: 100%; }
+.stage-seg .seg { flex: 0 1 auto; min-width: 0; max-width: 220px; padding: 4px 12px; font-size: var(--fs-sm);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stage-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.stage-field .field-label { color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; }
+.stage-select { max-width: 280px; }
 .context-chips .badge { flex: none; }
 .context-chips .badge { margin-left: 0; }
 .search-settings #controls { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 300px; }

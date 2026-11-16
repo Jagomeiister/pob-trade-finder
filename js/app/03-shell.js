@@ -33,9 +33,9 @@ async function onDecode() {
     saveSettings();
     document.getElementById('build-label').textContent =
       build.ascendClass || build.className || 'Unknown class';
-    var nSets = (build.itemSets || []).length;
-    document.getElementById('build-sub').textContent =
-      Object.keys(build.items).length + ' items' + (nSets > 1 ? ' · ' + nSets + ' gear sets' : '');
+    var nSets = (build.itemSets || []).length, nStages = stageList(build).length;
+    document.getElementById('build-sub').textContent = Object.keys(build.items).length + ' items' +
+      (nStages > 1 ? ' · ' + nStages + ' stages' : nSets > 1 ? ' · ' + nSets + ' gear sets' : '');
     renderBuild();
     computeBuildDiff(); // before the cost line: it carries unchanged slots' history over
     showLastBuildCost();
@@ -43,6 +43,7 @@ async function onDecode() {
     refreshSlotLists();
     showBuild();
     libAfterLoad(); // saved: mark it opened; new: offer to save it (04-library.js)
+    stageRestore(); // the stage picked last time for this build (after the diff: that describes PoB's own sets)
     if (buildDiff) {
       UI.toast(buildDiff.rows.length + ' slot' + (buildDiff.rows.length > 1 ? 's' : '') +
         ' changed since the last version of this build. They\'re listed above the gear.', 'info');
@@ -93,11 +94,14 @@ function renderBuild(setIndex) {
   var sets = build.itemSets || [];
   if (setIndex === undefined) setIndex = build.activeSetIndex || 0;
   var set = sets[setIndex] || { slots: build.slots, flasks: build.flasks };
+  build.gearSet = setIndex; // the gear set on show (the upgrade check compares with it: 18-upgrade.js)
 
-  // Gear-set picker — guide PoBs ship several (Leveling / Budget / Endgame…)
+  // Gear-set picker — guide PoBs ship several (Leveling / Budget / Endgame…). The Stage control
+  // (top bar) switches them with their gems and tree; this one only if the sets made no stages
   var pickSlot = document.getElementById('set-picker-slot');
   pickSlot.textContent = '';
-  if (sets.length > 1) {
+  renderStageControl();
+  if (sets.length > 1 && stageList(build).length < 2) {
     var pick = UI.select(sets.map(function (s, i) {
       return [String(i), s.title + (i === build.activeSetIndex ? ' (active in PoB)' : '')];
     }), String(setIndex), { onChange: function () { renderBuild(parseInt(this.value, 10)); } });
@@ -163,6 +167,157 @@ function renderBuild(setIndex) {
   setView(present.indexOf(keep) !== -1 || (keep && keep !== 'home' && !BUILD_VIEWS[keep]) || keep === 'planner' ? keep : present[0] || 'planner');
   renderCostSummary(); // clears stale summary — fresh cards have no prices yet
   applyCharDiff();     // re-annotate fresh cards if a character is loaded
+}
+
+// ---- stages: one switch for a build's gear set, gems and tree ----------------------
+// Guide PoBs ship a gear set, a skill set and a tree per stage (Leveling / Budget / Endgame…).
+// PoB.buildStages pairs them by name (or position); the Stage control in the top bar of every
+// build view switches all three. The pick is remembered per build code (pobtf-stage:
+// {buildKey: {i, t (title), ts}}, the newest STAGE_MAX); PoB's own active stage isn't stored.
+var STAGE_KEY = 'pobtf-stage', STAGE_MAX = 100;
+var stageCtl = null; // {build, el}: the control on show, kept while the build is the same (focus stays put)
+
+function stageList(b) {
+  if (!b) return [];
+  if (!b.stages) b.stages = PoB.buildStages(b);
+  return b.stages;
+}
+function stagePobIndex(st) {
+  var i = st.findIndex(function (s) { return s.active; });
+  return i === -1 ? 0 : i;
+}
+function stageCurrent(b) {
+  var st = stageList(b);
+  return b.stageIndex !== undefined && st[b.stageIndex] ? b.stageIndex : stagePobIndex(st);
+}
+// a stage's three parts as indexes; a part the stage has none of keeps PoB's active one
+function stageParts(b, st) {
+  return { item: st.itemSet !== null ? st.itemSet : (b.activeSetIndex || 0),
+           skill: st.skillSet !== null ? st.skillSet : (b.activeSkillSet || 0),
+           tree: st.treeSpec !== null ? st.treeSpec : (b.treeActive || 0) };
+}
+// put stage i's gems, tree and slots where every view reads them (no drawing)
+function stageUse(b, i) {
+  var st = stageList(b)[i];
+  if (!st) return null;
+  var p = stageParts(b, st);
+  var ss = (b.skillSets || [])[p.skill];
+  if (ss) { b.gemGroups = ss.gemGroups; b.gems = ss.gems; b.mainSkill = ss.mainSkill; }
+  var spec = (b.treeSpecs || [])[p.tree];
+  if (spec) { b.tree = spec; b.treeStage = p.tree; }
+  var set = (b.itemSets || [])[p.item];
+  if (set) { b.slots = set.slots; b.flasks = set.flasks; }
+  b.stageIndex = i;
+  return p;
+}
+function stageDescribe(b, st) {
+  var p = stageParts(b, st), out = [];
+  var set = (b.itemSets || [])[p.item], ss = (b.skillSets || [])[p.skill], tr = (b.treeSpecs || [])[p.tree];
+  if (set) out.push('Gear: ' + set.title);
+  if (ss) out.push('Gems: ' + ss.title);
+  if (tr) out.push('Tree: ' + (tr.title || 'Tree ' + (p.tree + 1)));
+  return out.join(' · ');
+}
+
+// the control's place: the top bar, after the view title (made once)
+function stageSlot() {
+  var slot = document.getElementById('stage-slot');
+  if (!slot) {
+    slot = UI.el('div', 'stage-slot');
+    slot.id = 'stage-slot';
+    slot.hidden = true;
+    var title = document.getElementById('view-title');
+    title.parentNode.insertBefore(slot, title.nextSibling);
+  }
+  return slot;
+}
+// shown on the build's own views when the build has stages
+function stageShowFor(k) {
+  var slot = document.getElementById('stage-slot');
+  if (slot) slot.hidden = !(build && slot.firstChild && BUILD_VIEWS[k]);
+}
+
+// up to 5 stages: a segmented choice; more: a select
+function renderStageControl() {
+  var slot = stageSlot();
+  var st = stageList(build);
+  if (st.length < 2) {
+    slot.textContent = '';
+    stageCtl = null;
+    stageShowFor(document.body.dataset.view);
+    return;
+  }
+  var cur = String(stageCurrent(build));
+  if (stageCtl && stageCtl.build === build && slot.contains(stageCtl.el)) {
+    if (stageCtl.el.setValue) stageCtl.el.setValue(cur); else stageCtl.el.value = cur;
+  } else {
+    slot.textContent = '';
+    var opts = st.map(function (s, i) { return [String(i), s.title + (s.active ? ' (active in PoB)' : '')]; });
+    var titles = {};
+    st.forEach(function (s, i) { titles[String(i)] = stageDescribe(build, s); });
+    var el;
+    if (st.length <= 5) {
+      var lab = UI.el('span', 'stage-label', 'Stage');
+      lab.setAttribute('aria-hidden', 'true'); // the group carries the name
+      slot.appendChild(lab);
+      el = UI.segmented(opts, cur, { ariaLabel: 'Stage', titles: titles,
+        onChange: function (v) { applyStage(parseInt(v, 10)); } });
+      el.classList.add('stage-seg');
+      slot.appendChild(el);
+    } else {
+      el = UI.select(opts, cur, { ariaLabel: 'Stage', cls: 'stage-select',
+        onChange: function () { applyStage(parseInt(this.value, 10)); } });
+      Array.prototype.forEach.call(el.options, function (o) { o.title = titles[o.value]; });
+      slot.appendChild(UI.field('Stage', el, { cls: 'stage-field' }));
+    }
+    slot.title = 'Your PoB build has ' + st.length + ' stages. Pick one to see its gear, gems and tree.';
+    stageCtl = { build: build, el: el };
+  }
+  stageShowFor(document.body.dataset.view);
+}
+
+// switch the build to stage i: gear (renderBuild), gems, tree, the in-game sheet's gems
+function applyStage(i, opts) {
+  opts = opts || {};
+  if (!build || !stageList(build)[i]) return;
+  var keepDiff = buildDiff, shownSet = build.gearSet;
+  var p = stageUse(build, i);
+  renderBuild(p.item);
+  if (keepDiff && shownSet === p.item) { // same gear on show: the changes list still holds
+    buildDiff = keepDiff;
+    gearStates().forEach(function (s) {
+      var r = keepDiff.rows.find(function (x) { return x.slot === s.slot; });
+      if (r) s.diffKind = r.kind;
+    });
+    renderBuildDiff();
+    refreshSlotLists();
+  }
+  if (typeof sheetRememberBuild === 'function') sheetRememberBuild(build); // cheat sheet gems (24-cheatsheets.js)
+  if (!opts.restore) stageRemember(build, i);
+}
+
+function stageMemory() {
+  try { var m = JSON.parse(localStorage.getItem(STAGE_KEY)); return m && typeof m === 'object' ? m : {}; }
+  catch (e) { return {}; }
+}
+function stageRemember(b, i) {
+  var m = stageMemory(), key = buildKey(), st = stageList(b)[i];
+  if (!st || st.active) delete m[key];
+  else m[key] = { i: i, t: st.title, ts: Date.now() };
+  Object.keys(m).sort(function (x, y) { return (m[y].ts || 0) - (m[x].ts || 0); })
+    .slice(STAGE_MAX).forEach(function (k) { delete m[k]; });
+  try { persist(STAGE_KEY, JSON.stringify(m)); } catch (e) { /* storage full */ }
+}
+// on load: the stage picked last time for this build, found by its title (else its place)
+function stageRestore() {
+  var st = stageList(build);
+  if (st.length < 2) return;
+  var mem = stageMemory()[buildKey()];
+  if (!mem) return;
+  var i = st[mem.i] && st[mem.i].title === mem.t ? mem.i
+    : st.findIndex(function (s) { return s.title === mem.t; });
+  if (i === -1 && st[mem.i]) i = mem.i;
+  if (i !== -1 && i !== stageCurrent(build)) applyStage(i, { restore: true });
 }
 
 // ---- settings drawer: slides in from the right, focus stays inside until closed ----
@@ -358,6 +513,7 @@ function setView(k) {
   if (k === 'atlas') showAtlasView(); // Atlas tree: built once, canvas sized once visible (28-atlas.js)
   if (k === 'filter') renderFilterView(); // loot filter tools (29-lootfilter.js)
   document.getElementById('view-title').textContent = VIEW_LABELS[k] || '';
+  stageShowFor(k);
   document.querySelectorAll('#nav .nav-item').forEach(function (b) {
     if (b.dataset.view === k) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
