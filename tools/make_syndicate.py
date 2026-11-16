@@ -157,7 +157,10 @@ def main(argv):
     args = [a for a in argv if not a.startswith("--")]
     try:
         path = args[0] if args else make_guides.default_input()
-        src, cpath, fixed = make_guides.corrected_research(path)
+        # the planner's tables (rewards per division, price hints) are 3.29 data the patch updates
+        # do not cover: it builds from the research + corrections only, until a 3.30 reward table
+        # is researched (the sheet's 3.30 notice says so meanwhile)
+        src, cpath, fixed = make_guides.corrected_research(path, updates=False)
     except make_guides.Bad as e:
         fail(str(e))
     rel = os.path.relpath(path, ROOT).replace("\\", "/")

@@ -42,6 +42,8 @@ OUT_JSON = os.path.join(ROOT, "server", "public", "guides.json")
 SHEETS_JS = os.path.join(ROOT, "data", "cheatsheets.js")
 SYNDICATE_JS = os.path.join(ROOT, "data", "syndicate.js")
 CURRENCYMAP = os.path.join(ROOT, "data", "currencymap.json")
+# the 3.29 scarabs (name, art), kept after 3.30 removed them from the exchange data
+RETIRED_SCARABS = os.path.join(ROOT, "data", "retired-scarabs.json")
 
 STAGES = ("league-start", "mid", "late", "ssf", "all")
 ID_MAP = {"betrayal": "syndicate"}  # research id -> cheat sheet id
@@ -290,8 +292,9 @@ def apply_corrections(research, corrections):
     return counts, problems
 
 
-def corrected_research(path):
+def corrected_research(path, updates=True):
     """(research with its corrections applied, corrections file or None, {guide: count}).
+    updates=False leaves out the patch update files (the Syndicate planner keeps its 3.29 tables).
     Raises Bad when a correction does not apply."""
     with open(path, encoding="utf-8") as f:
         research = json.load(f)
@@ -302,7 +305,7 @@ def corrected_research(path):
                   % (len(problems), os.path.basename(cpath), "\n    ".join(problems)))
     # patch updates (tools/make_update.py): what a later patch changed, applied on top, in name order
     del UPDATES_APPLIED[:]
-    for upath in update_paths(path):
+    for upath in (update_paths(path) if updates else []):
         with open(upath, encoding="utf-8") as f:
             doc = json.load(f)
         need(doc.get("research") == os.path.basename(path), "%s is for %r" % (os.path.basename(upath), doc.get("research")))
@@ -458,6 +461,14 @@ def all_text(guide):
 def icon_names():
     with open(CURRENCYMAP, encoding="utf-8") as f:
         cm = json.load(f)
+    # items the exchange no longer lists (3.30 removed scarabs) keep their art for older guide
+    # lines; the current currencymap wins on any name in both
+    try:
+        with open(RETIRED_SCARABS, encoding="utf-8") as f:
+            for k, v in json.load(f).items():
+                cm.setdefault("retired:" + k, v)
+    except OSError:
+        pass
     names = {}
     for v in cm.values():
         name, img = (v.get("name") or "").strip(), v.get("img") or ""

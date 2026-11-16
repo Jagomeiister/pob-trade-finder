@@ -139,8 +139,29 @@ def build(research_path, run):
                     skipped.append({"guide": sid, "why": "unknown action %r" % action, "match": match})
                     continue
                 n_fix += 1
-            # deletes last, and from the end of each list, so earlier ones don't shift later ones
-            deletes.sort(key=lambda e: (e["path"], -e["_index"]))
+            # an edit inside an element another fix deletes (a step of a dropped strategy, a line
+            # that is replaced and also deleted) is moot: the delete wins
+            gone = {"%s[%d]" % (e["path"], e["_index"]) for e in deletes}
+
+            def within(p, strict):
+                return any((not strict and p == g) or p.startswith(g + ".") or p.startswith(g + "[") for g in gone)
+            for e in [e for e in out if e.get("guide") == rid and e.get("action") == "replace"
+                      and "-330-fix-" in e.get("id", "")]:
+                if within(e["path"], False):
+                    out.remove(e)
+                    skipped.append({"guide": sid, "why": "inside an element another fix deletes", "match": e["match"]})
+            dels = []
+            for e in deletes:
+                if within("%s[%d]" % (e["path"], e["_index"]), True):
+                    skipped.append({"guide": sid, "why": "inside an element another fix deletes", "match": e["match"]})
+                    continue
+                if any(d["path"] == e["path"] and d["_index"] == e["_index"] for d in dels):
+                    continue  # two fixes delete the same element
+                dels.append(e)
+            deletes = dels
+            # deletes last: nested lists before the lists holding them ("strategies[4].steps" before
+            # "strategies"), and from the end of each list, so no delete shifts a later one's path
+            deletes.sort(key=lambda e: (e["path"], e["_index"]), reverse=True)
             for e in deletes:
                 e.pop("_index")
                 out.append(e)

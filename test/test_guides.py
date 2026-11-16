@@ -21,6 +21,8 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import make_guides  # noqa: E402
 failures = 0
 try:
     sys.stdout.reconfigure(errors="backslashreplace")
@@ -162,10 +164,16 @@ check("icons: name -> GGG art path", icons and all(isinstance(k, str) and isinst
                                                    and p.endswith(".png") for k, p in icons.items()), len(icons))
 with open(os.path.join(ROOT, "data", "currencymap.json"), encoding="utf-8") as f:
     cm = {v["name"]: v.get("img") for v in json.load(f).values()}
-check("icon names come from data/currencymap.json", all(cm.get(k) == p for k, p in icons.items()),
+with open(os.path.join(ROOT, "data", "retired-scarabs.json"), encoding="utf-8") as f:
+    for v in json.load(f).values():
+        cm.setdefault(v["name"], v.get("img"))
+check("icon names come from data/currencymap.json (or the retired scarabs)", all(cm.get(k) == p for k, p in icons.items()),
       [k for k, p in icons.items() if cm.get(k) != p][:5])
-check("scarabs used by strategies get icons", all(k in icons for k in ("Betrayal Scarab of Reinforcements",
-                                                                         "Harvest Scarab of Doubling")))
+shipped_lines = [ln or "" for g in guides.values() for ln in make_guides.all_text(g)]
+named = [k for k in ("Betrayal Scarab of Reinforcements", "Harvest Scarab of Doubling", "Ambush Scarab")
+         if any(re.search(r"(?<![A-Za-z'])%s(?=s?(?![A-Za-z]))" % re.escape(k), ln) for ln in shipped_lines)]
+check("scarabs the guides still name get icons (3.30 removed scarabs; the retired list keeps their art)",
+      named and all(k in icons for k in named), (named, [k for k in named if k not in icons]))
 all_text = json.dumps(guides, ensure_ascii=False)
 check("every icon name appears in some guide", all(k in all_text for k in icons), [k for k in icons if k not in all_text][:5])
 
@@ -177,8 +185,6 @@ size = len(raw.encode("utf-8"))
 check("payload size reasonable (< 800 KB)", size < 800 * 1024, "%.0f KB" % (size / 1024.0))
 
 # -- corrections layer ------------------------------------------------------------------------
-sys.path.insert(0, os.path.join(ROOT, "tools"))
-import make_guides  # noqa: E402
 
 research_path = make_guides.default_input()
 with open(research_path, encoding="utf-8") as f:
@@ -230,6 +236,13 @@ def shipped_text(v):
         return [x for x in v if isinstance(x, str)]
     return []
 
+
+# The checks from here to the 3.30 section hold for the 3.29 guides (research + corrections). The
+# 3.30 update rewrites many of those lines on purpose (scarabs, maps, tier tables), so they run on
+# the guides built without it; the shipped data has its own checks in the 3.30 section.
+shipped_guides, shipped_raw = guides, raw
+guides = {make_guides.ID_MAP.get(g["id"], g["id"]): make_guides.build_guide(copy.deepcopy(g)) for g in fixed["guides"]}
+raw = json.dumps(guides, ensure_ascii=False)
 
 missing = [c["id"] for c in corrections if c["action"] in ("replace", "add") and not c["path"].endswith(("readMore", "cite"))
            and not all(t in raw for t in (json.dumps(x, ensure_ascii=False)[1:-1] for x in shipped_text(c["value"])) if t)]
@@ -348,6 +361,8 @@ check("data/syndicate.js is built from the same research and corrections",
 check("make_guides' syndicate check passes", make_guides.check_syndicate(data["asOf"], research_path, corr_path) is None,
       make_guides.check_syndicate(data["asOf"], research_path, corr_path))
 
+guides, raw = shipped_guides, shipped_raw  # end of the 3.29 content checks: back to the shipped data
+
 # -- bridge (gui.py): validation + Read more links ----------------------------------------
 import gui  # noqa: E402
 
@@ -464,6 +479,35 @@ if "tools" in data:
     check("shipped tools: Liquid Cowardice is in the Sanctum checker (review fix)", "Liquid Cowardice" in sanct)
     check("shipped tools: the temple room count rule names the fixed Entrance and 11 shaped rooms",
           any("11 rooms the 12 incursions shape" in r["text"] for r in data["tools"]["incursion"]["rules"]))
+
+# -- the shipped data: 3.30 update (tools/guides/updates-3.29-to-3.30.json) ---------------------------
+upd_files = make_guides.update_paths(research_path)
+if upd_files:
+    with open(upd_files[-1], encoding="utf-8") as f:
+        upd = json.load(f)
+    to = upd.get("to")
+    check("currentPatch is the newest update's patch", data.get("currentPatch") == to, (data.get("currentPatch"), to))
+    got = {gid: [c for c in g.get("changes", []) if str(c.get("patch", "")).startswith(to + ".")]
+           for gid, g in shipped_guides.items()}
+    check("every guide the update covers carries its %s changes" % to,
+          all(len(got[ID]) >= s["changes"] for ID, s in ((make_guides.ID_MAP.get(k, k), s) for k, s in upd["guides"].items())),
+          {k: (len(got.get(make_guides.ID_MAP.get(k, k), [])), s["changes"]) for k, s in upd["guides"].items()})
+    def cite_urls(gid, c):
+        rm = shipped_guides[gid].get("readMore", [])
+        return [rm[i]["url"] if isinstance(i, int) and 0 <= i < len(rm) else str(i) for i in c.get("cite", [])]
+    check("every %s change cites the official notes" % to,
+          all(c.get("cite") and all(u.startswith("https://www.pathofexile.com/forum/view-thread/") for u in cite_urls(gid, c))
+              for gid, cs in got.items() for c in cs),
+          [(gid, cite_urls(gid, c)) for gid, cs in got.items() for c in cs
+           if not all(u.startswith("https://www.pathofexile.com/forum/view-thread/") for u in cite_urls(gid, c))][:3])
+    check("guides marked up to date are the ones the update rated none/minor",
+          {k for k, g in shipped_guides.items() if g.get("asOf") == to} ==
+          {make_guides.ID_MAP.get(k, k) for k, s in upd["guides"].items() if s["impact"] in ("none", "minor")})
+    check("update entries skipped for a reason", all(s.get("why") for s in upd.get("skipped", [])))
+    no_spawn = [gid for gid in ("syndicate", "blight", "incursion", "expedition", "ultimatum", "ritual", "breach",
+                                "legion", "abyss", "bestiary")
+                if not any(re.search(r"Thread", c["text"]) for c in got.get(gid, []))]
+    check("the Thread mechanics' guides explain Threads (no more random spawns)", not no_spawn, no_spawn)
 
 print("\n" + ("ALL TESTS PASSED" if not failures else "%d FAILED" % failures))
 sys.exit(1 if failures else 0)
