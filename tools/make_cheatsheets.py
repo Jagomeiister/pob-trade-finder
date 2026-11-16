@@ -694,6 +694,12 @@ def quest_gems(cx):
 
 ABYSS_JEWEL = re.compile(r"abyss(?:al)?\b[^.;]{0,30}jewel", re.I)
 DIVISIONS = ["Transportation", "Fortification", "Research", "Intervention"]
+# (member, division, text of the old reward, 3.30 reward, the 3.30.0 notes' words)
+SYNDICATE_330 = [
+    ("Vorici", "Research", "Orb of Chance", "Trapped stashes with quality Skill Gems that have had a Soul Core applied",
+     "Vorici in Research now rewards trapped stashes containing quality Skill Gems that have had a Soul Core applied "
+     "(previously a crafting spree with Orbs of Chance and Orbs of Scouring)."),
+]
 
 
 def _soft(sections, sid, title, fn):
@@ -725,9 +731,23 @@ def m_syndicate(cx):
         rows.append(cells)
     vagan = next((r for r in rows if r[0].startswith("Vagan")), None)
     need(vagan, "Vagan row missing")
-    need("Trarthan" in vagan[1] and "Enshrouded" in vagan[2],
-         "Vagan's Transportation/Fortification rewards are not the 3.29 Trarthan scarabs / Enshrouded uniques "
-         "(stale wiki): %r" % vagan[1:3])
+    # 3.30.0 notes: Rin's Fortification gives Threads, Riker's Transportation Ancient Orbs (scarabs
+    # are gone); a table without them is the stale 3.29 page
+    rin = next((r for r in rows if r[0] == "Rin"), None)
+    riker = next((r for r in rows if r[0] == "Riker"), None)
+    need(rin and "Thread" in rin[2] and riker and "Ancient Orb" in riker[1],
+         "Rin's Fortification / Riker's Transportation are not the 3.30 Threads / Ancient Orbs (stale wiki): %r"
+         % (((rin or [None] * 3)[2], (riker or [None] * 2)[1]),))
+    # cells the wiki had not caught up with at 3.30 launch, from the 3.30.0 notes (quoted), used
+    # only while the wiki still shows the old reward
+    for name, div, old, new, quote in SYNDICATE_330:
+        r = next((x for x in rows if x[0] == name), None)
+        i = DIVISIONS.index(div) + 1
+        if r and old in r[i]:
+            warn("syndicate: %s %s still reads %r on the wiki; using the 3.30.0 notes: %r" % (name, div, r[i], quote))
+            r[i] = new
+    for r in rows:  # an unknown reward the wiki marks with "?" ("Trapped Chest with ?")
+        r[1:] = [re.sub(r"\s?\?$", " (not listed yet)", c.strip()).strip() for c in r[1:]]
     need(len(rows) >= 14 and any(r[0] == "Aisling" for r in rows), "only %d members" % len(rows))
     sections = [table_section("Safehouse rewards by member and division", ["Member"] + DIVISIONS, rows)]
     uniq = [clean(m.group(1) + ": " + m.group(2)) for m in
@@ -825,13 +845,18 @@ def m_eldritch(cx):
     cards = grid(lambda n: "Divination" in n)
     other = grid(lambda n: "Scarab" not in n and "Divination" not in n)
     need(len(scarabs) + len(cards) + len(other) >= 30, "only %d boss/minion upsides" % len(rewards))
-    need(any("Divine Orb" in r[0] for r in other) and scarabs, "required rewards missing")
+    # 3.30 removed scarabs: with none left in Cargo, altar mods that still give them are stale data
+    if scarabs and not _scarab_rows(cx):
+        warn("eldritch: dropped %d scarab upsides: no scarab is in the game any more (3.30), the altar mods are stale"
+             % len(scarabs))
+        scarabs = []
+    need(any("Divine Orb" in r[0] for r in other), "required rewards missing")
     need(len(downs) >= 15, "only %d dangerous downsides" % len(downs))
     downs.sort(key=lambda r: (r[1] != "Player", r[0], r[1]))
     head = ["Reward"] + ["%s altar" % c for c in cols]
     return {"sections": [
         table_section("Upsides: currency and items (Boss = map boss drops 2-4 more, Minions = chance per kill)", head, other),
-        table_section("Upsides: scarabs", head, scarabs),
+    ] + ([table_section("Upsides: scarabs", head, scarabs)] if scarabs else []) + [
         table_section("Upsides: divination cards", head, cards),
         table_section("Upsides for the whole map (Player)", ["Altar", "Upside"], sorted(player_up)),
         table_section("Dangerous downsides (all Player ones, plus Boss/Minion ones that add damage or speed)",
@@ -1015,26 +1040,29 @@ def incursion_rooms(cx):
 
 def m_incursion(cx):
     rooms = incursion_rooms(cx)
-    archs = set(clean(a) for a in re.findall(r"^===\s*\[\[([^\]|]+)(?:\|[^\]]*)?\]\]\s*===\s*$",
+    # an architect by name, title dropped: 3.30's Xipocado is "Royal Architect" on tiers 1-2 and
+    # "Architect of the Queen" on the Cradle of Creation (tier 3)
+    who = lambda a: clean(a).split(",")[0].strip()  # noqa: E731
+    archs = set(who(a) for a in re.findall(r"^===\s*\[\[([^\]|]+)(?:\|[^\]]*)?\]\]\s*===\s*$",
                                              section(cx["pages"]["Incursion room"], "Architects"), re.M))
     need(len(archs) >= 20, "architect list not found on 'Incursion room'")
     byid = {r["id"]: r for r in rooms}
-    legacy = [r["id"] for r in rooms if r.get("tier") in ("1", "2", "3") and clean(r["arch"]) not in archs]
+    legacy = [r["id"] for r in rooms if r.get("tier") in ("1", "2", "3") and who(r["arch"]) not in archs]
     if legacy:
         warn("incursion: dropped %d rooms whose architect is not on the current 'Incursion room' page: %s"
              % (len(legacy), ", ".join(legacy)))
     chains, tier3, full = [], [], []
     for r in rooms:
-        if r.get("tier") != "1" or clean(r["arch"]) not in archs:
+        if r.get("tier") != "1" or who(r["arch"]) not in archs:
             continue
         chain, cur = [r], r
         while cur.get("up") and cur["up"] in byid and len(chain) < 3:
             cur = byid[cur["up"]]
             chain.append(cur)
-        if [c.get("tier") for c in chain] != ["1", "2", "3"] or len(set(clean(c["arch"]) for c in chain)) != 1:
+        if [c.get("tier") for c in chain] != ["1", "2", "3"] or len(set(who(c["arch"]) for c in chain)) != 1:
             warn("incursion: dropped incomplete upgrade chain starting at %s" % r["id"])
             continue
-        chains.append([clean(r["arch"])] + [clean(c["name"]) for c in chain])
+        chains.append([who(r["arch"])] + [clean(c["name"]) for c in chain])
         t3 = chain[2]
         tier3.append([clean(t3["name"]), clean(t3["arch"]).split(",")[0], clean(t3["descr"] or t3["stats"] or "")])
         full.append(chain)
@@ -2553,11 +2581,32 @@ def mechanics():
             warn("%s skipped: %s" % (mid, e))
         except Exception as e:  # a changed page layout must not take the other sheets down
             warn("%s skipped: %s: %s" % (mid, type(e).__name__, e))
+    # a sheet for content the game removed (3.30: scarabs) keeps its last build, with its own patch:
+    # the retired tools on it (the scarab hub) say what happened, and older leagues still use it
+    for mid in KEEP_WHEN_GONE:
+        if mid not in built:
+            old = previous_sheet(mid)
+            if old:
+                warn("%s: not on the wiki any more; kept the %s sheet from data/cheatsheets.js" % (mid, old.get("patch")))
+                built[mid] = old
     try:
         build_matches(cx, built)
     except Exception as e:
         warn("match triggers not built: %s: %s" % (type(e).__name__, e))
     return [built[mid] for mid, *_ in MECHANICS if mid in built]
+
+
+KEEP_WHEN_GONE = ("scarabs",)
+
+
+def previous_sheet(mid):
+    try:
+        with open(os.path.join(ROOT, "data", "cheatsheets.js"), encoding="utf-8") as f:
+            text = f.read()
+        data = json.loads(text[text.index("{"):text.rstrip().rstrip(";").rindex("}") + 1])
+    except (OSError, ValueError):
+        return None
+    return next((m for m in data.get("mechanics", []) if m.get("id") == mid), None)
 
 
 def main():

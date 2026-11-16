@@ -190,7 +190,13 @@ if "syndicate" in by:
     check("syndicate: member x four divisions", t and t["columns"] == ["Member", "Transportation", "Fortification",
                                                                       "Research", "Intervention"], t and t["columns"])
     vagan = t and next((r for r in t["rows"] if r[0].startswith("Vagan")), None)
-    check("syndicate: Vagan has the 3.29 rewards", vagan and "Trarthan" in vagan[1] and "Enshrouded" in vagan[2], vagan)
+    row = lambda n: t and next((r for r in t["rows"] if r[0] == n), None)  # noqa: E731
+    # 3.30.0 notes: no scarabs; Rin's Fortification gives Threads, Riker's Transportation Ancient Orbs,
+    # Vorici's Research Soul Core gems; every Intervention is a class of uniques
+    check("syndicate: the 3.30 rewards (Threads, Ancient Orbs, Soul Core gems, no scarabs)",
+          vagan and row("Rin") and "Thread" in row("Rin")[2] and "Ancient Orb" in row("Riker")[1] and
+          "Soul Core" in row("Vorici")[3] and not any("Scarab" in c for r in t["rows"] for c in r) and
+          all("?" not in c for r in t["rows"] for c in r), (row("Rin"), row("Riker"), row("Vorici")))
     check("syndicate: no abyss jewel rewards left", t and not any(re.search(r"abyss(al)?\b[^;]{0,30}jewel", " ".join(r), re.I)
                                                                for r in t["rows"]))
     check("syndicate: matches the safehouses", "BetrayalSafeHouse" in by["syndicate"]["match"]["areaIds"],

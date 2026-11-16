@@ -258,7 +258,8 @@ def run(s, tag, check):
     check(tag + " Essences: 'All 7' shows every tier; available cells match the sheet's ranges",
           len(r["essHeadAll"]) == 7 and r["essAllOk"] and r["essAvail"] == r["essAvailWant"] == 100,
           (r["essHeadAll"], r["essAvail"], r["essAvailWant"]))
-    check(tag + " Essences: the one-tier specials as tiles", r["essSpecial"] == r["essSpecialWant"] and len(r["essSpecial"]) == 4,
+    check(tag + " Essences: the one-tier specials as tiles", r["essSpecial"] == r["essSpecialWant"] and len(r["essSpecial"]) >= 4 and
+          "Essence of Insanity" in r["essSpecial"],  # 3.30 added Trickery; Desolation joined the specials
           r["essSpecial"])
     check(tag + " Harvest: each / per 100 / per 1,000, Sacred marked most valuable",
           r["lfRows"] == 4 and r["lfHead"][:4] == ["Lifeforce", "Each", "Per 100", "Per 1,000"] and

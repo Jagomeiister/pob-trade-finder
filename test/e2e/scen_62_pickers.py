@@ -213,7 +213,11 @@ pick('incursion'); await H.sleep(80);
 const t = panel().querySelector('.mech-tool[data-tool="temple"]');
 out.goals = [...t.querySelectorAll('select option')].slice(1).map(o => o.textContent);
 out.values = t.querySelectorAll('.temple-row .mech-rating').length;
-out.rooms = T.incursion.rooms.length;
+// researched rooms still in the temple (3.30 made the Throne of Atziri the Cradle of Creation, a new
+// room the 3.29 research did not rate)
+const rowText = [...t.querySelectorAll('.temple-row')].map(r => r.textContent);
+out.rooms = T.incursion.rooms.filter(r => rowText.some(x => x.includes(r.tier3Room))).length;
+out.allRooms = T.incursion.rooms.length;
 pick('scarabs'); await H.sleep(150);
 const sel = panel().querySelector('.mech-tool[data-tool="scarabhub"] select.shub-strat-select');
 out.strats = sel ? [...sel.options].filter(o => o.value).length : -1;
@@ -261,7 +265,8 @@ def run(s, tag, check):
         check(tag + " shipped data: a row per rated altar downside / Ultimatum mod / affliction / bad remnant",
               all(r[k][0] == r[k][1] and r[k][0] > 0 for k in ("altar", "ulti", "sanct", "exp")), r)
         check(tag + " shipped data: temple goals read as words, every researched room shows its value",
-              r["goals"] and all(g[:1].isupper() and "-" not in g for g in r["goals"]) and r["values"] == r["rooms"], r)
+              r["goals"] and all(g[:1].isupper() and "-" not in g for g in r["goals"]) and r["values"] == r["rooms"] and
+              r["rooms"] >= r["allRooms"] - 1, r)
         check(tag + " shipped data: the scarab hub offers the research strategies", r["strats"] == r["wantStrats"] > 0, r)
     s.fresh("?sheet=1")
     r = s.run(OVERLAY, timeout=40, FIX=FIX)
