@@ -131,30 +131,33 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAGUE-DAY.md`. Branch
 `sheets-round2` (worktree `.claude/worktrees/sheets-round2`), merged to main at v2.5.24.
 
-- [ ] **3.30 guide updates**: `poe-330-update` workflow (run `wf_145d4bb2-821`, resumable with
-      its scriptPath + same args; it stops whenever the session ends) → save the result as
-      `tools/guides/update-research-3.30.json` → `python tools/make_update.py <that file>` → check
-      `skipped` → `make_guides.py --checked <date>` + `make_syndicate.py` → tests → push main (the
-      server serves it; no release needed).
+- [x] **3.30 guide updates** (16 Nov): 21 guides, 1244 entries from the patch notes
+      (`tools/guides/updates-3.29-to-3.30.json`, 66 fixes skipped and listed there); Covens of Umbra
+      and Threads sheets (`tools/guides/league-sheets-3.30.json`). On the server.
+- [x] **Launch-day data** (16 Nov): refresh_all for 3.30; exchange category "Fragments, Threads &
+      Mapping"; map mods / Search text use Atlas Drops and More Threads; 215 reworded stats kept as
+      old texts (`data/statslegacy.json`); cheat sheet wiki build for 3.30 (on the server).
+- [x] **Stage switch** (PoB gear set + skill set + tree as one control, e2e 69) and **guide window**
+      (build guide links in an app-owned window, e2e 70): merged on `sheets-round2`, in v2.5.25.
+- [ ] **Release v2.5.25** (needs the user's "publish it"): the merges above, matcher legacy texts,
+      Market Threads, Atlas Drops search. Guide window needs hand checks in a real window first
+      (Mobalytics Cloudflare page, off-site links to the browser, Keep on top without focus).
 - [ ] **Pre-release review** of the round-2 code (`review-round2` workflow, run `wf_08ae55ee-250`)
-      was NOT finished before v2.5.24 went out (the user chose to publish for launch): finish it and
-      ship fixes as v2.5.25.
-- [ ] **Launch day**: `python tools/refresh_all.py` once the league is live and RePoE has 3.30 data;
-      currencymap (Threads), new uniques/bases, loot filter syntax (Item Filter Information post),
-      cheat sheet wiki tables (`make_cheatsheets.py`) when the wiki updates.
+      was NOT finished before v2.5.24 went out: finish it and ship fixes in v2.5.25.
+- [ ] Syndicate planner: still the 3.29 reward table (`make_syndicate.py` builds without the 3.30
+      update); needs a 3.30 reward table (wiki is now mostly 3.30).
+- [ ] Major-impact guides keep their 3.29 as-of date and notice: re-research strategies (no scarabs,
+      new atlas tree) to clear them.
 - [ ] **New 3.30 tools**: Threads of Creation planner (replaces the scarab hub), Fate helper,
-      Viscera / Wickerman tracker, Covens of Umbra sheet — data from the research run above.
-- [ ] Tool data for reworked mechanics (`mechtools-3.30.json`): altars, Ultimatum, Expedition,
-      Incursion (Atziri, Cradle of Creation), strategy setups without scarabs.
+      Viscera / Wickerman tracker (data: the Covens / Threads sheets' records).
+- [ ] Tool data for reworked mechanics (`mechtools-3.30.json`): altars (Threads), Ultimatum,
+      Expedition, Incursion (Cradle of Creation is unrated), strategy setups without scarabs.
 - [ ] Boss guides (+ Grim Fate variants, Coven Queen), Sanctum relic planner, Heist rogue gear:
-      research `poe-extras` (run `wf_fc97f557-17e`) partly done; UIs not built. Page code for
-      `extras_data` not written yet.
+      research `poe-extras` (run `wf_fc97f557-17e`) partly done; UIs not built.
 - [ ] Leveling guide upgrades (3.30 changed the campaign: re-research first).
-- [ ] Lighter overlay windows (each loads ~6 MB of scripts), Ctrl+K palette, one price module,
-      Recent row in the in-game sheet picker.
-- [ ] **Asked 2026-11-14**: choose between a PoB link's gear sets ("gear levels") in the app; show
-      Mobalytics / Icy Veins build guides in the app (embed or another way), e.g.
-      mobalytics.gg/poe/profile/<user>/builds/<slug>.
+- [ ] Lighter overlay windows (guides payload is 822 KB, every window loads it), Ctrl+K palette,
+      one price module, Recent row in the in-game sheet picker.
+- [ ] Loot filter editor: 3.30 conditions (Item Filter Information post 4013923).
 - [ ] PoB timeless data for 3.30 (two tree nodes moved): `make_timeless.py --update` when PoB updates.
 
 ## 3. To do (agreed, not started)
