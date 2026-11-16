@@ -139,9 +139,10 @@ Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAG
       old texts (`data/statslegacy.json`); cheat sheet wiki build for 3.30 (on the server).
 - [x] **Stage switch** (PoB gear set + skill set + tree as one control, e2e 69) and **guide window**
       (build guide links in an app-owned window, e2e 70): merged on `sheets-round2`, in v2.5.25.
-- [ ] **Release v2.5.25** (needs the user's "publish it"): the merges above, matcher legacy texts,
-      Market Threads, Atlas Drops search. Guide window needs hand checks in a real window first
-      (Mobalytics Cloudflare page, off-site links to the browser, Keep on top without focus).
+- [x] **Released v2.5.25** (16 Nov, main 5813210). Guide window still needs hand checks in a real
+      window (Mobalytics Cloudflare page, off-site links to the browser, Keep on top without focus).
+      The pre-release review of v2.5.25's code did not run (workflow denied by the permission
+      classifier): review the guide window's pywebview hooks and the Stage switch next.
 - [ ] **Pre-release review** of the round-2 code (`review-round2` workflow, run `wf_08ae55ee-250`)
       was NOT finished before v2.5.24 went out: finish it and ship fixes in v2.5.25.
 - [ ] Syndicate planner: still the 3.29 reward table (`make_syndicate.py` builds without the 3.30
