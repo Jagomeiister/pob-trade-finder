@@ -38,3 +38,4 @@ data/storage.json.tmp
 data/storage.bad-*.json
 data/extras_cache.json
 data/guides_cache.json
+data/stats.prev.json

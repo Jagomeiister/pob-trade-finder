@@ -195,6 +195,16 @@ async function main() {
   assert(mOldRarity && mOldRarity.entry.id === 'explicit.stat_3917489142', 'pre-3.30 rarity text matches the reworded stat: ' + (mOldRarity && mOldRarity.entry.id));
   const mOldNearby = Matcher.matchMod(index, { line: 'Nearby Allies gain 2% of Life Regenerated per second', kind: 'explicit', crafted: false, fractured: false }, 'Helmet');
   assert(mOldNearby && /within 5 metres/.test(mOldNearby.entry.text), 'pre-3.30 "Nearby Allies" text matches: ' + (mOldNearby && mOldNearby.entry.text));
+  // 3.30 wordings carry literal numbers: only the '#' places are rolls
+  const mWithin = Matcher.matchMod(index, { line: 'Allies within 5 metres gain 2% of Life Regenerated per second', kind: 'explicit', crafted: false, fractured: false }, 'Helmet');
+  assert(mWithin && JSON.stringify(mWithin.values) === '[2]' && mWithin.avg === 2,
+    '"within 5 metres": the 5 is text, the roll is 2: ' + (mWithin && JSON.stringify(mWithin.values)));
+  const mOldNearbyVals = Matcher.matchMod(index, { line: 'Nearby Allies gain 2% of Life Regenerated per second', kind: 'explicit', crafted: false, fractured: false }, 'Helmet');
+  assert(mOldNearbyVals && JSON.stringify(mOldNearbyVals.values) === '[2]', 'old wording keeps its value: ' + (mOldNearbyVals && JSON.stringify(mOldNearbyVals.values)));
+  // an old multi-line text matches line by line too
+  const mlOld = Object.keys(legacy).filter(t => t.indexOf('\n') !== -1);
+  const mlMiss = mlOld.filter(t => t.split('\n').some(l => !Matcher.matchMod(index, { line: l.replace(/#/g, '7'), kind: 'explicit', crafted: false, fractured: false }, 'Jewel')));
+  assert(mlOld.length && !mlMiss.length, 'old multi-line stat texts match line by line: ' + JSON.stringify(mlMiss.slice(0, 3)));
   const mCrafted = Matcher.matchMod(index, { line: '15% increased Rarity of Items found', kind: 'explicit', crafted: true, fractured: false }, 'Ring 1');
   assert(mCrafted && /^(crafted|explicit)\./.test(mCrafted.entry.id), 'old text keeps its section: ' + (mCrafted && mCrafted.entry.id));
 
@@ -433,6 +443,28 @@ async function main() {
   got = S(B(['Leveling', 'End-game'], ['end game', 'leveling'], []));
   assert(JSON.stringify(got) === JSON.stringify(['Leveling|0|1|null|A|name', 'End-game|1|0|null||name']),
     'punctuation inside a name folds to a space ("End-game" = "end game"): ' + JSON.stringify(got));
+  // PoB loadout tags ("{1}", "{1,2}"): sets pair by id, whatever their names or order
+  got = S(B(['Endgame gear {3}', 'Leveling gear {1,2}'], ['Late {3}', 'Early {1}', 'Mid {2}'], ['Act 1-5 {1}', 'Maps {2}', 'Pinnacle {3}'], [0, 0, 2]));
+  assert(JSON.stringify(got) === JSON.stringify(['Leveling gear|1|1|0||tag', 'Leveling gear|1|2|1||tag', 'Endgame gear|0|0|2|A|tag']),
+    'loadout tags pair sets by id (comma lists give several stages), tags left out of titles: ' + JSON.stringify(got));
+  // an empty skill set is written self-closing: it must not swallow the next set
+  const scXml = '<PathOfBuilding><Build className="Witch" mainSocketGroup="1"/><Skills activeSkillSet="3">' +
+    '<SkillSet id="1" title="Leveling"><Skill enabled="true"><Gem nameSpec="Arc" gemId="x/arc" enabled="true"/></Skill></SkillSet>' +
+    '<SkillSet id="2" title="Budget"/>' +
+    '<SkillSet id="3" title="Endgame"><Skill enabled="true"><Gem nameSpec="Fireball" gemId="x/fb" enabled="true"/></Skill></SkillSet>' +
+    '</Skills></PathOfBuilding>';
+  const sc = PoB.parseBuild(scXml);
+  assert(sc.skillSets.length === 3 && sc.skillSets[1].gems.length === 0 && sc.activeSkillSet === 2 &&
+    sc.mainSkill[0] === 'Fireball', 'self-closing <SkillSet/> is an empty set, the next set stays its own: ' +
+    JSON.stringify(sc.skillSets.map(s => [s.title, s.gems.map(g => g.name || g)])));
+  // a gem-less group (a label) is written self-closing: it counts for mainSocketGroup, swallows nothing
+  const glXml = '<PathOfBuilding><Build className="Witch" mainSocketGroup="3"/><Skills>' +
+    '<Skill enabled="false" label="-- notes --"/>' +
+    '<Skill enabled="true"><Gem nameSpec="Arc" gemId="x/arc" enabled="true"/></Skill>' +
+    '<Skill enabled="true"><Gem nameSpec="Fireball" gemId="x/fb" enabled="true"/></Skill></Skills></PathOfBuilding>';
+  const gl = PoB.parseBuild(glXml);
+  assert(gl.gemGroups.length === 2 && gl.mainSkill[0] === 'Fireball', 'self-closing <Skill/> label group: ' +
+    JSON.stringify([gl.gemGroups.length, gl.mainSkill]));
   const realStages = PoB.buildStages(build);
   assert(realStages.length === 2 && realStages[0].title === 'Budget' && realStages[0].active &&
     realStages[1].skillSet === 1, 'parsed build: 2 gear sets + 2 skill sets pair by position: ' + JSON.stringify(realStages));

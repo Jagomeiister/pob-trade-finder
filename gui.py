@@ -109,7 +109,8 @@ def guide_url_check(url):
     if any(urllib.parse.unquote(seg) in (".", "..") for seg in p.path.split("/")):
         return None, nope  # a browser resolves /forum/../trade to /trade: no dot segments at all
     need = GUIDE_PATHS.get(host)
-    if need and not (p.path or "/").startswith(need):
+    # "/forum/" or anything under it, and "/forum" itself (where /forum/ redirects)
+    if need and not ((p.path or "/").startswith(need) or (p.path or "/") == need.rstrip("/")):
         return None, "On %s only forum guides (%s…) open here." % (host, need)
     return url, None
 
@@ -167,6 +168,68 @@ def _debug_log(msg):
             f.write("%s %s\n" % (time.strftime("%m-%d %H:%M:%S"), msg))
     except Exception:
         pass
+
+
+# ---- reworded trade stats --------------------------------------------------------------------
+# GGG rewords stat texts between leagues (3.30: "#% increased Rarity of Items found" became
+# "+#% to Item Rarity") with the same stat id; items saved in PoB before keep the old text. The
+# old texts live in data/stats.js as window.POE_STATS_LEGACY = {old text: [stat ids]}, which
+# js/matcher.js indexes after every current text. Shared by Api.refresh_data and
+# tools/make_statslegacy.py, so neither refresh loses or misses a rewording.
+STATS_LEGACY_MARK = "window.POE_STATS_LEGACY = "
+
+
+def stat_texts(stats):
+    """{stat id: text} for every stat entry of a trade /data/stats answer"""
+    out = {}
+    for sec in (stats or {}).get("result", []):
+        for e in sec.get("entries", []):
+            if e.get("id") and e.get("text"):
+                out[e["id"]] = e["text"]
+    return out
+
+
+def stats_legacy_merge(old_stats, new_stats, legacy):
+    """(legacy, added): the old-text table brought up to new_stats. Keeps what it had (ids still in
+    the game, texts no current stat of that section uses), adds every text old_stats had for a stat
+    id whose text new_stats changed. old_stats None: nothing added."""
+    new = stat_texts(new_stats)
+    # (section, text) pairs in use now: an old text another section still uses (a pseudo stat keeps
+    # "#% increased Rarity of Items found") is still needed for this section
+    current = {(sid.split(".")[0], t) for sid, t in new.items()}
+    out = {}
+    for t, ids in (legacy or {}).items():
+        keep = [i for i in ([ids] if isinstance(ids, str) else ids or [])
+                if i in new and (i.split(".")[0], t) not in current]
+        if keep:
+            out[t] = keep
+    added = 0
+    for sid, text in stat_texts(old_stats).items() if old_stats else []:
+        if sid in new and new[sid] != text and (sid.split(".")[0], text) not in current:
+            ids = out.setdefault(text, [])
+            if sid not in ids:
+                ids.append(sid)
+                added += 1
+    return {t: sorted(ids) for t, ids in sorted(out.items())}, added
+
+
+def stats_js_text(stats, legacy):
+    """data/stats.js: the stats, then the old-text table"""
+    return ("window.POE_STATS = " + json.dumps(stats, separators=(",", ":")) + ";\n" +
+            STATS_LEGACY_MARK + json.dumps(legacy or {}, ensure_ascii=False, separators=(",", ":")) + ";\n")
+
+
+def read_stats_legacy(stats_js_path):
+    """the old-text table in a data/stats.js ({} when it has none or can't be read)"""
+    try:
+        with open(stats_js_path, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith(STATS_LEGACY_MARK):
+                    v = json.loads(line[len(STATS_LEGACY_MARK):].strip().rstrip(";"))
+                    return v if isinstance(v, dict) else {}
+    except (OSError, ValueError):
+        pass
+    return {}
 
 
 class Api:
@@ -1578,12 +1641,20 @@ class Api:
             leagues = self._http(TRADE_BASE + "/data/leagues")
             if "result" not in stats or "result" not in leagues:
                 return {"ok": False, "error": "unexpected API response"}
+            # keep the old wording of stats GGG rewords, and add this refresh's rewordings
+            stats_js = os.path.join(DATA_DIR, "stats.js")
+            try:
+                with open(os.path.join(DATA_DIR, "stats.json"), encoding="utf-8") as f:
+                    old_stats = json.load(f)
+            except (OSError, ValueError):
+                old_stats = None
+            legacy, _added = stats_legacy_merge(old_stats, stats, read_stats_legacy(stats_js))
             with open(os.path.join(DATA_DIR, "stats.json"), "w", encoding="utf-8") as f:
                 json.dump(stats, f)
             with open(os.path.join(DATA_DIR, "leagues.json"), "w", encoding="utf-8") as f:
                 json.dump(leagues, f)
-            with open(os.path.join(DATA_DIR, "stats.js"), "w", encoding="utf-8") as f:
-                f.write("window.POE_STATS = " + json.dumps(stats) + ";\n")
+            with open(stats_js, "w", encoding="utf-8") as f:
+                f.write(stats_js_text(stats, legacy))
             with open(os.path.join(DATA_DIR, "leagues.js"), "w", encoding="utf-8") as f:
                 f.write("window.POE_LEAGUES = " + json.dumps(leagues) + ";\n")
             n = len([l for l in leagues["result"] if l.get("realm") == "pc"])
@@ -3735,6 +3806,8 @@ class Api:
         if err:
             return {"ok": False, "error": err}
         title = self._guide_title(title, url)
+        if self._quitting:  # the app is closing: a new window would keep it alive
+            return {"ok": False, "error": "The app is closing."}
         if not self._guide_hooks_ready():
             # no WebView2 (or a pywebview whose handlers changed): the bridge could not be kept out
             # of the page, so the guide goes to the system browser instead
@@ -3748,7 +3821,13 @@ class Api:
                     win.set_title(GUIDE_WIN_PREFIX + title)
                     self._guide_raise(win)
                     return {"ok": True, "reused": True, "onTop": bool(self._guide_saved().get("top"))}
-                self._guide_win = self._guide_create(url, title)
+                win = self._guide_create(url, title)
+                if self._quitting:
+                    # the main window closed while this one was being made: guide_close found
+                    # nothing to close, so close it here, or the app would stay alive
+                    self._destroy_once(win)
+                    return {"ok": False, "error": "The app is closing."}
+                self._guide_win = win
                 return {"ok": True, "reused": False, "onTop": bool(self._guide_saved().get("top"))}
         except Exception as e:
             _debug_log("guide window: %r" % e)
@@ -3776,10 +3855,27 @@ class Api:
         _GUIDE_UIDS.add(win.uid)
         self._guide_rect = {"x": x, "y": y, "w": w, "h": h}
 
+        def normal():
+            # pywebview reports moves and sizes while minimised (-32000, -32000, a caption-sized
+            # window) and maximised too: only a normal window's place is worth remembering
+            if sys.platform != "win32":
+                return True
+            try:
+                import ctypes
+                hwnd = int(win.native.Handle.ToInt64())
+                u = ctypes.windll.user32
+                return not (u.IsIconic(hwnd) or u.IsZoomed(hwnd))
+            except Exception:
+                return True
+
         def moved(x, y):
+            if int(x) <= -30000 or int(y) <= -30000 or not normal():
+                return
             self._guide_rect.update(x=int(x), y=int(y))
 
         def resized(width, height):
+            if not normal():
+                return
             self._guide_rect.update(w=int(width), h=int(height))
 
         def closing():
@@ -3938,7 +4034,10 @@ def install_guide_hooks(cls):
         if guide_url_check(uri)[1] is None:
             return None
         args.Cancel = True
-        _guide_off_site(uri, bool(getattr(args, "IsUserInitiated", False)))
+        # a redirect leg off the allowed sites is never the user's click: an allowed page loaded by
+        # the app (load_url counts as "user initiated" in WebView2) could bounce anywhere
+        user = bool(getattr(args, "IsUserInitiated", False)) and not bool(getattr(args, "IsRedirected", False))
+        _guide_off_site(uri, user)
         return None
 
     def on_new_window_request(self, sender, args):
@@ -3946,10 +4045,13 @@ def install_guide_hooks(cls):
             return orig["on_new_window_request"](self, sender, args)
         args.Handled = True  # never a second WebView2 window, never pywebview's open-anything path
         uri = str(args.Uri)
-        if guide_url_check(uri)[1] is None:
+        user = bool(getattr(args, "IsUserInitiated", False))
+        if not user:  # window.open from page script (a timer, a pop-up): nothing at all
+            _debug_log("guide window: blocked a script's new-window request")
+        elif guide_url_check(uri)[1] is None:
             self.load_url(uri)  # another guide page: this same window
         else:
-            _guide_off_site(uri, bool(getattr(args, "IsUserInitiated", True)))
+            _guide_off_site(uri, True)
         return None
 
     def on_webview_ready(self, sender, args):

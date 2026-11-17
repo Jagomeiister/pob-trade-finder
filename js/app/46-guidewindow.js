@@ -52,7 +52,8 @@ function guideCheckUrl(url, h) {
   if (rest.split('/').some(function (s) { return /^(\.|%2e){1,2}$/i.test(s); })) return nope;
   try { if (new URL(url).hostname !== host) return nope; } catch (e) { return nope; }
   var need = (h.paths || {})[host];
-  if (need && (rest || '/').indexOf(need) !== 0) return { ok: false, error: 'On ' + host + ' only forum guides (' + need + '…) open here.' };
+  // "/forum/" or anything under it, and "/forum" itself (where /forum/ redirects)
+  if (need && (rest || '/').indexOf(need) !== 0 && (rest || '/') !== need.replace(/\/$/, '')) return { ok: false, error: 'On ' + host + ' only forum guides (' + need + '…) open here.' };
   return { ok: true, url: url };
 }
 

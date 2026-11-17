@@ -32,6 +32,7 @@ GOOD = [
     "https://poe.ninja/builds/settlers",
     "https://pobb.in/abc123",
     "https://www.pathofexile.com/forum/view-thread/3500000",
+    "https://www.pathofexile.com/forum",     # where /forum/ redirects
     "  https://mobalytics.gg/x  ",           # trimmed
     "HTTPS://Mobalytics.GG/poe",             # case of scheme / host
     "https://mobalytics.gg:443/poe",         # the https port, said out loud
@@ -57,6 +58,7 @@ BAD = [
     ("https://mobalytics.gg/\nx", "newline inside"),
     ("https://www.youtube.com/watch?v=x", "video site"),
     ("https://www.pathofexile.com/trade/search/Standard", "pathofexile.com outside the forum"),
+    ("https://www.pathofexile.com/forumx", "a path that only starts like the forum"),
     ("https://www.pathofexile.com/forum/../trade/search", "dot segments out of the forum"),
     ("https://www.pathofexile.com/forum/%2e%2e/trade", "encoded dot segments"),
     ("https://mobalytics.gg/" + "a" * 3000, "too long"),
@@ -200,6 +202,7 @@ try:
     # the user moves / resizes it, then closes it
     w1.events.moved.fire(300, 200)
     w1.events.resized.fire(900, 700)
+    w1.events.moved.fire(-32000, -32000)  # minimised: Windows parks it off screen
     w1.destroy()
     saved = json.loads(api._storage[gui.GUIDE_WIN_KEY])
     check("closing remembers its place and size", (saved.get("x"), saved.get("y"), saved.get("w"), saved.get("h"))
@@ -244,6 +247,25 @@ try:
 
     # no WebView2 / hooks unavailable: the system browser, no window
     n = len(fake.made)
+    api._quitting = True
+    r = api.guide_open(URL1, "x")
+    check("app closing: no new guide window", r["ok"] is False and len(fake.made) == n, r)
+    api._quitting = False
+    api.guide_close()
+    real_create = api._guide_create
+
+    def create_then_quit(url, title):
+        w = real_create(url, title)
+        api._quitting = True  # the main window closed while this one was being made
+        return w
+    api._guide_create = create_then_quit
+    r = api.guide_open(URL1, "x")
+    made = fake.made[-1]
+    check("app closed while the window was being made: closed again, not kept", r["ok"] is False and
+          made.destroys == 1 and api._guide_win is None, (r, made.destroys))
+    api._guide_create = real_create
+    api._quitting = False
+    n = len(fake.made)
     api._guide_hooks_ready = lambda: False
     r = api.guide_open(URL1, "x")
     check("hooks unavailable: the system browser instead, no window", r["ok"] and r.get("external") and opened == [URL1]
@@ -257,8 +279,8 @@ finally:
 
 # ---- install_guide_hooks against a stand-in EdgeChrome ----------------------------------------
 class Args:
-    def __init__(self, uri, user=True, success=True):
-        self.Uri, self.IsUserInitiated, self.IsSuccess = uri, user, success
+    def __init__(self, uri, user=True, success=True, redirected=False):
+        self.Uri, self.IsUserInitiated, self.IsSuccess, self.IsRedirected = uri, user, success, redirected
         self.Cancel = False
         self.Handled = False
 
@@ -358,6 +380,10 @@ opened[:] = []
 a = Args("https://ads.example/redirect", user=False)
 guide.on_navigation_start(s, a)
 check("guide window: a script's off-site navigation is cancelled, not opened", a.Cancel is True and not opened, opened)
+a = Args("https://anything.example/landing", user=True, redirected=True)
+guide.on_navigation_start(s, a)
+check("guide window: an allowed page redirecting off-site is cancelled, not opened (app loads count as "
+      "user-initiated in WebView2)", a.Cancel is True and not opened, opened)
 a = Args("file:///C:/Windows/System32/calc.exe", user=True)
 guide.on_navigation_start(s, a)
 check("guide window: file: navigation cancelled, never handed to the OS", a.Cancel is True and not opened, opened)
@@ -370,6 +396,10 @@ guide.calls[:] = []
 guide.on_new_window_request(s, a)
 check("guide window: new-window to an allowed page opens in the same window", a.Handled and
       guide.loaded_urls == ["https://mobalytics.gg/other"] and "newwin" not in guide.calls, guide.calls)
+a = Args("https://maxroll.gg/r?to=https://anything.example", user=False)
+guide.on_new_window_request(s, a)
+check("guide window: a script's window.open does nothing, even to an allowed site", a.Handled and not opened and
+      guide.loaded_urls == ["https://mobalytics.gg/other"], (opened, guide.loaded_urls))
 a = Args("ms-settings:privacy", user=True)
 guide.on_new_window_request(s, a)
 check("guide window: new-window to another scheme is dropped", a.Handled and not opened and

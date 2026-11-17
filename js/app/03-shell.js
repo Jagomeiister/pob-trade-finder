@@ -28,6 +28,7 @@ async function onDecode() {
     var xml = await PoB.decodePobCode(code);
     if (xml.indexOf('<PathOfBuilding') === -1) throw new Error('Decoded data is not a PoB build.');
     build = PoB.parseBuild(xml);
+    build.key = codeKey(input); // the code it came from (the paste box may hold other text later)
     if (typeof sheetRememberBuild === 'function') sheetRememberBuild(build); // cheat sheet gems (24-cheatsheets.js)
     status.textContent = '';
     saveSettings();
@@ -301,23 +302,29 @@ function stageMemory() {
   catch (e) { return {}; }
 }
 function stageRemember(b, i) {
-  var m = stageMemory(), key = buildKey(), st = stageList(b)[i];
+  var m = stageMemory(), key = b.key || buildKey(), list = stageList(b), st = list[i];
   if (!st || st.active) delete m[key];
-  else m[key] = { i: i, t: st.title, ts: Date.now() };
+  else m[key] = { i: i, t: st.title, n: list.length, ts: Date.now() };
   Object.keys(m).sort(function (x, y) { return (m[y].ts || 0) - (m[x].ts || 0); })
     .slice(STAGE_MAX).forEach(function (k) { delete m[k]; });
   try { persist(STAGE_KEY, JSON.stringify(m)); } catch (e) { /* storage full */ }
 }
-// on load: the stage picked last time for this build, found by its title (else its place)
+// on load: the stage picked last time for this build, found by its title (else its place, when
+// the build still has as many stages); without one, PoB's active stage. A stage is applied when
+// what PoB shows is not exactly it (guide PoBs often leave gear, gems and tree on different sets)
 function stageRestore() {
   var st = stageList(build);
   if (st.length < 2) return;
-  var mem = stageMemory()[buildKey()];
-  if (!mem) return;
-  var i = st[mem.i] && st[mem.i].title === mem.t ? mem.i
-    : st.findIndex(function (s) { return s.title === mem.t; });
-  if (i === -1 && st[mem.i]) i = mem.i;
-  if (i !== -1 && i !== stageCurrent(build)) applyStage(i, { restore: true });
+  var mem = stageMemory()[build.key || buildKey()], i = -1;
+  if (mem) {
+    i = st[mem.i] && st[mem.i].title === mem.t ? mem.i : st.findIndex(function (s) { return s.title === mem.t; });
+    if (i === -1 && st[mem.i] && mem.n === st.length) i = mem.i;
+  }
+  if (i === -1) i = stagePobIndex(st);
+  var p = stageParts(build, st[i]);
+  var mixed = p.item !== (build.activeSetIndex || 0) || p.skill !== (build.activeSkillSet || 0) ||
+    p.tree !== (build.treeActive || 0);
+  if (i !== stageCurrent(build) || mixed) applyStage(i, { restore: true });
 }
 
 // ---- settings drawer: slides in from the right, focus stays inside until closed ----

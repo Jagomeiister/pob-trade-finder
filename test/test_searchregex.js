@@ -77,6 +77,18 @@ check('plain quality skips typed quality', !hits(mapSearchText({ quality: { plai
 check('map price note', hits(mapSearchText({ priceOn: true, priceMin: 5, priceMax: 20 }), MAP + '\nNote: ~price 15 chaos') &&
   !hits(mapSearchText({ priceOn: true, priceMin: 5, priceMax: 20 }), MAP + '\nNote: ~price 25 chaos'));
 
+// map mod tokens (data/mapmods.js) never hit a line every 3.30 map shows: avoiding a mod must not
+// drop every map with More Threads (3.30 added "% more Threads" to every T17 mod)
+vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'data', 'mapmods.js'), 'utf8'));
+const MAP330 = ['Item Class: Maps', 'Rarity: Rare', 'Map Tier: 17', 'Atlas Drops: +45% (augmented)', 'More Threads: +12% (augmented)',
+  'Quality (Threads): +20% (augmented)', 'Item Quantity: +20% (augmented)', 'Item Rarity: +45% (augmented)',
+  "This Map's Modifiers to Atlas Drops also apply to Item Rarity", 'More Maps: +40% (augmented)', 'More Currency: +12% (augmented)',
+  'Monster Pack Size: +30% (augmented)', 'Quality (Pack Size): +20% (augmented)', 'Corrupted', 'Unidentified'];
+const hitsCommon = (window.POE_MAP_MODS || []).filter(m => MAP330.some(l => new RegExp(m.token, 'i').test(l)));
+check('map mod tokens miss every line all 3.30 maps carry', window.POE_MAP_MODS.length > 40 && !hitsCommon.length,
+  hitsCommon.map(m => m.token + ' <- ' + m.text));
+check('no map mod text carries the Threads or Atlas Drops totals', !window.POE_MAP_MODS.some(m => /Threads found|Atlas Drops/.test(m.text)));
+
 // old presets (one flat state) load into the tabs
 const old = migrateSearchState({ tab: 'custom', picks: { x: 'want' }, quant: '70', custom: 'a\nb', customMode: 'all',
   preset: { flasks: { bleed: true } }, presetAll: { flasks: true } });

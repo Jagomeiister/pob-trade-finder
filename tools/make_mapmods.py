@@ -19,9 +19,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP_TAGS = {"low_tier_map", "mid_tier_map", "top_tier_map", "uber_tier_map"}
 DROP = re.compile(r"increased (quantity|rarity) of items found in this area|increased \[?(atlasdropscaling\|)?atlas drops\]? in this area|"
                   r"monster pack size|"
-                  r"increased pack size|more maps|more currency|more scarabs|chance for .* to drop", re.I)
+                  r"increased pack size|more maps|more currency|more scarabs|"
+                  r"more \[?(thread\|)?threads\]? found in area|chance for .* to drop", re.I)  # 3.30: every T17 mod adds "% more Threads"
 # text on every map item: a token must not match these (it would select every map)
 COMMON = ("map tier: item quantity: item rarity: atlas drops: monster pack size: more currency: more maps: more scarabs: "
+          "more threads: quality (threads): this map's modifiers to atlas drops also apply to item rarity "
           "quality: corrupted unidentified travel to this map by using it in a personal map device. "
           "maps can only be used once. rarity: normal magic rare unique map item class: maps area level "
           "delirium blighted uber elder shaper conqueror influenced originator memory nightmare")

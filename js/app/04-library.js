@@ -23,16 +23,21 @@ function libIndexOf(code) {
   var c = String(code || '').trim();
   return c ? loadBuildLib().findIndex(function (b) { return String(b.code || '').trim() === c; }) : -1;
 }
+// PoB's own main skill: not the one of the stage on show (the Stage switch changes build.mainSkill)
+function libMainSkill() {
+  var ss = build && build.skillSets && build.skillSets[build.activeSkillSet || 0];
+  return ((ss || build || {}).mainSkill || [])[0] || '';
+}
 // a name for the loaded build: "Main Skill · Ascendancy"
 function libDefaultName() {
   if (!build) return 'Build';
-  var skill = (build.mainSkill || [])[0] || '';
+  var skill = libMainSkill();
   var who = build.ascendClass || build.className || 'Build';
   return skill ? skill + ' · ' + who : who;
 }
 function libMeta() {
   return { cls: build.className || '', asc: build.ascendClass || '', level: build.level || null,
-           skill: (build.mainSkill || [])[0] || '', items: Object.keys(build.items || {}).length };
+           skill: libMainSkill(), items: Object.keys(build.items || {}).length };
 }
 
 // ☆ Save on the build card (and the offer after an import): asks for a name; the same build saved

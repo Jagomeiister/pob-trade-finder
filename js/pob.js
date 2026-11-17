@@ -233,10 +233,12 @@
   function findSkillSets(skillsAttrs, scope) {
     var activeId = attr(skillsAttrs, 'activeSkillSet') || '1';
     var sets = [], active = 0;
-    var re = /<SkillSet\b([^>]*)>([\s\S]*?)<\/SkillSet>/g, m;
+    // lazy attributes: PoB writes an empty set self-closing (<SkillSet id="2" title="Budget"/>),
+    // which must not swallow the next set
+    var re = /<SkillSet\b([^>]*?)(?:\/>|>([\s\S]*?)<\/SkillSet>)/g, m;
     while ((m = re.exec(scope))) {
       if (attr(m[1], 'id') === activeId) active = sets.length;
-      sets.push({ id: attr(m[1], 'id'), title: attr(m[1], 'title') || '', body: m[2] });
+      sets.push({ id: attr(m[1], 'id'), title: attr(m[1], 'title') || '', body: m[2] || '' });
     }
     if (!sets.length) sets.push({ id: '1', title: '', body: scope });
     return { sets: sets, active: active };
@@ -247,9 +249,12 @@
    * set (disabled and item-granted ones count); 0 = none. */
   function parseSkillScope(scope, mainIdx) {
     var res = { gemGroups: [], gems: [], mainSkill: [] };
-    var skillRe = /<Skill\b([^>]*)>([\s\S]*?)<\/Skill>/g, sk, n = 0;
+    // a gem-less group (a "-- notes --" label) is written self-closing: it counts, but must not
+    // swallow the next group
+    var skillRe = /<Skill\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Skill>)/g, sk, n = 0;
     while ((sk = skillRe.exec(scope))) {
       n++;
+      sk[2] = sk[2] || '';
       var gemRe = /<Gem\b([^>]*)\/?>/g, gm;
       if (n === mainIdx) {
         while ((gm = gemRe.exec(sk[2]))) {
@@ -454,6 +459,17 @@
     return k === 'default' ? '' : k;
   }
   function wordsIn(a, b) { return (' ' + a + ' ').indexOf(' ' + b + ' ') !== -1; }
+  // PoB's loadout tags: "Endgame gear {3}", "Leveling {1,2}" pair sets by id (Build.lua SyncLoadouts)
+  var STAGE_TAG = /\{([\w,]+)\}/;
+  function stageTagIds(title) {
+    var m = String(title || '').match(STAGE_TAG);
+    return m ? m[1].split(',').filter(Boolean) : [];
+  }
+  function stageUntag(title) { return String(title || '').replace(STAGE_TAG, '').replace(/\s+/g, ' ').trim(); }
+  function stageEntry(title, untitled) {
+    var t = stageUntag(title);
+    return { title: t, key: stageKey(t, untitled), ids: stageTagIds(title) };
+  }
 
   /* A build's stages: [{ title, itemSet, skillSet, treeSpec, active, match }] where each of the
    * three is an index into build.itemSets / skillSets / treeSpecs, or null when that list has
@@ -470,17 +486,46 @@
     b = b || {};
     var kinds = [
       { k: 'itemSet', active: b.activeSetIndex || 0,
-        list: (b.itemSets || []).map(function (s) { return { title: s.title || '', key: stageKey(s.title, s.untitled) }; }) },
+        list: (b.itemSets || []).map(function (s) { return stageEntry(s.title, s.untitled); }) },
       { k: 'skillSet', active: b.activeSkillSet || 0,
-        list: (b.skillSets || []).map(function (s) { return { title: s.title || '', key: stageKey(s.title, s.untitled) }; }) },
+        list: (b.skillSets || []).map(function (s) { return stageEntry(s.title, s.untitled); }) },
       { k: 'treeSpec', active: b.treeActive || 0,
-        list: (b.treeSpecs || []).map(function (s) { return { title: s.title || '', key: stageKey(s.title, !s.title) }; }) }
+        list: (b.treeSpecs || []).map(function (s) { return stageEntry(s.title, !s.title); }) }
     ];
     function blank(match) { return { title: '', itemSet: null, skillSet: null, treeSpec: null, active: false, match: match, keys: [], titles: [] }; }
     var multi = kinds.filter(function (x) { return x.list.length > 1; });
     var stages = [];
+    var tagged = multi.some(function (x) { return x.list.some(function (e) { return e.ids.length; }); });
     if (!multi.length) {
       stages.push(blank('single'));
+    } else if (tagged) {
+      // loadout tags: one stage per id, each list's entry carrying that id; untagged entries join
+      // a stage of the same name, else make their own
+      var ids = [];
+      multi.forEach(function (x) { x.list.forEach(function (e) { e.ids.forEach(function (id) { if (ids.indexOf(id) === -1) ids.push(id); }); }); });
+      ids.sort(function (a, c) { return (Number(a) - Number(c)) || (a < c ? -1 : a > c ? 1 : 0); });
+      ids.forEach(function (id) {
+        var st = blank('tag');
+        multi.forEach(function (x) {
+          for (var j = 0; j < x.list.length; j++) {
+            if (x.list[j].ids.indexOf(id) !== -1) { st[x.k] = j; st.keys.push(x.list[j].key); st.titles.push(x.list[j]); return; }
+          }
+        });
+        stages.push(st);
+      });
+      multi.forEach(function (x) {
+        x.list.forEach(function (e, j) {
+          if (e.ids.length) return;
+          var st = null;
+          for (var si = 0; si < stages.length && !st; si++) {
+            if (stages[si][x.k] === null && e.key && stages[si].keys.indexOf(e.key) !== -1) st = stages[si];
+          }
+          if (!st) { st = blank('name'); stages.push(st); }
+          st[x.k] = j;
+          st.keys.push(e.key);
+          st.titles.push(e);
+        });
+      });
     } else {
       var base = multi[0];
       base.list.forEach(function (e, i) {

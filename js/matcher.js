@@ -21,6 +21,16 @@
     return text.toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
+  // the rolled values only: a number in the line whose place in the stat template is a '#'.
+  // 3.30 texts carry literal numbers ("Allies within 5 metres gain #% ..."): the 5 is not a roll.
+  // When the line and template don't line up number for number (a matched part of a multi-line
+  // stat, an older wording), every number is kept, as before.
+  function templateValues(values, template) {
+    var slots = String(template || '').match(/#|-?\d+(?:\.\d+)?/g) || [];
+    if (slots.length !== values.length || slots.indexOf('#') === -1) return values.slice();
+    return values.filter(function (v, i) { return slots[i] === '#'; });
+  }
+
   function extractNumbers(line) {
     var nums = [];
     var re = /-?\d+(\.\d+)?/g, m;
@@ -39,17 +49,25 @@
     var index = buildCurrentIndex(statsJson);
     Object.keys(legacy || {}).forEach(function (text) {
       var nk = normalize(text), ek = exactKey(text);
+      // a multi-line old text: each line and the leading lines joined, as for current texts
+      var parts = [];
+      if (text.indexOf('\n') !== -1) {
+        var lines = text.split('\n');
+        lines.forEach(function (l) { parts.push(normalize(l)); });
+        for (var k = 2; k < lines.length; k++) parts.push(normalize(lines.slice(0, k).join(' ')));
+      }
       [].concat(legacy[text]).forEach(function (id) {
         var entry = index.byId[id];
         if (!entry) return;
         var secId = id.split('.')[0];
-        [[index.norm, nk], [index.exact, ek]].forEach(function (p, i) {
-          var map = p[0], k = p[1];
-          if (i && ek === nk) return; // exact only when the text has literal digits
-          if (map[k] && map[k][secId]) return;
-          if (!map[k]) map[k] = {};
-          map[k][secId] = [entry];
-        });
+        function add(map, key) {
+          if (!key || (map[key] && map[key][secId])) return; // a current text always wins
+          if (!map[key]) map[key] = {};
+          map[key][secId] = [entry];
+        }
+        add(index.norm, nk);
+        if (ek !== nk) add(index.exact, ek); // exact only when the text has literal digits
+        parts.forEach(function (p) { add(index.norm, p); });
       });
     });
     return index;
@@ -212,7 +230,7 @@
     }
     if (!picked) return null;
 
-    var vals = values.slice();
+    var vals = templateValues(values, picked.entry.text);
     if (flipped) vals = vals.map(function (v) { return -v; });
     var avg = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : null;
 
