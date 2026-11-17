@@ -2090,7 +2090,7 @@ def scenario_search(s, tag):
     r = s.run(S22_SEARCH, timeout=60)
     check(tag + " Search text view visible with the map mods", r["visible"] and r["mods"] > 60, (r["visible"], r["mods"]))
     t = r["tokens"]
-    want = '"!%s|%s" "%s" "as drops:.*([6-9]\d|\d{3})%%"' % (t["regen"], t["vuln"], t["pen"])
+    want = r'"!%s|%s" "%s" "as drops:.*([6-9]\d|\d{3})%%"' % (t["regen"], t["vuln"], t["pen"])
     check(tag + " avoid + want + quantity build one search string", r["text"] == want, (r["text"], want))
     check(tag + " length shown against the 250 limit", r["count"] == "%d / 250" % len(want), r["count"])
     check(tag + " filter narrows the list", 0 < r["filtered"] < 15, r["filtered"])

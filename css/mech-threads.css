@@ -1,0 +1,23 @@
+/* css/mech-threads.css — the Threads planner (js/app/47-threads.js). Colours come from
+   css/tokens.css only. The steppers reuse .shub-step / .shub-step-n (css/mech-scarabhub.css). */
+
+.thr { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.thr-lead { margin: 0; color: var(--text-2); font-size: var(--fs-sm); }
+.thr-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: var(--fs-sm); }
+.thr-free, .thr-mph { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.thr-num { width: 72px; }
+.thr-list { display: flex; flex-direction: column; gap: 2px; }
+.thr-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 4px 10px;
+  padding: 3px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--s1); }
+.thr-row.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--s1)); }
+.thr-price { color: var(--text-2); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; min-width: 4em; text-align: right; }
+.thr-frayed { grid-template-columns: minmax(0, 1fr) auto auto; border-style: dashed; }
+.thr-frayed-note { color: var(--text-3); font-size: var(--fs-sm); }
+.thr-sum { display: flex; flex-direction: column; gap: 4px; }
+.thr-sum-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.thr-k { color: var(--text-2); font-size: var(--fs-sm); }
+.thr-extra { color: var(--text-2); font-size: var(--fs-sm); }
+.thr-cost, .thr-cost-hour { font-variant-numeric: tabular-nums; }
+.thr-warn { padding: 4px 8px; border-left: 3px solid var(--warn); background: var(--s2); color: var(--text); font-size: var(--fs-sm); }
+.thr-notes { margin: 0; padding-left: 18px; color: var(--text-2); font-size: var(--fs-sm); }
+.thr.is-overlay .thr-row { padding: 2px 6px; }
