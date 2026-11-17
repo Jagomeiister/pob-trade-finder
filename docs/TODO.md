@@ -141,8 +141,10 @@ Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAG
       (build guide links in an app-owned window, e2e 70): merged on `sheets-round2`, in v2.5.25.
 - [x] **Released v2.5.25** (16 Nov, main 5813210). Guide window still needs hand checks in a real
       window (Mobalytics Cloudflare page, off-site links to the browser, Keep on top without focus).
-      The pre-release review of v2.5.25's code did not run (workflow denied by the permission
-      classifier): review the guide window's pywebview hooks and the Stage switch next.
+      Reviewed after release (3 review agents, 17 Nov): fixes in 0d3bc77 (Stage switch parsing,
+      loadout tags, guide window script/redirect tabs, T17 map-mod token "ads", matcher roll
+      values, old-text table kept by Refresh trade data). **Ship as v2.5.26** on the user's word.
+- [x] **Threads planner** (17 Nov, 9968de9): on the Threads / Atlas / Scarabs sheets + in game.
 - [ ] **Pre-release review** of the round-2 code (`review-round2` workflow, run `wf_08ae55ee-250`)
       was NOT finished before v2.5.24 went out: finish it and ship fixes in v2.5.25.
 - [ ] Syndicate planner: still the 3.29 reward table (`make_syndicate.py` builds without the 3.30
