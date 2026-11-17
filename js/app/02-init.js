@@ -5,8 +5,9 @@
 
 // ---- init ----------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
-  statIndex = Matcher.buildStatIndex(window.POE_STATS, window.POE_STATS_LEGACY);
-  leagues = (window.POE_LEAGUES.result || []).filter(function (l) { return l.realm === 'pc'; });
+  // the in-game windows that never match item mods don't load stats.js (index.html)
+  statIndex = Matcher.buildStatIndex(window.POE_STATS || { result: [] }, window.POE_STATS_LEGACY);
+  leagues = ((window.POE_LEAGUES || {}).result || []).filter(function (l) { return l.realm === 'pc'; });
 
   var saved = loadSettings();
   var sel = document.getElementById('league');

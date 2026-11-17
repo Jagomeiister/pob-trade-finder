@@ -457,9 +457,26 @@
   var APP = ['01-state', '02-init', '03-shell', '04-library', '05-craft', '06-jewels', '07-history-gems',
              '08-cards', '09-query', '10-character', '11-market', '12-cost', '13-builds-tracking',
              '14-basket-live', '15-price-check', '16-overlay', '17-stash', '18-upgrade', '19-trades', '20-unique-jewels', '21-search-text', '22-divcards', '23-tree', '24-cheatsheets', '25-trade-ledger', '26-dust', '27-anoints', '28-atlas', '29-lootfilter', '30-patchnotes', '31-regex', '32-filter-editor', '33-guides', '34-syndicate', '40-mechtools', '41-scarabhub', '42-priceboards', '43-pickers', '45-beastrecipes', '46-guidewindow', '47-threads'];
-  ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js', 'data/filtericons.js',
-   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/watcherseye.js', 'data/forbidden.js', 'data/mapmods.js', 'data/treeview.js', 'data/cheatsheets.js', 'data/guides.js', 'data/gemcolours.js', 'data/dust.js', 'data/atlasview.js', 'data/divweights.js', 'data/patchnotes.js', 'data/syndicate.js', 'data/sample.js',
-   'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/filter.js', 'js/filter-edit.js'].concat(APP.map(function (n) {
+  var DATA = ['data/stats.js', 'data/leagues.js', 'data/ranges.js', 'data/baseicons.js', 'data/filtericons.js',
+   'data/eldritch.js', 'data/uniquenames.js', 'data/uniqueranges.js', 'data/gemtypes.js', 'data/basetypes.js', 'data/watcherseye.js', 'data/forbidden.js', 'data/mapmods.js', 'data/treeview.js', 'data/cheatsheets.js', 'data/guides.js', 'data/gemcolours.js', 'data/dust.js', 'data/atlasview.js', 'data/divweights.js', 'data/patchnotes.js', 'data/syndicate.js', 'data/sample.js'];
+  // The in-game windows load the same program but only the data their code reads (every code file
+  // still loads: they share their names). A window skips what it never uses; data a new file
+  // brings loads everywhere until it is listed here. Every reader of these globals copes with
+  // them missing (window.POE_X || {}), and e2e runs each window. stats.js alone is 2.1 MB.
+  var q = location.search, has = function (k) { return new RegExp('[?&]' + k + '=1(&|$)').test(q); };
+  var ITEM_VIEWS = ['data/mapmods.js', 'data/gemcolours.js', 'data/atlasview.js', 'data/patchnotes.js', 'data/sample.js'];
+  var SKIP = has('overlay') ? ITEM_VIEWS.concat(['data/treeview.js', 'data/cheatsheets.js', 'data/guides.js', 'data/syndicate.js'])
+    // trade request windows (19-trades.js): no item data at all
+    : (has('ovicon') || has('cards') || has('trades')) ? DATA.filter(function (d) {
+        return ['data/leagues.js', 'data/uniquenames.js', 'data/gemtypes.js', 'data/basetypes.js'].indexOf(d) === -1; })
+    // the hint pill: which sheet fits the area (cheat sheets only)
+    : has('sheethint') ? DATA.filter(function (d) { return ['data/leagues.js', 'data/cheatsheets.js'].indexOf(d) === -1; })
+    // the in-game sheet: sheets, guides, tools (the Blight anoint helper reads the tree), no item matching
+    : has('sheet') ? ITEM_VIEWS.concat(['data/stats.js', 'data/ranges.js', 'data/uniqueranges.js', 'data/eldritch.js',
+        'data/watcherseye.js', 'data/forbidden.js', 'data/dust.js', 'data/divweights.js'])
+    : [];
+  DATA.filter(function (d) { return SKIP.indexOf(d) === -1; }).concat([
+   'js/ui.js', 'js/pob.js', 'js/matcher.js', 'js/craft.js', 'js/jewels.js', 'js/filter.js', 'js/filter-edit.js']).concat(APP.map(function (n) {
     return 'js/app/' + n + '.js';
   })).forEach(function (src) {
     document.write('<scr' + 'ipt src="' + src + '?v=' + v + '"></scr' + 'ipt>');

@@ -635,7 +635,8 @@ function sheetReady(hydrate) { // markGui() in the sheet / hint overlay windows 
   sheetHydrate = hydrate;
   Promise.resolve(hydrate()).then(sheetStatusLoop, sheetStatusLoop);
   sheetSync(sheetRender);
-  if (typeof guideSync === 'function') guideSync(sheetRender);
+  // the hint pill shows no guides (and doesn't load them): don't fetch the server's copy either
+  if (!SHEET_HINT && typeof guideSync === 'function') guideSync(sheetRender);
 }
 function sheetStatusLoop() {
   // (__sheetStatusReady: the first labels are in, so the start-up redraw is over; tests wait for it)
