@@ -158,8 +158,8 @@ Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAG
 - [ ] Boss guides (+ Grim Fate variants, Coven Queen), Sanctum relic planner, Heist rogue gear:
       research `poe-extras` (run `wf_fc97f557-17e`) partly done; UIs not built.
 - [ ] Leveling guide upgrades (3.30 changed the campaign: re-research first).
-- [ ] Lighter overlay windows (guides payload is 822 KB, every window loads it), Ctrl+K palette,
-      one price module, Recent row in the in-game sheet picker.
+- [x] Lighter in-game windows (17 Nov, b68e1a8): 23.5 MB of data at launch down to 5.3 MB.
+- [ ] Ctrl+K palette, one price module, Recent row in the in-game sheet picker.
 - [ ] Loot filter editor: 3.30 conditions (Item Filter Information post 4013923).
 - [ ] PoB timeless data for 3.30 (two tree nodes moved): `make_timeless.py --update` when PoB updates.
 
