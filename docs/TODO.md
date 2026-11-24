@@ -143,6 +143,10 @@ to p0-charts / p0-uikit / p0-prices-atlas to continue, then merge the three into
   p0-charts: WIP 5fd555f in worktree .claude/worktrees/agent-a9ceae70466e74a88 (charts.js, charts.css,
   series tokens written, NOT yet run). Left: index.html + SHIP registration, 11-market wrappers, contrast
   SERIES check, test_charts.js, scen_73, full suite, screenshots.
+  p0-uikit: WIP 8a0dda0 in worktree .claude/worktrees/agent-a3021b67cae95c6be (ui.js APIs + 4 tab migrations,
+  goal meter, Syndicate on UI.place, shortcuts moved; node --check only). Left: components.css styles (goal bar
+  unstyled until then), contrast export check, test_ui.js, scen_74, full suite (watch 44/19/49/ledger goal/
+  filter Ctrl+Z), screenshots. Note: Ctrl+Shift+Z no longer undoes in the filter editor.
 
 ## 2b. 3.30 follow-up (after v2.5.24)
 
