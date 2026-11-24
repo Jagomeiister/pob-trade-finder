@@ -126,7 +126,16 @@ Play in **Windowed** or **Windowed Fullscreen**; true fullscreen hides every ove
 - [x] **Search text**: one map mod (done: regex `s have \d+% increased ar`) ("Monsters have #% increased Area of Effect") has no
       unique plain-text token. It could use a small regex.
 
-## 2b. In progress: 3.30 follow-up (after v2.5.24)
+## 2c. In progress: interactivity + visualization round (plan: ~/.claude/plans/snuggly-toasting-teapot.md)
+
+Phases: 0 foundations (charts.js, UI.tabs/tooltip/meter/slider/place/shortcuts, 48-prices) -> 1 build visuals
+(paper doll, cost bars, stage comparison, upgrade scatter) -> 2 charts + profit (market compare, map sessions,
+cost per slot, strategy chart) -> 3 less text (guide cards, checklists per league, Ctrl+K palette, pins) -> 4
+planners (Syndicate 3.30, temple map, clickable Atlas, Fates/Wickerman) -> 5 quick wins (listing histogram,
+upgrade meters, trade card market chip, sort/filter, board change chips) -> 6 in-game sweep + docs.
+Releases v2.6.0..v2.6.4 on the user's word. Stash-based profit skipped (OAuth off).
+
+## 2b. 3.30 follow-up (after v2.5.24)
 
 Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAGUE-DAY.md`. Branch
 `sheets-round2` (worktree `.claude/worktrees/sheets-round2`), merged to main at v2.5.24.
@@ -143,7 +152,7 @@ Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAG
       window (Mobalytics Cloudflare page, off-site links to the browser, Keep on top without focus).
       Reviewed after release (3 review agents, 17 Nov): fixes in 0d3bc77 (Stage switch parsing,
       loadout tags, guide window script/redirect tabs, T17 map-mod token "ads", matcher roll
-      values, old-text table kept by Refresh trade data). **Ship as v2.5.26** on the user's word.
+      values, old-text table kept by Refresh trade data). **Released v2.5.26** (24 Nov, main 951ee35).
 - [x] **Threads planner** (17 Nov, 9968de9): on the Threads / Atlas / Scarabs sheets + in game.
 - [ ] **Pre-release review** of the round-2 code (`review-round2` workflow, run `wf_08ae55ee-250`)
       was NOT finished before v2.5.24 went out: finish it and ship fixes in v2.5.25.
