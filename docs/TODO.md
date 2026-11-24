@@ -140,6 +140,9 @@ to commit WIP and stop: branches p0-charts (js/charts.js, chart tokens, market w
 p0-uikit (UI.tabs/tooltip/meter/slider/place/shortcuts, 4 tab migrations, e2e 74), p0-prices-atlas
 (js/app/48-prices.js, e2e 75; R1 atlas layout research -> tools/make_atlasmaps.py). Resume: SendMessage
 to p0-charts / p0-uikit / p0-prices-atlas to continue, then merge the three into sheets-round2, full suite.
+  p0-charts: WIP 5fd555f in worktree .claude/worktrees/agent-a9ceae70466e74a88 (charts.js, charts.css,
+  series tokens written, NOT yet run). Left: index.html + SHIP registration, 11-market wrappers, contrast
+  SERIES check, test_charts.js, scen_73, full suite, screenshots.
 
 ## 2b. 3.30 follow-up (after v2.5.24)
 
