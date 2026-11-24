@@ -135,6 +135,12 @@ planners (Syndicate 3.30, temple map, clickable Atlas, Fates/Wickerman) -> 5 qui
 upgrade meters, trade card market chip, sort/filter, board change chips) -> 6 in-game sweep + docs.
 Releases v2.6.0..v2.6.4 on the user's word. Stash-based profit skipped (OAuth off).
 
+PAUSED 2026-11-24 (user: "pause for tonight") during Phase 0. Three agents in their own worktrees, told
+to commit WIP and stop: branches p0-charts (js/charts.js, chart tokens, market wrappers, e2e 73),
+p0-uikit (UI.tabs/tooltip/meter/slider/place/shortcuts, 4 tab migrations, e2e 74), p0-prices-atlas
+(js/app/48-prices.js, e2e 75; R1 atlas layout research -> tools/make_atlasmaps.py). Resume: SendMessage
+to p0-charts / p0-uikit / p0-prices-atlas to continue, then merge the three into sheets-round2, full suite.
+
 ## 2b. 3.30 follow-up (after v2.5.24)
 
 Plan: `~/.claude/plans/snuggly-toasting-teapot.md`; launch-day steps: `docs/LEAGUE-DAY.md`. Branch
