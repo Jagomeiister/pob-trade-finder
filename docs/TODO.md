@@ -147,6 +147,11 @@ to p0-charts / p0-uikit / p0-prices-atlas to continue, then merge the three into
   goal meter, Syndicate on UI.place, shortcuts moved; node --check only). Left: components.css styles (goal bar
   unstyled until then), contrast export check, test_ui.js, scen_74, full suite (watch 44/19/49/ledger goal/
   filter Ctrl+Z), screenshots. Note: Ctrl+Shift+Z no longer undoes in the filter editor.
+  p0-prices-atlas: WIP 5b4dfbb in worktree .claude/worktrees/agent-a6b739ee6533144a1. R1 DONE: 3.30 Atlas
+  layout from GGG game data (repoe-fork/dat-export @85174b6, AtlasNode/WorldAreas/AtlasRegions, MIT tools):
+  164 nodes (110 maps, 23 uniques, 31 hubs), all 31 re-added maps, connected; tools/make_atlasmaps.py,
+  tools/guides/atlasmaps-3.30.json, test/test_atlasmaps.py (22/22). Open: Infested Valley is in the 3.30
+  client though the notes say removed (data follows the client; review). Price module 48-prices.js NOT started.
 
 ## 2b. 3.30 follow-up (after v2.5.24)
 
